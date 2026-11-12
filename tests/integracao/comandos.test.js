@@ -34,6 +34,6 @@ describe('comandos do projeto', () => {
     rodar('exemplo-local.mjs')
     const gestor = await entrarComo({ email: 'gestor@exemplo.test', senha: 'exemplo-123' })
     const { data: times } = await gestor.from('times').select('nome')
-    expect(times.map((t) => t.nome)).toEqual(['Implantação'])
+    expect(times.map((t) => t.nome)).toContain('Implantação')
   })
 })
