@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SelectNativo } from '@/components/ui/select-nativo'
 import { listarPessoas } from '@/data/pessoas'
-import { adicionarMembro, apagarTime, buscarTime, editarTime, removerMembro } from '@/data/times'
+import { adicionarMembro, apagarTime, buscarTime, editarTime, idsDosMembros, listarMembros, removerMembro } from '@/data/times'
 
 export default function Time() {
   const { id } = useParams()
@@ -23,6 +23,9 @@ export default function Time() {
   const [apagando, setApagando] = useState(false)
   const { perfil } = useAuth()
   const [time, setTime] = useState(undefined)
+  const [membros, setMembros] = useState(null)
+  const [pagina, setPagina] = useState(1)
+  const [noTime, setNoTime] = useState(new Set())
   const [pessoas, setPessoas] = useState([])
   const [escolhida, setEscolhida] = useState('')
   const [ocupado, setOcupado] = useState(false)
@@ -39,6 +42,21 @@ export default function Time() {
     }
   }, [id, versao])
 
+  // Pessoas do time: uma página por vez, em ordem de nome (regra "Escala" no CLAUDE.md).
+  useEffect(() => {
+    let ativo = true
+    listarMembros(id, { pagina })
+      .then((r) => {
+        if (!ativo) return
+        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
+        setMembros(r)
+      })
+      .catch(() => ativo && setMembros({ itens: [], total: 0 }))
+    return () => {
+      ativo = false
+    }
+  }, [id, pagina, versao])
+
   // Mexer no time: administrador da consultoria ou o gestor do time. O dono só olha.
   const gerencio = Boolean(time) && (perfil.papel === 'admin' || (perfil.papel === 'gestor' && time.gestor_id === perfil.id))
 
@@ -47,11 +65,16 @@ export default function Time() {
     listarPessoas({ consultoriaId: perfil.consultoria_id }).then(setPessoas).catch(() => setPessoas([]))
   }, [gerencio, perfil.consultoria_id])
 
-  const disponiveis = useMemo(() => {
-    if (!time) return []
-    const noTime = new Set([time.gestor_id, ...time.membros.map((m) => m.id)])
-    return pessoas.filter((p) => !noTime.has(p.id))
-  }, [pessoas, time])
+  // Para o "Colocar pessoa": só os ids de quem já está (não a lista inteira de membros).
+  useEffect(() => {
+    if (!gerencio) return
+    idsDosMembros(id).then(setNoTime).catch(() => setNoTime(new Set()))
+  }, [gerencio, id, versao])
+
+  const disponiveis = useMemo(
+    () => pessoas.filter((p) => p.id !== time?.gestor_id && !noTime.has(p.id)),
+    [pessoas, noTime, time?.gestor_id],
+  )
 
   async function colocar() {
     if (!escolhida) return
@@ -147,10 +170,12 @@ export default function Time() {
         </div>
       )}
 
-      {time.membros.length === 0 && <ListaVazia>Ninguém no time ainda.</ListaVazia>}
-      {time.membros.length > 0 && (
-        <Tabela rotulo="Pessoas do time" colunas={['Nome', 'Papel']} larguraMinima={560}>
-          {time.membros.map((p) => (
+      {membros === null && <GraficoCarregando texto="Carregando as pessoas do time…" className="py-8" />}
+      {membros?.total === 0 && <ListaVazia>Ninguém no time ainda.</ListaVazia>}
+      {membros?.itens.length > 0 && (
+        <Tabela rotulo="Pessoas do time" colunas={['Nome', 'Papel']} larguraMinima={560}
+          paginacao={{ pagina, total: membros.total, aoMudar: setPagina }}>
+          {membros.itens.map((p) => (
             <Linha key={p.id}>
               <Celula>
                 <div className="flex items-center gap-3">

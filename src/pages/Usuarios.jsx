@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import EditarAcesso from '@/components/usuarios/EditarAcesso'
 import NovoAcesso from '@/components/usuarios/NovoAcesso'
 import { tirarFoto, trocarFoto } from '@/data/imagens'
-import { adicionarMembro, listarTimes, removerMembro } from '@/data/times'
+import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { situacao } from '@/lib/situacao'
 
@@ -29,7 +29,8 @@ export default function Usuarios() {
   const { perfil } = useAuth()
   const ehDono = perfil.papel === 'dono'
   const [consultoriaId, setConsultoriaId] = useState(ehDono ? '' : perfil.consultoria_id)
-  const [pessoas, setPessoas] = useState(null)
+  const [resultado, setResultado] = useState(null)
+  const [pagina, setPagina] = useState(1)
   const [erro, setErro] = useState(null)
   const [times, setTimes] = useState([])
   const [novo, setNovo] = useState(false)
@@ -40,33 +41,33 @@ export default function Usuarios() {
   const [versao, setVersao] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
 
+  // Uma página por vez, filtrada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
     let ativo = true
-    listarUsuarios({ consultoriaId: consultoriaId || undefined })
-      .then((lista) => {
+    listarUsuarios({ consultoriaId: consultoriaId || undefined, ativos: filtro === 'ativos', pagina })
+      .then((r) => {
         if (!ativo) return
-        setPessoas(lista)
+        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
+        setResultado(r)
         setErro(null)
       })
       .catch(() => ativo && setErro('Não foi possível carregar as pessoas.'))
     return () => {
       ativo = false
     }
-  }, [consultoriaId, versao])
+  }, [consultoriaId, filtro, pagina, versao])
 
   // Times que aparecem no "Novo acesso": o gestor só os dele; o administrador, todos da consultoria.
   useEffect(() => {
     if (ehDono) return
-    listarTimes({ consultoriaId: perfil.consultoria_id })
+    listarOpcoesDeTimes({ consultoriaId: perfil.consultoria_id })
       .then((lista) => setTimes(perfil.papel === 'gestor' ? lista.filter((t) => t.gestor_id === perfil.id) : lista))
       .catch(() => setTimes([]))
   }, [ehDono, perfil.consultoria_id, perfil.papel, perfil.id, versao])
 
   const meusTimes = useMemo(() => new Set(times.map((t) => t.id)), [times])
-  const lista = useMemo(
-    () => (pessoas ?? []).filter((p) => (filtro === 'ativos' ? p.ativo !== false : p.ativo === false)),
-    [pessoas, filtro],
-  )
+  const lista = resultado?.itens ?? []
+  const total = resultado?.total ?? 0
 
   // Quem mexe em quem (as Edge Functions conferem de novo): dono → administradores; administrador →
   // gestores e pessoas; gestor → só o nome e os times dele das pessoas que vê. Ninguém mexe em si mesmo.
@@ -143,7 +144,7 @@ export default function Usuarios() {
   return (
     <>
       <Cabecalho titulo="Usuários"
-        descricao={pessoas ? `${lista.length} ${lista.length === 1 ? 'pessoa' : 'pessoas'}` : null}>
+        descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'pessoa' : 'pessoas'}` : null}>
         {!ehDono && (
           <Button onClick={() => setNovo(true)}>
             <Plus /> Novo acesso
@@ -151,10 +152,10 @@ export default function Usuarios() {
         )}
       </Cabecalho>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
+        {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />}
         <div role="group" aria-label="Mostrar" className="mb-4 inline-flex rounded-lg bg-muted p-1 text-sm font-semibold">
           {[['ativos', 'Ativos'], ['desativados', 'Desativados']].map(([valor, rotulo]) => (
-            <button key={valor} type="button" aria-pressed={filtro === valor} onClick={() => setFiltro(valor)}
+            <button key={valor} type="button" aria-pressed={filtro === valor} onClick={() => { setFiltro(valor); setPagina(1) }}
               className={`botao-animado rounded-md px-3 py-1 transition-[background-color,color,translate,scale] hover:-translate-y-px active:scale-[0.97] ${filtro === valor ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground'}`}>
               {rotulo}
             </button>
@@ -162,12 +163,13 @@ export default function Usuarios() {
         </div>
       </div>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
-      {!erro && pessoas === null && <GraficoCarregando texto="Carregando as pessoas…" className="py-12" />}
-      {pessoas && lista.length === 0 && (
+      {!erro && resultado === null && <GraficoCarregando texto="Carregando as pessoas…" className="py-12" />}
+      {resultado && lista.length === 0 && (
         <ListaVazia>{filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}</ListaVazia>
       )}
       {lista.length > 0 && (
-        <Tabela rotulo="Usuários" colunas={['Nome', 'Papel', 'Times', 'Situação']}>
+        <Tabela rotulo="Usuários" colunas={['Nome', 'Papel', 'Times', 'Situação']}
+          paginacao={{ pagina, total, aoMudar: setPagina }}>
           {lista.map((p) => {
             const s = situacao(p)
             const timesVisiveis = ehDono || perfil.papel === 'admin' ? p.times : p.times.filter((t) => meusTimes.has(t.id))

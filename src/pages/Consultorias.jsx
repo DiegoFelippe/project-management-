@@ -1,5 +1,5 @@
 import { Archive, ArchiveRestore, Building2, Pencil, Plus, UserPlus } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
@@ -14,20 +14,19 @@ import { tirarLogo, trocarLogo } from '@/data/imagens'
 import { urlPublica } from '@/lib/imagem'
 import { criarAcesso } from '@/data/usuarios'
 
-const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`
+const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
 
 export default function Consultorias() {
-  const [consultorias, setConsultorias] = useState(null)
+  const [resultado, setResultado] = useState(null)
+  const [pagina, setPagina] = useState(1)
   const [erro, setErro] = useState(null)
   const [nova, setNova] = useState(false)
   const [novoAdminEm, setNovoAdminEm] = useState(null)
   const [filtro, setFiltro] = useState('ativas')
   const [editando, setEditando] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
-  const lista = useMemo(
-    () => (consultorias ?? []).filter((c) => (filtro === 'ativas' ? !c.arquivada : c.arquivada)),
-    [consultorias, filtro],
-  )
+  const lista = resultado?.itens ?? []
+  const total = resultado?.total ?? 0
 
   async function gerenciar(acao, c, extra) {
     const resposta = await gerenciarConsultoria(acao, c.id, extra)
@@ -54,19 +53,21 @@ export default function Consultorias() {
   const [versao, setVersao] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
 
+  // Uma página por vez, ativas ou arquivadas, filtrada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
     let ativo = true
-    listarConsultorias()
-      .then((lista) => {
+    listarConsultorias({ arquivadas: filtro === 'arquivadas', pagina })
+      .then((r) => {
         if (!ativo) return
-        setConsultorias(lista)
+        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
+        setResultado(r)
         setErro(null)
       })
       .catch(() => ativo && setErro('Não foi possível carregar as consultorias.'))
     return () => {
       ativo = false
     }
-  }, [versao])
+  }, [filtro, pagina, versao])
 
   async function criar(dados) {
     const resposta = await criarConsultoria(dados)
@@ -91,28 +92,31 @@ export default function Consultorias() {
   return (
     <>
       <Cabecalho titulo="Consultorias"
-        descricao={consultorias ? plural(consultorias.length, 'consultoria contratou a plataforma', 'consultorias contrataram a plataforma') : null}>
+        descricao={resultado
+          ? (filtro === 'ativas' ? plural(total, 'consultoria ativa', 'consultorias ativas') : plural(total, 'consultoria arquivada', 'consultorias arquivadas'))
+          : null}>
         <Button onClick={() => setNova(true)}>
           <Plus /> Nova consultoria
         </Button>
       </Cabecalho>
       <div role="group" aria-label="Mostrar" className="mb-4 inline-flex rounded-lg bg-muted p-1 text-sm font-semibold">
         {[['ativas', 'Ativas'], ['arquivadas', 'Arquivadas']].map(([valor, rotulo]) => (
-          <button key={valor} type="button" aria-pressed={filtro === valor} onClick={() => setFiltro(valor)}
+          <button key={valor} type="button" aria-pressed={filtro === valor} onClick={() => { setFiltro(valor); setPagina(1) }}
             className={`botao-animado rounded-md px-3 py-1 transition-[background-color,color,translate,scale] hover:-translate-y-px active:scale-[0.97] ${filtro === valor ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground'}`}>
             {rotulo}
           </button>
         ))}
       </div>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
-      {!erro && consultorias === null && <GraficoCarregando texto="Carregando as consultorias…" className="py-12" />}
-      {consultorias && lista.length === 0 && (
+      {!erro && resultado === null && <GraficoCarregando texto="Carregando as consultorias…" className="py-12" />}
+      {resultado && lista.length === 0 && (
         <ListaVazia>
           {filtro === 'ativas' ? 'Nenhuma consultoria ainda. Cadastre a primeira em "Nova consultoria".' : 'Nenhuma consultoria arquivada.'}
         </ListaVazia>
       )}
       {lista.length > 0 && (
-        <Tabela rotulo="Consultorias" colunas={['Consultoria', 'Administração', 'Pessoas', 'Times']} larguraMinima={880}>
+        <Tabela rotulo="Consultorias" colunas={['Consultoria', 'Administração', 'Pessoas', 'Times']} larguraMinima={880}
+          paginacao={{ pagina, total, aoMudar: setPagina }}>
           {lista.map((c) => (
             <Linha key={c.id}>
               <Celula>
@@ -136,8 +140,8 @@ export default function Consultorias() {
                   </p>
                 ))}
               </Celula>
-              <Celula className="text-muted-foreground tabular-nums">{c.pessoas}</Celula>
-              <Celula className="text-muted-foreground tabular-nums">{c.times}</Celula>
+              <Celula className="text-muted-foreground tabular-nums">{c.pessoas.toLocaleString('pt-BR')}</Celula>
+              <Celula className="text-muted-foreground tabular-nums">{c.times.toLocaleString('pt-BR')}</Celula>
               <CelulaAcoes>
                 {!c.arquivada && (
                   <>

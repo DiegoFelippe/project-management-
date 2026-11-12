@@ -50,12 +50,40 @@ Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na 
 - **Teste de tela para cada lista:** a tabela pelo nome e o Editar abrindo com os dados da linha
   escolhida (exemplos em `src/pages/Times.test.jsx` e `src/pages/Consultorias.test.jsx`).
 
+## Escala: pensar sempre em milhares de registros
+
+Regra do Diego (2026-11-12): **o sistema é pensado como um software grande, com milhares de pessoas,
+times e consultorias.** Nada pode depender de "são poucos registros".
+
+- **Toda lista em tabela tem paginação quando passa de 15 registros**: 15 por página, com
+  "1–15 de 230" e Anterior/Próxima (`Paginacao`, dentro da `Tabela`, prop `paginacao`).
+- **A paginação vem do banco**: `range()` com `count: 'exact'` (ajudante `faixa()` em
+  `src/data/paginar.js`), devolvendo `{ itens, total }`. Nunca carregar tudo e fatiar no navegador.
+- **Filtro, busca e ordenação rodam no banco** (`eq`, `ilike`, `order`), e mudar o filtro volta para
+  a página 1. Totais e resumos saem de `count` no banco, não de somar a lista na tela.
+- **Nada de buscar a lista inteira de outra tabela só para contar ou mostrar uma amostra**: use
+  `relacao(count)` e `limit` no embutido (ex.: rostos do time = 4 primeiros + total).
+- **Sem chamada ao banco por item da lista** (N+1): embutir na mesma consulta ou mandar em lote.
+- **Toda coluna usada em filtro, ordenação ou junção tem índice** (migração junto com a tela).
+- **Seletor com muitas opções** (ex.: escolher pessoa) carrega só o necessário (id e nome); quando
+  passar de centenas, vira busca no banco.
+- **Teste de tela da paginação** em cada lista: some com 15 ou menos, aparece com mais, e Próxima
+  pede a página 2 ao banco.
+
 ## Layout
 
 - Telas internas ocupam a largura toda: nada de `max-w-*` + `mx-auto` no conteúdo da página.
   Limite só campos pequenos (um select, uma janela). Em telas largas, grades ganham colunas.
 - Visual "claro e azul" (cores em `:root` de `src/index.css`); a logo da IXC Consult é quadrada, sem
   cantos arredondados.
+
+## Dados do Diego: nunca apagar sem perguntar
+
+- **Nada que apague dados roda sem o Diego confirmar antes**, nem no Supabase local: `supabase db reset`,
+  apagar registros, limpar o Storage, recriar banco ou volume do Docker. Pedido dele (2026-11-12), depois
+  de um `db reset` ter apagado cadastros feitos à mão.
+- **Migração nova:** `npx supabase migration up` (aplica só o que falta, sem apagar nada).
+- Os testes de integração só apagam o que eles mesmos criaram (`limparTudo`); o pgTAP roda em transação.
 
 ## Segurança
 

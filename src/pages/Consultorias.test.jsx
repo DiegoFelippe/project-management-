@@ -20,11 +20,15 @@ beforeAll(() => {
 const dono = { id: 'd1', papel: 'dono', consultoria_id: null }
 
 beforeEach(() => {
-  vi.mocked(listarConsultorias).mockResolvedValue([
-    { id: 'c1', nome: 'Acme', arquivada: false, pessoas: 5, times: 2,
-      admins: [{ id: 'a1', nome: 'Rita', email: 'rita@acme.test', convite_pendente: false }] },
-    { id: 'c2', nome: 'Beta', arquivada: false, pessoas: 1, times: 0, admins: [] },
-  ])
+  vi.clearAllMocks()
+  vi.mocked(listarConsultorias).mockResolvedValue({
+    itens: [
+      { id: 'c1', nome: 'Acme', arquivada: false, pessoas: 5, times: 2,
+        admins: [{ id: 'a1', nome: 'Rita', email: 'rita@acme.test', convite_pendente: false }] },
+      { id: 'c2', nome: 'Beta', arquivada: false, pessoas: 1, times: 0, admins: [] },
+    ],
+    total: 2,
+  })
   vi.mocked(gerenciarConsultoria).mockResolvedValue({ erro: null })
 })
 
@@ -58,5 +62,14 @@ describe('Consultorias', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(trocarLogo).toHaveBeenCalledWith('c1', arquivo, undefined)
     expect(gerenciarConsultoria).not.toHaveBeenCalled()
+  })
+
+  it('pagina no banco, e Arquivadas pede as arquivadas desde a página 1', async () => {
+    vi.mocked(listarConsultorias).mockResolvedValueOnce({ itens: [], total: 0 })
+    renderizarTela(<Consultorias />, { perfil: dono })
+    await screen.findByText(/Nenhuma consultoria ainda/)
+    expect(listarConsultorias).toHaveBeenLastCalledWith({ arquivadas: false, pagina: 1 })
+    await userEvent.click(screen.getByRole('button', { name: 'Arquivadas' }))
+    expect(listarConsultorias).toHaveBeenLastCalledWith({ arquivadas: true, pagina: 1 })
   })
 })

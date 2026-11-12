@@ -1,5 +1,6 @@
 import { traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
+import { buscarPagina } from './paginar'
 
 // Para o filtro do dono nas telas Times e Usuários.
 export async function listarNomesDeConsultorias() {
@@ -8,22 +9,28 @@ export async function listarNomesDeConsultorias() {
   return data
 }
 
-// Tela Consultorias (só o dono enxerga todas).
-export async function listarConsultorias() {
-  const { data, error } = await supabase
+// Tela Consultorias (só o dono enxerga todas): uma página, ativas ou arquivadas. Pessoas e times
+// vêm contados no banco; da administração, só quem é admin.
+export async function listarConsultorias({ arquivadas = false, pagina = 1 } = {}) {
+  let consulta = supabase
     .from('consultorias')
-    .select('id, nome, logo, arquivada_em, perfis(id, nome, email, papel, convite_pendente, ativo), times(id)')
+    .select('id, nome, logo, arquivada_em, admins:perfis(id, nome, email, convite_pendente), pessoas:perfis(count), times(count)',
+      { count: 'exact' })
+    .eq('admins.papel', 'admin')
     .order('nome')
-  if (error) throw error
-  return data.map((c) => ({
+    .order('id')
+  consulta = arquivadas ? consulta.not('arquivada_em', 'is', null) : consulta.is('arquivada_em', null)
+  const resultado = await buscarPagina(consulta, pagina)
+  const itens = resultado.itens.map((c) => ({
     id: c.id,
     nome: c.nome,
     logo: c.logo,
     arquivada: Boolean(c.arquivada_em),
-    admins: c.perfis.filter((p) => p.papel === 'admin'),
-    pessoas: c.perfis.length,
-    times: c.times.length,
+    admins: c.admins ?? [],
+    pessoas: c.pessoas?.[0]?.count ?? 0,
+    times: c.times?.[0]?.count ?? 0,
   }))
+  return { ...resultado, itens }
 }
 
 export async function criarConsultoria({ nome, admin }) {

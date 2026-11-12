@@ -12,14 +12,15 @@ vi.mock('@/data/consultorias', () => ({ listarNomesDeConsultorias: vi.fn().mockR
 const gil = { id: 'g1', nome: 'Gil Gestor' }
 const TIMES = [
   { id: 't1', nome: 'Implantação', descricao: 'Clientes novos', gestor_id: 'g1', gestor: gil, consultoria_id: 'c1',
-    membros: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa' }] },
-  { id: 't2', nome: 'Suporte', descricao: null, gestor_id: 'g2', gestor: { id: 'g2', nome: 'Outro' }, consultoria_id: 'c1', membros: [] },
+    membros: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa' }], totalMembros: 1 },
+  { id: 't2', nome: 'Suporte', descricao: null, gestor_id: 'g2', gestor: { id: 'g2', nome: 'Outro' }, consultoria_id: 'c1', membros: [], totalMembros: 0 },
 ]
 const admin = { id: 'a1', papel: 'admin', consultoria_id: 'c1' }
 const linha = (nome) => screen.getByRole('row', { name: new RegExp(nome) })
 
 beforeEach(() => {
-  vi.mocked(listarTimes).mockResolvedValue(TIMES)
+  vi.clearAllMocks()
+  vi.mocked(listarTimes).mockResolvedValue({ itens: TIMES, total: 2 })
   vi.mocked(editarTime).mockResolvedValue({ erro: null })
   vi.mocked(apagarTime).mockResolvedValue({ erro: null })
 })
@@ -59,5 +60,20 @@ describe('Times', () => {
     await screen.findByRole('table', { name: 'Times' })
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Apagar' })).not.toBeInTheDocument()
+  })
+
+  it('o número de pessoas vem do total do banco, não da amostra de rostos', async () => {
+    vi.mocked(listarTimes).mockResolvedValue({ itens: [{ ...TIMES[0], totalMembros: 120 }], total: 1 })
+    renderizarTela(<Times />, { perfil: admin })
+    expect(within(await screen.findByRole('row', { name: /Implantação/ })).getByText('121 pessoas')).toBeInTheDocument()
+  })
+
+  it('pagina no banco acima de 15 times', async () => {
+    vi.mocked(listarTimes).mockResolvedValue({ itens: TIMES, total: 31 })
+    renderizarTela(<Times />, { perfil: admin })
+    expect(await screen.findByText('1–15 de 31')).toBeInTheDocument()
+    expect(listarTimes).toHaveBeenLastCalledWith({ consultoriaId: 'c1', pagina: 1 })
+    await userEvent.click(screen.getByRole('button', { name: /Próxima/ }))
+    expect(listarTimes).toHaveBeenLastCalledWith({ consultoriaId: 'c1', pagina: 2 })
   })
 })

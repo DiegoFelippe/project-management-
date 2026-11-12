@@ -15,22 +15,11 @@ import { Button } from '@/components/ui/button'
 import { listarPessoas } from '@/data/pessoas'
 import { apagarTime, criarTime, editarTime, listarTimes } from '@/data/times'
 
-function resumo(times) {
-  const pessoas = new Set()
-  for (const t of times) {
-    if (t.gestor) pessoas.add(t.gestor.id)
-    for (const m of t.membros) pessoas.add(m.id)
-  }
-  const nTimes = `${times.length} ${times.length === 1 ? 'time' : 'times'}`
-  return `${nTimes} · ${pessoas.size} ${pessoas.size === 1 ? 'pessoa' : 'pessoas'}`
-}
-
-// Gestor primeiro, depois os membros (sem repetir o gestor).
-const pessoasDoTime = (time) => [time.gestor, ...time.membros.filter((m) => m.id !== time.gestor?.id)].filter(Boolean)
-
-function Rostos({ pessoas }) {
-  const visiveis = pessoas.slice(0, 4)
-  const resto = pessoas.length - visiveis.length
+// Rostos: o gestor e os primeiros membros (amostra que vem do banco); o número é o total contado no banco.
+function Rostos({ time }) {
+  const visiveis = [time.gestor, ...time.membros.filter((m) => m.id !== time.gestor?.id)].filter(Boolean).slice(0, 4)
+  const total = time.totalMembros + (time.gestor ? 1 : 0)
+  const resto = total - visiveis.length
   return (
     <div className="flex items-center gap-2.5">
       <div className="flex items-center">
@@ -39,11 +28,11 @@ function Rostos({ pessoas }) {
         ))}
         {resto > 0 && (
           <span className="-ml-1.5 grid size-7 place-items-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground ring-2 ring-card">
-            +{resto}
+            +{resto > 99 ? '99' : resto}
           </span>
         )}
       </div>
-      <span className="text-muted-foreground">{pessoas.length} {pessoas.length === 1 ? 'pessoa' : 'pessoas'}</span>
+      <span className="text-muted-foreground">{total.toLocaleString('pt-BR')} {total === 1 ? 'pessoa' : 'pessoas'}</span>
     </div>
   )
 }
@@ -52,7 +41,8 @@ export default function Times() {
   const { perfil } = useAuth()
   const ehDono = perfil.papel === 'dono'
   const [consultoriaId, setConsultoriaId] = useState(ehDono ? '' : perfil.consultoria_id)
-  const [times, setTimes] = useState(null)
+  const [resultado, setResultado] = useState(null)
+  const [pagina, setPagina] = useState(1)
   const [erro, setErro] = useState(null)
   const [novo, setNovo] = useState(false)
   const [gestores, setGestores] = useState([])
@@ -61,19 +51,21 @@ export default function Times() {
   const [versao, setVersao] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
 
+  // Uma página por vez, paginada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
     let ativo = true
-    listarTimes({ consultoriaId: consultoriaId || undefined })
-      .then((lista) => {
+    listarTimes({ consultoriaId: consultoriaId || undefined, pagina })
+      .then((r) => {
         if (!ativo) return
-        setTimes(lista)
+        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
+        setResultado(r)
         setErro(null)
       })
       .catch(() => ativo && setErro('Não foi possível carregar os times.'))
     return () => {
       ativo = false
     }
-  }, [consultoriaId, versao])
+  }, [consultoriaId, pagina, versao])
 
   useEffect(() => {
     if (perfil.papel !== 'admin') return
@@ -116,23 +108,26 @@ export default function Times() {
     return resposta
   }
 
+  const times = resultado?.itens ?? null
+  const total = resultado?.total ?? 0
+
   return (
     <>
-      <Cabecalho titulo="Times" descricao={times ? resumo(times) : null}>
+      <Cabecalho titulo="Times" descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'time' : 'times'}` : null}>
         {!ehDono && (
           <Button onClick={() => setNovo(true)}>
             <Plus /> Novo time
           </Button>
         )}
       </Cabecalho>
-      {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
+      {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />}
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!erro && times === null && <GraficoCarregando texto="Carregando os times…" className="py-12" />}
       {times?.length === 0 && (
         <ListaVazia>{ehDono ? 'Nenhum time por aqui.' : 'Nenhum time ainda. Crie o primeiro em "Novo time".'}</ListaVazia>
       )}
       {times?.length > 0 && (
-        <Tabela rotulo="Times" colunas={['Time', 'Gestor', 'Pessoas']}>
+        <Tabela rotulo="Times" colunas={['Time', 'Gestor', 'Pessoas']} paginacao={{ pagina, total, aoMudar: setPagina }}>
           {times.map((t) => (
             <Linha key={t.id}>
               <Celula>
@@ -140,7 +135,7 @@ export default function Times() {
                 {t.descricao && <p className="truncate text-xs text-muted-foreground">{t.descricao}</p>}
               </Celula>
               <Celula className="text-muted-foreground">{t.gestor?.nome ?? '—'}</Celula>
-              <Celula><Rostos pessoas={pessoasDoTime(t)} /></Celula>
+              <Celula><Rostos time={t} /></Celula>
               <CelulaAcoes>
                 {gerencio(t) && (
                   <>

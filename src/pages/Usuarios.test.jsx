@@ -11,7 +11,7 @@ vi.mock('@/data/usuarios', () => ({
 }))
 vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn().mockResolvedValue({ erro: null }), tirarFoto: vi.fn() }))
 vi.mock('@/data/times', () => ({
-  listarTimes: vi.fn().mockResolvedValue([]), adicionarMembro: vi.fn(), removerMembro: vi.fn(),
+  listarOpcoesDeTimes: vi.fn().mockResolvedValue([]), adicionarMembro: vi.fn(), removerMembro: vi.fn(),
 }))
 
 beforeAll(() => {
@@ -20,10 +20,14 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
-  vi.mocked(listarUsuarios).mockResolvedValue([
-    { id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [] },
-    { id: 'p2', nome: 'Bruno', email: 'bruno@x.test', papel: 'gestor', ativo: true, times: [] },
-  ])
+  vi.clearAllMocks()
+  vi.mocked(listarUsuarios).mockResolvedValue({
+    itens: [
+      { id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [] },
+      { id: 'p2', nome: 'Bruno', email: 'bruno@x.test', papel: 'gestor', ativo: true, times: [] },
+    ],
+    total: 2,
+  })
 })
 
 describe('Usuários', () => {
@@ -45,5 +49,19 @@ describe('Usuários', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(trocarFoto).toHaveBeenCalledWith('p1', arquivo, undefined)
     expect(gerenciarAcesso).not.toHaveBeenCalled()
+  })
+
+  it('pagina no banco acima de 15 pessoas, e o filtro volta para a página 1', async () => {
+    vi.mocked(listarUsuarios).mockResolvedValue({
+      itens: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [] }],
+      total: 40,
+    })
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    expect(await screen.findByText('1–15 de 40')).toBeInTheDocument()
+    expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: true, pagina: 1 })
+    await userEvent.click(screen.getByRole('button', { name: /Próxima/ }))
+    expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: true, pagina: 2 })
+    await userEvent.click(screen.getByRole('button', { name: 'Desativados' }))
+    expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: false, pagina: 1 })
   })
 })

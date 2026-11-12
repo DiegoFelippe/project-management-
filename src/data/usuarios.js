@@ -1,6 +1,7 @@
 // Pessoas com acesso, criação de acesso e reenvio de convite (as duas últimas pelas Edge Functions).
 import { traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
+import { buscarPagina } from './paginar'
 
 const CAMPOS =
   'id, nome, email, foto, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ativo, ' +
@@ -8,13 +9,19 @@ const CAMPOS =
 
 const redirectTo = () => `${window.location.origin}/definir-senha`
 
+// Uma página de pessoas (ativas ou desativadas), filtrada e paginada no banco.
 // Os times que quem olha não enxerga vêm nulos e ficam de fora.
-export async function listarUsuarios({ consultoriaId } = {}) {
-  let consulta = supabase.from('perfis').select(CAMPOS).neq('papel', 'dono').order('nome')
+export async function listarUsuarios({ consultoriaId, ativos = true, pagina = 1 } = {}) {
+  let consulta = supabase
+    .from('perfis')
+    .select(CAMPOS, { count: 'exact' })
+    .neq('papel', 'dono')
+    .eq('ativo', ativos)
+    .order('nome')
+    .order('id')
   if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
-  const { data, error } = await consulta
-  if (error) throw error
-  return data.map((p) => ({ ...p, times: (p.times ?? []).map((m) => m.time).filter(Boolean) }))
+  const resultado = await buscarPagina(consulta, pagina)
+  return { ...resultado, itens: resultado.itens.map((p) => ({ ...p, times: (p.times ?? []).map((m) => m.time).filter(Boolean) })) }
 }
 
 export async function criarAcesso(dados) {
