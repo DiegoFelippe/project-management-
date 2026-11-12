@@ -2,7 +2,7 @@
 -- e a senha provisória bloqueia tudo até ser trocada. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(28);
+select plan(30);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -113,8 +113,8 @@ reset role;
 
 -- Dono vê tudo, mas só olha
 select testes.como('dono');
-select is((select count(*) from public.consultorias), 2::bigint, 'dono vê todas as consultorias');
-select is((select count(*) from public.times), 3::bigint, 'dono vê todos os times');
+select is((select count(*) from public.consultorias where id in (testes.id('A'), testes.id('B'))), 2::bigint, 'dono vê todas as consultorias');
+select is((select count(*) from public.times where consultoria_id in (testes.id('A'), testes.id('B'))), 3::bigint, 'dono vê todos os times');
 select throws_ok(
   $$ insert into public.times (consultoria_id, nome, gestor_id) values (testes.id('A'), 'Do dono', testes.id('gestor_a1')) $$,
   '42501', null, 'dono não cria time dentro de uma consultoria');
@@ -125,6 +125,9 @@ select testes.como('gestor_a1');
 select lives_ok(
   $$ insert into public.times (consultoria_id, nome, gestor_id) values (testes.id('A'), 'Novo do g1', testes.id('gestor_a1')) $$,
   'gestor cria time com ele mesmo de gestor');
+select lives_ok(
+  $$ insert into public.times (consultoria_id, nome, gestor_id) values (testes.id('A'), 'Com retorno', testes.id('gestor_a1')) returning id $$,
+  'gestor cria time e recebe o id de volta (como a tela faz)');
 select throws_ok(
   $$ insert into public.times (consultoria_id, nome, gestor_id) values (testes.id('A'), 'Para o g2', testes.id('gestor_a2')) $$,
   '42501', null, 'gestor não cria time para outro gestor');
@@ -138,6 +141,9 @@ select testes.como('admin_a');
 select lives_ok(
   $$ insert into public.times (consultoria_id, nome, gestor_id) values (testes.id('A'), 'Do g2', testes.id('gestor_a2')) $$,
   'admin cria time para um gestor');
+select lives_ok(
+  $$ insert into public.times (consultoria_id, nome, gestor_id) values (testes.id('A'), 'Admin com retorno', testes.id('gestor_a2')) returning id $$,
+  'admin cria time e recebe o id de volta');
 select throws_ok(
   $$ insert into public.times (consultoria_id, nome, gestor_id) values (testes.id('A'), 'Da pessoa', testes.id('pessoa_a')) $$,
   'P0001', null, 'gestor do time precisa ser gestor ou admin');
