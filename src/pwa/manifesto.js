@@ -9,6 +9,8 @@ export const manifesto = {
   start_url: '/',
   scope: '/',
   display: 'standalone',
+  // Instalado no computador: sem a barra de título; a barra de cima do app faz o papel dela.
+  display_override: ['window-controls-overlay'],
   theme_color: '#ffffff',
   background_color: '#ffffff',
   icons: [

@@ -6,7 +6,8 @@ import AnimacaoGestao from './AnimacaoGestao'
 // No celular, a arte vira uma faixa em cima.
 export default function TelaDeAcesso({ children }) {
   return (
-    <div className="grid min-h-dvh bg-moldura md:grid-cols-2">
+    <div className="tela-acesso grid min-h-dvh bg-moldura md:grid-cols-2">
+      <div className="faixa-janela" aria-hidden="true" />
       <aside className="flex flex-col justify-between gap-6 overflow-hidden bg-painel px-6 py-6 md:px-10 md:py-10"
         style={{
           backgroundImage:

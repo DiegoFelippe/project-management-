@@ -25,3 +25,6 @@ dist-ssr
 
 # Modelos de tela do brainstorming
 .superpowers/
+
+# Service worker do PWA em desenvolvimento (gerado)
+dev-dist

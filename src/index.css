@@ -208,3 +208,28 @@
 .group:hover .anim-abrir, .group:focus-visible .anim-abrir { animation: icone-abrir 0.55s ease-in-out; }
 .group:hover .anim-erguer, .group:focus-visible .anim-erguer { animation: icone-erguer 0.55s ease-out; }
 .group:hover .anim-sair, .group:focus-visible .anim-sair { animation: icone-sair 0.5s ease-in-out 2; }
+
+/* App instalado sem a barra de título (Window Controls Overlay): só os botões da janela ficam sobre o app.
+   A barra de cima do app arrasta a janela; o trilho e a tela de entrar descem para não ficar embaixo
+   dos botões da janela (no Mac ficam à esquerda; no Windows, à direita). */
+.faixa-janela { display: none; }
+@media (display-mode: window-controls-overlay) {
+  .barra-topo {
+    -webkit-app-region: drag;
+    app-region: drag;
+    padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 12px);
+  }
+  .barra-topo :is(button, a, [role='button']) { -webkit-app-region: no-drag; app-region: no-drag; }
+  .trilho { padding-top: env(titlebar-area-height, 0px); }
+  .tela-acesso > aside, .tela-acesso > main { padding-top: calc(env(titlebar-area-height, 0px) + 1.5rem); }
+  .faixa-janela {
+    display: block;
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: env(titlebar-area-height, 0px);
+    -webkit-app-region: drag;
+    app-region: drag;
+    z-index: 40;
+  }
+}
+

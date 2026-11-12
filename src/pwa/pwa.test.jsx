@@ -28,6 +28,10 @@ describe('manifesto do app', () => {
     })
   })
 
+  it('instalado, abre sem a barra de título (só os botões da janela sobre o app)', () => {
+    expect(manifesto.display_override).toEqual(['window-controls-overlay'])
+  })
+
   it('usa a logo como ícone, inclusive o adaptável, e os arquivos existem', () => {
     const tamanhos = manifesto.icons.map((i) => i.sizes)
     expect(tamanhos).toEqual(expect.arrayContaining(['192x192', '512x512']))

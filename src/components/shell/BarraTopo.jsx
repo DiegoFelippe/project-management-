@@ -12,7 +12,7 @@ export default function BarraTopo({ aoAbrirMenu }) {
   const { podeInstalar, instalar } = useInstalar()
 
   return (
-    <header className="flex h-[52px] flex-none items-center gap-2 px-3 md:px-5">
+    <header className="barra-topo flex h-[52px] flex-none items-center gap-2 px-3 md:px-5">
       <Button variant="ghost" size="icon" className="md:hidden" aria-label="Abrir o menu" onClick={aoAbrirMenu}>
         <Menu />
       </Button>
