@@ -14,7 +14,7 @@ const rotulo = (aceso) =>
     aceso ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground',
   )
 
-function Quadro({ icone: Icone, aceso, perigo, apagado }) {
+function Quadro({ icone: Icone, animacao, aceso, perigo, apagado }) {
   return (
     <span
       className={cn(
@@ -25,18 +25,18 @@ function Quadro({ icone: Icone, aceso, perigo, apagado }) {
         apagado && 'text-muted-foreground/60',
       )}
     >
-      <Icone className="size-[18px]" strokeWidth={aceso ? 2.1 : 1.75} />
+      <Icone className={cn('size-[18px]', `anim-${animacao}`)} strokeWidth={aceso ? 2.1 : 1.75} />
     </span>
   )
 }
 
 function Item({ item, aoNavegar }) {
   return (
-    <NavLink to={item.rota} end={item.rota === '/'} title={item.rotulo} onClick={aoNavegar}
+    <NavLink to={item.rota} end={item.rota === '/'} title={item.rotulo} onClick={aoNavegar} data-item-trilho=""
       className="group flex w-16 flex-col items-center gap-1 py-0.5 outline-none focus-visible:[&>span:first-child]:ring-2 focus-visible:[&>span:first-child]:ring-ring">
       {({ isActive }) => (
         <>
-          <Quadro icone={item.icone} aceso={isActive} />
+          <Quadro icone={item.icone} animacao={item.animacao} aceso={isActive} />
           <span className={rotulo(isActive)}>{item.rotulo}</span>
         </>
       )}
@@ -46,8 +46,8 @@ function Item({ item, aoNavegar }) {
 
 function ItemEmBreve({ item }) {
   return (
-    <div aria-disabled="true" title={`${item.rotulo}: em breve`} className="flex w-16 cursor-default flex-col items-center gap-1 py-0.5">
-      <Quadro icone={item.icone} apagado />
+    <div aria-disabled="true" title={`${item.rotulo}: em breve`} data-item-trilho="" className="group flex w-16 cursor-default flex-col items-center gap-1 py-0.5">
+      <Quadro icone={item.icone} animacao={item.animacao} apagado />
       <span className="max-w-[64px] truncate text-[10px] leading-none font-semibold text-muted-foreground/70">{item.rotulo}</span>
       <span className="text-[8px] leading-none font-semibold tracking-wide text-muted-foreground/70 uppercase">em breve</span>
     </div>
@@ -72,16 +72,16 @@ export default function Trilho({ aoNavegar }) {
       </nav>
       <div className="flex flex-none flex-col items-center gap-1.5 pt-2 pb-3">
         <span aria-hidden="true" className="mb-0.5 h-px w-8 bg-border" />
-        <div title={`${perfil.nome} (${perfil.email})`} className="flex w-16 flex-col items-center gap-1 py-0.5">
-          <span className="grid size-8 place-items-center rounded-full bg-primary/10 text-[12px] font-bold text-primary ring-1 ring-primary/25">
+        <div title={`${perfil.nome} (${perfil.email})`} data-item-trilho="" className="group flex w-16 flex-col items-center gap-1 py-0.5">
+          <span className="anim-pulsar grid size-8 place-items-center rounded-full bg-primary/10 text-[12px] font-bold text-primary ring-1 ring-primary/25">
             {iniciais(perfil.nome)}
           </span>
           <span className={rotulo(false)}>{primeiroNome(perfil.nome)}</span>
         </div>
-        <button type="button" title="Sair da conta"
+        <button type="button" title="Sair da conta" data-item-trilho=""
           className="group flex w-16 flex-col items-center gap-1 py-0.5 outline-none focus-visible:[&>span:first-child]:ring-2 focus-visible:[&>span:first-child]:ring-ring"
           onClick={async () => { await sair(); navigate('/entrar', { replace: true }) }}>
-          <Quadro icone={LogOut} perigo />
+          <Quadro icone={LogOut} animacao="sair" perigo />
           <span className="text-[10px] leading-none font-semibold text-muted-foreground group-hover:text-destructive">Sair</span>
         </button>
       </div>

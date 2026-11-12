@@ -170,3 +170,41 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* Trilho: todo ícone anima ao passar o mouse ou focar pelo teclado (regra do projeto, ver CLAUDE.md).
+   Animação nova: keyframes "icone-<nome>" + a regra abaixo + o nome em ANIMACOES_DO_MENU (menu.js). */
+@keyframes icone-subir {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-4px); }
+  70% { transform: translateY(1px); }
+}
+@keyframes icone-balancar {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-14deg); }
+  60% { transform: rotate(10deg); }
+}
+@keyframes icone-pulsar {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.22); }
+  65% { transform: scale(0.94); }
+}
+@keyframes icone-abrir {
+  0%, 100% { transform: none; }
+  45% { transform: perspective(60px) rotateX(-28deg) translateY(-1px); }
+}
+@keyframes icone-erguer {
+  0%, 100% { transform: scaleY(1); }
+  40% { transform: translateY(-2px) scaleY(1.18); }
+  70% { transform: scaleY(0.95); }
+}
+@keyframes icone-sair {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+.anim-erguer { transform-origin: bottom center; }
+.group:hover .anim-subir, .group:focus-visible .anim-subir { animation: icone-subir 0.55s ease-out; }
+.group:hover .anim-balancar, .group:focus-visible .anim-balancar { animation: icone-balancar 0.6s ease-in-out; }
+.group:hover .anim-pulsar, .group:focus-visible .anim-pulsar { animation: icone-pulsar 0.5s ease-out; }
+.group:hover .anim-abrir, .group:focus-visible .anim-abrir { animation: icone-abrir 0.55s ease-in-out; }
+.group:hover .anim-erguer, .group:focus-visible .anim-erguer { animation: icone-erguer 0.55s ease-out; }
+.group:hover .anim-sair, .group:focus-visible .anim-sair { animation: icone-sair 0.5s ease-in-out 2; }

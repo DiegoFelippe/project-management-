@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { itensDoMenu, tituloDaRota } from './menu'
+import { ANIMACOES_DO_MENU, itensDoMenu, tituloDaRota } from './menu'
 
 const ids = (papel) => itensDoMenu(papel).map((item) => item.id)
 
@@ -22,5 +22,13 @@ describe('tituloDaRota', () => {
     expect(tituloDaRota('/')).toBe('Início')
     expect(tituloDaRota('/usuarios')).toBe('Usuários')
     expect(tituloDaRota('/consultorias')).toBe('Consultorias')
+  })
+})
+
+describe('animação no hover', () => {
+  it('todo item do menu tem uma animação da lista (regra do projeto)', () => {
+    for (const item of itensDoMenu('dono')) {
+      expect(ANIMACOES_DO_MENU, `item "${item.id}" sem animação`).toContain(item.animacao)
+    }
   })
 })
