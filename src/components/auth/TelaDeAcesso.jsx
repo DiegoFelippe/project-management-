@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import Logo from '@/components/shell/Logo'
 
 // Telas fora da moldura (entrar, senha): arte à esquerda e o conteúdo à direita.
@@ -24,6 +25,9 @@ export default function TelaDeAcesso({ children }) {
 }
 
 export function Titulo({ titulo, children }) {
+  useEffect(() => {
+    document.title = `${titulo} | Consultoria`
+  }, [titulo])
   return (
     <div className="mb-6 grid gap-1.5">
       <h1 className="text-3xl font-bold tracking-tight">{titulo}</h1>
