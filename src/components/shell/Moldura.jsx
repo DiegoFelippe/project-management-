@@ -12,7 +12,7 @@ export default function Moldura() {
   const { pathname } = useLocation()
 
   useEffect(() => {
-    document.title = `${tituloDaRota(pathname)} | Consultoria`
+    document.title = `${tituloDaRota(pathname)} | IXC Consult`
     document.getElementById('conteudo')?.scrollTo({ top: 0 })
   }, [pathname])
 

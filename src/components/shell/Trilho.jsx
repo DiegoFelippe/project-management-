@@ -61,7 +61,7 @@ export default function Trilho({ aoNavegar }) {
   return (
     <div className="flex h-full w-[72px] flex-none flex-col bg-moldura">
       <div className="grid h-[56px] flex-none place-items-center">
-        <NavLink to="/" onClick={aoNavegar} title="Consultoria: início" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <NavLink to="/" onClick={aoNavegar} title="IXC Consult: início" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Logo />
         </NavLink>
       </div>

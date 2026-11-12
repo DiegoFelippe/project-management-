@@ -1,13 +1,22 @@
 import { useEffect } from 'react'
 import Logo from '@/components/shell/Logo'
+import AnimacaoGestao from './AnimacaoGestao'
 
 // Telas fora da moldura (entrar, senha): arte à esquerda e o conteúdo à direita.
 // No celular, a arte vira uma faixa em cima.
 export default function TelaDeAcesso({ children }) {
   return (
     <div className="grid min-h-dvh bg-moldura md:grid-cols-2">
-      <aside className="flex flex-col justify-between gap-6 bg-painel bg-[radial-gradient(120%_90%_at_0%_0%,rgb(37_99_235/0.16),transparent_60%)] px-6 py-6 md:px-10 md:py-10">
-        <Logo />
+      <aside className="flex flex-col justify-between gap-6 overflow-hidden bg-painel px-6 py-6 md:px-10 md:py-10"
+        style={{
+          backgroundImage:
+            'radial-gradient(120% 90% at 0% 0%, rgb(37 99 235 / 0.16), transparent 60%), radial-gradient(circle, rgb(37 99 235 / 0.11) 1px, transparent 1.4px)',
+          backgroundSize: 'auto, 22px 22px',
+        }}>
+        <Logo className="size-14" />
+        <div className="hidden min-h-0 flex-1 items-center md:flex">
+          <AnimacaoGestao />
+        </div>
         <div>
           <h2 className="text-xl leading-tight font-bold text-balance md:text-3xl">
             Projetos, times e pessoas no mesmo lugar.
@@ -26,7 +35,7 @@ export default function TelaDeAcesso({ children }) {
 
 export function Titulo({ titulo, children }) {
   useEffect(() => {
-    document.title = `${titulo} | Consultoria`
+    document.title = `${titulo} | IXC Consult`
   }, [titulo])
   return (
     <div className="mb-6 grid gap-1.5">
