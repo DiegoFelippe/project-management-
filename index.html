@@ -9,6 +9,14 @@
     <meta name="apple-mobile-web-app-title" content="IXC Consult" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IXC Consult</title>
+    <script>
+      // tema antes de a página aparecer (sem piscar): escolha salva ou o tema do computador
+      try {
+        var t = localStorage.getItem('consultoria:tema')
+        if (t === 'escuro' || ((!t || t === 'sistema') && matchMedia('(prefers-color-scheme: dark)').matches))
+          document.documentElement.classList.add('dark')
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

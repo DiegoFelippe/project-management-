@@ -139,7 +139,7 @@ function Cartao({ className, atraso, children }) {
   return (
     <div data-cartao="" className={cn('absolute w-[37%] min-w-[150px] max-w-[190px]', className)}
       style={{ animation: `entrar3d 0.8s cubic-bezier(0.2, 0.9, 0.25, 1.15) ${atraso}s both` }}>
-      <div className="rounded-xl border border-white/80 bg-card/85 p-3 shadow-[0_18px_40px_-18px_rgb(15_23_42/0.45)] ring-1 ring-primary/5 backdrop-blur-md"
+      <div className="rounded-xl border border-white/80 bg-card/85 dark:border-white/10 p-3 shadow-[0_18px_40px_-18px_rgb(15_23_42/0.45)] ring-1 ring-primary/5 backdrop-blur-md"
         style={{ animation: `flutuar 6s ease-in-out ${atraso * 1.7}s infinite` }}>
         {children}
       </div>

@@ -1,5 +1,6 @@
-import { Download, Menu } from 'lucide-react'
+import { Download, Menu, Monitor, Moon, Sun } from 'lucide-react'
 import { useInstalar } from '@/pwa/useInstalar'
+import { NOME_DO_TEMA, useTema } from '@/tema/useTema'
 import { useLocation } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { Button } from '@/components/ui/button'
@@ -10,6 +11,8 @@ export default function BarraTopo({ aoAbrirMenu }) {
   const { perfil } = useAuth()
   const { pathname } = useLocation()
   const { podeInstalar, instalar } = useInstalar()
+  const { tema, trocarTema } = useTema()
+  const IconeTema = { claro: Sun, escuro: Moon, sistema: Monitor }[tema]
 
   return (
     <header className="barra-topo flex h-[52px] flex-none items-center gap-2 px-3 md:px-5">
@@ -26,7 +29,11 @@ export default function BarraTopo({ aoAbrirMenu }) {
           <Download /> <span className="hidden sm:inline">Instalar app</span>
         </Button>
       )}
-      <span className={`${podeInstalar ? '' : 'ml-auto '}shrink-0 rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground`}>
+      <Button variant="ghost" size="icon" className={podeInstalar ? 'shrink-0' : 'ml-auto shrink-0'} onClick={trocarTema}
+        aria-label={`Tema: ${NOME_DO_TEMA[tema]}. Clique para trocar`} title={`Tema: ${NOME_DO_TEMA[tema]}`}>
+        <IconeTema />
+      </Button>
+      <span className="shrink-0 rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
         {NOME_DO_PAPEL[perfil.papel]}
       </span>
     </header>
