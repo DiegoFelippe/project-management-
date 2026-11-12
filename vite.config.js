@@ -21,6 +21,9 @@ export default defineConfig({
       injectRegister: 'script-defer',
       includeAssets: ['logo-ixc-consult.png', 'icons/apple-touch-icon.png'],
       manifest: manifesto,
+      // Também no app de desenvolvimento (Docker): manifesto, ícones e botão Instalar app funcionam lá.
+      // Em desenvolvimento o service worker não guarda o código (só a página inicial), então nada fica velho.
+      devOptions: { enabled: true, navigateFallback: 'index.html', suppressWarnings: true },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
         navigateFallback: '/index.html',
