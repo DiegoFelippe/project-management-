@@ -1,7 +1,27 @@
 // Enfeite do lado esquerdo da tela de entrar: a consultoria no centro de uma rede (times, projetos,
 // metas e empresas), com dados correndo pelas linhas, e cartões de gestão flutuando em volta.
 // Só transform/opacity (leve para o processador); com "reduzir movimento" fica parado.
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
+
+// Número que conta de 0 até o valor (com "reduzir movimento", já mostra o valor final).
+function Contador({ ate, prefixo = '', sufixo = '', atraso = 0, duracao = 1400 }) {
+  const parado = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const [valor, setValor] = useState(parado ? ate : 0)
+  useEffect(() => {
+    if (parado) return
+    let quadro
+    const inicio = performance.now() + atraso * 1000
+    const passo = (agora) => {
+      const t = Math.min(Math.max((agora - inicio) / duracao, 0), 1)
+      setValor(Math.round(ate * (1 - (1 - t) ** 3)))
+      if (t < 1) quadro = requestAnimationFrame(passo)
+    }
+    quadro = requestAnimationFrame(passo)
+    return () => cancelAnimationFrame(quadro)
+  }, [ate, atraso, duracao, parado])
+  return <>{prefixo}{valor}{sufixo}</>
+}
 
 const CENTRO = { x: 250, y: 200 }
 const NOS = [
@@ -76,13 +96,35 @@ function Rede() {
         </g>
       ))}
 
+      <defs>
+        <linearGradient id="grad-centro" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#60a5fa" />
+          <stop offset="1" stopColor="#1d4ed8" />
+        </linearGradient>
+      </defs>
+      {[
+        { r: 62, tempo: 16, sentido: 'normal', tracos: '2 7' },
+        { r: 88, tempo: 24, sentido: 'reverse', tracos: '1 10' },
+      ].map((orbita, i) => (
+        <g key={orbita.r} transform={`translate(${CENTRO.x} ${CENTRO.y})`}>
+          <g style={{ animation: `aparecer 0.8s ease-out ${0.5 + i * 0.2}s both` }}>
+            <g style={{ animation: `girar ${orbita.tempo}s linear infinite ${orbita.sentido}` }}>
+              <circle r={orbita.r} fill="none" stroke="var(--primary)" strokeOpacity="0.28" strokeWidth="1.5"
+                strokeDasharray={orbita.tracos} strokeLinecap="round" />
+              <circle cx={orbita.r} r="4.5" fill="var(--primary)" style={{ filter: 'drop-shadow(0 0 6px rgb(37 99 235 / 0.8))' }} />
+              <circle cx={-orbita.r} r="3" fill="#22c55e" />
+            </g>
+          </g>
+        </g>
+      ))}
+
       <g data-no="" transform={`translate(${CENTRO.x} ${CENTRO.y})`}>
         {[0, 1.2].map((atraso) => (
-          <circle key={atraso} r="34" fill="var(--primary)" className="motion-reduce:hidden"
+          <circle key={atraso} r="38" fill="var(--primary)" className="motion-reduce:hidden"
             style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: `pulso 2.4s ease-out ${1 + atraso}s infinite` }} />
         ))}
         <g style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: 'surgir 0.5s cubic-bezier(0.2, 0.8, 0.2, 1.3) 0.15s both' }}>
-          <circle r="34" fill="var(--primary)" style={{ filter: 'drop-shadow(0 10px 22px rgb(37 99 235 / 0.45))' }} />
+          <circle r="38" fill="url(#grad-centro)" style={{ filter: 'drop-shadow(0 12px 28px rgb(37 99 235 / 0.55))' }} />
           <g fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="-13" y="-6" width="26" height="18" rx="3" />
             <path d="M-5 -6v-3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v3M-13 2h26" />
@@ -96,8 +138,8 @@ function Rede() {
 function Cartao({ className, atraso, children }) {
   return (
     <div data-cartao="" className={cn('absolute w-[37%] min-w-[150px] max-w-[190px]', className)}
-      style={{ animation: `entrar 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) ${atraso}s both` }}>
-      <div className="rounded-xl border border-white/80 bg-card/90 p-3 shadow-md backdrop-blur-sm"
+      style={{ animation: `entrar3d 0.8s cubic-bezier(0.2, 0.9, 0.25, 1.15) ${atraso}s both` }}>
+      <div className="rounded-xl border border-white/80 bg-card/85 p-3 shadow-[0_18px_40px_-18px_rgb(15_23_42/0.45)] ring-1 ring-primary/5 backdrop-blur-md"
         style={{ animation: `flutuar 6s ease-in-out ${atraso * 1.7}s infinite` }}>
         {children}
       </div>
@@ -109,7 +151,30 @@ const rotulo = 'text-[11px] font-medium text-muted-foreground'
 
 export default function AnimacaoGestao({ className }) {
   return (
-    <div data-animacao-gestao="" aria-hidden="true" className={cn('relative mx-auto aspect-[5/4] w-full max-w-[540px] select-none', className)}>
+    <div data-animacao-gestao="" aria-hidden="true" className={cn('relative mx-auto aspect-[5/4] w-full max-w-[560px] select-none [perspective:900px]', className)}>
+      {[
+        'left-[-8%] top-[8%] size-[55%] bg-[#60a5fa]',
+        'right-[-6%] top-[30%] size-[48%] bg-[#818cf8]',
+        'bottom-[-6%] left-[25%] size-[50%] bg-[#22d3ee]',
+      ].map((mancha, i) => (
+        <span key={mancha} className={cn('absolute rounded-full opacity-25 blur-3xl motion-reduce:hidden', mancha)}
+          style={{ animation: `deriva ${14 + i * 3}s ease-in-out ${i * -4}s infinite alternate` }} />
+      ))}
+
+      <svg viewBox="0 0 500 110" preserveAspectRatio="none" className="absolute inset-x-[-4%] bottom-[-4%] h-[34%] w-[108%]">
+        <defs>
+          <linearGradient id="grad-area" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="var(--primary)" stopOpacity="0.28" />
+            <stop offset="1" stopColor="var(--primary)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d="M0 92 C60 88 90 70 140 72 S220 50 270 56 S350 30 400 34 S470 12 500 8 V110 H0 Z" fill="url(#grad-area)"
+          style={{ animation: 'subir 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s both' }} />
+        <path d="M0 92 C60 88 90 70 140 72 S220 50 270 56 S350 30 400 34 S470 12 500 8" fill="none" stroke="var(--primary)"
+          strokeOpacity="0.6" strokeWidth="2" pathLength="1" strokeDasharray="1" vectorEffect="non-scaling-stroke"
+          style={{ animation: 'desenhar 1.8s ease-out 0.4s both' }} />
+      </svg>
+
       <Rede />
 
       <Cartao className="top-[1%] left-[31%]" atraso={1.3}>
@@ -122,7 +187,7 @@ export default function AnimacaoGestao({ className }) {
               style={{ animation: 'anel 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) 1.6s both' }} />
           </svg>
           <div>
-            <p className="text-lg leading-none font-bold">87%</p>
+            <p className="text-lg leading-none font-bold tabular-nums"><Contador ate={87} sufixo="%" atraso={1.6} /></p>
             <p className="mt-1 text-[10px] font-semibold text-positive">+5 esta semana</p>
           </div>
         </div>
@@ -131,7 +196,7 @@ export default function AnimacaoGestao({ className }) {
       <Cartao className="top-[36%] -right-[3%]" atraso={1.5}>
         <div className="flex items-center justify-between">
           <p className={rotulo}>Crescimento</p>
-          <span className="rounded-full bg-positive-soft px-1.5 py-0.5 text-[10px] font-bold text-positive">+24%</span>
+          <span className="rounded-full bg-positive-soft px-1.5 py-0.5 text-[10px] font-bold text-positive tabular-nums"><Contador ate={24} prefixo="+" sufixo="%" atraso={1.8} /></span>
         </div>
         <div className="mt-2 flex h-10 items-end gap-1">
           {[40, 55, 48, 70, 82, 100].map((altura, i) => (

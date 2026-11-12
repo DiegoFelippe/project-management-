@@ -129,6 +129,25 @@
   from { transform: scaleX(0); }
 }
 
+@keyframes entrar3d {
+  from { opacity: 0; transform: translateY(26px) rotateX(22deg) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes deriva {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(14%, -10%) scale(1.15); }
+}
+
+@keyframes subir {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+
 @theme {
   --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.06);
   --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 4px 12px -4px rgb(15 23 42 / 0.08);

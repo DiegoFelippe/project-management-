@@ -13,7 +13,7 @@ export default function TelaDeAcesso({ children }) {
             'radial-gradient(120% 90% at 0% 0%, rgb(37 99 235 / 0.16), transparent 60%), radial-gradient(circle, rgb(37 99 235 / 0.11) 1px, transparent 1.4px)',
           backgroundSize: 'auto, 22px 22px',
         }}>
-        <Logo className="size-14" />
+        <Logo className="size-14 shadow-[0_10px_26px_-10px_rgb(15_23_42/0.45),0_2px_8px_rgb(15_23_42/0.12)]" />
         <div className="hidden min-h-0 flex-1 items-center md:flex">
           <AnimacaoGestao />
         </div>
