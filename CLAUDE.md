@@ -3,6 +3,18 @@
 Plataforma de gestão de projetos para várias consultorias (React 19 + Vite, Supabase, Vercel).
 Como rodar, comandos e publicação: `README.md`. Design e plano: `docs/superpowers/`.
 
+## CRUD completo: criar, consultar, editar e apagar
+
+Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na tela**, para quem tem permissão.
+
+- **Criar, consultar (lista e detalhe), editar e apagar.** Nada entra só com "criar" e "ver".
+- **Ao planejar algo novo**, o design lista as quatro operações e quem pode fazer cada uma. Deixar uma
+  delas de fora só com o Diego aprovando, e escrito no design.
+- **Apagar sempre pede confirmação** na tela, dizendo o que some junto. Quando apagar quebraria histórico
+  ou acesso de outras pessoas, a tela oferece **desativar/arquivar** e explica a diferença.
+- **Cada operação tem** a regra no banco (RLS ou Edge Function), teste no banco ou de integração e teste
+  de tela, como as que já existem.
+
 ## Menu lateral (trilho): sempre animar no hover
 
 - **Todo ícone do trilho tem uma animação ao passar o mouse** (e ao focar pelo teclado). Sem exceção:
