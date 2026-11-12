@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import Avatar from '@/components/comum/Avatar'
 import Cabecalho from '@/components/comum/Cabecalho'
+import { GraficoCarregando } from '@/components/comum/Carregando'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Badge } from '@/components/ui/badge'
@@ -98,7 +99,7 @@ export default function Usuarios() {
       </Cabecalho>
       {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
-      {!erro && pessoas === null && <p className="text-sm text-muted-foreground">Carregando…</p>}
+      {!erro && pessoas === null && <GraficoCarregando texto="Carregando as pessoas…" className="py-12" />}
       {pessoas?.length === 0 && (
         <div className="rounded-xl border border-dashed bg-card/60 p-8 text-center text-sm text-muted-foreground">
           Ninguém por aqui ainda.

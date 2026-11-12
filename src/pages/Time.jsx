@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import Avatar from '@/components/comum/Avatar'
 import Cabecalho from '@/components/comum/Cabecalho'
+import { GraficoCarregando } from '@/components/comum/Carregando'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -71,7 +72,7 @@ export default function Time() {
     </Link>
   )
 
-  if (time === undefined) return <p className="text-sm text-muted-foreground">Carregando…</p>
+  if (time === undefined) return <GraficoCarregando texto="Carregando o time…" className="py-12" />
   if (time === null) {
     return (
       <>

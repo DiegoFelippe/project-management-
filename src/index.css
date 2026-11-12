@@ -71,6 +71,28 @@
   --color-positive: var(--positive);
   --color-positive-soft: var(--positive-soft);
   --animate-page-enter: page-enter 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  --animate-barra: barra 1.1s ease-in-out infinite;
+}
+
+/* Gráficos: carregamento em onda e o painel do Início se montando. */
+@keyframes barra {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes crescer {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes desenhar {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes surgir {
+  from { opacity: 0; transform: scale(0.3); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @theme {

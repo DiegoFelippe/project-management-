@@ -8,6 +8,27 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { traduzirErroAuth } from '@/lib/erros'
 
+// Só o e-mail fica guardado neste navegador. A senha nunca: quem guarda é o gerenciador de senhas
+// do próprio navegador, que oferece salvar porque os campos dizem o que são (username / current-password).
+export const CHAVE_EMAIL_LEMBRADO = 'consultoria:email-lembrado'
+
+function lerEmailLembrado() {
+  try {
+    return localStorage.getItem(CHAVE_EMAIL_LEMBRADO) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function guardarEmail(email, lembrar) {
+  try {
+    if (lembrar) localStorage.setItem(CHAVE_EMAIL_LEMBRADO, email.trim().toLowerCase())
+    else localStorage.removeItem(CHAVE_EMAIL_LEMBRADO)
+  } catch {
+    // navegador sem armazenamento: só não lembra
+  }
+}
+
 // O Google (e o SSO) devolvem a pessoa para /entrar; se o Supabase recusou, o motivo vem no endereço.
 function erroDoEndereco() {
   const params = new URLSearchParams(window.location.hash.slice(1) || window.location.search)
@@ -28,7 +49,8 @@ function IconeGoogle() {
 
 export default function Entrar() {
   const { sessao, perfil, carregando, entrarComSenha, entrarComGoogle, entrarComSso } = useAuth()
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(lerEmailLembrado)
+  const [lembrar, setLembrar] = useState(() => Boolean(lerEmailLembrado()))
   const [senha, setSenha] = useState('')
   const [emailSso, setEmailSso] = useState('')
   const [mostrarSso, setMostrarSso] = useState(false)
@@ -54,22 +76,36 @@ export default function Entrar() {
       <Titulo titulo="Entrar">Use o acesso que o seu gestor criou.</Titulo>
 
       <form noValidate className="grid gap-4" aria-label="Entrar com e-mail"
-        onSubmit={(e) => { e.preventDefault(); agir('senha', () => entrarComSenha(email, senha)) }}>
+        onSubmit={(e) => {
+          e.preventDefault()
+          agir('senha', async () => {
+            const resposta = await entrarComSenha(email, senha)
+            if (!resposta.erro) guardarEmail(email, lembrar)
+            return resposta
+          })
+        }}>
         <div className="grid gap-2">
           <Label htmlFor="email">E-mail</Label>
-          <Input id="email" type="email" autoComplete="email" autoFocus className="h-10"
+          <Input id="email" name="email" type="email" autoComplete="username" autoFocus={!email} className="h-10"
             placeholder="voce@empresa.com.br" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="senha">Senha</Label>
-          <Input id="senha" type="password" autoComplete="current-password" className="h-10"
-            value={senha} onChange={(e) => setSenha(e.target.value)} />
+          <Input id="senha" name="password" type="password" autoComplete="current-password" autoFocus={Boolean(email)}
+            className="h-10" value={senha} onChange={(e) => setSenha(e.target.value)} />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground select-none">
+            <input type="checkbox" className="size-4 accent-primary" checked={lembrar}
+              onChange={(e) => setLembrar(e.target.checked)} />
+            Lembrar meu e-mail
+          </label>
+          <Link to="/esqueci-senha" className="text-sm font-semibold text-primary hover:underline">
+            Esqueci minha senha
+          </Link>
         </div>
         {erro && <Aviso>{erro}</Aviso>}
         <Button type="submit" size="lg" disabled={enviando !== null}>Entrar</Button>
-        <Link to="/esqueci-senha" className="text-sm font-semibold text-primary hover:underline">
-          Esqueci minha senha
-        </Link>
       </form>
 
       <p className="my-5 flex items-center gap-3 text-[13px] text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">

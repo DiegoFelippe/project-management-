@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import Cabecalho from '@/components/comum/Cabecalho'
+import { GraficoCarregando } from '@/components/comum/Carregando'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
 import CartaoTime from '@/components/times/CartaoTime'
 import NovoTime from '@/components/times/NovoTime'
@@ -76,7 +77,7 @@ export default function Times() {
       </Cabecalho>
       {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
-      {!erro && times === null && <p className="text-sm text-muted-foreground">Carregando…</p>}
+      {!erro && times === null && <GraficoCarregando texto="Carregando os times…" className="py-12" />}
       {times?.length === 0 && (
         <div className="rounded-xl border border-dashed bg-card/60 p-8 text-center text-sm text-muted-foreground">
           {ehDono ? 'Nenhum time por aqui.' : 'Nenhum time ainda. Crie o primeiro em "Novo time".'}
