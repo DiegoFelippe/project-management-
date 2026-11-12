@@ -182,3 +182,30 @@
     border-right-color: var(--border);
   }
 }
+
+.status-banco {
+  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+}
+
+.status-banco.ok {
+  color: #1a7f37;
+  border-color: rgba(26, 127, 55, 0.4);
+}
+
+.status-banco.erro {
+  color: #cf222e;
+  border-color: rgba(207, 34, 46, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  .status-banco.ok {
+    color: #3fb950;
+  }
+
+  .status-banco.erro {
+    color: #f85149;
+  }
+}

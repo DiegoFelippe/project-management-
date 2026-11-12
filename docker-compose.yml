@@ -1,0 +1,16 @@
+# Docker local do app. O banco é outro Docker, o do Supabase (npm run db:start).
+# O navegador fala direto com o Supabase em 127.0.0.1:54521, então o app não precisa entrar na rede dele.
+name: consultoria
+
+services:
+  app:
+    build: .
+    image: consultoria-app:dev
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      # O código do Mac entra no container: salvar um arquivo já recarrega a página.
+      - .:/app
+      # node_modules fica no container (pacotes de Linux, não os do Mac).
+      - /app/node_modules
+    restart: unless-stopped

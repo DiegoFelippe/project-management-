@@ -2,6 +2,7 @@ import { useState } from 'react'
 import heroImg from './assets/hero.png'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
+import StatusBanco from './components/StatusBanco'
 import './App.css'
 
 function App() {
@@ -16,7 +17,7 @@ function App() {
           <img src={viteLogo} className="vite" alt="Vite logo" />
         </div>
         <div>
-          <h1>Get started</h1>
+          <h1>Consultoria</h1>
           <p>
             Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
           </p>
@@ -28,6 +29,7 @@ function App() {
         >
           Count is {count}
         </button>
+        <StatusBanco />
       </section>
 
       <div className="ticks"></div>
