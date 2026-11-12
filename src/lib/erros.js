@@ -28,6 +28,7 @@ const ERROS_FUNCAO = {
   gestor_com_times: 'Essa pessoa ainda é gestora de times. Troque o gestor desses times antes.',
   consultoria_arquivada: 'A consultoria dessa pessoa está arquivada. Reative a consultoria antes.',
   nome_em_uso: 'Já existe uma consultoria com esse nome.',
+  google_nao_configurado: 'Falta configurar o app do Google na plataforma (veja o README).',
 }
 
 export function traduzirErroAuth(erro) {

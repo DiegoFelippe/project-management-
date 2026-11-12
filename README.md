@@ -99,6 +99,28 @@ Enquanto isso não for feito, o botão "Entrar com Google" avisa que o Google ai
 - Tabelas novas não aparecem sozinhas na API do Supabase: é preciso dar `GRANT` para `anon`/`authenticated`.
 - No navegador só vai a chave publicável (`sb_publishable_…`). A chave secreta nunca entra no app.
 
+## Integrações (IA, e-mail e Google)
+
+Menu **Integrações** (administrador da consultoria; o dono só olha): cada consultoria conecta a sua IA
+(Claude ou OpenAI), o seu e-mail (SMTP) e a sua conta Google, e todo o sistema usa a mesma conexão
+(`conexaoDa` em `supabase/functions/_shared/integracoes.ts`). Chaves, senhas e tokens ficam cifrados no
+Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. Desenho:
+`docs/superpowers/specs/2026-11-12-integracoes-design.md`.
+
+- **E-mail no local:** dá para testar com o Mailpit do Supabase local: servidor
+  `supabase_inbucket_consultoria`, porta `1025`, segurança "Sem cifra", sem usuário. Fora do local, o
+  teste só aceita servidores públicos nas portas 25, 465, 587 e 2525.
+- **Google:** precisa de um app OAuth da plataforma (uma vez, pelo dono):
+  1. No Google Cloud, crie um "ID do cliente OAuth" (aplicativo da Web) e ative as APIs do Calendar e
+     do Drive. Endereço de retorno: `https://<projeto>.supabase.co/functions/v1/integracoes-google`
+     (no local: `http://127.0.0.1:54521/functions/v1/integracoes-google`).
+  2. Passe para as Edge Functions `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` e
+     `GOOGLE_OAUTH_REDIRECT_URI` (o endereço acima). Na nuvem:
+     `npx supabase secrets set GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... GOOGLE_OAUTH_REDIRECT_URI=...`.
+     No local: em `[edge_runtime.secrets]` do `supabase/config.toml` (com `env(...)`), e reinicie com
+     `npx supabase stop && npx supabase start` (os dados ficam).
+  Sem isso, "Conectar" no Google avisa que falta configurar o app do Google.
+
 ## Publicar (depois)
 
 **Supabase na nuvem**
@@ -106,7 +128,8 @@ Enquanto isso não for feito, o botão "Entrar com Google" avisa que o Google ai
 1. Crie o projeto em https://supabase.com/dashboard.
 2. `npx supabase login` e `npx supabase link --project-ref <ref-do-projeto>`.
 3. `npx supabase db push --remote` envia as migrações. No CLI 3, sem `--remote` ele mexe no banco local.
-4. `npx supabase functions deploy` publica as Edge Functions (`criar-acesso`, `criar-consultoria`, `reenviar-convite`).
+4. `npx supabase functions deploy` publica as Edge Functions (`criar-acesso`, `criar-consultoria`, `reenviar-convite`,
+   `gerenciar-acesso`, `gerenciar-consultoria`, `integracoes`, `integracoes-google`).
 5. Em Authentication: Site URL e redirecionamentos com o endereço da Vercel (`https://.../**`),
    cadastro aberto desligado, senha mínima 8, os modelos de e-mail de `supabase/templates` e o Google.
 6. Configure um provedor de e-mail (Resend, SendGrid etc.): o e-mail que vem com o Supabase só entrega para o time do projeto.

@@ -228,6 +228,12 @@
   40% { transform: translateY(-2px) scaleY(1.18); }
   70% { transform: scaleY(0.95); }
 }
+@keyframes icone-conectar {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  30% { transform: translate(-2px, 2px) rotate(-8deg); }
+  55% { transform: translate(1px, -1px) rotate(6deg); }
+  75% { transform: translate(0, 0) rotate(-3deg); }
+}
 @keyframes icone-sair {
   0%, 100% { transform: translateX(0); }
   50% { transform: translateX(3px); }
@@ -238,6 +244,7 @@
 .group:hover .anim-pulsar, .group:focus-visible .anim-pulsar { animation: icone-pulsar 0.5s ease-out; }
 .group:hover .anim-abrir, .group:focus-visible .anim-abrir { animation: icone-abrir 0.55s ease-in-out; }
 .group:hover .anim-erguer, .group:focus-visible .anim-erguer { animation: icone-erguer 0.55s ease-out; }
+.group:hover .anim-conectar, .group:focus-visible .anim-conectar { animation: icone-conectar 0.6s ease-in-out; }
 .group:hover .anim-sair, .group:focus-visible .anim-sair { animation: icone-sair 0.5s ease-in-out 2; }
 
 /* App instalado sem a barra de título (Window Controls Overlay): só os botões da janela ficam sobre o app.

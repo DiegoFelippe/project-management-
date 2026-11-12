@@ -28,3 +28,6 @@ dist-ssr
 
 # Service worker do PWA em desenvolvimento (gerado)
 dev-dist
+
+# Cópias do banco local (têm dados; nunca vão para o git)
+supabase/.copias/

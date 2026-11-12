@@ -440,6 +440,14 @@ verify_jwt = false
 [functions.reenviar-convite]
 verify_jwt = false
 
+# Integrações: a função confere o token de quem chama (só o administrador da consultoria mexe).
+[functions.integracoes]
+verify_jwt = false
+
+# Volta do "Conectar com Google": quem chega é o navegador vindo do Google, sem token; vale o estado.
+[functions.integracoes-google]
+verify_jwt = false
+
 [functions.gerenciar-acesso]
 verify_jwt = false
 

@@ -7,8 +7,8 @@ describe('itensDoMenu', () => {
   it('cada papel vê os seus itens', () => {
     expect(ids('pessoa')).toEqual(['inicio', 'projetos'])
     expect(ids('gestor')).toEqual(['inicio', 'projetos', 'times', 'usuarios'])
-    expect(ids('admin')).toEqual(['inicio', 'projetos', 'times', 'usuarios'])
-    expect(ids('dono')).toEqual(['inicio', 'projetos', 'times', 'usuarios', 'consultorias'])
+    expect(ids('admin')).toEqual(['inicio', 'projetos', 'times', 'usuarios', 'integracoes'])
+    expect(ids('dono')).toEqual(['inicio', 'projetos', 'times', 'usuarios', 'consultorias', 'integracoes'])
   })
 
   it('projetos ainda está em breve', () => {
@@ -22,10 +22,16 @@ describe('tituloDaRota', () => {
     expect(tituloDaRota('/')).toBe('Início')
     expect(tituloDaRota('/usuarios')).toBe('Usuários')
     expect(tituloDaRota('/consultorias')).toBe('Consultorias')
+    expect(tituloDaRota('/integracoes')).toBe('Integrações')
   })
 })
 
 describe('animação no hover', () => {
+  it('Integrações ganhou animação própria (conectar)', () => {
+    expect(itensDoMenu('admin').find((item) => item.id === 'integracoes').animacao).toBe('conectar')
+    expect(ANIMACOES_DO_MENU).toContain('conectar')
+  })
+
   it('todo item do menu tem uma animação da lista (regra do projeto)', () => {
     for (const item of itensDoMenu('dono')) {
       expect(ANIMACOES_DO_MENU, `item "${item.id}" sem animação`).toContain(item.animacao)

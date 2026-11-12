@@ -6,6 +6,7 @@ import DefinirSenha from '@/pages/DefinirSenha'
 import Entrar from '@/pages/Entrar'
 import EsqueciSenha from '@/pages/EsqueciSenha'
 import Inicio from '@/pages/Inicio'
+import Integracoes from '@/pages/Integracoes'
 import Time from '@/pages/Time'
 import Times from '@/pages/Times'
 import TrocarSenha from '@/pages/TrocarSenha'
@@ -28,6 +29,9 @@ export default function Rotas() {
           </Route>
           <Route element={<RotaProtegida papeis={['dono']} />}>
             <Route path="/consultorias" element={<Consultorias />} />
+          </Route>
+          <Route element={<RotaProtegida papeis={['dono', 'admin']} />}>
+            <Route path="/integracoes" element={<Integracoes />} />
           </Route>
         </Route>
       </Route>

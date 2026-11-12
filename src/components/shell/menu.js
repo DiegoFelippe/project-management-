@@ -1,8 +1,8 @@
-import { Building2, FolderKanban, House, UserPlus, Users } from 'lucide-react'
+import { Building2, FolderKanban, House, PlugZap, UserPlus, Users } from 'lucide-react'
 
 // Regra do projeto (CLAUDE.md): todo ícone do trilho anima ao passar o mouse.
 // Item novo: escolha uma destas (keyframes "icone-<nome>" em src/index.css).
-export const ANIMACOES_DO_MENU = ['subir', 'balancar', 'pulsar', 'abrir', 'erguer', 'sair']
+export const ANIMACOES_DO_MENU = ['subir', 'balancar', 'pulsar', 'abrir', 'erguer', 'conectar', 'sair']
 
 const TODOS = ['dono', 'admin', 'gestor', 'pessoa']
 const QUEM_ADMINISTRA = ['dono', 'admin', 'gestor']
@@ -14,6 +14,7 @@ const ITENS = [
   { id: 'times', rotulo: 'Times', rota: '/times', icone: Users, animacao: 'pulsar', papeis: QUEM_ADMINISTRA },
   { id: 'usuarios', rotulo: 'Usuários', rota: '/usuarios', icone: UserPlus, animacao: 'balancar', papeis: QUEM_ADMINISTRA },
   { id: 'consultorias', rotulo: 'Consultorias', rota: '/consultorias', icone: Building2, animacao: 'erguer', papeis: ['dono'] },
+  { id: 'integracoes', rotulo: 'Integrações', rota: '/integracoes', icone: PlugZap, animacao: 'conectar', papeis: ['dono', 'admin'] },
 ]
 
 export const NOME_DO_PAPEL = {
