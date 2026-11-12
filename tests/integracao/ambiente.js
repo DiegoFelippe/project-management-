@@ -90,6 +90,11 @@ export async function emailsPara(email) {
   return dados.messages ?? []
 }
 
+// Consultorias criadas pelas funções entram na limpeza pelo id.
+export function registrarConsultoria(id) {
+  if (id) criados.consultorias.add(id)
+}
+
 // Usuários criados pelas funções (não pelos ajudantes) entram na limpeza pelo e-mail.
 export async function registrarEmail(email) {
   const { data } = await admin.from('perfis').select('id').eq('email', email)

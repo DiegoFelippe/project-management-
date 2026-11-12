@@ -33,10 +33,20 @@ function falhaDaSituacao(situacao: SituacaoEmail): Falha {
   return new Falha(409, situacao.codigo)
 }
 
-function emailRepetido(erro: { code?: string; status?: number; message?: string }): boolean {
+type ErroAuth = { code?: string; status?: number; message?: string; name?: string }
+
+function emailRepetido(erro: ErroAuth): boolean {
   return erro.code === 'email_exists' || erro.code === 'user_already_exists' ||
     (erro.status === 422 && /already/i.test(erro.message ?? ''))
 }
+
+// Dois convites ao mesmo tempo: o Supabase recusa o segundo com "Database error saving new user"
+// (500, sem código), porque o e-mail acabou de ser gravado pelo primeiro.
+function erroTemporario(erro: ErroAuth): boolean {
+  return erro.name === 'AuthRetryableFetchError' || (erro.status ?? 0) >= 500
+}
+
+const esperar = (ms: number) => new Promise((pronto) => setTimeout(pronto, ms))
 
 export async function criarLogin(
   admin: SupabaseClient,
@@ -79,10 +89,21 @@ export async function criarAcessoCompleto(admin: SupabaseClient, novo: NovoAcess
     pessoaId = await criarLogin(admin, novo)
   } catch (erro) {
     // Clique duplo: o outro pedido criou o login primeiro.
-    if (emailRepetido(erro as { code?: string })) {
+    if (emailRepetido(erro as ErroAuth)) {
       throw falhaDaSituacao(await situacaoDoEmail(admin, novo.email, novo.consultoriaId))
     }
-    throw erro
+    if (!erroTemporario(erro as ErroAuth)) throw erro
+    const depois = await situacaoDoEmail(admin, novo.email, novo.consultoriaId)
+    if (depois !== 'livre') throw falhaDaSituacao(depois)
+    await esperar(300)
+    try {
+      pessoaId = await criarLogin(admin, novo)
+    } catch (deNovo) {
+      if (emailRepetido(deNovo as ErroAuth)) {
+        throw falhaDaSituacao(await situacaoDoEmail(admin, novo.email, novo.consultoriaId))
+      }
+      throw deNovo
+    }
   }
 
   const { error: erroPerfil } = await admin.from('perfis').insert({

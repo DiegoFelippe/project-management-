@@ -429,3 +429,9 @@ enabled = true
 # As funções conferem o token de quem chama (auth.getUser), por isso o gateway não confere.
 [functions.criar-acesso]
 verify_jwt = false
+
+[functions.criar-consultoria]
+verify_jwt = false
+
+[functions.reenviar-convite]
+verify_jwt = false

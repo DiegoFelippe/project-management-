@@ -18,7 +18,8 @@
     "app:logs": "docker compose logs -f app",
     "test:db": "supabase test db",
     "test": "vitest run --project unidade",
-    "test:integracao": "vitest run --project integracao"
+    "test:integracao": "vitest run --project integracao",
+    "functions:reiniciar": "docker restart supabase_edge_runtime_consultoria"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0",
