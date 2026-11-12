@@ -29,7 +29,7 @@ O design e o plano estão em `docs/superpowers/`.
 | React / Vite | 19 / 8 | `package.json` |
 
 O Supabase CLI fica dentro do projeto, não no Mac todo. O Supabase instalado pelo Homebrew
-(2.98, usado pelos projetos Karina) continua igual.
+(2.98, usado por outros projetos) continua igual.
 
 ## Primeira vez
 
