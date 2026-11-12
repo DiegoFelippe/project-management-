@@ -6,6 +6,7 @@ import TelaDeAcesso, { Aviso, Titulo } from '@/components/auth/TelaDeAcesso'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { codigoDeErroNoEndereco } from '@/lib/endereco'
 import { traduzirErroAuth } from '@/lib/erros'
 
 // Só o e-mail fica guardado neste navegador. A senha nunca: quem guarda é o gerenciador de senhas
@@ -31,8 +32,7 @@ function guardarEmail(email, lembrar) {
 
 // O Google (e o SSO) devolvem a pessoa para /entrar; se o Supabase recusou, o motivo vem no endereço.
 function erroDoEndereco() {
-  const params = new URLSearchParams(window.location.hash.slice(1) || window.location.search)
-  const codigo = params.get('error_code') ?? (params.get('error') ? 'desconhecido' : null)
+  const codigo = codigoDeErroNoEndereco()
   return codigo ? traduzirErroAuth({ code: codigo }) : null
 }
 

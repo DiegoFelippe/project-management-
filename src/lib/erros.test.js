@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MENSAGEM_SSO, traduzirErroAuth, traduzirErroBanco, traduzirErroFuncao } from './erros'
+import { MENSAGEM_SSO, erroDeRecuperacao, traduzirErroAuth, traduzirErroBanco, traduzirErroFuncao } from './erros'
 
 describe('traduzirErroAuth', () => {
   it('traduz os erros de login', () => {
@@ -51,6 +51,20 @@ describe('traduzirErroFuncao e traduzirErroBanco', () => {
   it('mensagem do SSO', () => {
     expect(MENSAGEM_SSO).toBe(
       'O SSO da sua empresa ainda não foi configurado. Entre com e-mail e senha ou com o Google.',
+    )
+  })
+})
+
+describe('erroDeRecuperacao (esqueci minha senha)', () => {
+  it('não revela se o e-mail existe: o limite por e-mail vira sucesso', () => {
+    expect(erroDeRecuperacao({ code: 'over_email_send_rate_limit' })).toBeNull()
+    expect(erroDeRecuperacao({ code: 'user_not_found' })).toBeNull()
+    expect(erroDeRecuperacao(null)).toBeNull()
+  })
+
+  it('o limite por endereço de rede aparece (vale para qualquer e-mail)', () => {
+    expect(erroDeRecuperacao({ code: 'over_request_rate_limit' })).toBe(
+      'Muitas tentativas seguidas. Espere um pouco e tente de novo.',
     )
   })
 })

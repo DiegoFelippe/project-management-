@@ -46,3 +46,13 @@ describe('DefinirSenha', () => {
     expect(auth.definirSenha).not.toHaveBeenCalled()
   })
 })
+
+describe('DefinirSenha com link vencido', () => {
+  it('mesmo com alguém logado, o erro do link vence e o formulário não aparece', () => {
+    window.history.replaceState(null, '', '/definir-senha#error=access_denied&error_code=otp_expired')
+    montar({ sessao: { user: { id: 'outra-conta' } } })
+    expect(screen.getByText('Esse link expirou ou já foi usado.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Senha nova')).not.toBeInTheDocument()
+    window.history.replaceState(null, '', '/')
+  })
+})

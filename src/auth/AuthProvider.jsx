@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { MENSAGEM_SSO, traduzirErroAuth } from '@/lib/erros'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { MENSAGEM_SSO, erroDeRecuperacao, traduzirErroAuth } from '@/lib/erros'
 import { provedorLigado, supabase } from '@/lib/supabase'
 import { AuthContext } from './useAuth'
 
 const CAMPOS_PERFIL = 'id, nome, email, papel, consultoria_id, precisa_trocar_senha, consultoria:consultorias(nome)'
-const ERROS_DE_LIMITE = ['over_request_rate_limit', 'over_email_send_rate_limit']
 
 const resultado = (error) => ({ erro: error ? traduzirErroAuth(error) : null })
 
@@ -13,6 +12,7 @@ export default function AuthProvider({ children }) {
   const [sessao, setSessao] = useState(null)
   const [perfil, setPerfil] = useState(null)
   const [carregando, setCarregando] = useState(true)
+  const usuarioAtual = useRef(undefined)
 
   const carregarPerfil = useCallback(async (s) => {
     if (!s) {
@@ -34,6 +34,10 @@ export default function AuthProvider({ children }) {
     const { data } = supabase.auth.onAuthStateChange((_evento, s) => {
       if (!ativo) return
       setSessao(s)
+      // Mesma pessoa (token renovado, voltou para a aba): só atualiza a sessão, sem recarregar o app.
+      const id = s?.user?.id ?? null
+      if (id === usuarioAtual.current) return
+      usuarioAtual.current = id
       setCarregando(true)
       // fora do callback: chamar o Supabase aqui dentro trava o cliente
       setTimeout(async () => {
@@ -81,7 +85,7 @@ export default function AuthProvider({ children }) {
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
           redirectTo: `${origem}/definir-senha`,
         })
-        return ERROS_DE_LIMITE.includes(error?.code) ? resultado(error) : { erro: null }
+        return { erro: erroDeRecuperacao(error) }
       },
       async definirSenha(senha) {
         const { error } = await supabase.auth.updateUser({ password: senha })

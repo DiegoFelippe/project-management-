@@ -1,15 +1,20 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import FormularioNovaSenha from '@/components/auth/FormularioNovaSenha'
 import TelaDeAcesso, { Aviso, Titulo } from '@/components/auth/TelaDeAcesso'
 import Carregando from '@/components/comum/Carregando'
+import { codigoDeErroNoEndereco } from '@/lib/endereco'
 
 // Destino do link do convite e do "esqueci minha senha": o link já traz a sessão.
 export default function DefinirSenha() {
   const { sessao, carregando } = useAuth()
-  if (carregando) return <Carregando />
+  // Link vencido ou já usado: o motivo vem no endereço. Vale mesmo com outra conta aberta neste
+  // navegador, para o formulário nunca trocar a senha da pessoa errada.
+  const [linkComErro] = useState(() => codigoDeErroNoEndereco() !== null)
+  if (!linkComErro && carregando) return <Carregando />
 
-  if (!sessao) {
+  if (linkComErro || !sessao) {
     return (
       <TelaDeAcesso>
         <Titulo titulo="Criar senha" />

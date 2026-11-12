@@ -43,3 +43,9 @@ export function traduzirErroBanco(erro) {
   if (erro?.code === '42501') return ERROS_FUNCAO.sem_permissao
   return PADRAO
 }
+
+// "Esqueci minha senha": só o limite por endereço de rede aparece. O limite por e-mail só acontece
+// com e-mails cadastrados e revelaria quem tem acesso; para a tela, ele vale como "enviado".
+export function erroDeRecuperacao(erro) {
+  return erro?.code === 'over_request_rate_limit' ? MUITAS_TENTATIVAS : null
+}
