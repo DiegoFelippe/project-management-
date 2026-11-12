@@ -1,20 +1,25 @@
-import { ArrowLeft, UserPlus } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, UserPlus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import Avatar from '@/components/comum/Avatar'
 import Cabecalho from '@/components/comum/Cabecalho'
+import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
+import EditarTime from '@/components/times/EditarTime'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SelectNativo } from '@/components/ui/select-nativo'
 import { listarPessoas } from '@/data/pessoas'
-import { adicionarMembro, buscarTime, removerMembro } from '@/data/times'
+import { adicionarMembro, apagarTime, buscarTime, editarTime, removerMembro } from '@/data/times'
 
 export default function Time() {
   const { id } = useParams()
+  const navigate = useNavigate()
+  const [editando, setEditando] = useState(false)
+  const [apagando, setApagando] = useState(false)
   const { perfil } = useAuth()
   const [time, setTime] = useState(undefined)
   const [pessoas, setPessoas] = useState([])
@@ -85,7 +90,43 @@ export default function Time() {
   return (
     <>
       {voltar}
-      <Cabecalho titulo={time.nome} descricao={`Gestor: ${time.gestor?.nome ?? '—'}`} />
+      <Cabecalho titulo={time.nome} descricao={`Gestor: ${time.gestor?.nome ?? '—'}`}>
+        {gerencio && (
+          <>
+            <Button variant="outline" onClick={() => setEditando(true)}>
+              <Pencil /> Editar
+            </Button>
+            <Button variant="outline" onClick={() => setApagando(true)}
+              className="text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive">
+              <Trash2 /> Apagar time
+            </Button>
+          </>
+        )}
+      </Cabecalho>
+      {editando && (
+        <EditarTime key={time.id + time.nome} aberto time={time} papelDeQuemEdita={perfil.papel}
+          gestores={pessoas.filter((p) => p.papel === 'gestor' || p.papel === 'admin')}
+          aoFechar={() => setEditando(false)}
+          aoSalvar={async (dados) => {
+            const resposta = await editarTime(time.id, dados)
+            if (!resposta.erro) {
+              toast.success('Time atualizado.')
+              carregar()
+            }
+            return resposta
+          }} />
+      )}
+      <ConfirmarAcao aberto={apagando} aoFechar={() => setApagando(false)} titulo={`Apagar o time ${time.nome}?`}
+        descricao="O time some de vez. As pessoas continuam com acesso; só saem deste time."
+        rotuloConfirmar="Apagar time"
+        aoConfirmar={async () => {
+          const resposta = await apagarTime(time.id)
+          if (!resposta.erro) {
+            toast.success(`Time ${time.nome} apagado.`)
+            navigate('/times', { replace: true })
+          }
+          return resposta
+        }} />
       {time.descricao && <p className="-mt-3 mb-5 text-sm text-muted-foreground">{time.descricao}</p>}
 
       {gerencio && (

@@ -53,3 +53,20 @@ export async function removerMembro(timeId, pessoaId) {
   if (!data.length) return { erro: traduzirErroBanco({ code: '42501' }) }
   return { erro: null }
 }
+
+export async function editarTime(id, { nome, descricao, gestorId }) {
+  const mudancas = { nome: nome.trim(), descricao: descricao?.trim() || null }
+  if (gestorId) mudancas.gestor_id = gestorId
+  const { data, error } = await supabase.from('times').update(mudancas).eq('id', id).select('id')
+  if (error) return { erro: traduzirErroBanco(error) }
+  if (!data.length) return { erro: traduzirErroBanco({ code: '42501' }) }
+  return { erro: null }
+}
+
+// Apaga só o time: as pessoas continuam com acesso (saem só deste time).
+export async function apagarTime(id) {
+  const { data, error } = await supabase.from('times').delete().eq('id', id).select('id')
+  if (error) return { erro: traduzirErroBanco(error) }
+  if (!data.length) return { erro: traduzirErroBanco({ code: '42501' }) }
+  return { erro: null }
+}

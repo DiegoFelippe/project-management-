@@ -1,23 +1,26 @@
-import { Plus, Send } from 'lucide-react'
+import { Pencil, Plus, Send, UserCheck, UserX } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import Avatar from '@/components/comum/Avatar'
 import Cabecalho from '@/components/comum/Cabecalho'
+import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import EditarAcesso from '@/components/usuarios/EditarAcesso'
 import NovoAcesso from '@/components/usuarios/NovoAcesso'
-import { adicionarMembro, listarTimes } from '@/data/times'
-import { criarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
+import { adicionarMembro, listarTimes, removerMembro } from '@/data/times'
+import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { situacao } from '@/lib/situacao'
 
 const COR_DA_SITUACAO = {
   'Convite pendente': 'notice',
   'Senha provisória': 'secondary',
   Ativo: 'positive',
+  Desativado: 'outline',
 }
 
 export default function Usuarios() {
@@ -29,6 +32,9 @@ export default function Usuarios() {
   const [times, setTimes] = useState([])
   const [novo, setNovo] = useState(false)
   const [reenviando, setReenviando] = useState(null)
+  const [filtro, setFiltro] = useState('ativos')
+  const [editando, setEditando] = useState(null)
+  const [confirmando, setConfirmando] = useState(null)
   const [versao, setVersao] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
 
@@ -55,6 +61,47 @@ export default function Usuarios() {
   }, [ehDono, perfil.consultoria_id, perfil.papel, perfil.id, versao])
 
   const meusTimes = useMemo(() => new Set(times.map((t) => t.id)), [times])
+  const lista = useMemo(
+    () => (pessoas ?? []).filter((p) => (filtro === 'ativos' ? p.ativo !== false : p.ativo === false)),
+    [pessoas, filtro],
+  )
+
+  // Quem mexe em quem (as Edge Functions conferem de novo): dono → administradores; administrador →
+  // gestores e pessoas; gestor → só o nome e os times dele das pessoas que vê. Ninguém mexe em si mesmo.
+  const podeEditar = (p) =>
+    p.id !== perfil.id &&
+    (ehDono ? p.papel === 'admin' : perfil.papel === 'admin' ? p.papel !== 'admin' : p.papel === 'pessoa')
+  const podeDesativar = (p) => p.id !== perfil.id && (ehDono ? p.papel === 'admin' : perfil.papel === 'admin' && p.papel !== 'admin')
+
+  async function salvarEdicao(pessoa, { nome, papel, timesAdicionar, timesRemover }) {
+    const mudancas = {}
+    if (nome !== pessoa.nome) mudancas.nome = nome
+    if (papel && papel !== pessoa.papel) mudancas.papel = papel
+    if (Object.keys(mudancas).length) {
+      const { erro: falha } = await gerenciarAcesso('editar', pessoa.id, mudancas)
+      if (falha) return { erro: falha }
+    }
+    for (const timeId of timesAdicionar) {
+      const { erro: falha } = await adicionarMembro(timeId, pessoa.id)
+      if (falha) return { erro: falha }
+    }
+    for (const timeId of timesRemover) {
+      const { erro: falha } = await removerMembro(timeId, pessoa.id)
+      if (falha) return { erro: falha }
+    }
+    toast.success(`${nome} atualizado.`)
+    recarregar()
+    return { erro: null }
+  }
+
+  async function mudarAtivo(pessoa, acao) {
+    const resposta = await gerenciarAcesso(acao, pessoa.id)
+    if (!resposta.erro) {
+      toast.success(acao === 'desativar' ? `${pessoa.nome} foi desativado.` : `${pessoa.nome} foi reativado.`)
+      recarregar()
+    }
+    return resposta
+  }
 
   async function criar(dados) {
     const resposta = await criarAcesso(dados)
@@ -90,22 +137,32 @@ export default function Usuarios() {
   return (
     <>
       <Cabecalho titulo="Usuários"
-        descricao={pessoas ? `${pessoas.length} ${pessoas.length === 1 ? 'pessoa' : 'pessoas'}` : null}>
+        descricao={pessoas ? `${lista.length} ${lista.length === 1 ? 'pessoa' : 'pessoas'}` : null}>
         {!ehDono && (
           <Button onClick={() => setNovo(true)}>
             <Plus /> Novo acesso
           </Button>
         )}
       </Cabecalho>
-      {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
+        <div role="group" aria-label="Mostrar" className="mb-4 inline-flex rounded-lg bg-muted p-1 text-sm font-semibold">
+          {[['ativos', 'Ativos'], ['desativados', 'Desativados']].map(([valor, rotulo]) => (
+            <button key={valor} type="button" aria-pressed={filtro === valor} onClick={() => setFiltro(valor)}
+              className={`rounded-md px-3 py-1 ${filtro === valor ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground'}`}>
+              {rotulo}
+            </button>
+          ))}
+        </div>
+      </div>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!erro && pessoas === null && <GraficoCarregando texto="Carregando as pessoas…" className="py-12" />}
-      {pessoas?.length === 0 && (
+      {pessoas && lista.length === 0 && (
         <div className="rounded-xl border border-dashed bg-card/60 p-8 text-center text-sm text-muted-foreground">
-          Ninguém por aqui ainda.
+          {filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}
         </div>
       )}
-      {pessoas?.length > 0 && (
+      {lista.length > 0 && (
         <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
@@ -118,7 +175,7 @@ export default function Usuarios() {
               </tr>
             </thead>
             <tbody>
-              {pessoas.map((p) => {
+              {lista.map((p) => {
                 const s = situacao(p)
                 const timesVisiveis = ehDono || perfil.papel === 'admin' ? p.times : p.times.filter((t) => meusTimes.has(t.id))
                 return (
@@ -142,8 +199,19 @@ export default function Usuarios() {
                       </div>
                     </td>
                     <td className="px-4 py-3"><Badge variant={COR_DA_SITUACAO[s]}>{s}</Badge></td>
-                    <td className="px-4 py-3 text-right">
-                      {p.convite_pendente && !ehDono && (
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {podeEditar(p) && p.ativo !== false && (
+                        <Button variant="ghost" size="sm" onClick={() => setEditando(p)}>
+                          <Pencil /> Editar
+                        </Button>
+                      )}
+                      {podeDesativar(p) && (
+                        <Button variant="ghost" size="sm" onClick={() => setConfirmando({ pessoa: p, acao: p.ativo === false ? 'reativar' : 'desativar' })}
+                          className={p.ativo === false ? '' : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'}>
+                          {p.ativo === false ? <><UserCheck /> Reativar</> : <><UserX /> Desativar</>}
+                        </Button>
+                      )}
+                      {p.convite_pendente && p.ativo !== false && !ehDono && (
                         <Button variant="ghost" size="sm" disabled={reenviando === p.id} onClick={() => reenviar(p)}>
                           <Send /> Reenviar convite
                         </Button>
@@ -155,6 +223,19 @@ export default function Usuarios() {
             </tbody>
           </table>
         </div>
+      )}
+      {editando && (
+        <EditarAcesso key={editando.id} aberto pessoa={editando} papelDeQuemEdita={perfil.papel} times={ehDono ? [] : times}
+          aoFechar={() => setEditando(null)} aoSalvar={(dados) => salvarEdicao(editando, dados)} />
+      )}
+      {confirmando && (
+        <ConfirmarAcao aberto aoFechar={() => setConfirmando(null)} perigo={confirmando.acao === 'desativar'}
+          titulo={confirmando.acao === 'desativar' ? `Desativar ${confirmando.pessoa.nome}?` : `Reativar ${confirmando.pessoa.nome}?`}
+          descricao={confirmando.acao === 'desativar'
+            ? 'A pessoa não entra mais e some das listas de ativos. Nada é apagado: os times e o histórico ficam, e dá para reativar depois.'
+            : 'A pessoa volta a entrar, do jeito que estava antes de ser desativada.'}
+          rotuloConfirmar={confirmando.acao === 'desativar' ? 'Desativar' : 'Reativar'}
+          aoConfirmar={() => mudarAtivo(confirmando.pessoa, confirmando.acao)} />
       )}
       {!ehDono && (
         <NovoAcesso aberto={novo} aoFechar={() => setNovo(false)} papelDeQuemCria={perfil.papel} times={times}

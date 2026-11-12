@@ -3,7 +3,7 @@ import { traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
 
 const CAMPOS =
-  'id, nome, email, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ' +
+  'id, nome, email, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ativo, ' +
   'times:time_membros!time_membros_pessoa_id_fkey(time:times(id, nome))'
 
 const redirectTo = () => `${window.location.origin}/definir-senha`
@@ -25,5 +25,11 @@ export async function criarAcesso(dados) {
 
 export async function reenviarConvite(pessoaId) {
   const { status, corpo } = await chamarFuncao('reenviar-convite', { pessoa_id: pessoaId, redirectTo: redirectTo() })
+  return { erro: status === 200 ? null : traduzirErroFuncao(corpo.codigo) }
+}
+
+// editar ({ nome?, papel? }), desativar ou reativar (Edge Function gerenciar-acesso).
+export async function gerenciarAcesso(acao, pessoaId, extra = {}) {
+  const { status, corpo } = await chamarFuncao('gerenciar-acesso', { acao, pessoa_id: pessoaId, ...extra })
   return { erro: status === 200 ? null : traduzirErroFuncao(corpo.codigo) }
 }

@@ -15,6 +15,7 @@ const ERROS_AUTH = {
   over_email_send_rate_limit: MUITAS_TENTATIVAS,
   weak_password: 'A senha precisa ter pelo menos 8 caracteres.',
   same_password: 'A senha nova precisa ser diferente da atual.',
+  user_banned: 'Seu acesso está desativado. Fale com o administrador da sua consultoria.',
 }
 
 const ERROS_FUNCAO = {
@@ -24,6 +25,9 @@ const ERROS_FUNCAO = {
   ja_na_consultoria: 'Essa pessoa já tem acesso na sua consultoria.',
   email_indisponivel: 'Não foi possível criar esse acesso com esse e-mail. Fale com o suporte.',
   convite_ja_aceito: 'Essa pessoa já aceitou o convite.',
+  gestor_com_times: 'Essa pessoa ainda é gestora de times. Troque o gestor desses times antes.',
+  consultoria_arquivada: 'A consultoria dessa pessoa está arquivada. Reative a consultoria antes.',
+  nome_em_uso: 'Já existe uma consultoria com esse nome.',
 }
 
 export function traduzirErroAuth(erro) {

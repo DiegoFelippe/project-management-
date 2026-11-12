@@ -12,3 +12,10 @@ describe('situacao', () => {
     expect(situacao({ convite_pendente: true, precisa_trocar_senha: true })).toBe('Convite pendente')
   })
 })
+
+describe('situacao: desativado', () => {
+  it('desativado vem antes de tudo', () => {
+    expect(situacao({ ativo: false, convite_pendente: true, precisa_trocar_senha: false })).toBe('Desativado')
+  })
+})
+

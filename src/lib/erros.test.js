@@ -68,3 +68,13 @@ describe('erroDeRecuperacao (esqueci minha senha)', () => {
     )
   })
 })
+
+describe('mensagens do CRUD', () => {
+  it('traduz os códigos novos', () => {
+    expect(traduzirErroFuncao('gestor_com_times')).toBe('Essa pessoa ainda é gestora de times. Troque o gestor desses times antes.')
+    expect(traduzirErroFuncao('consultoria_arquivada')).toBe('A consultoria dessa pessoa está arquivada. Reative a consultoria antes.')
+    expect(traduzirErroFuncao('nome_em_uso')).toBe('Já existe uma consultoria com esse nome.')
+    expect(traduzirErroAuth({ code: 'user_banned' })).toBe('Seu acesso está desativado. Fale com o administrador da sua consultoria.')
+  })
+})
+
