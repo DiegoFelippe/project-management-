@@ -439,3 +439,9 @@ verify_jwt = false
 
 [functions.reenviar-convite]
 verify_jwt = false
+
+[functions.gerenciar-acesso]
+verify_jwt = false
+
+[functions.gerenciar-consultoria]
+verify_jwt = false
