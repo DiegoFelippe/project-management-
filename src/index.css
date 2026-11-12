@@ -1,111 +1,282 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* As classes dark: dos componentes só valem com .dark no <html> (botão de tema), nunca direto pelo sistema. */
+@custom-variant dark (&:is(.dark *));
+
+/* Visual "claro e azul" (opção C), no conceito do app de música e do Hub:
+   a moldura (trilho e barra de cima) é branca; o conteúdo fica num painel rebaixado cinza-azulado;
+   uma cor de ação só, o azul (botão principal, item aberto do menu, seleção, foco, links).
+   Cores no formato do shadcn/ui. */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --radius: 0.75rem;
+  --moldura: #ffffff;
+  --painel: #eef1f5;
+  --background: #eef1f5;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #eff6ff;
+  --accent-foreground: #1e3a8a;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e2e8f0;
+  --input: #cbd5e1;
+  --ring: #2563eb;
+  --notice: #b45309;
+  --notice-soft: #fef3c7;
+  --positive: #15803d;
+  --positive-soft: #dcfce7;
+  color-scheme: light;
+}
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+/* Modo escuro (classe .dark no <html>; botão de tema na barra de cima). Mesmo conceito: moldura um tom
+   acima do painel rebaixado, um azul só de destaque, um pouco mais claro para manter o contraste. */
+.dark {
+  --moldura: #0e1424;
+  --painel: #080c17;
+  --background: #080c17;
+  --foreground: #e5e9f0;
+  --card: #121a2c;
+  --card-foreground: #e5e9f0;
+  --popover: #121a2c;
+  --popover-foreground: #e5e9f0;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1b2438;
+  --secondary-foreground: #e5e9f0;
+  --muted: #1b2438;
+  --muted-foreground: #94a0b8;
+  --accent: #172554;
+  --accent-foreground: #bfdbfe;
+  --destructive: #f05252;
+  --destructive-foreground: #ffffff;
+  --border: #222c42;
+  --input: #34405a;
+  --ring: #60a5fa;
+  --notice: #fbbf24;
+  --notice-soft: rgb(251 191 36 / 0.14);
+  --positive: #4ade80;
+  --positive-soft: rgb(74 222 128 / 0.14);
+  color-scheme: dark;
+}
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@theme inline {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
+  --color-moldura: var(--moldura);
+  --color-painel: var(--painel);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-notice: var(--notice);
+  --color-notice-soft: var(--notice-soft);
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --animate-page-enter: page-enter 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  --animate-barra: barra 1.1s ease-in-out infinite;
+}
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+/* Gráficos: carregamento em onda e o painel do Início se montando. */
+@keyframes barra {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes crescer {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes desenhar {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes surgir {
+  from { opacity: 0; transform: scale(0.3); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Tela de entrar: rede da consultoria e cartões de gestão. */
+@keyframes entrar {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes flutuar {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes aparecer {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fluxo {
+  to { stroke-dashoffset: -24; }
+}
+
+@keyframes pulso {
+  from { opacity: 0.35; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.9); }
+}
+
+/* "from" só: anima até o valor que o elemento já tem (ex.: o anel para em 87%). */
+@keyframes anel {
+  from { stroke-dashoffset: 100; }
+}
+
+@keyframes encher {
+  from { transform: scaleX(0); }
+}
+
+@keyframes entrar3d {
+  from { opacity: 0; transform: translateY(26px) rotateX(22deg) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes deriva {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(14%, -10%) scale(1.15); }
+}
+
+@keyframes subir {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+
+@theme {
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.06);
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 4px 12px -4px rgb(15 23 42 / 0.08);
+  --shadow-md: 0 2px 4px -1px rgb(15 23 42 / 0.06), 0 12px 28px -10px rgb(15 23 42 / 0.18);
+  --shadow-lg: 0 4px 10px -2px rgb(15 23 42 / 0.08), 0 28px 60px -16px rgb(15 23 42 / 0.3);
+}
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-moldura text-foreground antialiased; }
+  ::selection { background: color-mix(in oklab, var(--primary) 25%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Trilho: todo ícone anima ao passar o mouse ou focar pelo teclado (regra do projeto, ver CLAUDE.md).
+   Animação nova: keyframes "icone-<nome>" + a regra abaixo + o nome em ANIMACOES_DO_MENU (menu.js). */
+@keyframes icone-subir {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-4px); }
+  70% { transform: translateY(1px); }
+}
+@keyframes icone-balancar {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-14deg); }
+  60% { transform: rotate(10deg); }
+}
+@keyframes icone-pulsar {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.22); }
+  65% { transform: scale(0.94); }
+}
+@keyframes icone-abrir {
+  0%, 100% { transform: none; }
+  45% { transform: perspective(60px) rotateX(-28deg) translateY(-1px); }
+}
+@keyframes icone-erguer {
+  0%, 100% { transform: scaleY(1); }
+  40% { transform: translateY(-2px) scaleY(1.18); }
+  70% { transform: scaleY(0.95); }
+}
+@keyframes icone-conectar {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  30% { transform: translate(-2px, 2px) rotate(-8deg); }
+  55% { transform: translate(1px, -1px) rotate(6deg); }
+  75% { transform: translate(0, 0) rotate(-3deg); }
+}
+@keyframes icone-sair {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+.anim-erguer { transform-origin: bottom center; }
+.group:hover .anim-subir, .group:focus-visible .anim-subir { animation: icone-subir 0.55s ease-out; }
+.group:hover .anim-balancar, .group:focus-visible .anim-balancar { animation: icone-balancar 0.6s ease-in-out; }
+.group:hover .anim-pulsar, .group:focus-visible .anim-pulsar { animation: icone-pulsar 0.5s ease-out; }
+.group:hover .anim-abrir, .group:focus-visible .anim-abrir { animation: icone-abrir 0.55s ease-in-out; }
+.group:hover .anim-erguer, .group:focus-visible .anim-erguer { animation: icone-erguer 0.55s ease-out; }
+.group:hover .anim-conectar, .group:focus-visible .anim-conectar { animation: icone-conectar 0.6s ease-in-out; }
+.group:hover .anim-sair, .group:focus-visible .anim-sair { animation: icone-sair 0.5s ease-in-out 2; }
+
+/* App instalado sem a barra de título (Window Controls Overlay): só os botões da janela ficam sobre o app.
+   A barra de cima do app arrasta a janela; o trilho e a tela de entrar descem para não ficar embaixo
+   dos botões da janela (no Mac ficam à esquerda; no Windows, à direita). */
+.faixa-janela { display: none; }
+@media (display-mode: window-controls-overlay) {
+  .barra-topo {
+    -webkit-app-region: drag;
+    app-region: drag;
+    padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 12px);
+  }
+  .barra-topo :is(button, a, [role='button']) { -webkit-app-region: no-drag; app-region: no-drag; }
+  .trilho { padding-top: env(titlebar-area-height, 0px); }
+  .tela-acesso > aside, .tela-acesso > main { padding-top: calc(env(titlebar-area-height, 0px) + 1.5rem); }
+  .faixa-janela {
+    display: block;
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: env(titlebar-area-height, 0px);
+    -webkit-app-region: drag;
+    app-region: drag;
+    z-index: 40;
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+/* Botões: sempre animados (regra do projeto, ver CLAUDE.md). O botão sobe 1px e ganha sombra no hover e
+   afunda ao apertar (classes do componente Button); o ícone dentro dele dá um pulinho. */
+@keyframes icone-botao {
+  0%, 100% { transform: none; }
+  40% { transform: translateY(-1px) scale(1.18) rotate(-6deg); }
+}
+.botao-animado:hover:not(:disabled) > svg,
+.botao-animado:focus-visible > svg { animation: icone-botao 0.45s ease-out; }
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
-  margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}

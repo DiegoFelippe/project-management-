@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Modelos de tela do brainstorming
+.superpowers/
+
+# Service worker do PWA em desenvolvimento (gerado)
+dev-dist
+
+# Cópias do banco local (têm dados; nunca vão para o git)
+supabase/.copias/

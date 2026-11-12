@@ -6,6 +6,8 @@ services:
   app:
     build: .
     image: consultoria-app:dev
+    environment:
+      DOCKER: "1"
     ports:
       - "127.0.0.1:5173:5173"
     volumes:
