@@ -8,6 +8,7 @@ import Inicio from '@/pages/Inicio'
 import Time from '@/pages/Time'
 import Times from '@/pages/Times'
 import TrocarSenha from '@/pages/TrocarSenha'
+import Usuarios from '@/pages/Usuarios'
 
 export default function Rotas() {
   return (
@@ -22,6 +23,7 @@ export default function Rotas() {
           <Route element={<RotaProtegida papeis={['dono', 'admin', 'gestor']} />}>
             <Route path="/times" element={<Times />} />
             <Route path="/times/:id" element={<Time />} />
+            <Route path="/usuarios" element={<Usuarios />} />
           </Route>
         </Route>
       </Route>
