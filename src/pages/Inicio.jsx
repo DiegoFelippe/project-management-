@@ -18,7 +18,7 @@ export default function Inicio() {
             Os projetos chegam em breve. Por enquanto, use o menu para cuidar dos times e das pessoas.
           </p>
         </div>
-        <GraficoInicio className="w-full max-w-md justify-self-center" />
+        <GraficoInicio className="w-full max-w-2xl justify-self-end" />
       </div>
     </section>
   )

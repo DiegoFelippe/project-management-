@@ -86,10 +86,10 @@ export default function Time() {
     <>
       {voltar}
       <Cabecalho titulo={time.nome} descricao={`Gestor: ${time.gestor?.nome ?? '—'}`} />
-      {time.descricao && <p className="-mt-3 mb-5 max-w-2xl text-sm text-muted-foreground">{time.descricao}</p>}
+      {time.descricao && <p className="-mt-3 mb-5 text-sm text-muted-foreground">{time.descricao}</p>}
 
       {gerencio && (
-        <div className="mb-5 flex max-w-xl flex-wrap items-end gap-2 rounded-xl border bg-card p-3 shadow-xs">
+        <div className="mb-5 flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3 shadow-xs">
           <div className="grid min-w-56 flex-1 gap-1.5">
             <Label htmlFor="colocar-pessoa">Colocar pessoa</Label>
             <SelectNativo id="colocar-pessoa" value={escolhida} onChange={(e) => setEscolhida(e.target.value)}>
@@ -105,7 +105,7 @@ export default function Time() {
         </div>
       )}
 
-      <ul className="grid max-w-3xl gap-2" aria-label="Pessoas do time">
+      <ul className="grid gap-2 lg:grid-cols-2 2xl:grid-cols-3" aria-label="Pessoas do time">
         {time.membros.length === 0 && (
           <li className="rounded-xl border border-dashed bg-card/60 p-6 text-center text-sm text-muted-foreground">
             Ninguém no time ainda.

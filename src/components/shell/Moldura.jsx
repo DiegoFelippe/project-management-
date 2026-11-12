@@ -32,7 +32,7 @@ export default function Moldura() {
         <BarraTopo aoAbrirMenu={() => setGaveta(true)} />
         <main id="conteudo"
           className="relative min-h-0 flex-1 overflow-y-auto bg-painel shadow-[inset_0_2px_8px_rgb(15_23_42/0.07)] md:rounded-tl-2xl md:border-t md:border-l">
-          <div key={pathname.split('/')[1]} className="mx-auto w-full max-w-[1400px] animate-page-enter p-4 md:p-6">
+          <div key={pathname.split('/')[1]} className="w-full animate-page-enter p-4 md:p-6">
             <Outlet />
           </div>
         </main>

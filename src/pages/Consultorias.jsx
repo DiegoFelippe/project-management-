@@ -69,7 +69,7 @@ export default function Consultorias() {
         </div>
       )}
       {consultorias?.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {consultorias.map((c) => (
             <article key={c.id} className="grid gap-3 rounded-xl border bg-card p-4 shadow-xs">
               <div className="flex items-start gap-3">

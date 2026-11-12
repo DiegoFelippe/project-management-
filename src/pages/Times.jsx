@@ -84,7 +84,7 @@ export default function Times() {
         </div>
       )}
       {times?.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {times.map((t) => (
             <CartaoTime key={t.id} time={t} />
           ))}
