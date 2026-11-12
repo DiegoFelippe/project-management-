@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-export default function RenomearConsultoria({ aberto, aoFechar, consultoria, aoSalvar }) {
+// Editar consultoria (só o dono): o nome. Arquivar e reativar ficam na linha da tabela.
+export default function EditarConsultoria({ aberto, aoFechar, consultoria, aoSalvar }) {
   const [nome, setNome] = useState(consultoria?.nome ?? '')
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
@@ -25,13 +26,13 @@ export default function RenomearConsultoria({ aberto, aoFechar, consultoria, aoS
     <Dialog open={aberto} onOpenChange={(abrir) => !abrir && aoFechar()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Renomear consultoria</DialogTitle>
+          <DialogTitle>Editar consultoria</DialogTitle>
           <DialogDescription>O nome aparece para todos da consultoria.</DialogDescription>
         </DialogHeader>
         <form noValidate onSubmit={salvar} className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="renomear-consultoria">Nome da consultoria</Label>
-            <Input id="renomear-consultoria" className="h-10" maxLength={120} value={nome} onChange={(e) => setNome(e.target.value)} />
+            <Label htmlFor="editar-consultoria">Nome da consultoria</Label>
+            <Input id="editar-consultoria" className="h-10" maxLength={120} value={nome} onChange={(e) => setNome(e.target.value)} />
           </div>
           {erro && <Aviso>{erro}</Aviso>}
           <DialogFooter>

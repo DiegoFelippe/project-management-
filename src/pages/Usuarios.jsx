@@ -7,6 +7,7 @@ import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
+import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -158,71 +159,56 @@ export default function Usuarios() {
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!erro && pessoas === null && <GraficoCarregando texto="Carregando as pessoas…" className="py-12" />}
       {pessoas && lista.length === 0 && (
-        <div className="rounded-xl border border-dashed bg-card/60 p-8 text-center text-sm text-muted-foreground">
-          {filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}
-        </div>
+        <ListaVazia>{filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}</ListaVazia>
       )}
       {lista.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Nome</th>
-                <th className="px-4 py-2.5 font-medium">Papel</th>
-                <th className="px-4 py-2.5 font-medium">Times</th>
-                <th className="px-4 py-2.5 font-medium">Situação</th>
-                <th className="px-4 py-2.5"><span className="sr-only">Ações</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map((p) => {
-                const s = situacao(p)
-                const timesVisiveis = ehDono || perfil.papel === 'admin' ? p.times : p.times.filter((t) => meusTimes.has(t.id))
-                return (
-                  <tr key={p.id} className="border-b last:border-0">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar pessoa={p} className="size-8 text-[11px]" />
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold">{p.nome}</p>
-                          <p className="truncate text-xs text-muted-foreground">{p.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{NOME_DO_PAPEL[p.papel]}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {timesVisiveis.length === 0 && <span className="text-muted-foreground">—</span>}
-                        {timesVisiveis.map((t) => (
-                          <Badge key={t.id} variant="outline" className="font-medium">{t.nome}</Badge>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3"><Badge variant={COR_DA_SITUACAO[s]}>{s}</Badge></td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      {podeEditar(p) && p.ativo !== false && (
-                        <Button variant="ghost" size="sm" onClick={() => setEditando(p)}>
-                          <Pencil /> Editar
-                        </Button>
-                      )}
-                      {podeDesativar(p) && (
-                        <Button variant="ghost" size="sm" onClick={() => setConfirmando({ pessoa: p, acao: p.ativo === false ? 'reativar' : 'desativar' })}
-                          className={p.ativo === false ? '' : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'}>
-                          {p.ativo === false ? <><UserCheck /> Reativar</> : <><UserX /> Desativar</>}
-                        </Button>
-                      )}
-                      {p.convite_pendente && p.ativo !== false && !ehDono && (
-                        <Button variant="ghost" size="sm" disabled={reenviando === p.id} onClick={() => reenviar(p)}>
-                          <Send /> Reenviar convite
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <Tabela rotulo="Usuários" colunas={['Nome', 'Papel', 'Times', 'Situação']}>
+          {lista.map((p) => {
+            const s = situacao(p)
+            const timesVisiveis = ehDono || perfil.papel === 'admin' ? p.times : p.times.filter((t) => meusTimes.has(t.id))
+            return (
+              <Linha key={p.id}>
+                <Celula>
+                  <div className="flex items-center gap-3">
+                    <Avatar pessoa={p} className="size-8 text-[11px]" />
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{p.nome}</p>
+                      <p className="truncate text-xs text-muted-foreground">{p.email}</p>
+                    </div>
+                  </div>
+                </Celula>
+                <Celula className="text-muted-foreground">{NOME_DO_PAPEL[p.papel]}</Celula>
+                <Celula>
+                  <div className="flex flex-wrap gap-1">
+                    {timesVisiveis.length === 0 && <span className="text-muted-foreground">—</span>}
+                    {timesVisiveis.map((t) => (
+                      <Badge key={t.id} variant="outline" className="font-medium">{t.nome}</Badge>
+                    ))}
+                  </div>
+                </Celula>
+                <Celula><Badge variant={COR_DA_SITUACAO[s]}>{s}</Badge></Celula>
+                <CelulaAcoes>
+                  {podeEditar(p) && p.ativo !== false && (
+                    <Button variant="ghost" size="sm" onClick={() => setEditando(p)}>
+                      <Pencil /> Editar
+                    </Button>
+                  )}
+                  {podeDesativar(p) && (
+                    <Button variant="ghost" size="sm" onClick={() => setConfirmando({ pessoa: p, acao: p.ativo === false ? 'reativar' : 'desativar' })}
+                      className={p.ativo === false ? '' : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'}>
+                      {p.ativo === false ? <><UserCheck /> Reativar</> : <><UserX /> Desativar</>}
+                    </Button>
+                  )}
+                  {p.convite_pendente && p.ativo !== false && !ehDono && (
+                    <Button variant="ghost" size="sm" disabled={reenviando === p.id} onClick={() => reenviar(p)}>
+                      <Send /> Reenviar convite
+                    </Button>
+                  )}
+                </CelulaAcoes>
+              </Linha>
+            )
+          })}
+        </Tabela>
       )}
       {editando && (
         <EditarAcesso key={editando.id} aberto pessoa={editando} papelDeQuemEdita={perfil.papel} times={ehDono ? [] : times}

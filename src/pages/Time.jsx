@@ -1,4 +1,4 @@
-import { ArrowLeft, Pencil, Trash2, UserPlus } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, UserMinus, UserPlus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -7,6 +7,7 @@ import Avatar from '@/components/comum/Avatar'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
+import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import EditarTime from '@/components/times/EditarTime'
 import { Button } from '@/components/ui/button'
@@ -146,28 +147,33 @@ export default function Time() {
         </div>
       )}
 
-      <ul className="grid gap-2 lg:grid-cols-2 2xl:grid-cols-3" aria-label="Pessoas do time">
-        {time.membros.length === 0 && (
-          <li className="rounded-xl border border-dashed bg-card/60 p-6 text-center text-sm text-muted-foreground">
-            Ninguém no time ainda.
-          </li>
-        )}
-        {time.membros.map((p) => (
-          <li key={p.id} className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs">
-            <Avatar pessoa={p} className="size-8 text-[11px]" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">{p.nome}</p>
-              <p className="truncate text-xs text-muted-foreground">{p.email} · {NOME_DO_PAPEL[p.papel]}</p>
-            </div>
-            {gerencio && (
-              <Button variant="ghost" size="sm" disabled={ocupado} onClick={() => tirar(p)}
-                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-                Tirar do time
-              </Button>
-            )}
-          </li>
-        ))}
-      </ul>
+      {time.membros.length === 0 && <ListaVazia>Ninguém no time ainda.</ListaVazia>}
+      {time.membros.length > 0 && (
+        <Tabela rotulo="Pessoas do time" colunas={['Nome', 'Papel']} larguraMinima={560}>
+          {time.membros.map((p) => (
+            <Linha key={p.id}>
+              <Celula>
+                <div className="flex items-center gap-3">
+                  <Avatar pessoa={p} className="size-8 text-[11px]" />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{p.nome}</p>
+                    <p className="truncate text-xs text-muted-foreground">{p.email}</p>
+                  </div>
+                </div>
+              </Celula>
+              <Celula className="text-muted-foreground">{NOME_DO_PAPEL[p.papel]}</Celula>
+              <CelulaAcoes>
+                {gerencio && (
+                  <Button variant="ghost" size="sm" disabled={ocupado} onClick={() => tirar(p)}
+                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                    <UserMinus /> Tirar do time
+                  </Button>
+                )}
+              </CelulaAcoes>
+            </Linha>
+          ))}
+        </Tabela>
+      )}
     </>
   )
 }

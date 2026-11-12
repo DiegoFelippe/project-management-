@@ -4,8 +4,9 @@ import { toast } from 'sonner'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
+import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import NovaConsultoria from '@/components/consultorias/NovaConsultoria'
-import RenomearConsultoria from '@/components/consultorias/RenomearConsultoria'
+import EditarConsultoria from '@/components/consultorias/EditarConsultoria'
 import { Button } from '@/components/ui/button'
 import NovoAcesso from '@/components/usuarios/NovoAcesso'
 import { criarConsultoria, gerenciarConsultoria, listarConsultorias } from '@/data/consultorias'
@@ -19,7 +20,7 @@ export default function Consultorias() {
   const [nova, setNova] = useState(false)
   const [novoAdminEm, setNovoAdminEm] = useState(null)
   const [filtro, setFiltro] = useState('ativas')
-  const [renomeando, setRenomeando] = useState(null)
+  const [editando, setEditando] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
   const lista = useMemo(
     () => (consultorias ?? []).filter((c) => (filtro === 'ativas' ? !c.arquivada : c.arquivada)),
@@ -91,42 +92,41 @@ export default function Consultorias() {
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!erro && consultorias === null && <GraficoCarregando texto="Carregando as consultorias…" className="py-12" />}
       {consultorias && lista.length === 0 && (
-        <div className="rounded-xl border border-dashed bg-card/60 p-8 text-center text-sm text-muted-foreground">
+        <ListaVazia>
           {filtro === 'ativas' ? 'Nenhuma consultoria ainda. Cadastre a primeira em "Nova consultoria".' : 'Nenhuma consultoria arquivada.'}
-        </div>
+        </ListaVazia>
       )}
       {lista.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <Tabela rotulo="Consultorias" colunas={['Consultoria', 'Administração', 'Pessoas', 'Times']} larguraMinima={880}>
           {lista.map((c) => (
-            <article key={c.id} className="grid gap-3 rounded-xl border bg-card p-4 shadow-xs">
-              <div className="flex items-start gap-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
-                  <Building2 className="size-[18px]" />
-                </span>
-                <div className="min-w-0">
-                  <h2 className="truncate text-base font-semibold">{c.nome}</h2>
-                  <p className="text-xs text-muted-foreground">
-                    {plural(c.pessoas, 'pessoa', 'pessoas')} · {plural(c.times, 'time', 'times')}
-                  </p>
+            <Linha key={c.id}>
+              <Celula>
+                <div className="flex items-center gap-3">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
+                    <Building2 className="size-4" />
+                  </span>
+                  <span className="truncate font-semibold">{c.nome}</span>
                 </div>
-              </div>
-              <div className="grid gap-1 text-sm">
-                <p className="text-xs font-medium text-muted-foreground">Administração</p>
-                {c.admins.length === 0 && <p className="text-muted-foreground">Sem administrador</p>}
+              </Celula>
+              <Celula>
+                {c.admins.length === 0 && <span className="text-muted-foreground">Sem administrador</span>}
                 {c.admins.map((a) => (
                   <p key={a.id} className="truncate">
-                    {a.nome} <span className="text-muted-foreground">· {a.email}{a.convite_pendente ? ' · convite pendente' : ''}</span>
+                    <span>{a.nome}</span>{' '}
+                    <span className="text-xs text-muted-foreground">· {a.email}{a.convite_pendente ? ' · convite pendente' : ''}</span>
                   </p>
                 ))}
-              </div>
-              <div className="flex flex-wrap gap-2">
+              </Celula>
+              <Celula className="text-muted-foreground tabular-nums">{c.pessoas}</Celula>
+              <Celula className="text-muted-foreground tabular-nums">{c.times}</Celula>
+              <CelulaAcoes>
                 {!c.arquivada && (
                   <>
-                    <Button variant="outline" size="sm" onClick={() => setNovoAdminEm(c.id)}>
+                    <Button variant="ghost" size="sm" onClick={() => setNovoAdminEm(c.id)}>
                       <UserPlus /> Novo administrador
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setRenomeando(c)}>
-                      <Pencil /> Renomear
+                    <Button variant="ghost" size="sm" onClick={() => setEditando(c)}>
+                      <Pencil /> Editar
                     </Button>
                   </>
                 )}
@@ -134,14 +134,14 @@ export default function Consultorias() {
                   className={c.arquivada ? '' : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'}>
                   {c.arquivada ? <><ArchiveRestore /> Reativar</> : <><Archive /> Arquivar</>}
                 </Button>
-              </div>
-            </article>
+              </CelulaAcoes>
+            </Linha>
           ))}
-        </div>
+        </Tabela>
       )}
-      {renomeando && (
-        <RenomearConsultoria key={renomeando.id} aberto consultoria={renomeando} aoFechar={() => setRenomeando(null)}
-          aoSalvar={(nome) => gerenciar('renomear', renomeando, { nome })} />
+      {editando && (
+        <EditarConsultoria key={editando.id} aberto consultoria={editando} aoFechar={() => setEditando(null)}
+          aoSalvar={(nome) => gerenciar('renomear', editando, { nome })} />
       )}
       {confirmando && (
         <ConfirmarAcao aberto aoFechar={() => setConfirmando(null)} perigo={confirmando.acao === 'arquivar'}

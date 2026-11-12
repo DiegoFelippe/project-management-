@@ -38,6 +38,18 @@ Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na 
 - Os itens do trilho têm animação própria (seção acima) e são marcados com `data-item-trilho`.
 - `src/components/ui/button.test.jsx` varre o código e falha se algum `<button>` ficar sem animação.
 
+## Listas: sempre em tabela, e Editar abre o formulário preenchido
+
+- **Toda lista de itens é uma tabela no padrão da tela Usuários** (pessoas, times, consultorias, pessoas
+  do time e o que vier). Pedido do Diego (2026-11-12). Grade de cartões não serve para lista.
+- **Use o componente** `Tabela` (`src/components/comum/Tabela.jsx`) com `Linha`, `Celula` e
+  `CelulaAcoes`, e `ListaVazia` quando não houver nada. A tabela tem nome (`rotulo`), uma linha por item
+  e as ações da linha na última coluna (Editar, Desativar, Apagar...).
+- **Editar abre um formulário (janela) com o item daquela linha já preenchido.** Salvar atualiza a
+  lista. O mesmo formulário serve para a tela de detalhe, quando houver.
+- **Teste de tela para cada lista:** a tabela pelo nome e o Editar abrindo com os dados da linha
+  escolhida (exemplos em `src/pages/Times.test.jsx` e `src/pages/Consultorias.test.jsx`).
+
 ## Layout
 
 - Telas internas ocupam a largura toda: nada de `max-w-*` + `mx-auto` no conteúdo da página.
