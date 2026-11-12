@@ -15,7 +15,8 @@
     "env:local": "node scripts/env-local.mjs",
     "app:up": "docker compose up -d --build --renew-anon-volumes",
     "app:down": "docker compose down",
-    "app:logs": "docker compose logs -f app"
+    "app:logs": "docker compose logs -f app",
+    "test:db": "supabase test db"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0",
