@@ -63,3 +63,5 @@ Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na 
 - Toda tabela nova: RLS ligado, `GRANT` explícito só para `authenticated`, recorte por consultoria
   (funções em `private`) e teste em `supabase/tests/database/`.
 - Criar login, papel ou consultoria só pelas Edge Functions (`supabase/functions/`).
+- Fotos e logos ficam no Storage (buckets `fotos` e `logos`), na pasta do dono do arquivo
+  (`<id>/<uuid>.webp`). Quem pode mudar: `private.posso_mudar_foto` e `private.posso_mudar_logo`.

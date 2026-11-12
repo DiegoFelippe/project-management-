@@ -3,7 +3,7 @@ import { traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
 
 const CAMPOS =
-  'id, nome, email, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ativo, ' +
+  'id, nome, email, foto, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ativo, ' +
   'times:time_membros!time_membros_pessoa_id_fkey(time:times(id, nome))'
 
 const redirectTo = () => `${window.location.origin}/definir-senha`

@@ -1,7 +1,8 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gerenciarConsultoria, listarConsultorias } from '@/data/consultorias'
+import { trocarLogo } from '@/data/imagens'
 import { renderizarTela } from '@/test/renderizar'
 import Consultorias from './Consultorias'
 
@@ -9,6 +10,12 @@ vi.mock('@/data/consultorias', () => ({
   listarConsultorias: vi.fn(), criarConsultoria: vi.fn(), gerenciarConsultoria: vi.fn(),
 }))
 vi.mock('@/data/usuarios', () => ({ criarAcesso: vi.fn() }))
+vi.mock('@/data/imagens', () => ({ trocarLogo: vi.fn().mockResolvedValue({ erro: null }), tirarLogo: vi.fn() }))
+
+beforeAll(() => {
+  URL.createObjectURL = vi.fn(() => 'blob:previa')
+  URL.revokeObjectURL = vi.fn()
+})
 
 const dono = { id: 'd1', papel: 'dono', consultoria_id: null }
 
@@ -41,5 +48,15 @@ describe('Consultorias', () => {
     await userEvent.type(nome, ' Brasil')
     await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
     expect(gerenciarConsultoria).toHaveBeenCalledWith('renomear', 'c2', { nome: 'Beta Brasil' })
+  })
+
+  it('a logo escolhida no Editar vai para o Storage, sem renomear se o nome não mudou', async () => {
+    renderizarTela(<Consultorias />, { perfil: dono })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Acme/ })).getByRole('button', { name: 'Editar' }))
+    const arquivo = new File(['x'], 'logo.png', { type: 'image/png' })
+    await userEvent.upload(screen.getByLabelText('Escolher logo'), arquivo)
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(trocarLogo).toHaveBeenCalledWith('c1', arquivo, undefined)
+    expect(gerenciarConsultoria).not.toHaveBeenCalled()
   })
 })

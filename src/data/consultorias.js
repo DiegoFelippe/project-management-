@@ -12,12 +12,13 @@ export async function listarNomesDeConsultorias() {
 export async function listarConsultorias() {
   const { data, error } = await supabase
     .from('consultorias')
-    .select('id, nome, arquivada_em, perfis(id, nome, email, papel, convite_pendente, ativo), times(id)')
+    .select('id, nome, logo, arquivada_em, perfis(id, nome, email, papel, convite_pendente, ativo), times(id)')
     .order('nome')
   if (error) throw error
   return data.map((c) => ({
     id: c.id,
     nome: c.nome,
+    logo: c.logo,
     arquivada: Boolean(c.arquivada_em),
     admins: c.perfis.filter((p) => p.papel === 'admin'),
     pessoas: c.perfis.length,

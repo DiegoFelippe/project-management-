@@ -1,19 +1,23 @@
 import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import CampoImagem from '@/components/comum/CampoImagem'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SelectNativo } from '@/components/ui/select-nativo'
+import { urlPublica } from '@/lib/imagem'
+import { iniciais } from '@/lib/nomes'
 import { cn } from '@/lib/utils'
 
-// Editar acesso: nome (todos que podem editar), papel (só o administrador, pessoa ↔ gestor) e times
+// Editar acesso: foto e nome (todos que podem editar), papel (só o administrador, pessoa ↔ gestor) e times
 // (administrador: todos da consultoria; gestor: só os dele). E-mail não muda (decisão do Diego).
 export default function EditarAcesso({ aberto, aoFechar, pessoa, papelDeQuemEdita, times = [], aoSalvar }) {
   const timesIniciais = (pessoa?.times ?? []).map((t) => t.id).filter((id) => times.some((t) => t.id === id))
   const [nome, setNome] = useState(pessoa?.nome ?? '')
   const [papel, setPapel] = useState(pessoa?.papel ?? 'pessoa')
   const [marcados, setMarcados] = useState(timesIniciais)
+  const [foto, setFoto] = useState(null)
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
   const mudaPapel = papelDeQuemEdita === 'admin'
@@ -31,6 +35,7 @@ export default function EditarAcesso({ aberto, aoFechar, pessoa, papelDeQuemEdit
       papel: mudaPapel ? papel : undefined,
       timesAdicionar: marcados.filter((id) => !timesIniciais.includes(id)),
       timesRemover: timesIniciais.filter((id) => !marcados.includes(id)),
+      foto,
     })
     setEnviando(false)
     if (resposta?.erro) return setErro(resposta.erro)
@@ -45,6 +50,8 @@ export default function EditarAcesso({ aberto, aoFechar, pessoa, papelDeQuemEdit
           <DialogDescription>O e-mail não muda. Para trocar de e-mail, crie um acesso novo e desative este.</DialogDescription>
         </DialogHeader>
         <form noValidate onSubmit={salvar} className="grid gap-4">
+          <CampoImagem rotulo="foto" atual={urlPublica('fotos', pessoa?.foto)} reserva={iniciais(nome || pessoa?.nome || '')}
+            valor={foto} aoMudar={setFoto} />
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="editar-nome">Nome</Label>

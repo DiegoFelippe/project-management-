@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MENSAGEM_SSO, erroDeRecuperacao, traduzirErroAuth } from '@/lib/erros'
 import { provedorLigado, supabase } from '@/lib/supabase'
+import { adotarTemaDoPerfil } from '@/tema/tema'
 import { AuthContext } from './useAuth'
 
-const CAMPOS_PERFIL = 'id, nome, email, papel, consultoria_id, precisa_trocar_senha, consultoria:consultorias(nome)'
+const CAMPOS_PERFIL =
+  'id, nome, email, foto, papel, consultoria_id, precisa_trocar_senha, consultoria:consultorias(nome, logo), preferencias(tema)'
 
 const resultado = (error) => ({ erro: error ? traduzirErroAuth(error) : null })
 
@@ -26,6 +28,9 @@ export default function AuthProvider({ children }) {
       setPerfil(null)
       return
     }
+    // o tema salvo no perfil vira o padrão deste navegador
+    const preferencias = Array.isArray(data.preferencias) ? data.preferencias[0] : data.preferencias
+    adotarTemaDoPerfil(preferencias?.tema)
     setPerfil(data)
   }, [])
 

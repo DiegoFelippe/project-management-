@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import Logo from '@/components/shell/Logo'
+import BotaoTema from '@/tema/BotaoTema'
 import AnimacaoGestao from './AnimacaoGestao'
 
 // Telas fora da moldura (entrar, senha): arte à esquerda e o conteúdo à direita.
@@ -27,7 +28,9 @@ export default function TelaDeAcesso({ children }) {
           </p>
         </div>
       </aside>
-      <main className="flex items-center justify-center px-6 py-10">
+      <main className="relative flex items-center justify-center px-6 py-10">
+        {/* tema escolhido aqui fica guardado neste navegador (e vira o do perfil quando a pessoa escolher lá dentro) */}
+        <BotaoTema className="absolute top-[calc(env(titlebar-area-height,0px)+1rem)] right-4" />
         <div className="w-full max-w-sm">{children}</div>
       </main>
     </div>

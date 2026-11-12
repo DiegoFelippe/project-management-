@@ -1,5 +1,6 @@
-// Tema do app: 'sistema' (segue o computador), 'claro' ou 'escuro'. A escolha fica neste navegador.
-// O index.html aplica o tema antes de a página aparecer, para não piscar claro.
+// Tema do app: 'sistema' (segue o computador), 'claro' ou 'escuro'. A escolha fica neste navegador
+// (vale também na tela de login) e, com a pessoa logada, no perfil dela: ao entrar em outro computador,
+// o tema salvo no perfil vira o padrão de lá. O index.html aplica o tema antes de a página aparecer.
 export const CHAVE_TEMA = 'consultoria:tema'
 export const TEMAS = ['sistema', 'claro', 'escuro']
 // Cor da barra da janela do app instalado (e da barra do navegador no celular): a mesma da moldura
@@ -37,4 +38,14 @@ export function aplicarTema(tema) {
     document.head.append(meta)
   }
   meta.content = escuro ? COR_DA_BARRA.escuro : COR_DA_BARRA.claro
+}
+
+// Avisa os botões de tema abertos quando o tema muda por fora (ex.: o salvo no perfil, ao entrar).
+export const EVENTO_TEMA = 'consultoria:tema'
+
+export function adotarTemaDoPerfil(tema) {
+  if (!TEMAS.includes(tema)) return
+  guardarTema(tema)
+  aplicarTema(tema)
+  window.dispatchEvent(new CustomEvent(EVENTO_TEMA, { detail: tema }))
 }

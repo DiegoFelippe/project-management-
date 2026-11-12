@@ -8,6 +8,8 @@ import BarraTopo from '@/components/shell/BarraTopo'
 import { manifesto } from './manifesto'
 import { useInstalar } from './useInstalar'
 
+vi.mock('@/data/preferencias', () => ({ salvarTema: vi.fn().mockResolvedValue(undefined) }))
+
 function eventoDeInstalar() {
   const evento = new Event('beforeinstallprompt', { cancelable: true })
   evento.prompt = vi.fn().mockResolvedValue(undefined)

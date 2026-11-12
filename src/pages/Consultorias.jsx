@@ -10,6 +10,8 @@ import EditarConsultoria from '@/components/consultorias/EditarConsultoria'
 import { Button } from '@/components/ui/button'
 import NovoAcesso from '@/components/usuarios/NovoAcesso'
 import { criarConsultoria, gerenciarConsultoria, listarConsultorias } from '@/data/consultorias'
+import { tirarLogo, trocarLogo } from '@/data/imagens'
+import { urlPublica } from '@/lib/imagem'
 import { criarAcesso } from '@/data/usuarios'
 
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`
@@ -30,11 +32,24 @@ export default function Consultorias() {
   async function gerenciar(acao, c, extra) {
     const resposta = await gerenciarConsultoria(acao, c.id, extra)
     if (!resposta.erro) {
-      const feito = { renomear: 'renomeada', arquivar: 'arquivada', reativar: 'reativada' }[acao]
+      const feito = { arquivar: 'arquivada', reativar: 'reativada' }[acao]
       toast.success(`${extra?.nome ?? c.nome} ${feito}.`)
       recarregar()
     }
     return resposta
+  }
+  async function salvarEdicao(c, { nome, logo }) {
+    if (nome !== c.nome) {
+      const resposta = await gerenciarConsultoria('renomear', c.id, { nome })
+      if (resposta.erro) return resposta
+    }
+    if (logo?.arquivo || logo?.tirar) {
+      const resposta = logo.arquivo ? await trocarLogo(c.id, logo.arquivo, c.logo) : await tirarLogo(c.id, c.logo)
+      if (resposta.erro) return resposta
+    }
+    toast.success(`${nome} atualizada.`)
+    recarregar()
+    return { erro: null }
   }
   const [versao, setVersao] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
@@ -102,9 +117,13 @@ export default function Consultorias() {
             <Linha key={c.id}>
               <Celula>
                 <div className="flex items-center gap-3">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
-                    <Building2 className="size-4" />
-                  </span>
+                  {c.logo
+                    ? <img src={urlPublica('logos', c.logo)} alt="" loading="lazy" className="size-8 shrink-0 rounded-lg border bg-white object-contain p-0.5" />
+                    : (
+                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
+                        <Building2 className="size-4" />
+                      </span>
+                    )}
                   <span className="truncate font-semibold">{c.nome}</span>
                 </div>
               </Celula>
@@ -141,7 +160,7 @@ export default function Consultorias() {
       )}
       {editando && (
         <EditarConsultoria key={editando.id} aberto consultoria={editando} aoFechar={() => setEditando(null)}
-          aoSalvar={(nome) => gerenciar('renomear', editando, { nome })} />
+          aoSalvar={(dados) => salvarEdicao(editando, dados)} />
       )}
       {confirmando && (
         <ConfirmarAcao aberto aoFechar={() => setConfirmando(null)} perigo={confirmando.acao === 'arquivar'}

@@ -1,6 +1,7 @@
 // POST /functions/v1/gerenciar-acesso — { acao: 'editar' | 'desativar' | 'reativar', pessoa_id, nome?, papel? }
 // Dono cuida dos administradores; administrador, de gestores e pessoas da consultoria dele;
-// gestor só muda o nome das pessoas que vê. Ninguém mexe em si mesmo. E-mail não muda.
+// gestor só muda o nome das pessoas que vê. Em si mesmo ("Meu perfil"), cada um muda só o próprio nome:
+// não troca o próprio papel nem se desativa. E-mail não muda.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
 import { clienteAdmin, type Perfil, quemChama } from '../_shared/clientes.ts'
 import { Falha, lerJson, responder, servir } from '../_shared/http.ts'
@@ -43,10 +44,11 @@ servir(async (req) => {
     throw new Falha(400, 'dados_invalidos', { campo: 'acao' })
   }
   const pessoaId = validarUuid(corpo.pessoa_id, 'pessoa_id')
-  if (pessoaId === quem.id) throw new Falha(403, 'sem_permissao')
+  const euMesmo = pessoaId === quem.id
+  if (euMesmo && acao !== 'editar') throw new Falha(403, 'sem_permissao')
 
   const { data: alvo } = await admin.from('perfis').select('*').eq('id', pessoaId).maybeSingle()
-  const poder = alvo ? await poderSobre(admin, quem, alvo as Perfil) : null
+  const poder: Poder = euMesmo ? 'nome' : alvo ? await poderSobre(admin, quem, alvo as Perfil) : null
   if (!poder) throw new Falha(403, 'sem_permissao')
 
   if (acao === 'editar') {

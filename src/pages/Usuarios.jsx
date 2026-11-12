@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import EditarAcesso from '@/components/usuarios/EditarAcesso'
 import NovoAcesso from '@/components/usuarios/NovoAcesso'
+import { tirarFoto, trocarFoto } from '@/data/imagens'
 import { adicionarMembro, listarTimes, removerMembro } from '@/data/times'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { situacao } from '@/lib/situacao'
@@ -74,7 +75,7 @@ export default function Usuarios() {
     (ehDono ? p.papel === 'admin' : perfil.papel === 'admin' ? p.papel !== 'admin' : p.papel === 'pessoa')
   const podeDesativar = (p) => p.id !== perfil.id && (ehDono ? p.papel === 'admin' : perfil.papel === 'admin' && p.papel !== 'admin')
 
-  async function salvarEdicao(pessoa, { nome, papel, timesAdicionar, timesRemover }) {
+  async function salvarEdicao(pessoa, { nome, papel, timesAdicionar, timesRemover, foto }) {
     const mudancas = {}
     if (nome !== pessoa.nome) mudancas.nome = nome
     if (papel && papel !== pessoa.papel) mudancas.papel = papel
@@ -88,6 +89,10 @@ export default function Usuarios() {
     }
     for (const timeId of timesRemover) {
       const { erro: falha } = await removerMembro(timeId, pessoa.id)
+      if (falha) return { erro: falha }
+    }
+    if (foto?.arquivo || foto?.tirar) {
+      const { erro: falha } = foto.arquivo ? await trocarFoto(pessoa.id, foto.arquivo, pessoa.foto) : await tirarFoto(pessoa.id, pessoa.foto)
       if (falha) return { erro: falha }
     }
     toast.success(`${nome} atualizado.`)

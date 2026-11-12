@@ -60,8 +60,8 @@ describe('gerenciar-acesso', () => {
     expect((await acesso(comoGestor, { acao: 'editar', pessoa_id: pessoa2.id, nome: 'Não Pode' })).status).toBe(403)
   })
 
-  it('admin não mexe em si mesmo nem em outro admin; outra consultoria não mexe', async () => {
-    expect((await acesso(comoAdminA, { acao: 'editar', pessoa_id: adminA.id, nome: 'Eu Mesmo' })).status).toBe(403)
+  it('admin não muda o próprio papel nem mexe em outro admin; outra consultoria não mexe', async () => {
+    expect((await acesso(comoAdminA, { acao: 'editar', pessoa_id: adminA.id, papel: 'gestor' })).status).toBe(403)
     expect((await acesso(comoAdminA, { acao: 'desativar', pessoa_id: adminA2.id })).status).toBe(403)
     expect((await acesso(comoAdminB, { acao: 'desativar', pessoa_id: pessoa.id })).status).toBe(403)
   })

@@ -4,8 +4,8 @@ import { supabase } from '@/lib/supabase'
 
 const CAMPOS =
   'id, nome, descricao, consultoria_id, gestor_id, ' +
-  'gestor:perfis!times_gestor_id_fkey(id, nome), ' +
-  'membros:time_membros(pessoa:perfis!time_membros_pessoa_id_fkey(id, nome, email, papel))'
+  'gestor:perfis!times_gestor_id_fkey(id, nome, foto), ' +
+  'membros:time_membros(pessoa:perfis!time_membros_pessoa_id_fkey(id, nome, email, foto, papel))'
 
 // Membro que quem olha não pode ver vem nulo: fica de fora da lista (mas conta no total do banco).
 function normalizar(time) {

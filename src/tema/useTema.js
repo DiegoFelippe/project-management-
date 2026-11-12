@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react'
-import { aplicarTema, guardarTema, lerTema } from './tema'
+import { EVENTO_TEMA, aplicarTema, guardarTema, lerTema } from './tema'
 
 const PROXIMO = { claro: 'escuro', escuro: 'sistema', sistema: 'claro' }
 export const NOME_DO_TEMA = { claro: 'Claro', escuro: 'Escuro', sistema: 'Sistema' }
 
-export function useTema() {
+// aoTrocar: chamado com o tema novo quando a pessoa clica (a barra de cima salva no perfil).
+export function useTema({ aoTrocar } = {}) {
   const [tema, setTema] = useState(lerTema)
+
+  useEffect(() => {
+    const ouvir = (evento) => setTema(evento.detail)
+    window.addEventListener(EVENTO_TEMA, ouvir)
+    return () => window.removeEventListener(EVENTO_TEMA, ouvir)
+  }, [])
 
   useEffect(() => {
     aplicarTema(tema)
@@ -22,6 +29,7 @@ export function useTema() {
     guardarTema(novo)
     aplicarTema(novo)
     setTema(novo)
+    aoTrocar?.(novo)
   }
 
   return { tema, trocarTema }

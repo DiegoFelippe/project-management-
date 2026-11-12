@@ -1,8 +1,11 @@
 // Trilho de ícones (conceito do app de música e do Hub): ícone num quadrado arredondado e o nome
-// pequeno embaixo; o item aberto acende no azul. Embaixo, quem está usando e o Sair.
+// pequeno embaixo; o item aberto acende no azul. Embaixo, quem está usando (abre o Meu perfil) e o Sair.
 import { LogOut } from 'lucide-react'
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
+import MeuPerfil from '@/components/perfil/MeuPerfil'
+import { urlPublica } from '@/lib/imagem'
 import { iniciais, primeiroNome } from '@/lib/nomes'
 import { cn } from '@/lib/utils'
 import Logo from './Logo'
@@ -57,6 +60,8 @@ function ItemEmBreve({ item }) {
 export default function Trilho({ aoNavegar }) {
   const { perfil, sair } = useAuth()
   const navigate = useNavigate()
+  const [perfilAberto, setPerfilAberto] = useState(false)
+  const foto = urlPublica('fotos', perfil.foto)
 
   return (
     <div className="trilho flex h-full w-[72px] flex-none flex-col bg-moldura">
@@ -72,12 +77,14 @@ export default function Trilho({ aoNavegar }) {
       </nav>
       <div className="flex flex-none flex-col items-center gap-1.5 pt-2 pb-3">
         <span aria-hidden="true" className="mb-0.5 h-px w-8 bg-border" />
-        <div title={`${perfil.nome} (${perfil.email})`} data-item-trilho="" className="group flex w-16 flex-col items-center gap-1 py-0.5">
-          <span className="anim-pulsar grid size-8 place-items-center rounded-full bg-primary/10 text-[12px] font-bold text-primary ring-1 ring-primary/25">
-            {iniciais(perfil.nome)}
+        <button type="button" title={`Meu perfil: ${perfil.nome} (${perfil.email})`} aria-label={`Meu perfil (${perfil.nome})`}
+          data-item-trilho="" onClick={() => setPerfilAberto(true)}
+          className="group flex w-16 flex-col items-center gap-1 py-0.5 outline-none focus-visible:[&>span:first-child]:ring-2 focus-visible:[&>span:first-child]:ring-ring">
+          <span className="anim-pulsar grid size-8 place-items-center overflow-hidden rounded-full bg-primary/10 text-[12px] font-bold text-primary ring-1 ring-primary/25 transition-shadow group-hover:ring-2 group-hover:ring-primary/50">
+            {foto ? <img src={foto} alt="" className="size-full object-cover" /> : iniciais(perfil.nome)}
           </span>
           <span className={rotulo(false)}>{primeiroNome(perfil.nome)}</span>
-        </div>
+        </button>
         <button type="button" title="Sair da conta" data-item-trilho=""
           className="group flex w-16 flex-col items-center gap-1 py-0.5 outline-none focus-visible:[&>span:first-child]:ring-2 focus-visible:[&>span:first-child]:ring-ring"
           onClick={async () => { await sair(); navigate('/entrar', { replace: true }) }}>
@@ -85,6 +92,7 @@ export default function Trilho({ aoNavegar }) {
           <span className="text-[10px] leading-none font-semibold text-muted-foreground group-hover:text-destructive">Sair</span>
         </button>
       </div>
+      {perfilAberto && <MeuPerfil key={perfil.id} aberto aoFechar={() => setPerfilAberto(false)} />}
     </div>
   )
 }

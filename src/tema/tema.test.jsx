@@ -1,12 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '@/auth/useAuth'
+import TelaDeAcesso from '@/components/auth/TelaDeAcesso'
 import BarraTopo from '@/components/shell/BarraTopo'
-import { CHAVE_TEMA, COR_DA_BARRA, aplicarTema, escuroAtivo, lerTema } from './tema'
+import { salvarTema } from '@/data/preferencias'
+import { CHAVE_TEMA, COR_DA_BARRA, adotarTemaDoPerfil, aplicarTema, escuroAtivo, lerTema } from './tema'
+
+vi.mock('@/data/preferencias', () => ({ salvarTema: vi.fn().mockResolvedValue(undefined) }))
 
 const corDaBarra = () => document.querySelector('meta[name="theme-color"]')?.getAttribute('content')
 const arquivo = (nome) => readFileSync(join(process.cwd(), nome), 'utf8')
@@ -42,7 +46,7 @@ describe('tema', () => {
     sistemaEscuro(false)
     localStorage.setItem(CHAVE_TEMA, 'claro')
     render(
-      <AuthContext.Provider value={{ perfil: { papel: 'gestor', consultoria: { nome: 'Exemplo' } } }}>
+      <AuthContext.Provider value={{ perfil: { id: 'me', papel: 'gestor', consultoria: { nome: 'Exemplo' } } }}>
         <MemoryRouter>
           <BarraTopo aoAbrirMenu={() => {}} />
         </MemoryRouter>
@@ -54,6 +58,34 @@ describe('tema', () => {
     await userEvent.click(screen.getByRole('button', { name: /Tema: Escuro/ }))
     expect(localStorage.getItem(CHAVE_TEMA)).toBe('sistema')
     expect(screen.getByRole('button', { name: /Tema: Sistema/ })).toBeInTheDocument()
+    expect(salvarTema).toHaveBeenLastCalledWith('me', 'sistema')
+  })
+
+  it('a tela de login também tem o botão de tema, e a escolha fica guardada', async () => {
+    sistemaEscuro(false)
+    localStorage.setItem(CHAVE_TEMA, 'claro')
+    render(<MemoryRouter><TelaDeAcesso>formulário</TelaDeAcesso></MemoryRouter>)
+    await userEvent.click(screen.getByRole('button', { name: /Tema: Claro/ }))
+    expect(localStorage.getItem(CHAVE_TEMA)).toBe('escuro')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
+  it('ao entrar, o tema salvo no perfil vira o padrão deste navegador', () => {
+    sistemaEscuro(false)
+    localStorage.setItem(CHAVE_TEMA, 'claro')
+    render(
+      <AuthContext.Provider value={{ perfil: { id: 'me', papel: 'gestor', consultoria: { nome: 'Exemplo' } } }}>
+        <MemoryRouter>
+          <BarraTopo aoAbrirMenu={() => {}} />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
+    act(() => adotarTemaDoPerfil('escuro'))
+    expect(localStorage.getItem(CHAVE_TEMA)).toBe('escuro')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(screen.getByRole('button', { name: /Tema: Escuro/ })).toBeInTheDocument()
+    act(() => adotarTemaDoPerfil(null))
+    expect(localStorage.getItem(CHAVE_TEMA)).toBe('escuro')
   })
 
   it('a barra da janela do app instalado (theme-color) fica escura no tema escuro e branca no claro', () => {
