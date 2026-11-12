@@ -28,6 +28,16 @@ Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na 
 - `menu.test.js` e `Trilho.test.jsx` falham se algum item ficar sem animação.
 - Com "reduzir movimento" ligado no sistema, as animações param (regra global em `src/index.css`).
 
+## Botões: sempre animados
+
+- **Todo botão anima** ao passar o mouse e ao apertar: sobe 1px com sombra no hover, o ícone dá um
+  pulinho, e ao apertar afunda (`active:scale-[0.97]`). Pedido do Diego (2026-11-12).
+- **Use sempre o componente `Button`** (`src/components/ui/button.jsx`), que já anima.
+- **Botão escrito à mão** (`<button>` fora do `Button`) precisa da classe `botao-animado` e das mesmas
+  transições (`hover:-translate-y-px active:scale-[0.97]`).
+- Os itens do trilho têm animação própria (seção acima) e são marcados com `data-item-trilho`.
+- `src/components/ui/button.test.jsx` varre o código e falha se algum `<button>` ficar sem animação.
+
 ## Layout
 
 - Telas internas ocupam a largura toda: nada de `max-w-*` + `mx-auto` no conteúdo da página.

@@ -264,3 +264,12 @@
   }
 }
 
+/* Botões: sempre animados (regra do projeto, ver CLAUDE.md). O botão sobe 1px e ganha sombra no hover e
+   afunda ao apertar (classes do componente Button); o ícone dentro dele dá um pulinho. */
+@keyframes icone-botao {
+  0%, 100% { transform: none; }
+  40% { transform: translateY(-1px) scale(1.18) rotate(-6deg); }
+}
+.botao-animado:hover:not(:disabled) > svg,
+.botao-animado:focus-visible > svg { animation: icone-botao 0.45s ease-out; }
+

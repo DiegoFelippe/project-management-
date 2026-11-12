@@ -2,9 +2,10 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-// o principal é o azul da marca; ao apertar, afunda um pixel
+// o principal é o azul da marca. Regra do projeto (CLAUDE.md): todo botão anima — sobe 1px e ganha sombra no
+// hover, o ícone dá um pulinho ("botao-animado" em index.css) e ao apertar ele afunda.
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-[color,background-color,border-color,box-shadow,filter,translate] duration-150 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 aria-invalid:border-destructive aria-busy:opacity-70 aria-busy:pointer-events-none active:translate-y-px",
+  "botao-animado inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-[color,background-color,border-color,box-shadow,filter,translate,scale] duration-150 hover:-translate-y-px hover:shadow-md active:translate-y-0 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 aria-invalid:border-destructive aria-busy:opacity-70 aria-busy:pointer-events-none",
   {
     variants: {
       variant: {

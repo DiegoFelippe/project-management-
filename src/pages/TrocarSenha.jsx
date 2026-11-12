@@ -13,7 +13,7 @@ export default function TrocarSenha() {
     <TelaDeAcesso>
       <Titulo titulo="Troque a senha provisória">Antes de continuar, crie uma senha só sua.</Titulo>
       <FormularioNovaSenha />
-      <button type="button" className="mt-6 text-sm font-semibold text-muted-foreground hover:text-foreground"
+      <button type="button" className="botao-animado mt-6 text-sm font-semibold text-muted-foreground transition-[color,translate] hover:-translate-y-px hover:text-foreground"
         onClick={async () => { await sair(); navigate('/entrar', { replace: true }) }}>
         Sair
       </button>

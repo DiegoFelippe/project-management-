@@ -83,7 +83,7 @@ export default function Consultorias() {
       <div role="group" aria-label="Mostrar" className="mb-4 inline-flex rounded-lg bg-muted p-1 text-sm font-semibold">
         {[['ativas', 'Ativas'], ['arquivadas', 'Arquivadas']].map(([valor, rotulo]) => (
           <button key={valor} type="button" aria-pressed={filtro === valor} onClick={() => setFiltro(valor)}
-            className={`rounded-md px-3 py-1 ${filtro === valor ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground'}`}>
+            className={`botao-animado rounded-md px-3 py-1 transition-[background-color,color,translate,scale] hover:-translate-y-px active:scale-[0.97] ${filtro === valor ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground'}`}>
             {rotulo}
           </button>
         ))}
