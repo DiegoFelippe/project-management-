@@ -19,7 +19,9 @@
     "test:db": "supabase test db",
     "test": "vitest run --project unidade",
     "test:integracao": "vitest run --project integracao",
-    "functions:reiniciar": "docker restart supabase_edge_runtime_consultoria"
+    "functions:reiniciar": "docker restart supabase_edge_runtime_consultoria",
+    "dono:criar": "node scripts/criar-dono.mjs",
+    "exemplo:local": "node scripts/exemplo-local.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0",
