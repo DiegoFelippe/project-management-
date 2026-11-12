@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router'
 import RotaProtegida from '@/auth/RotaProtegida'
 import Moldura from '@/components/shell/Moldura'
+import Consultorias from '@/pages/Consultorias'
 import DefinirSenha from '@/pages/DefinirSenha'
 import Entrar from '@/pages/Entrar'
 import EsqueciSenha from '@/pages/EsqueciSenha'
@@ -24,6 +25,9 @@ export default function Rotas() {
             <Route path="/times" element={<Times />} />
             <Route path="/times/:id" element={<Time />} />
             <Route path="/usuarios" element={<Usuarios />} />
+          </Route>
+          <Route element={<RotaProtegida papeis={['dono']} />}>
+            <Route path="/consultorias" element={<Consultorias />} />
           </Route>
         </Route>
       </Route>

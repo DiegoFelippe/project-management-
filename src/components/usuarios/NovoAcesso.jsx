@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import EscolhaForma from '@/components/comum/EscolhaForma'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -17,10 +18,6 @@ const PAPEIS_POR_QUEM_CRIA = {
   dono: [{ valor: 'admin', rotulo: 'Administrador' }],
 }
 
-const FORMAS = [
-  { valor: 'convite', rotulo: 'Enviar convite' },
-  { valor: 'senha', rotulo: 'Criar com senha' },
-]
 
 const vazio = (papel) => ({ forma: 'convite', nome: '', email: '', papel, times: [], senha: '' })
 
@@ -103,17 +100,7 @@ export default function NovoAcesso({ aberto, aoFechar, papelDeQuemCria, times = 
         </DialogHeader>
 
         <form noValidate onSubmit={enviar} className="grid gap-4">
-          <div role="radiogroup" aria-label="Como criar o acesso" className="grid grid-cols-2 rounded-lg bg-muted p-1 text-sm font-semibold">
-            {FORMAS.map((f) => (
-              <label key={f.valor}
-                className={cn('cursor-pointer rounded-md py-1.5 text-center text-muted-foreground transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring',
-                  dados.forma === f.valor && 'bg-card text-foreground shadow-xs')}>
-                <input type="radio" name="forma" value={f.valor} className="sr-only"
-                  checked={dados.forma === f.valor} onChange={mudar('forma')} />
-                {f.rotulo}
-              </label>
-            ))}
-          </div>
+          <EscolhaForma valor={dados.forma} aoMudar={(forma) => setDados((d) => ({ ...d, forma }))} />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
