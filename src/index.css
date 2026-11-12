@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Ainda sem modo escuro: as classes dark: dos componentes só valem com .dark no <html>, nunca pelo sistema. */
+/* As classes dark: dos componentes só valem com .dark no <html> (botão de tema), nunca direto pelo sistema. */
 @custom-variant dark (&:is(.dark *));
 
 /* Visual "claro e azul" (opção C), no conceito do app de música e do Hub:

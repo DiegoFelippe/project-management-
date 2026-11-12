@@ -10,11 +10,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IXC Consult</title>
     <script>
-      // tema antes de a página aparecer (sem piscar): escolha salva ou o tema do computador
+      // tema antes de a página aparecer (sem piscar): escolha salva ou o tema do computador.
+      // No escuro, a barra da janela do app instalado também fica escura (COR_DA_BARRA em src/tema/tema.js).
       try {
         var t = localStorage.getItem('consultoria:tema')
-        if (t === 'escuro' || ((!t || t === 'sistema') && matchMedia('(prefers-color-scheme: dark)').matches))
+        if (t === 'escuro' || ((!t || t === 'sistema') && matchMedia('(prefers-color-scheme: dark)').matches)) {
           document.documentElement.classList.add('dark')
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0e1424')
+        }
       } catch (e) {}
     </script>
   </head>
