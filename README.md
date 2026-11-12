@@ -119,4 +119,11 @@ Enquanto isso não for feito, o botão "Entrar com Google" avisa que o Google ai
 3. Crie as variáveis `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` com os dados do projeto na nuvem.
 4. A Vercel não usa os Dockers: eles são só para rodar no Mac.
 
-Se o app ganhar rotas (react-router), vai precisar de um `vercel.json` mandando as rotas para o `index.html`.
+O `vercel.json` manda as rotas do app (`/times`, `/usuarios`...) para o `index.html` e evita cache velho do `sw.js`.
+
+## App instalável (PWA)
+
+O IXC Consult pode ser instalado como aplicativo (computador e celular), com a logo como ícone (`public/icons`).
+Quando o navegador permite, aparece o botão **Instalar app** na barra de cima. O app guarda só a "casca"
+(HTML, JS, CSS e ícones); os dados vêm sempre do Supabase. No Docker de desenvolvimento o service worker
+fica desligado; para testar a instalação no Mac: `npm run build && npm run preview` e abra http://localhost:4173.
