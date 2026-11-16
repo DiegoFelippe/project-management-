@@ -114,15 +114,52 @@ export function conferirLimpeza(acao, { error }) {
     'Os dados de teste que sobraram continuam no banco local.')
 }
 
+// Objetos do bucket "arquivos" na pasta de cada cliente de teste, inclusive os que ficaram sem linha.
+async function objetosNasPastas(clientes) {
+  const caminhos = []
+  for (const cliente of clientes) {
+    for (let inicio = 0; ; inicio += 1000) {
+      const resposta = await admin.storage.from('arquivos').list(cliente, { limit: 1000, offset: inicio })
+      conferirLimpeza(`listar os objetos do cliente de teste ${cliente}`, resposta)
+      caminhos.push(...resposta.data.map((objeto) => `${cliente}/${objeto.name}`))
+      if (resposta.data.length < 1000) break
+    }
+  }
+  return caminhos
+}
+
+// Arquivos dos clientes e das consultorias de teste: os objetos do Storage e as linhas (as linhas seguram a
+// consultoria, restrict; o objeto não sai junto com o cliente).
+async function limparArquivos(clientes, consultorias) {
+  const caminhos = new Set(await objetosNasPastas(clientes))
+  if (consultorias.length) {
+    const resposta = await admin.from('cliente_arquivos').select('caminho').in('consultoria_id', consultorias)
+    conferirLimpeza('ler os arquivos das consultorias de teste', resposta)
+    for (const linha of resposta.data ?? []) caminhos.add(linha.caminho)
+  }
+  if (caminhos.size) {
+    conferirLimpeza('apagar os objetos dos arquivos de teste', await admin.storage.from('arquivos').remove([...caminhos]))
+  }
+  if (clientes.length) {
+    conferirLimpeza('apagar os arquivos dos clientes de teste',
+      await admin.from('cliente_arquivos').delete().in('cliente_id', clientes))
+  }
+  if (consultorias.length) {
+    conferirLimpeza('apagar os arquivos das consultorias de teste',
+      await admin.from('cliente_arquivos').delete().in('consultoria_id', consultorias))
+  }
+}
+
 export async function limparTudo() {
   const consultorias = [...criados.consultorias]
-  // Check-ins e clientes seguram consultorias e clientes (restrict): saem antes.
+  // Arquivos, check-ins e clientes seguram consultorias e clientes (restrict): saem antes.
   const clientes = new Set(criados.clientes)
   if (consultorias.length) {
     const resposta = await admin.from('clientes').select('id').in('consultoria_id', consultorias)
     conferirLimpeza('ler os clientes das consultorias de teste', resposta)
     for (const linha of resposta.data ?? []) clientes.add(linha.id)
   }
+  await limparArquivos([...clientes], consultorias)
   if (clientes.size) {
     conferirLimpeza('apagar os check-ins dos clientes de teste',
       await admin.from('checkins').delete().in('cliente_id', [...clientes]))

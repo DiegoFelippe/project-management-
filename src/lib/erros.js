@@ -54,13 +54,32 @@ const ERROS_MENSAGEM_BANCO = {
   checkin_sem_cliente: 'Você não é o consultor deste cliente.',
   checkin_no_futuro: 'O horário não pode estar no futuro.',
   consultoria_escolhe_consultor: 'Quem escolhe o consultor é a consultoria.',
+  objeto_de_outra_pessoa: ERROS_FUNCAO.sem_permissao,
   sem_permissao: ERROS_FUNCAO.sem_permissao,
 }
 
-// `sobre`: 'time' (padrão) | 'cliente' | 'checkin' — muda o texto de alguns códigos.
+// O Storage recusa (413) arquivo acima do limite do bucket "arquivos"; a tela confere o mesmo antes de enviar.
+export const ARQUIVO_GRANDE_DEMAIS = 'O arquivo passa de 25 MB.'
+
+// Erros do Storage (bucket "arquivos"): a resposta vem com HTTP 400 e o código em `statusCode` ("403" sem
+// permissão, "404" para o objeto que a pessoa não vê, sem dizer se ele existe, "413" acima do limite); `status`
+// é o HTTP, que conta quando a resposta não traz corpo.
+function traduzirErroDoStorage(erro) {
+  const codigos = [erro?.statusCode, erro?.status].map((codigo) => String(codigo ?? ''))
+  if (codigos.includes('413')) return ARQUIVO_GRANDE_DEMAIS
+  if (codigos.includes('403')) return ERROS_FUNCAO.sem_permissao
+  if (codigos.includes('404')) return 'Esse arquivo não foi encontrado.'
+  return null
+}
+
+// `sobre`: 'time' (padrão) | 'cliente' | 'checkin' | 'arquivo' — muda o texto de alguns códigos.
 export function traduzirErroBanco(erro, { sobre = 'time' } = {}) {
   const mensagem = ERROS_MENSAGEM_BANCO[erro?.message]
   if (mensagem) return mensagem
+  if (sobre === 'arquivo') {
+    const doStorage = traduzirErroDoStorage(erro)
+    if (doStorage) return doStorage
+  }
   if (erro?.code === '23505') {
     return sobre === 'cliente'
       ? 'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).'

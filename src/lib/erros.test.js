@@ -99,6 +99,25 @@ describe('traduzirErroBanco com contexto', () => {
     )
   })
 
+  it('traduz arquivo (erros do Storage e do banco)', () => {
+    const arquivo = (erro) => traduzirErroBanco(erro, { sobre: 'arquivo' })
+    // Formas reais do Storage local (HTTP 400 com o código em statusCode).
+    expect(arquivo({ status: 400, statusCode: '413', code: 'EntityTooLarge', message: 'The object exceeded the maximum allowed size' }))
+      .toBe('O arquivo passa de 25 MB.')
+    expect(arquivo({ status: 400, statusCode: '403', code: 'AccessDenied', message: 'new row violates row-level security policy' }))
+      .toBe('Você não tem permissão para isso.')
+    expect(arquivo({ status: 400, statusCode: '404', code: 'NoSuchKey', message: 'Object not found' }))
+      .toBe('Esse arquivo não foi encontrado.')
+    // Resposta sem corpo (ex.: o limite de um proxy): vale o HTTP.
+    expect(arquivo({ status: 413 })).toBe('O arquivo passa de 25 MB.')
+    expect(arquivo({ code: '42501' })).toBe('Você não tem permissão para isso.')
+    expect(arquivo({ code: 'P0001', message: 'objeto_de_outra_pessoa' })).toBe('Você não tem permissão para isso.')
+    expect(arquivo({ code: '23514' })).toBe('Confira os campos destacados.')
+    expect(arquivo({ status: 500, statusCode: '500' })).toBe('Algo deu errado. Tente de novo.')
+    // Fora de "arquivo", os códigos HTTP do Storage não mudam as mensagens de antes.
+    expect(traduzirErroBanco({ status: 413 })).toBe('Algo deu errado. Tente de novo.')
+  })
+
   it('traduz as mensagens do banco', () => {
     const msg = (message) => traduzirErroBanco({ code: 'P0001', message }, { sobre: 'cliente' })
     expect(msg('consultor_invalido')).toBe('Escolha um consultor ativo desta consultoria.')

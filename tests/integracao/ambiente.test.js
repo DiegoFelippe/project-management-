@@ -1,5 +1,6 @@
 // A limpeza dos testes de integração: cada passo é conferido, e o que o teste criou sai do banco local.
-import { describe, expect, it } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { afterAll, describe, expect, it } from 'vitest'
 import {
   clienteAdmin,
   conferirLimpeza,
@@ -11,6 +12,9 @@ import {
 } from './ambiente.js'
 
 const admin = clienteAdmin()
+
+// Se um caso falhar antes de chamar a limpeza, o que ele criou sai aqui.
+afterAll(limparTudo)
 
 describe('limparTudo', () => {
   it('erro num passo da limpeza vira exceção dizendo o que não saiu', () => {
@@ -44,6 +48,36 @@ describe('limparTudo', () => {
     expect((await admin.from('checkins').select('id').eq('cliente_id', cliente.id)).data).toEqual([])
     expect((await admin.from('clientes').select('id').eq('id', cliente.id)).data).toEqual([])
     expect((await admin.from('perfis').select('id').eq('id', pessoa.id)).data).toEqual([])
+    expect((await admin.from('consultorias').select('id').eq('id', consultoria)).data).toEqual([])
+  })
+
+  it('apaga os arquivos do cliente e os objetos do Storage, inclusive o que ficou sem linha', async () => {
+    const consultoria = await criarConsultoriaDeTeste()
+    const pessoa = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: consultoria })
+    const { data: cliente, error } = await admin
+      .from('clientes')
+      .insert({ nome: 'Limpeza dos arquivos', horas_mes: 1, consultoria_id: consultoria, consultor_id: pessoa.id })
+      .select('id')
+      .single()
+    expect(error).toBeNull()
+    registrarCliente(cliente.id)
+    const comoPessoa = await entrarComo(pessoa)
+    const comLinha = `${cliente.id}/${randomUUID()}-com_linha.txt`
+    const semLinha = `${cliente.id}/${randomUUID()}-sem_linha.txt`
+    for (const caminho of [comLinha, semLinha]) {
+      const { error: erroEnvio } = await comoPessoa.storage.from('arquivos').upload(caminho, new Blob(['x']))
+      expect(erroEnvio).toBeNull()
+    }
+    const { error: erroLinha } = await comoPessoa
+      .from('cliente_arquivos')
+      .insert({ cliente_id: cliente.id, caminho: comLinha, nome: 'com linha.txt', tamanho: 1 })
+    expect(erroLinha).toBeNull()
+
+    await limparTudo()
+
+    expect((await admin.from('cliente_arquivos').select('id').eq('cliente_id', cliente.id)).data).toEqual([])
+    expect((await admin.storage.from('arquivos').list(cliente.id)).data).toEqual([])
+    expect((await admin.from('clientes').select('id').eq('id', cliente.id)).data).toEqual([])
     expect((await admin.from('consultorias').select('id').eq('id', consultoria)).data).toEqual([])
   })
 })
