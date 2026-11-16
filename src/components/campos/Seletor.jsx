@@ -21,21 +21,25 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
   const listaId = useId()
   const [aberto, setAberto] = useState(false)
   const [termo, setTermo] = useState('')
-  const [ativo, setAtivo] = useState(-1)
+  const [ativo, setAtivo] = useState(-1) // escolha de quem usa o teclado ou o mouse; -1 = ainda não escolheu
   const [remoto, setRemoto] = useState(null)
   const [escolhido, setEscolhido] = useState(null)
   const gatilho = useRef(null)
   const pedido = useRef(0)
+  const procurado = useRef(null) // termo do último pedido desta abertura
   const termoAtrasado = useAtraso(termo, 250)
   const comBusca = !!buscar || opcoes.length > BUSCA_LOCAL_A_PARTIR_DE
 
+  // Termo vazio busca na hora (ao abrir não pode sobrar o termo atrasado da vez anterior); com termo, espera a pessoa parar de digitar.
   useEffect(() => {
     if (!buscar || !aberto) return
+    const quero = termo.trim()
+    if ((quero !== '' && quero !== termoAtrasado.trim()) || quero === procurado.current) return
+    procurado.current = quero
     const numero = ++pedido.current
-    buscar(termoAtrasado.trim())
-      .then((r) => { if (numero === pedido.current) setRemoto(r) })
-      .catch(() => { if (numero === pedido.current) setRemoto({ itens: [], total: 0, erro: true }) })
-  }, [buscar, aberto, termoAtrasado])
+    const chegou = (r) => { if (numero === pedido.current) { setRemoto({ ...r, termo: quero }); setAtivo(-1) } }
+    buscar(quero).then(chegou).catch(() => chegou({ itens: [], total: 0, erro: true }))
+  }, [buscar, aberto, termo, termoAtrasado])
 
   const todos = useMemo(() => (rotuloTodos != null ? { valor: '', rotulo: rotuloTodos } : null), [rotuloTodos])
   const mostradas = useMemo(() => {
@@ -47,6 +51,10 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
   }, [buscar, remoto, opcoes, termo, todos])
 
   const atual = String(valor ?? '')
+  // O resultado do banco só vale para o termo que está na caixa; enquanto não, a lista é do termo velho e Enter não escolhe.
+  const fresco = !buscar || remoto?.termo === termo.trim()
+  const padrao = termo.trim() ? (mostradas.length ? 0 : -1) : mostradas.findIndex((o) => String(o.valor) === atual)
+  const ativoNaLista = ativo >= 0 && ativo < mostradas.length ? ativo : padrao
   const selecionada = opcoes.find((o) => String(o.valor) === atual) ?? remoto?.itens.find((o) => String(o.valor) === atual)
     ?? (escolhido && String(escolhido.valor) === atual ? escolhido : undefined) ?? (atual === '' ? todos : undefined)
 
@@ -54,8 +62,8 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
     if (desabilitado) return
     setTermo('')
     setRemoto(null)
-    const i = opcoes.findIndex((o) => String(o.valor) === String(valor ?? ''))
-    setAtivo(i < 0 ? -1 : i + (todos && i >= 0 ? 1 : 0))
+    procurado.current = null
+    setAtivo(-1)
     setAberto(true)
   }
 
@@ -68,9 +76,9 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
 
   function teclas(e) {
     const ultimo = mostradas.length - 1
-    const novo = { ArrowDown: Math.min(ultimo, ativo + 1), ArrowUp: Math.max(0, ativo - 1), ...(comBusca ? {} : { Home: 0, End: ultimo }) }[e.key]
+    const novo = { ArrowDown: Math.min(ultimo, ativoNaLista + 1), ArrowUp: Math.max(0, ativoNaLista - 1), ...(comBusca ? {} : { Home: 0, End: ultimo }) }[e.key]
     if (novo !== undefined) { e.preventDefault(); setAtivo(novo) }
-    else if (e.key === 'Enter' && mostradas[ativo]) { e.preventDefault(); escolher(mostradas[ativo]) }
+    else if (e.key === 'Enter') { e.preventDefault(); if (fresco && mostradas[ativoNaLista]) escolher(mostradas[ativoNaLista]) }
   }
 
   const total = remoto?.total ?? 0
@@ -79,7 +87,7 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
 
   return (
     <>
-      <button ref={gatilho} id={id} type="button" disabled={desabilitado} aria-haspopup="listbox" aria-expanded={aberto}
+      <button ref={gatilho} id={id} type="button" role="combobox" disabled={desabilitado} aria-haspopup="listbox" aria-expanded={aberto} aria-controls={aberto ? listaId : undefined}
         onClick={() => (aberto ? setAberto(false) : abrir())}
         onKeyDown={(e) => { if (e.key === 'ArrowDown' && !aberto) { e.preventDefault(); abrir() } }}
         className={cn('input botao-animado flex cursor-pointer items-center gap-2 text-left', campo, (aberto || (selecionada && rotuloTodos != null && selecionada.valor !== '')) && 'border-primary/60', aberto && 'ring-primary/15 ring-2')}>
@@ -94,17 +102,17 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
           {comBusca && (
             <div className="relative mb-1">
               <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2" aria-hidden="true" />
-              <input autoFocus role="combobox" aria-expanded="true" aria-controls={listaId} aria-activedescendant={ativo >= 0 ? idOpcao(ativo) : undefined} aria-label="Buscar"
-                value={termo} onChange={(e) => { setTermo(e.target.value); setAtivo(-1) }} placeholder="Buscar..." className="input py-1.5 pl-8 text-[12.5px]" />
+              <input autoFocus role="combobox" aria-expanded="true" aria-controls={listaId} aria-activedescendant={ativoNaLista >= 0 ? idOpcao(ativoNaLista) : undefined} aria-label="Buscar"
+                value={termo} onChange={(e) => { setTermo(e.target.value); setAtivo(-1) }} placeholder="Buscar..." className="input py-1.5 pl-8 text-base sm:text-[12.5px]" />
             </div>
           )}
-          <div id={listaId} role="listbox" tabIndex={comBusca ? -1 : 0} ref={(el) => { if (el && !comBusca) el.focus() }} aria-activedescendant={!comBusca && ativo >= 0 ? idOpcao(ativo) : undefined} className="outline-none">
+          <div id={listaId} role="listbox" tabIndex={comBusca ? -1 : 0} ref={(el) => { if (el && !comBusca) el.focus() }} aria-activedescendant={!comBusca && ativoNaLista >= 0 ? idOpcao(ativoNaLista) : undefined} className="outline-none">
             {mostradas.map((o, i) => {
               const marcada = String(o.valor) === atual
               return (
-                <div key={o.valor} id={idOpcao(i)} role="option" aria-selected={marcada} onClick={() => escolher(o)} onMouseMove={() => setAtivo(i)}
-                  ref={(el) => { if (el && i === ativo) el.scrollIntoView?.({ block: 'nearest' }) }}
-                  className={cn('flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5', marcada && 'bg-primary/10', i === ativo && 'bg-accent')}>
+                <div key={o.valor} id={idOpcao(i)} role="option" aria-selected={marcada} onClick={() => escolher(o)} onMouseMove={() => ativoNaLista !== i && setAtivo(i)}
+                  ref={(el) => { if (el && i === ativoNaLista) el.scrollIntoView?.({ block: 'nearest' }) }}
+                  className={cn('flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5', marcada && 'bg-primary/10', i === ativoNaLista && 'bg-accent')}>
                   <Marca opcao={o} />
                   <span className="min-w-0 flex-1">
                     <span className={cn('block truncate text-[12.5px]', marcada ? 'text-primary font-medium' : 'text-foreground')}>{o.rotulo}</span>
@@ -115,10 +123,10 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
               )
             })}
           </div>
-          {buscar && !remoto && <p className="text-muted-foreground py-3 text-center text-[12px]">Buscando…</p>}
+          {buscar && !fresco && <p className="text-muted-foreground py-3 text-center text-[12px]">Buscando…</p>}
           {remoto?.erro && <p role="alert" className="text-muted-foreground py-3 text-center text-[12px]">Não foi possível carregar as opções.</p>}
-          {!remoto?.erro && (buscar ? remoto : true) && mostradas.length === (todos && !termo.trim() ? 1 : 0) && <p className="text-muted-foreground py-3 text-center text-[12px]">Nada encontrado</p>}
-          {buscar && remoto && !remoto.erro && (
+          {!remoto?.erro && fresco && (buscar ? remoto : true) && mostradas.length === (todos && !termo.trim() ? 1 : 0) && <p className="text-muted-foreground py-3 text-center text-[12px]">Nada encontrado</p>}
+          {buscar && fresco && remoto && !remoto.erro && (
             <p className="text-muted-foreground mt-1 border-t px-2.5 pt-1.5 text-[10.5px]">
               {total > remoto.itens.length ? `${remoto.itens.length} de ${total.toLocaleString('pt-BR')}. Refine a busca.` : `${total.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')}`}
             </p>
