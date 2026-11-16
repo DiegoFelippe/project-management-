@@ -80,6 +80,18 @@ describe('gerenciar-acesso', () => {
     expect(r.corpo.codigo).toBe('gestor_com_times')
   })
 
+  it('perfil desativado com a sessão ainda aberta não usa as funções (403 sem_permissao)', async () => {
+    const adminSaindo = await criarPerfilDeTeste({ papel: 'admin', consultoriaId: A })
+    const comoAdminSaindo = await entrarComo(adminSaindo)
+    expect((await acesso(comoAdminSaindo, { acao: 'editar', pessoa_id: pessoa2.id, nome: 'Antes de sair' })).status).toBe(200)
+    // Só o perfil: o token de quem já estava logado continua valendo até expirar.
+    await admin.from('perfis').update({ ativo: false, desativado_em: new Date().toISOString() }).eq('id', adminSaindo.id)
+    const r = await acesso(comoAdminSaindo, { acao: 'editar', pessoa_id: pessoa2.id, nome: 'Depois de sair' })
+    expect(r.status).toBe(403)
+    expect(r.corpo.codigo).toBe('sem_permissao')
+    expect(await perfil(pessoa2.id)).toMatchObject({ nome: 'Antes de sair' })
+  })
+
   it('dono desativa e reativa um administrador', async () => {
     expect((await acesso(comoDono, { acao: 'desativar', pessoa_id: adminA2.id })).status).toBe(200)
     expect((await acesso(comoDono, { acao: 'reativar', pessoa_id: adminA2.id })).status).toBe(200)

@@ -13,6 +13,7 @@ export type Perfil = {
   precisa_trocar_senha: boolean
   convite_pendente: boolean
   criado_por: string | null
+  ativo: boolean
 }
 
 function chaveSecreta(): string {
@@ -36,13 +37,14 @@ export function clienteAdmin(): SupabaseClient {
   })
 }
 
-// Valida o token de quem chama e carrega o perfil. Senha provisória não trocada não faz nada.
+// Valida o token de quem chama e carrega o perfil. Senha provisória não trocada não faz nada, nem perfil
+// desativado: o token de quem já estava logado continua valendo até expirar, mas a pessoa saiu.
 export async function quemChama(req: Request, admin: SupabaseClient): Promise<Perfil> {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim()
   if (!token) throw new Falha(401, 'nao_autenticado')
   const { data, error } = await admin.auth.getUser(token)
   if (error || !data.user) throw new Falha(401, 'nao_autenticado')
   const { data: perfil } = await admin.from('perfis').select('*').eq('id', data.user.id).maybeSingle()
-  if (!perfil || perfil.precisa_trocar_senha) throw new Falha(403, 'sem_permissao')
+  if (!perfil || perfil.precisa_trocar_senha || perfil.ativo === false) throw new Falha(403, 'sem_permissao')
   return perfil as Perfil
 }
