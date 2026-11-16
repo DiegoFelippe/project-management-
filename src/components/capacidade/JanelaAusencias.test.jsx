@@ -60,6 +60,13 @@ describe('JanelaAusencias', () => {
     expect(criarAusencia).not.toHaveBeenCalled()
   })
 
+  it('De e Até são obrigatórios: não oferecem Limpar', async () => {
+    await userEvent.click(await screen.findByRole('button', { name: /Editar/ }))
+    expect(screen.queryByRole('button', { name: 'Limpar data' })).toBeNull()
+    await userEvent.click(screen.getByLabelText('De'))
+    expect(screen.queryByRole('button', { name: 'Limpar' })).toBeNull()
+  })
+
   it('Editar abre o formulário preenchido e salva', async () => {
     await userEvent.click(await screen.findByRole('button', { name: /Editar/ }))
     expect(screen.getByLabelText('De')).toHaveTextContent('20 de dez de 2026')

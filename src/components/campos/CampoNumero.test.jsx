@@ -49,7 +49,7 @@ describe('CampoNumero', () => {
     expect(campo).toHaveValue('123')
   })
 
-  it('setas do teclado mudam o valor e sair do campo ajusta a min/max', async () => {
+  it('setas e mais/menos respeitam min e max; sair do campo NÃO corta (o formulário avisa)', async () => {
     const aoMudar = vi.fn()
     render(<Controlado inicial="5" min={0} max={10} aoMudar={aoMudar} />)
     const campo = screen.getByRole('textbox')
@@ -59,7 +59,9 @@ describe('CampoNumero', () => {
     await userEvent.clear(campo)
     await userEvent.type(campo, '99')
     await userEvent.tab()
-    expect(aoMudar).toHaveBeenLastCalledWith('10')
+    expect(aoMudar).toHaveBeenLastCalledWith('99')
+    expect(campo).toHaveValue('99')
+    await userEvent.click(screen.getByRole('button', { name: 'Diminuir' }))
     expect(campo).toHaveValue('10')
   })
 

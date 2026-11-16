@@ -55,6 +55,19 @@ describe('Integrações', () => {
     expect(salvarIntegracao).toHaveBeenCalledWith('smtp', expect.objectContaining({ host: 'smtp.acme.test', porta: 587 }), null)
   })
 
+  it('porta fora do intervalo (70000) avisa e não grava 65535 no lugar', async () => {
+    renderizarTela(<Integracoes />, { perfil: admin })
+    await userEvent.click(within(await screen.findByRole('row', { name: /E-mail/ })).getByRole('button', { name: 'Editar' }))
+    const janela = screen.getByRole('dialog', { name: /E-mail \(SMTP\)/ })
+    const porta = within(janela).getByLabelText('Porta')
+    await userEvent.clear(porta)
+    await userEvent.type(porta, '70000')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar e testar' }))
+    expect(within(janela).getByRole('alert')).toHaveTextContent('Informe uma porta válida.')
+    expect(porta).toHaveValue('70000')
+    expect(salvarIntegracao).not.toHaveBeenCalled()
+  })
+
   it('Conectar a IA pede a chave e sugere o Claude Opus 5.5', async () => {
     renderizarTela(<Integracoes />, { perfil: admin })
     await userEvent.click(within(await screen.findByRole('row', { name: /Inteligência artificial/ })).getByRole('button', { name: 'Conectar' }))

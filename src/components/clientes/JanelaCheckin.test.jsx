@@ -34,6 +34,13 @@ describe('JanelaCheckin: check-out', () => {
     expect(aoFechar).toHaveBeenCalled()
   })
 
+  it('Data do fim e Fim são obrigatórios: não oferecem Limpar', async () => {
+    const { janela } = abrir(aberto('2026-11-10T10:00'))
+    expect(within(janela).queryByRole('button', { name: /^Limpar/ })).toBeNull()
+    await userEvent.click(within(janela).getByLabelText('Data do fim'))
+    expect(screen.queryByRole('button', { name: 'Limpar' })).toBeNull()
+  })
+
   it('check-out esquecido há mais de 24 h: o fim vem preenchido com início + 24 h e fecha assim', async () => {
     const { aoSalvar, janela } = abrir(aberto('2026-11-09T06:15'))
     expect(within(janela).getByLabelText('Data do fim')).toHaveTextContent('10 de nov de 2026')

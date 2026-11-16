@@ -38,11 +38,11 @@ function Formulario({ ausencia, aoSalvar, aoCancelar }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor="ausencia-de">De</Label>
-          <CampoData id="ausencia-de" valor={de} aoMudar={setDe} />
+          <CampoData id="ausencia-de" valor={de} aoMudar={setDe} obrigatorio />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="ausencia-ate">Até</Label>
-          <CampoData id="ausencia-ate" valor={ate} aoMudar={setAte} />
+          <CampoData id="ausencia-ate" valor={ate} aoMudar={setAte} obrigatorio />
         </div>
       </div>
       <div className="grid gap-2">

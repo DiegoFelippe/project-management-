@@ -245,7 +245,7 @@ export default function FichaDoConsultor({
               <Input id="ficha-cargo" autoComplete="off" maxLength={80} className="h-10" value={dados.cargo} onChange={mudar('cargo')} />
             </Campo>
             <Campo id="ficha-entrada" rotulo="Data de entrada" erro={erros.data_entrada}>
-              <CampoData id="ficha-entrada" valor={dados.data_entrada} aoMudar={definir('data_entrada')} />
+              <CampoData id="ficha-entrada" valor={dados.data_entrada} aoMudar={definir('data_entrada')} max={hoje()} />
             </Campo>
           </div>
         </Bloco>

@@ -87,13 +87,13 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
   const campoDataDoFim = (
     <div className="grid gap-2">
       <Label htmlFor="checkin-data-fim">Data do fim</Label>
-      <CampoData id="checkin-data-fim" valor={dataFim} aoMudar={setDataFim} />
+      <CampoData id="checkin-data-fim" valor={dataFim} aoMudar={setDataFim} obrigatorio />
     </div>
   )
   const campoFim = (
     <div className="grid gap-2">
       <Label htmlFor="checkin-fim">Fim</Label>
-      <CampoHora id="checkin-fim" valor={fim} aoMudar={setFim} />
+      <CampoHora id="checkin-fim" valor={fim} aoMudar={setFim} obrigatorio />
     </div>
   )
 
@@ -116,11 +116,11 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-3 grid gap-2 sm:col-span-1">
               <Label htmlFor="checkin-data">Data</Label>
-              <CampoData id="checkin-data" valor={data} aoMudar={setData} />
+              <CampoData id="checkin-data" valor={data} aoMudar={setData} obrigatorio />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="checkin-inicio">Início</Label>
-              <CampoHora id="checkin-inicio" valor={inicio} aoMudar={setInicio} />
+              <CampoHora id="checkin-inicio" valor={inicio} aoMudar={setInicio} obrigatorio />
             </div>
             {campoFim}
             {comDataDoFim && <div className="col-span-3">{campoDataDoFim}</div>}

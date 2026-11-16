@@ -168,7 +168,7 @@ describe('FichaDoConsultor: Novo acesso', () => {
     expect(aoCriar.mock.calls[0][1]).toEqual({ carga: undefined })
   })
 
-  it('carga fora de 0 a 60 e data de entrada no futuro não enviam', async () => {
+  it('carga fora de 0 a 60 não envia', async () => {
     const { aoCriar } = montarNovo()
     await preencher()
     await userEvent.clear(screen.getByLabelText('Carga semanal (horas)'))
@@ -177,10 +177,8 @@ describe('FichaDoConsultor: Novo acesso', () => {
     expect(await screen.findByText('Use de 0 a 60 horas.')).toBeInTheDocument()
     await userEvent.clear(screen.getByLabelText('Carga semanal (horas)'))
     await userEvent.type(screen.getByLabelText('Carga semanal (horas)'), '40')
-    await escolherData(userEvent, 'Data de entrada', '2099-01-01')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
-    expect(await screen.findByText('A data de entrada não pode ser no futuro.')).toBeInTheDocument()
-    expect(aoCriar).not.toHaveBeenCalled()
+    expect(aoCriar).toHaveBeenCalled()
   })
 
   it('o Novo não mostra ausências', () => {
@@ -240,6 +238,25 @@ describe('FichaDoConsultor: Editar', () => {
     expect(screen.getByLabelText('Cidade')).toHaveValue('Santos')
     expect(screen.getByLabelText('UF')).toHaveTextContent('SP')
     expect(screen.getByLabelText('Carga semanal (horas)')).toHaveValue('40')
+  })
+
+  it('o calendário da data de entrada apaga os dias futuros', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-16T15:00:00Z') })
+    try {
+      montarEditar({ pessoa: { ...PESSOA, data_entrada: '2026-11-10' } })
+      await userEvent.click(screen.getByLabelText('Data de entrada'))
+      expect(screen.getByRole('button', { name: '16 de novembro de 2026' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: '17 de novembro de 2026' })).toBeDisabled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('data de entrada no futuro (vinda do cadastro) continua sem enviar', async () => {
+    const { aoSalvar } = montarEditar({ pessoa: { ...PESSOA, data_entrada: '2099-01-01' } })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(await screen.findByText('A data de entrada não pode ser no futuro.')).toBeInTheDocument()
+    expect(aoSalvar).not.toHaveBeenCalled()
   })
 
   it('a lista de UF tem as 27 UFs mais a opção vazia', async () => {

@@ -7,8 +7,8 @@ import { lerHoras } from '@/components/clientes/rotulos'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
-// Carga semanal de uma pessoa (horas por semana). aoSalvar(horas) devolve { erro }. O campo vai até 99 (e não 60)
-// para o aviso "Use de 0 a 60 horas." continuar valendo: o CampoNumero corta no máximo ao sair do campo.
+// Carga semanal de uma pessoa (horas por semana). aoSalvar(horas) devolve { erro }. O campo aceita digitar até 99
+// e o aviso "Use de 0 a 60 horas." cobre o que passar de 60.
 export default function EditarCarga({ aberto, pessoa, aoFechar, aoSalvar }) {
   const [horas, setHoras] = useState(String(pessoa.carga_semanal ?? '').replace('.', ','))
   const [erro, setErro] = useState(null)
