@@ -22,14 +22,14 @@ export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, 
           onEscapeKeyDown={(e) => enviando && e.preventDefault()}
           {...(descricao ? {} : { 'aria-describedby': undefined })}
           className={cn(
-            'bg-card fixed z-50 flex w-full flex-col overflow-hidden border shadow-[var(--shadow-modal)] duration-200',
+            'bg-card fixed z-50 flex w-full flex-col border shadow-[var(--shadow-modal)] duration-200',
             'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'inset-x-0 bottom-0 max-h-[95dvh] rounded-t-2xl data-[state=open]:slide-in-from-bottom-8',
             'sm:inset-auto sm:top-[50%] sm:left-[50%] sm:max-h-[calc(100dvh-2rem)] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:data-[state=open]:zoom-in-95',
             LARGURAS[largura] ?? LARGURAS.md,
           )}
         >
-          <header className="flex items-start gap-3 border-b px-6 py-4">
+          <header className="flex items-start gap-3 rounded-t-2xl border-b px-6 py-4">
             {Icone && (
               <span data-slot="janela-icone" className="bg-primary/10 text-primary grid size-10 shrink-0 place-items-center rounded-xl">
                 <Icone className="size-5" aria-hidden="true" />
@@ -46,7 +46,7 @@ export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, 
           </header>
           <div data-slot="janela-corpo" className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">{children}</div>
           {rodape && (
-            <footer data-slot="janela-rodape" className="bg-muted/40 flex items-center justify-end gap-2 border-t px-6 py-3.5">
+            <footer data-slot="janela-rodape" className="bg-muted/40 flex items-center justify-end gap-2 rounded-b-2xl border-t px-6 py-3.5">
               {enviando && <Loader2 className="text-muted-foreground size-4 animate-spin" aria-hidden="true" />}
               {rodape}
             </footer>

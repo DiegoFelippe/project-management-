@@ -1,13 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
+import { calcular, JANELA } from './posicao'
 
 // Base das listas que abrem sobre um campo (data, hora, seletor). A janela do Radix prende o foco e
 // desliga o clique fora dela, então a lista é montada DENTRO da janela quando o campo está numa (senão,
 // no body). Dentro da janela, o conteúdo é centralizado com transform, e por isso o "fixed" passa a ser
-// relativo a ela (e cortado por ela): a posição é calculada em cima da janela, não da tela.
-const JANELA = '[data-slot="dialog-content"], [data-slot="janela-formulario"]'
-const FOLGA = 8
+// relativo a ela: as coordenadas são convertidas para a janela, mas vira e encolhe pelo espaço da tela (ver posicao.js).
 const abertas = []
 
 // Pulinho de ícone e levantada do hover do botão (regra do projeto) para botões dentro das listas.
@@ -19,28 +18,6 @@ export function BotaoCampo({ className, ...props }) {
       {...props}
     />
   )
-}
-
-function calcular(ancora, janela, largura, altura, alargar) {
-  const r = ancora.getBoundingClientRect()
-  const tela = { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight }
-  const estilo = janela ? getComputedStyle(janela) : null
-  const relativo = !!estilo && [estilo.transform, estilo.translate, estilo.scale, estilo.filter].some((v) => v && v !== 'none')
-  const base = relativo ? janela.getBoundingClientRect() : tela
-  const limite = relativo
-    ? { left: Math.max(tela.left, base.left), top: Math.max(tela.top, base.top), right: Math.min(tela.right, base.right), bottom: Math.min(tela.bottom, base.bottom) }
-    : tela
-  const largo = alargar ? Math.max(r.width, largura) : largura
-  const abaixo = limite.bottom - r.bottom - FOLGA
-  const acima = r.top - limite.top - FOLGA
-  const paraCima = abaixo < altura && acima > abaixo
-  const esquerda = Math.min(Math.max(limite.left + FOLGA, r.left), Math.max(limite.left + FOLGA, limite.right - largo - FOLGA))
-  return {
-    width: largo,
-    left: esquerda - base.left,
-    maxHeight: Math.max(120, paraCima ? acima : abaixo),
-    ...(paraCima ? { bottom: base.bottom - r.top + 4 } : { top: r.bottom - base.top + 4 }),
-  }
 }
 
 // `ancora`: ref do botão do campo. `aoFechar` roda no clique fora, no Esc (só a lista de cima fecha) e
