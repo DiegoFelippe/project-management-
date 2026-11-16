@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { apagarArquivo, enviarArquivo, linkParaBaixar, listarArquivos } from './arquivos'
+import { apagarArquivo, enviarArquivo, limparPastaDoCliente, linkParaBaixar, listarArquivos } from './arquivos'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), storage: { from: vi.fn() } } }))
 
@@ -13,6 +13,7 @@ beforeEach(() => {
     upload: vi.fn().mockResolvedValue({ data: { path: 'x' }, error: null }),
     remove: vi.fn().mockResolvedValue({ data: [{ name: 'x' }], error: null }),
     createSignedUrl: vi.fn().mockResolvedValue({ data: { signedUrl: 'http://storage/assinado' }, error: null }),
+    list: vi.fn().mockResolvedValue({ data: [], error: null }),
   }
   vi.mocked(supabase.storage.from).mockReturnValue(bucket)
 })
@@ -139,5 +140,16 @@ describe('apagarArquivo', () => {
     expect(resultado.aviso).toBe('O arquivo saiu da lista, mas a cópia guardada não foi apagada. Avise o suporte.')
     bucket.remove.mockResolvedValue({ data: null, error: { status: 500 } })
     expect((await apagarArquivo({ id: 'a1', caminho: 'c1/u-a.pdf' })).aviso).toBeDefined()
+  })
+})
+
+describe('limparPastaDoCliente', () => {
+  it('lista a pasta do cliente no bucket "arquivos" e tira o que achou', async () => {
+    bucket.list.mockResolvedValue({ data: [{ id: 'o1', name: 'u-a.pdf' }, { id: 'o2', name: 'u-b.pdf' }], error: null })
+    expect(await limparPastaDoCliente('c1')).toEqual({ erro: null })
+    expect(supabase.storage.from).toHaveBeenCalledWith('arquivos')
+    expect(bucket.list).toHaveBeenCalledWith('c1', { limit: 1000, offset: 0 })
+    expect(bucket.remove).toHaveBeenCalledWith(['c1/u-a.pdf', 'c1/u-b.pdf'])
+    expect(banco.chamadas).toEqual([])
   })
 })

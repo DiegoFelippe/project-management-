@@ -3,7 +3,7 @@
 -- a consultoria vê os dela e os da central; uma consultoria nunca vê os de outra. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(77);
+select plan(94);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -114,11 +114,12 @@ select testes.perfil('admin_b', 'admin', 'B');
 select testes.cliente('c1', 'A', 'pessoa_a');
 select testes.cliente('c_arq', 'A', 'pessoa_a');
 select testes.cliente('c_central', null, null);
+select testes.cliente('c_del', 'A', 'pessoa_a');
 update public.clientes set arquivado_em = now() where id = testes.id('c_arq');
 insert into testes.fx
 select n, gen_random_uuid()
 from unnest(array['f_central', 'f_central2', 'f_cc', 'f_pessoa', 'f_pessoa2', 'f_gestor', 'f_admin', 'f_b',
-  'f_x', 'f_solto']) n;
+  'f_x', 'f_solto', 'f_solto2', 'f_solto3', 'f_del']) n;
 
 -- ── Bucket ───────────────────────────────────────────────────────────────────
 
@@ -315,6 +316,45 @@ select testes.como('pessoa_a');
 select is(testes.objetos('c1', array['f_solto']), 1::bigint, 'quem enviou vê o objeto sem linha');
 with d as (delete from storage.objects where bucket_id = 'arquivos' and name = testes.caminho('c1', 'f_solto') returning 1)
 select is(count(*), 1::bigint, 'e o tira do Storage') from d;
+select lives_ok($$select testes.objeto('f_solto2', 'c1')$$, 'outro objeto sem linha');
+select lives_ok($$select testes.objeto('f_solto3', 'c1')$$, 'e mais um, para depois que o cliente sair dela');
+select is(testes.objetos('c1', array['f_solto3']), 1::bigint, 'enquanto é a consultora do cliente, ela vê o objeto sem linha');
+reset role;
+
+-- A central vê todos: também o objeto sem linha que outra pessoa subiu, e o tira. O que ainda tem linha só sai
+-- pela regra da linha, nem pela central.
+select testes.como('central');
+select is(testes.objetos('c1', array['f_solto2']), 1::bigint, 'a central vê o objeto sem linha que outra pessoa subiu');
+with d as (delete from storage.objects where bucket_id = 'arquivos' and name = testes.caminho('c1', 'f_solto2') returning 1)
+select is(count(*), 1::bigint, 'e o tira do Storage') from d;
+with d as (delete from storage.objects where bucket_id = 'arquivos' and name = testes.caminho('c1', 'f_pessoa') returning 1)
+select is(count(*), 0::bigint, 'mas nem a central tira o objeto que ainda tem linha') from d;
+reset role;
+
+-- ── Cliente apagado: as linhas saem junto, os objetos ficam para a central tirar ──
+
+select testes.como('pessoa_a');
+select lives_ok($$select testes.enviar('f_del', 'c_del')$$, 'a consultora envia arquivo ao cliente que vai ser apagado');
+select lives_ok($$select testes.objeto('f_del', 'c_del')$$, 'e sobe o objeto');
+reset role;
+
+select testes.como('central');
+with d as (delete from public.clientes where id = testes.id('c_del') returning 1)
+select is(count(*), 1::bigint, 'a central apaga o cliente (as linhas dos arquivos saem junto)') from d;
+reset role;
+
+select testes.como('pessoa_a');
+select is(testes.objetos('c_del', array['f_del']), 0::bigint, 'quem subiu não vê mais o objeto do cliente apagado');
+with d as (delete from storage.objects where bucket_id = 'arquivos' and name = testes.caminho('c_del', 'f_del') returning 1)
+select is(count(*), 0::bigint, 'nem o tira') from d;
+reset role;
+
+-- Passado 1 dia, a lembrança de quem apagou não vale mais; a central continua vendo e tirando.
+update private.arquivos_apagados set apagado_em = now() - interval '2 days' where caminho = testes.caminho('c_del', 'f_del');
+select testes.como('central');
+select is(testes.objetos('c_del', array['f_del']), 1::bigint, 'dias depois, a central ainda vê o que sobrou do cliente apagado');
+with d as (delete from storage.objects where bucket_id = 'arquivos' and name = testes.caminho('c_del', 'f_del') returning 1)
+select is(count(*), 1::bigint, 'e tira') from d;
 reset role;
 
 -- ── Quem apaga ───────────────────────────────────────────────────────────────
@@ -389,6 +429,19 @@ select is(testes.linhas(array['f_central', 'f_gestor', 'f_admin', 'f_b']), 0::bi
   'a consultoria antiga não vê mais os arquivos do cliente que saiu dela');
 with d as (delete from public.cliente_arquivos where id = testes.id('f_admin') returning 1)
 select is(count(*), 0::bigint, 'nem apaga') from d;
+reset role;
+
+select testes.como('pessoa_a');
+select is(testes.objetos('c1', array['f_solto3']), 0::bigint,
+  'quem subiu não vê mais o objeto sem linha do cliente que saiu dela');
+with d as (delete from storage.objects where bucket_id = 'arquivos' and name = testes.caminho('c1', 'f_solto3') returning 1)
+select is(count(*), 0::bigint, 'nem o tira') from d;
+reset role;
+
+select testes.como('central');
+select is(testes.objetos('c1', array['f_solto3']), 1::bigint, 'a central vê esse objeto');
+with d as (delete from storage.objects where bucket_id = 'arquivos' and name = testes.caminho('c1', 'f_solto3') returning 1)
+select is(count(*), 1::bigint, 'e o tira') from d;
 reset role;
 
 -- ── Estrutura ────────────────────────────────────────────────────────────────

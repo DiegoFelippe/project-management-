@@ -1,6 +1,6 @@
 // Arquivos do cliente: o objeto fica no Storage (bucket privado "arquivos", pasta do cliente) e a linha em
 // cliente_arquivos. O banco e o Storage conferem quem envia, quem vê e quem apaga.
-import { caminhoDoArquivo, nomeParaMostrar, TAMANHO_MAXIMO_ARQUIVO } from '@/lib/arquivos'
+import { caminhoDoArquivo, limparPasta, nomeParaMostrar, TAMANHO_MAXIMO_ARQUIVO } from '@/lib/arquivos'
 import { ARQUIVO_GRANDE_DEMAIS, traduzirErroBanco } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import { buscarPagina } from './paginar'
@@ -73,3 +73,7 @@ export async function apagarArquivo(arquivo) {
   if (erroObjeto || !tirados?.length) return { erro: null, aviso: OBJETO_FICOU }
   return { erro: null }
 }
+
+// Logo depois de apagar o cliente (as linhas saem junto; os objetos ficam): tira os objetos da pasta dele.
+// Com o cliente ainda lá, não tira o que tem linha.
+export const limparPastaDoCliente = (clienteId) => limparPasta(storage(), clienteId)

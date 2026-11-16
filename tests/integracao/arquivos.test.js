@@ -1,9 +1,10 @@
 // Arquivos do cliente no Supabase local de verdade (Storage + cliente_arquivos): o envio sobe o objeto e grava a
 // linha, o download é por link assinado, outra consultoria não baixa, apagar tira a linha e o objeto, e arquivo
-// acima de 25 MB é recusado. Os passos e os campos são os mesmos de src/data/arquivos.js; o caminho e as
-// mensagens vêm do mesmo código do app (src/lib/arquivos.js e src/lib/erros.js).
+// acima de 25 MB é recusado; depois de apagar o cliente, a central limpa a pasta dele. Os passos e os campos são
+// os mesmos de src/data/arquivos.js; o caminho, a limpeza da pasta (limparPastaDoCliente = limparPasta no bucket
+// "arquivos") e as mensagens vêm do mesmo código do app (src/lib/arquivos.js e src/lib/erros.js).
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { caminhoDoArquivo, TAMANHO_MAXIMO_ARQUIVO } from '../../src/lib/arquivos.js'
+import { caminhoDoArquivo, limparPasta, TAMANHO_MAXIMO_ARQUIVO } from '../../src/lib/arquivos.js'
 import { traduzirErroBanco } from '../../src/lib/erros.js'
 import {
   clienteAdmin,
@@ -21,21 +22,21 @@ const CAMPOS_DA_LISTA =
   'id, nome, tamanho, tipo, enviado_em, enviado_por, consultoria_id, caminho, autor:autor_do_arquivo(nome)'
 
 let A, B
-let central, gestorA, pessoaA, outraA, adminB
-let comoCentral, comoGestor, comoPessoa, comoOutra, comoAdminB
-let clienteId
+let central, gestorA, pessoaA, outraA, adminB, pessoaSai
+let comoCentral, comoGestor, comoPessoa, comoOutra, comoAdminB, comoSai
+let clienteId, clienteApagado, clienteSai
 
 const traduzir = (erro) => traduzirErroBanco(erro, { sobre: 'arquivo' })
 
 // Sobe o objeto e grava a linha, como enviarArquivo. Devolve o caminho e o id da linha (ou o erro do passo).
-async function enviar(cliente, nome, conteudo = `Conteúdo de ${nome}`) {
+async function enviar(cliente, nome, conteudo = `Conteúdo de ${nome}`, paraCliente = clienteId) {
   const arquivo = new Blob([conteudo], { type: 'text/plain' })
-  const caminho = caminhoDoArquivo(clienteId, nome)
+  const caminho = caminhoDoArquivo(paraCliente, nome)
   const { error } = await cliente.storage.from(BUCKET).upload(caminho, arquivo, { contentType: 'text/plain' })
   if (error) return { error, caminho }
   const { data, error: erroLinha } = await cliente
     .from('cliente_arquivos')
-    .insert({ cliente_id: clienteId, caminho, nome, tamanho: arquivo.size, tipo: 'text/plain' })
+    .insert({ cliente_id: paraCliente, caminho, nome, tamanho: arquivo.size, tipo: 'text/plain' })
     .select('id')
     .single()
   if (erroLinha) throw erroLinha
@@ -53,6 +54,25 @@ async function apagar(cliente, id) {
 
 const existe = async (caminho) => (await admin.storage.from(BUCKET).exists(caminho)).data
 
+// Objeto sem linha em cliente_arquivos (como quando a linha não grava).
+async function subirSemLinha(cliente, paraCliente, nome) {
+  const caminho = caminhoDoArquivo(paraCliente, nome)
+  const { error } = await cliente.storage.from(BUCKET).upload(caminho, new Blob(['x']), { contentType: 'text/plain' })
+  if (error) throw error
+  return caminho
+}
+
+async function novoCliente(nome, consultorId) {
+  const { data, error } = await admin
+    .from('clientes')
+    .insert({ nome, horas_mes: 10, consultoria_id: A, consultor_id: consultorId })
+    .select('id')
+    .single()
+  if (error) throw error
+  registrarCliente(data.id)
+  return data.id
+}
+
 beforeAll(async () => {
   A = await criarConsultoriaDeTeste()
   B = await criarConsultoriaDeTeste()
@@ -61,19 +81,16 @@ beforeAll(async () => {
   pessoaA = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: A })
   outraA = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: A })
   adminB = await criarPerfilDeTeste({ papel: 'admin', consultoriaId: B })
-  const { data, error } = await admin
-    .from('clientes')
-    .insert({ nome: 'Cliente com arquivos', horas_mes: 10, consultoria_id: A, consultor_id: pessoaA.id })
-    .select('id')
-    .single()
-  if (error) throw error
-  clienteId = data.id
-  registrarCliente(clienteId)
+  pessoaSai = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: A })
+  clienteId = await novoCliente('Cliente com arquivos', pessoaA.id)
+  clienteApagado = await novoCliente('Cliente que vai ser apagado', pessoaA.id)
+  clienteSai = await novoCliente('Cliente de quem sai da consultoria', pessoaSai.id)
   comoCentral = await entrarComo(central)
   comoGestor = await entrarComo(gestorA)
   comoPessoa = await entrarComo(pessoaA)
   comoOutra = await entrarComo(outraA)
   comoAdminB = await entrarComo(adminB)
+  comoSai = await entrarComo(pessoaSai)
 })
 
 afterAll(limparTudo)
@@ -203,5 +220,48 @@ describe('arquivos do cliente', () => {
     expect(resultado.objetos).toHaveLength(1)
     expect((await admin.from('cliente_arquivos').select('id').eq('id', outro.id)).data).toEqual([])
     expect(await existe(outro.caminho)).toBe(false)
+  })
+})
+
+describe('objetos sem linha e cliente apagado', () => {
+  let comLinha
+
+  it('limparPastaDoCliente com o cliente ainda lá não tira objeto que tem linha', async () => {
+    comLinha = await enviar(comoPessoa, 'Proposta.txt', 'Proposta', clienteApagado)
+    expect(comLinha.error).toBeUndefined()
+    expect(await limparPasta(comoCentral.storage.from(BUCKET), clienteApagado)).toEqual({ erro: null })
+    expect(await existe(comLinha.caminho)).toBe(true)
+    expect((await admin.from('cliente_arquivos').select('id').eq('id', comLinha.id)).data).toHaveLength(1)
+  })
+
+  it('a central apaga o cliente com arquivo; limparPastaDoCliente deixa a pasta vazia', async () => {
+    const semLinha = await subirSemLinha(comoPessoa, clienteApagado, 'Rascunho.txt')
+    const { data, error } = await comoCentral.from('clientes').delete().eq('id', clienteApagado).select('id')
+    expect(error).toBeNull()
+    expect(data).toHaveLength(1)
+    expect((await admin.from('cliente_arquivos').select('id').eq('cliente_id', clienteApagado)).data).toEqual([])
+    // Quem subiu não alcança mais os objetos do cliente apagado; a central, sim.
+    expect((await comoPessoa.storage.from(BUCKET).list(clienteApagado)).data).toEqual([])
+    expect((await comoCentral.storage.from(BUCKET).list(clienteApagado)).data).toHaveLength(2)
+
+    expect(await limparPasta(comoCentral.storage.from(BUCKET), clienteApagado)).toEqual({ erro: null })
+    expect((await admin.storage.from(BUCKET).list(clienteApagado)).data).toEqual([])
+    expect(await existe(comLinha.caminho)).toBe(false)
+    expect(await existe(semLinha)).toBe(false)
+  })
+
+  it('quem saiu da consultoria não lista nem baixa mais o objeto sem linha que subiu', async () => {
+    const semLinha = await subirSemLinha(comoSai, clienteSai, 'Anotações.txt')
+    expect((await comoSai.storage.from(BUCKET).list(clienteSai)).data).toHaveLength(1)
+    expect((await comoSai.storage.from(BUCKET).createSignedUrl(semLinha, 60)).error).toBeNull()
+
+    const { error } = await admin.from('perfis').update({ consultoria_id: B }).eq('id', pessoaSai.id)
+    expect(error).toBeNull()
+
+    expect((await comoSai.storage.from(BUCKET).list(clienteSai)).data).toEqual([])
+    const { data, error: erroLink } = await comoSai.storage.from(BUCKET).createSignedUrl(semLinha, 60)
+    expect(data).toBeNull()
+    expect(traduzir(erroLink)).toBe('Esse arquivo não foi encontrado.')
+    expect((await comoCentral.storage.from(BUCKET).list(clienteSai)).data).toHaveLength(1)
   })
 })

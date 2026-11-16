@@ -3,6 +3,7 @@
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { lerStatusLocal } from '../../scripts/supabase-local.mjs'
+import { caminhosNaPasta } from '../../src/lib/arquivos.js'
 
 export const status = lerStatusLocal()
 const semSessao = { auth: { persistSession: false, autoRefreshToken: false } }
@@ -118,12 +119,9 @@ export function conferirLimpeza(acao, { error }) {
 async function objetosNasPastas(clientes) {
   const caminhos = []
   for (const cliente of clientes) {
-    for (let inicio = 0; ; inicio += 1000) {
-      const resposta = await admin.storage.from('arquivos').list(cliente, { limit: 1000, offset: inicio })
-      conferirLimpeza(`listar os objetos do cliente de teste ${cliente}`, resposta)
-      caminhos.push(...resposta.data.map((objeto) => `${cliente}/${objeto.name}`))
-      if (resposta.data.length < 1000) break
-    }
+    const resposta = await caminhosNaPasta(admin.storage.from('arquivos'), cliente)
+    conferirLimpeza(`listar os objetos do cliente de teste ${cliente}`, resposta)
+    caminhos.push(...resposta.caminhos)
   }
   return caminhos
 }

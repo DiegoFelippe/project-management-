@@ -30,3 +30,32 @@ export function nomeParaMostrar(nome) {
   const limpo = String(nome ?? '').trim()
   return limpo ? Array.from(limpo).slice(0, MAXIMO_PARA_MOSTRAR).join('') : 'arquivo'
 }
+
+// O Storage lista e tira até 1000 objetos por pedido.
+const POR_PEDIDO_NO_STORAGE = 1000
+const PASTA_FICOU = 'Os arquivos guardados do cliente não foram apagados. Avise o suporte.'
+
+// Caminhos dos objetos na pasta do cliente (todas as páginas), só os que quem pergunta enxerga. `bucket` é
+// supabase.storage.from('arquivos') de quem pergunta. Subpastas (id nulo) ficam de fora.
+export async function caminhosNaPasta(bucket, clienteId) {
+  const caminhos = []
+  for (let inicio = 0; ; inicio += POR_PEDIDO_NO_STORAGE) {
+    const { data, error } = await bucket.list(clienteId, { limit: POR_PEDIDO_NO_STORAGE, offset: inicio })
+    if (error) return { caminhos, error }
+    caminhos.push(...data.filter((objeto) => objeto.id).map((objeto) => `${clienteId}/${objeto.name}`))
+    if (data.length < POR_PEDIDO_NO_STORAGE) return { caminhos, error: null }
+  }
+}
+
+// Tira da pasta do cliente o que quem pergunta pode tirar: depois de apagar o cliente, a central tira tudo.
+// Com o cliente ainda lá, o objeto que tem linha não sai (o banco recusa) e nada se perde.
+export async function limparPasta(bucket, clienteId) {
+  if (!clienteId) return { erro: null }
+  const { caminhos, error } = await caminhosNaPasta(bucket, clienteId)
+  if (error) return { erro: PASTA_FICOU }
+  for (let inicio = 0; inicio < caminhos.length; inicio += POR_PEDIDO_NO_STORAGE) {
+    const { error: erroAoTirar } = await bucket.remove(caminhos.slice(inicio, inicio + POR_PEDIDO_NO_STORAGE))
+    if (erroAoTirar) return { erro: PASTA_FICOU }
+  }
+  return { erro: null }
+}
