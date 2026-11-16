@@ -1,5 +1,5 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
@@ -12,7 +12,7 @@ import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/com
 import EditarTime from '@/components/times/EditarTime'
 import NovoTime from '@/components/times/NovoTime'
 import { Button } from '@/components/ui/button'
-import { listarPessoas } from '@/data/pessoas'
+import { buscarPessoas } from '@/data/pessoas'
 import { apagarTime, criarTime, editarTime, listarTimes } from '@/data/times'
 import { veTudo } from '@/lib/papeis'
 
@@ -46,7 +46,6 @@ export default function Times() {
   const [pagina, setPagina] = useState(1)
   const [erro, setErro] = useState(null)
   const [novo, setNovo] = useState(false)
-  const [gestores, setGestores] = useState([])
   const [editando, setEditando] = useState(null)
   const [apagando, setApagando] = useState(null)
   const [versao, setVersao] = useState(0)
@@ -68,12 +67,11 @@ export default function Times() {
     }
   }, [consultoriaId, pagina, versao])
 
-  useEffect(() => {
-    if (perfil.papel !== 'admin') return
-    listarPessoas({ consultoriaId: perfil.consultoria_id, papeis: ['gestor', 'admin'] })
-      .then(setGestores)
-      .catch(() => setGestores([]))
-  }, [perfil.papel, perfil.consultoria_id])
+  // Gestores para escolher ao criar ou editar um time (o administrador): busca no banco pelo nome, nunca a lista inteira.
+  const buscarGestores = useCallback(
+    (termo) => buscarPessoas({ consultoriaId: perfil.consultoria_id, papeis: ['gestor', 'admin'], termo }),
+    [perfil.consultoria_id],
+  )
 
   // Mexer no time: administrador da consultoria ou o gestor do time. O dono só olha.
   const gerencio = (time) => perfil.papel === 'admin' || (perfil.papel === 'gestor' && time.gestor_id === perfil.id)
@@ -155,7 +153,7 @@ export default function Times() {
         </Tabela>
       )}
       {editando && (
-        <EditarTime key={editando.id} aberto time={editando} papelDeQuemEdita={perfil.papel} gestores={gestores}
+        <EditarTime key={editando.id} aberto time={editando} papelDeQuemEdita={perfil.papel} buscarGestores={buscarGestores}
           aoFechar={() => setEditando(null)} aoSalvar={(dados) => salvarEdicao(editando, dados)} />
       )}
       {apagando && (
@@ -164,7 +162,7 @@ export default function Times() {
           rotuloConfirmar="Apagar time" aoConfirmar={() => apagar(apagando)} />
       )}
       <NovoTime aberto={novo} aoFechar={() => setNovo(false)} papelDeQuemCria={perfil.papel}
-        gestores={gestores} aoCriar={criar} />
+        buscarGestores={buscarGestores} aoCriar={criar} />
     </>
   )
 }

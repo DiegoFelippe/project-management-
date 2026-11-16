@@ -1,8 +1,9 @@
+import { Building2 } from 'lucide-react'
 import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import EscolhaForma from '@/components/comum/EscolhaForma'
+import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -56,30 +57,28 @@ export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
   )
 
   return (
-    <Dialog open={aberto} onOpenChange={(abrir) => !abrir && fechar()}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Nova consultoria</DialogTitle>
-          <DialogDescription>A consultoria que contratou a plataforma e quem vai administrá-la.</DialogDescription>
-        </DialogHeader>
-        <form noValidate onSubmit={enviar} className="grid gap-4">
+    <JanelaFormulario aberto={aberto} aoFechar={fechar} titulo="Nova consultoria" icone={Building2} largura="lg" enviando={enviando}
+      descricao="A consultoria que contratou a plataforma e quem vai administrá-la."
+      rodape={(
+        <>
+          <Button type="button" variant="outline" onClick={fechar} disabled={enviando}>Cancelar</Button>
+          <Button type="submit" form="form-nova-consultoria" disabled={enviando}>{enviando ? 'Criando…' : 'Criar consultoria'}</Button>
+        </>
+      )}>
+      <form id="form-nova-consultoria" noValidate onSubmit={enviar} className="space-y-5">
+        <SecaoFormulario titulo="Consultoria">
           {campo('consultoria-nome', 'Nome da consultoria', 'nome', { maxLength: 120 })}
-          <fieldset className="grid gap-4 rounded-xl border p-4">
-            <legend className="px-1 text-sm font-semibold">Primeiro administrador</legend>
-            <EscolhaForma nome="forma-admin" valor={dados.forma} aoMudar={(forma) => setDados((d) => ({ ...d, forma }))} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              {campo('admin-nome', 'Nome', 'adminNome', { maxLength: 120 })}
-              {campo('admin-email', 'E-mail', 'adminEmail', { type: 'email' })}
-            </div>
-            {dados.forma === 'senha' && campo('admin-senha', 'Senha provisória', 'senha')}
-          </fieldset>
-          {erro && <Aviso>{erro}</Aviso>}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={fechar}>Cancelar</Button>
-            <Button type="submit" disabled={enviando}>Criar consultoria</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </SecaoFormulario>
+        <SecaoFormulario titulo="Primeiro administrador">
+          <EscolhaForma nome="forma-admin" valor={dados.forma} aoMudar={(forma) => setDados((d) => ({ ...d, forma }))} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {campo('admin-nome', 'Nome', 'adminNome', { maxLength: 120 })}
+            {campo('admin-email', 'E-mail', 'adminEmail', { type: 'email' })}
+          </div>
+          {dados.forma === 'senha' && campo('admin-senha', 'Senha provisória', 'senha')}
+        </SecaoFormulario>
+        {erro && <Aviso>{erro}</Aviso>}
+      </form>
+    </JanelaFormulario>
   )
 }

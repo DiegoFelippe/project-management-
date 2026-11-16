@@ -1,10 +1,13 @@
 // Conectar ou editar a IA da consultoria: provedor, modelo e chave de API (a chave nunca volta do servidor).
 import { useState } from 'react'
+import Seletor from '@/components/campos/Seletor'
+import { SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { SelectNativo } from '@/components/ui/select-nativo'
 import { AVISO_DO_SEGREDO, MODELO_PADRAO } from './constantes'
 import JanelaIntegracao from './JanelaIntegracao'
+
+const PROVEDORES = [{ valor: 'anthropic', rotulo: 'Claude (Anthropic)' }, { valor: 'openai', rotulo: 'OpenAI' }]
 
 export default function FormularioIa({ integracao, aoFechar, aoSalvar }) {
   const atual = integracao?.config ?? {}
@@ -34,24 +37,25 @@ export default function FormularioIa({ integracao, aoFechar, aoSalvar }) {
   return (
     <JanelaIntegracao titulo="Inteligência artificial" aoFechar={aoFechar} aoSalvar={salvar} erro={erro} enviando={enviando}
       descricao="A chave de API da consultoria, usada por todos os recursos de IA do sistema.">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-2">
-          <Label htmlFor="ia-provedor">Provedor</Label>
-          <SelectNativo id="ia-provedor" value={provedor} onChange={(e) => trocarProvedor(e.target.value)}>
-            <option value="anthropic">Claude (Anthropic)</option>
-            <option value="openai">OpenAI</option>
-          </SelectNativo>
+      <SecaoFormulario titulo="Modelo">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="ia-provedor">Provedor</Label>
+            <Seletor id="ia-provedor" valor={provedor} aoMudar={trocarProvedor} opcoes={PROVEDORES} />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="ia-modelo">Modelo</Label>
+            <Input id="ia-modelo" className="h-10" maxLength={100} value={modelo} onChange={(e) => setModelo(e.target.value)} />
+          </div>
         </div>
+      </SecaoFormulario>
+      <SecaoFormulario titulo="Acesso">
         <div className="grid gap-2">
-          <Label htmlFor="ia-modelo">Modelo</Label>
-          <Input id="ia-modelo" className="h-10" maxLength={100} value={modelo} onChange={(e) => setModelo(e.target.value)} />
+          <Label htmlFor="ia-chave">Chave de API</Label>
+          <Input id="ia-chave" type="password" autoComplete="off" className="h-10" value={chave}
+            placeholder={integracao ? AVISO_DO_SEGREDO : ''} onChange={(e) => setChave(e.target.value)} />
         </div>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="ia-chave">Chave de API</Label>
-        <Input id="ia-chave" type="password" autoComplete="off" className="h-10" value={chave}
-          placeholder={integracao ? AVISO_DO_SEGREDO : ''} onChange={(e) => setChave(e.target.value)} />
-      </div>
+      </SecaoFormulario>
     </JanelaIntegracao>
   )
 }

@@ -1,13 +1,17 @@
-import { useState } from 'react'
+import { UsersRound } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import { buscarComoOpcoes } from '@/components/campos/opcoesDePessoa'
+import Seletor from '@/components/campos/Seletor'
+import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { SelectNativo } from '@/components/ui/select-nativo'
 
-// Gestor cria o time dele; o administrador escolhe quem é o gestor.
-export default function NovoTime({ aberto, aoFechar, papelDeQuemCria, gestores, aoCriar }) {
+// Gestor cria o time dele; o administrador escolhe quem é o gestor. `buscarGestores(termo)` busca no banco
+// ({ itens: [pessoa], total }): a lista de gestores nunca vem inteira.
+export default function NovoTime({ aberto, aoFechar, papelDeQuemCria, buscarGestores, aoCriar }) {
+  const buscarOpcoes = useMemo(() => (buscarGestores ? buscarComoOpcoes(buscarGestores) : undefined), [buscarGestores])
   const [nome, setNome] = useState('')
   const [descricao, setDescricao] = useState('')
   const [gestorId, setGestorId] = useState('')
@@ -39,46 +43,41 @@ export default function NovoTime({ aberto, aoFechar, papelDeQuemCria, gestores, 
     limpar()
   }
 
+  function cancelar() {
+    limpar()
+    aoFechar()
+  }
+
   return (
-    <Dialog open={aberto} onOpenChange={(abrir) => { if (!abrir) { limpar(); aoFechar() } }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Novo time</DialogTitle>
-          <DialogDescription>
-            {escolheGestor ? 'Dê um nome ao time e escolha quem é o gestor.' : 'Você será o gestor deste time.'}
-          </DialogDescription>
-        </DialogHeader>
-        <form noValidate onSubmit={enviar} className="grid gap-4">
+    <JanelaFormulario aberto={aberto} aoFechar={cancelar} titulo="Novo time" icone={UsersRound} enviando={enviando}
+      descricao={escolheGestor ? 'Dê um nome ao time e escolha quem é o gestor.' : 'Você será o gestor deste time.'}
+      rodape={(
+        <>
+          <Button type="button" variant="outline" onClick={cancelar} disabled={enviando}>Cancelar</Button>
+          <Button type="submit" form="form-novo-time" disabled={enviando}>{enviando ? 'Criando…' : 'Criar time'}</Button>
+        </>
+      )}>
+      <form id="form-novo-time" noValidate onSubmit={enviar} className="space-y-5">
+        <div className="grid gap-2">
+          <Label htmlFor="nome-time">Nome do time</Label>
+          <Input id="nome-time" maxLength={80} aria-invalid={erroNome ? true : undefined} className="h-10"
+            value={nome} onChange={(e) => setNome(e.target.value)} />
+          {erroNome && <p className="text-xs text-destructive">{erroNome}</p>}
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="descricao-time">Descrição (opcional)</Label>
+          <textarea id="descricao-time" maxLength={500} rows={2}
+            className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/30"
+            value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+        </div>
+        {escolheGestor && (
           <div className="grid gap-2">
-            <Label htmlFor="nome-time">Nome do time</Label>
-            <Input id="nome-time" maxLength={80} aria-invalid={erroNome ? true : undefined} className="h-10"
-              value={nome} onChange={(e) => setNome(e.target.value)} />
-            {erroNome && <p className="text-xs text-destructive">{erroNome}</p>}
+            <Label htmlFor="gestor-time">Gestor do time</Label>
+            <Seletor id="gestor-time" valor={gestorId} aoMudar={setGestorId} buscar={buscarOpcoes} placeholder="Escolha…" />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="descricao-time">Descrição (opcional)</Label>
-            <textarea id="descricao-time" maxLength={500} rows={2}
-              className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/30"
-              value={descricao} onChange={(e) => setDescricao(e.target.value)} />
-          </div>
-          {escolheGestor && (
-            <div className="grid gap-2">
-              <Label htmlFor="gestor-time">Gestor do time</Label>
-              <SelectNativo id="gestor-time" value={gestorId} onChange={(e) => setGestorId(e.target.value)}>
-                <option value="">Escolha…</option>
-                {gestores.map((g) => (
-                  <option key={g.id} value={g.id}>{g.nome}</option>
-                ))}
-              </SelectNativo>
-            </div>
-          )}
-          {erro && <Aviso>{erro}</Aviso>}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => { limpar(); aoFechar() }}>Cancelar</Button>
-            <Button type="submit" disabled={enviando}>Criar time</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        )}
+        {erro && <Aviso>{erro}</Aviso>}
+      </form>
+    </JanelaFormulario>
   )
 }

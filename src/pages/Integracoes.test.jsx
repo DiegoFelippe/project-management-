@@ -48,7 +48,7 @@ describe('Integrações', () => {
     await userEvent.click(within(await screen.findByRole('row', { name: /E-mail/ })).getByRole('button', { name: 'Editar' }))
     const janela = screen.getByRole('dialog', { name: /E-mail \(SMTP\)/ })
     expect(within(janela).getByLabelText('Servidor')).toHaveValue('smtp.acme.test')
-    expect(within(janela).getByLabelText('Porta')).toHaveValue(587)
+    expect(within(janela).getByLabelText('Porta')).toHaveValue('587')
     expect(within(janela).getByLabelText('Senha')).toHaveValue('')
     await userEvent.click(within(janela).getByRole('button', { name: 'Salvar e testar' }))
     expect(salvarIntegracao).toHaveBeenCalledWith('smtp', expect.objectContaining({ host: 'smtp.acme.test', porta: 587 }), null)

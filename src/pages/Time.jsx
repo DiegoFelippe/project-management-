@@ -1,8 +1,10 @@
 import { ArrowLeft, Pencil, Trash2, UserMinus, UserPlus } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
+import { buscarComoOpcoes } from '@/components/campos/opcoesDePessoa'
+import Seletor from '@/components/campos/Seletor'
 import Avatar from '@/components/comum/Avatar'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
@@ -12,8 +14,7 @@ import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import EditarTime from '@/components/times/EditarTime'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { SelectNativo } from '@/components/ui/select-nativo'
-import { listarPessoas } from '@/data/pessoas'
+import { buscarPessoas } from '@/data/pessoas'
 import { adicionarMembro, apagarTime, buscarTime, editarTime, idsDosMembros, listarMembros, removerMembro } from '@/data/times'
 
 export default function Time() {
@@ -26,7 +27,6 @@ export default function Time() {
   const [membros, setMembros] = useState(null)
   const [pagina, setPagina] = useState(1)
   const [noTime, setNoTime] = useState(new Set())
-  const [pessoas, setPessoas] = useState([])
   const [escolhida, setEscolhida] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [versao, setVersao] = useState(0)
@@ -60,21 +60,22 @@ export default function Time() {
   // Mexer no time: administrador da consultoria ou o gestor do time. O dono só olha.
   const gerencio = Boolean(time) && (perfil.papel === 'admin' || (perfil.papel === 'gestor' && time.gestor_id === perfil.id))
 
-  useEffect(() => {
-    if (!gerencio) return
-    listarPessoas({ consultoriaId: perfil.consultoria_id }).then(setPessoas).catch(() => setPessoas([]))
-  }, [gerencio, perfil.consultoria_id])
-
   // Para o "Colocar pessoa": só os ids de quem já está (não a lista inteira de membros).
   useEffect(() => {
     if (!gerencio) return
     idsDosMembros(id).then(setNoTime).catch(() => setNoTime(new Set()))
   }, [gerencio, id, versao])
 
-  const disponiveis = useMemo(
-    () => pessoas.filter((p) => p.id !== time?.gestor_id && !noTime.has(p.id)),
-    [pessoas, noTime, time?.gestor_id],
+  // Gestores para trocar no Editar (administrador) e pessoas para o "Colocar pessoa": busca no banco pelo nome, nunca
+  // a lista inteira. Quem já está no time e o gestor não são oferecidos de novo.
+  const buscarGestores = useCallback(
+    (termo) => buscarPessoas({ consultoriaId: perfil.consultoria_id, papeis: ['gestor', 'admin'], termo }),
+    [perfil.consultoria_id],
   )
+  const gestorId = time?.gestor_id
+  const buscarDisponiveis = useMemo(() => buscarComoOpcoes(
+    (termo) => buscarPessoas({ consultoriaId: perfil.consultoria_id, termo, excluirIds: [...noTime, gestorId].filter(Boolean) }),
+  ), [perfil.consultoria_id, noTime, gestorId])
 
   async function colocar() {
     if (!escolhida) return
@@ -129,7 +130,7 @@ export default function Time() {
       </Cabecalho>
       {editando && (
         <EditarTime key={time.id + time.nome} aberto time={time} papelDeQuemEdita={perfil.papel}
-          gestores={pessoas.filter((p) => p.papel === 'gestor' || p.papel === 'admin')}
+          buscarGestores={buscarGestores}
           aoFechar={() => setEditando(false)}
           aoSalvar={async (dados) => {
             const resposta = await editarTime(time.id, dados)
@@ -157,12 +158,7 @@ export default function Time() {
         <div className="mb-5 flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3 shadow-xs">
           <div className="grid min-w-56 flex-1 gap-1.5">
             <Label htmlFor="colocar-pessoa">Colocar pessoa</Label>
-            <SelectNativo id="colocar-pessoa" value={escolhida} onChange={(e) => setEscolhida(e.target.value)}>
-              <option value="">{disponiveis.length ? 'Escolha…' : 'Ninguém disponível'}</option>
-              {disponiveis.map((p) => (
-                <option key={p.id} value={p.id}>{p.nome} ({p.email})</option>
-              ))}
-            </SelectNativo>
+            <Seletor id="colocar-pessoa" valor={escolhida} aoMudar={setEscolhida} buscar={buscarDisponiveis} placeholder="Escolha…" />
           </div>
           <Button onClick={colocar} disabled={!escolhida || ocupado}>
             <UserPlus /> Colocar no time

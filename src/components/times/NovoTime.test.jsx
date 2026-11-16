@@ -1,11 +1,12 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { escolherNoSeletor } from '@/test/campos'
 import NovoTime from './NovoTime'
 
 function montar(props) {
   const aoCriar = props.aoCriar ?? vi.fn().mockResolvedValue({ id: 't1' })
-  render(<NovoTime aberto aoFechar={vi.fn()} gestores={[]} {...props} aoCriar={aoCriar} />)
+  render(<NovoTime aberto aoFechar={vi.fn()} {...props} aoCriar={aoCriar} />)
   return aoCriar
 }
 
@@ -16,9 +17,9 @@ describe('NovoTime', () => {
   })
 
   it('admin escolhe o gestor do time', async () => {
-    const aoCriar = montar({ papelDeQuemCria: 'admin', gestores: [{ id: 'g2', nome: 'Bruno' }] })
+    const aoCriar = montar({ papelDeQuemCria: 'admin', buscarGestores: vi.fn().mockResolvedValue({ itens: [{ id: 'g2', nome: 'Bruno', email: 'bruno@x.test' }], total: 1 }) })
     await userEvent.type(screen.getByLabelText('Nome do time'), 'Implantação')
-    await userEvent.selectOptions(screen.getByLabelText('Gestor do time'), 'g2')
+    await escolherNoSeletor(userEvent, 'Gestor do time', 'Bruno')
     await userEvent.click(screen.getByRole('button', { name: 'Criar time' }))
     expect(aoCriar).toHaveBeenCalledWith({ nome: 'Implantação', descricao: '', gestorId: 'g2' })
   })

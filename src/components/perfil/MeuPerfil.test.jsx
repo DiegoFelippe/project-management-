@@ -5,6 +5,7 @@ import { AuthContext } from '@/auth/useAuth'
 import { listarAusencias } from '@/data/capacidade'
 import { trocarFoto } from '@/data/imagens'
 import { atualizarMeuContato, gerenciarAcesso } from '@/data/usuarios'
+import { escolherNoSeletor } from '@/test/campos'
 import MeuPerfil from './MeuPerfil'
 
 vi.mock('@/data/usuarios', () => ({ gerenciarAcesso: vi.fn(), atualizarMeuContato: vi.fn() }))
@@ -83,7 +84,7 @@ describe('Meu perfil', () => {
   it('mostra telefone, cidade e UF para editar; cargo, entrada e carga só para ler', () => {
     expect(screen.getByLabelText('Telefone')).toHaveValue('(11) 97777-0000')
     expect(screen.getByLabelText('Cidade')).toHaveValue('Santos')
-    expect(screen.getByLabelText('UF')).toHaveValue('SP')
+    expect(screen.getByLabelText('UF')).toHaveTextContent('SP')
     expect(within(screen.getByRole('dialog')).getByText('Consultor sênior')).toBeInTheDocument()
     expect(within(screen.getByRole('dialog')).getByText('10/01/2026')).toBeInTheDocument()
     expect(within(screen.getByRole('dialog')).getByText('40 h por semana')).toBeInTheDocument()
@@ -94,7 +95,7 @@ describe('Meu perfil', () => {
     await userEvent.clear(screen.getByLabelText('Telefone'))
     await userEvent.type(screen.getByLabelText('Telefone'), '(13) 3333-4444')
     await userEvent.clear(screen.getByLabelText('Cidade'))
-    await userEvent.selectOptions(screen.getByLabelText('UF'), 'RJ')
+    await escolherNoSeletor(userEvent, 'UF', 'RJ')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar contato' }))
     expect(atualizarMeuContato).toHaveBeenCalledWith({ telefone: '(13) 3333-4444', cidade: '', uf: 'RJ' })
     await waitFor(() => expect(recarregarPerfil).toHaveBeenCalled())
