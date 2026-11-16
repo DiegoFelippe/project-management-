@@ -1,11 +1,11 @@
 // POST /functions/v1/gerenciar-acesso — { acao: 'editar' | 'desativar' | 'reativar' | 'mover_para_central', pessoa_id, nome?, papel? }
 // Dono cuida dos administradores e da central; a central, dos administradores; só o dono move alguém para a central; administrador, de gestores e pessoas da consultoria dele;
-// gestor só muda o nome das pessoas que vê. Em si mesmo ("Meu perfil"), cada um muda só o próprio nome:
+// gestor só muda o nome e a ficha (telefone, cidade, uf, cargo, data_entrada) das pessoas que vê. Em si mesmo ("Meu perfil"), cada um muda só o próprio nome:
 // não troca o próprio papel nem se desativa. E-mail não muda.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
 import { clienteAdmin, type Perfil, quemChama } from '../_shared/clientes.ts'
 import { Falha, lerJson, responder, servir } from '../_shared/http.ts'
-import { validarNome, validarUuid } from '../_shared/validar.ts'
+import { validarFicha, validarNome, validarUuid } from '../_shared/validar.ts'
 
 type Poder = 'tudo' | 'nome' | null
 
@@ -69,8 +69,10 @@ servir(async (req) => {
   if (!poder) throw new Falha(403, 'sem_permissao')
 
   if (acao === 'editar') {
-    const mudancas: Record<string, string> = {}
+    const mudancas: Record<string, string | null> = {}
     if (corpo.nome !== undefined) mudancas.nome = validarNome(corpo.nome)
+    if (!euMesmo) Object.assign(mudancas, validarFicha(corpo))
+    else if (Object.keys(validarFicha(corpo)).length) throw new Falha(403, 'sem_permissao')
     if (corpo.papel !== undefined) {
       if (poder !== 'tudo' || quem.papel !== 'admin') throw new Falha(403, 'sem_permissao')
       if (corpo.papel !== 'pessoa' && corpo.papel !== 'gestor') throw new Falha(400, 'dados_invalidos', { campo: 'papel' })

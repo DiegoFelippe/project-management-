@@ -67,6 +67,7 @@ servir(async (req) => {
     consultoriaId,
     criadoPor: quem.id,
     times: dados.times,
+    ficha: dados.ficha,
   })
   return responder(201, { pessoa_id: pessoaId })
 })

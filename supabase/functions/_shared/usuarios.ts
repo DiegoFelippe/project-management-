@@ -1,7 +1,7 @@
 // Criar o login (convite ou senha provisória), o perfil e os times de uma pessoa, sem deixar sobras.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
 import { Falha } from './http.ts'
-import type { Forma } from './validar.ts'
+import type { Ficha, Forma } from './validar.ts'
 
 export type SituacaoEmail =
   | 'livre'
@@ -77,6 +77,7 @@ export type NovoAcesso = {
   consultoriaId: string | null
   criadoPor: string
   times: string[]
+  ficha?: Ficha
 }
 
 // Devolve o id da pessoa criada. E-mail já usado → Falha 409 (ja_na_consultoria ou email_indisponivel).
@@ -115,6 +116,7 @@ export async function criarAcessoCompleto(admin: SupabaseClient, novo: NovoAcess
     precisa_trocar_senha: novo.forma === 'senha',
     convite_pendente: novo.forma === 'convite',
     criado_por: novo.criadoPor,
+    ...novo.ficha,
   })
   if (erroPerfil) {
     // O convite pode devolver o mesmo login ao outro pedido do clique duplo: esse login não é nosso para apagar.
