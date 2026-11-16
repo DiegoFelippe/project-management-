@@ -1,12 +1,14 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { apagarTime, editarTime, listarTimes } from '@/data/times'
+import { buscarPessoas } from '@/data/pessoas'
+import { apagarTime, criarTime, editarTime, listarTimes } from '@/data/times'
+import { escolherNoSeletor } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
 import Times from './Times'
 
 vi.mock('@/data/times', () => ({ listarTimes: vi.fn(), criarTime: vi.fn(), editarTime: vi.fn(), apagarTime: vi.fn() }))
-vi.mock('@/data/pessoas', () => ({ listarPessoas: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/data/pessoas', () => ({ buscarPessoas: vi.fn() }))
 vi.mock('@/data/consultorias', () => ({ listarNomesDeConsultorias: vi.fn().mockResolvedValue([]) }))
 
 const gil = { id: 'g1', nome: 'Gil Gestor' }
@@ -23,6 +25,8 @@ beforeEach(() => {
   vi.mocked(listarTimes).mockResolvedValue({ itens: TIMES, total: 2 })
   vi.mocked(editarTime).mockResolvedValue({ erro: null })
   vi.mocked(apagarTime).mockResolvedValue({ erro: null })
+  vi.mocked(criarTime).mockResolvedValue({ id: 't9' })
+  vi.mocked(buscarPessoas).mockResolvedValue({ itens: [{ id: 'g9', nome: 'Gabi Gestora', email: 'gabi@x.test', papel: 'gestor' }], total: 1 })
 })
 
 describe('Times', () => {
@@ -42,6 +46,24 @@ describe('Times', () => {
     expect(within(janela).getByLabelText('Nome do time')).toHaveValue('Suporte')
     await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
     expect(editarTime).toHaveBeenCalledWith('t2', expect.objectContaining({ nome: 'Suporte' }))
+  })
+
+  it('o administrador escolhe o gestor numa busca no banco, ao criar e ao editar o time', async () => {
+    renderizarTela(<Times />, { perfil: admin })
+    await userEvent.click(await screen.findByRole('button', { name: 'Novo time' }))
+    const nova = screen.getByRole('dialog', { name: 'Novo time' })
+    await userEvent.type(within(nova).getByLabelText('Nome do time'), 'Projetos')
+    await escolherNoSeletor(userEvent, 'Gestor do time', 'Gabi Gestora')
+    expect(buscarPessoas).toHaveBeenCalledWith({ consultoriaId: 'c1', papeis: ['gestor', 'admin'], termo: '' })
+    await userEvent.click(within(nova).getByRole('button', { name: 'Criar time' }))
+    expect(criarTime).toHaveBeenCalledWith(expect.objectContaining({ nome: 'Projetos', gestorId: 'g9', consultoriaId: 'c1' }))
+
+    await userEvent.click(within(await screen.findByRole('row', { name: /Suporte/ })).getByRole('button', { name: 'Editar' }))
+    const janela = await screen.findByRole('dialog', { name: 'Editar time' })
+    expect(within(janela).getByLabelText('Gestor do time')).toHaveTextContent('Outro')
+    await escolherNoSeletor(userEvent, 'Gestor do time', 'Gabi Gestora')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
+    expect(editarTime).toHaveBeenCalledWith('t2', expect.objectContaining({ gestorId: 'g9' }))
   })
 
   it('Apagar pede confirmação e apaga o time escolhido', async () => {
