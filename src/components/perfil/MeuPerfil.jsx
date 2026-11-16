@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
+import AusenciasDaPessoa from '@/components/capacidade/AusenciasDaPessoa'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import CampoImagem from '@/components/comum/CampoImagem'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
@@ -23,6 +24,8 @@ export default function MeuPerfil({ aberto, aoFechar }) {
   const [repetida, setRepetida] = useState('')
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
+
+  const minhasAusencias = ['admin', 'gestor', 'pessoa'].includes(perfil.papel)
 
   async function aplicar() {
     if (nome.trim() !== perfil.nome) {
@@ -94,6 +97,13 @@ export default function MeuPerfil({ aberto, aoFechar }) {
             </div>
             <p className="text-xs text-muted-foreground">Pelo menos 8 caracteres. Deixe em branco para manter a atual.</p>
           </fieldset>
+          {minhasAusencias && (
+            <section aria-labelledby="minhas-ausencias" className="grid gap-2">
+              <h3 id="minhas-ausencias" className="text-sm font-medium">Minhas ausências</h3>
+              <AusenciasDaPessoa perfilId={perfil.id} />
+              <p className="text-xs text-muted-foreground">Quem registra ou muda as ausências é a administração da sua consultoria.</p>
+            </section>
+          )}
           {erro && <Aviso>{erro}</Aviso>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={aoFechar}>Cancelar</Button>

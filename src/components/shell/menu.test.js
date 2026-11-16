@@ -6,10 +6,10 @@ const ids = (papel) => itensDoMenu(papel).map((item) => item.id)
 describe('itensDoMenu', () => {
   it('cada papel vê os seus itens', () => {
     expect(ids('pessoa')).toEqual(['inicio', 'clientes', 'projetos'])
-    expect(ids('gestor')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios'])
-    expect(ids('admin')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios', 'integracoes'])
-    expect(ids('central')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios', 'consultorias'])
-    expect(ids('dono')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios', 'consultorias', 'integracoes'])
+    expect(ids('gestor')).toEqual(['inicio', 'clientes', 'capacidade', 'projetos', 'times', 'usuarios'])
+    expect(ids('admin')).toEqual(['inicio', 'clientes', 'capacidade', 'projetos', 'times', 'usuarios', 'integracoes'])
+    expect(ids('central')).toEqual(['inicio', 'clientes', 'capacidade', 'projetos', 'times', 'usuarios', 'consultorias'])
+    expect(ids('dono')).toEqual(['inicio', 'clientes', 'capacidade', 'projetos', 'times', 'usuarios', 'consultorias', 'integracoes'])
   })
 
   it('projetos ainda está em breve', () => {
@@ -29,6 +29,7 @@ describe('tituloDaRota', () => {
     expect(tituloDaRota('/times/0b5c')).toBe('Times')
     expect(tituloDaRota('/')).toBe('Início')
     expect(tituloDaRota('/clientes')).toBe('Clientes')
+    expect(tituloDaRota('/capacidade')).toBe('Capacidade')
     expect(tituloDaRota('/usuarios')).toBe('Usuários')
     expect(tituloDaRota('/consultorias')).toBe('Consultorias')
     expect(tituloDaRota('/integracoes')).toBe('Integrações')
@@ -39,6 +40,12 @@ describe('animação no hover', () => {
   it('Integrações ganhou animação própria (conectar)', () => {
     expect(itensDoMenu('admin').find((item) => item.id === 'integracoes').animacao).toBe('conectar')
     expect(ANIMACOES_DO_MENU).toContain('conectar')
+  })
+
+  it('Capacidade usa a animação medir', () => {
+    expect(itensDoMenu('gestor').find((item) => item.id === 'capacidade').animacao).toBe('medir')
+    expect(ANIMACOES_DO_MENU).toContain('medir')
+    expect(ids('pessoa')).not.toContain('capacidade')
   })
 
   it('Clientes usa a animação transmitir', () => {

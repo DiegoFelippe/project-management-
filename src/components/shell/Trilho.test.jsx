@@ -6,6 +6,7 @@ import { AuthContext } from '@/auth/useAuth'
 import Trilho from './Trilho'
 
 vi.mock('@/data/usuarios', () => ({ gerenciarAcesso: vi.fn() }))
+vi.mock('@/data/capacidade', () => ({ listarAusencias: vi.fn().mockResolvedValue({ itens: [], total: 0 }) }))
 vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn(), tirarFoto: vi.fn() }))
 
 describe('Trilho', () => {
@@ -19,7 +20,7 @@ describe('Trilho', () => {
       </AuthContext.Provider>,
     )
     const itens = container.querySelectorAll('[data-item-trilho]')
-    expect(itens.length).toBe(9) // 7 itens do dono + bolinha + Sair
+    expect(itens.length).toBe(10) // 8 itens do dono + bolinha + Sair
     for (const item of itens) {
       expect(item.querySelector('[class*="anim-"]'), item.textContent).not.toBeNull()
     }
