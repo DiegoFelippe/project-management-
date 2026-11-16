@@ -1,10 +1,22 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apagarArquivo, enviarArquivo, linkParaBaixar, listarArquivos } from '@/data/arquivos'
 import { renderizarTela } from '@/test/renderizar'
 import ArquivosDoCliente from './ArquivosDoCliente'
+
+// O computador num fuso longe de São Paulo (antes de o componente criar os formatadores): o "Quando" não pode
+// depender dele.
+const fusoOriginal = vi.hoisted(() => {
+  const original = process.env.TZ
+  process.env.TZ = 'Asia/Tokyo'
+  return original
+})
+afterAll(() => {
+  if (fusoOriginal === undefined) delete process.env.TZ
+  else process.env.TZ = fusoOriginal
+})
 
 vi.mock('@/data/arquivos', () => ({
   listarArquivos: vi.fn(), enviarArquivo: vi.fn(), linkParaBaixar: vi.fn(), apagarArquivo: vi.fn(),
@@ -49,6 +61,33 @@ describe('ArquivosDoCliente', () => {
     expect(within(linha).getByText('Ana')).toBeInTheDocument()
     expect(within(tabela).getByText('3 MB')).toBeInTheDocument()
     expect(within(linha).getByRole('button', { name: 'Baixar' })).toBeInTheDocument()
+  })
+
+  it('tamanho abaixo de 1 KB aparece em bytes', async () => {
+    vi.mocked(listarArquivos).mockResolvedValue({ itens: [{ ...ARQUIVOS[0], tamanho: 45 }], total: 1 })
+    tela()
+    const linha = within(await screen.findByRole('table', { name: 'Arquivos' })).getByRole('row', { name: /contrato\.pdf/ })
+    expect(within(linha).getByText('45 B')).toBeInTheDocument()
+  })
+
+  it('"Quando" aparece no horário de São Paulo, qualquer que seja o fuso do computador', async () => {
+    vi.mocked(listarArquivos).mockResolvedValue({ itens: [{ ...ARQUIVOS[0], enviado_em: '2026-11-10T02:30:00Z' }], total: 1 })
+    tela()
+    const linha = within(await screen.findByRole('table', { name: 'Arquivos' })).getByRole('row', { name: /contrato\.pdf/ })
+    expect(within(linha).getByText('09/11/2026, 23:30')).toBeInTheDocument()
+  })
+
+  it('paginação: some com 15, aparece com 16, Próxima pede a página 2', async () => {
+    vi.mocked(listarArquivos).mockResolvedValue({ itens: ARQUIVOS, total: 15 })
+    const { unmount } = tela()
+    await screen.findByRole('table', { name: 'Arquivos' })
+    expect(screen.queryByRole('navigation', { name: 'Paginação' })).not.toBeInTheDocument()
+    unmount()
+    vi.mocked(listarArquivos).mockResolvedValue({ itens: ARQUIVOS, total: 16 })
+    tela()
+    expect(await screen.findByText('1–15 de 16')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Próxima/ }))
+    await waitFor(() => expect(listarArquivos).toHaveBeenLastCalledWith('k1', { pagina: 2 }))
   })
 
   it('sem arquivos mostra a lista vazia', async () => {
@@ -106,14 +145,21 @@ describe('ArquivosDoCliente', () => {
     expect(await screen.findByText(/a\.pdf.*Sem permissão\./)).toBeInTheDocument()
   })
 
-  it('Baixar abre o link temporário em outra aba', async () => {
+  it('Baixar baixa pelo link temporário na mesma aba, sem window.open (o Safari bloqueia depois do await)', async () => {
     const abrir = vi.spyOn(window, 'open').mockReturnValue(null)
+    const cliques = []
+    const clicar = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function () {
+      cliques.push({ href: this.href, download: this.download, naPagina: document.body.contains(this) })
+    })
     tela()
     const linha = within(await screen.findByRole('table', { name: 'Arquivos' })).getByRole('row', { name: /contrato\.pdf/ })
     await userEvent.click(within(linha).getByRole('button', { name: 'Baixar' }))
     expect(linkParaBaixar).toHaveBeenCalledWith(ARQUIVOS[0])
-    await waitFor(() => expect(abrir).toHaveBeenCalledWith('https://x.test/a', '_blank', 'noopener'))
+    await waitFor(() => expect(cliques).toEqual([{ href: 'https://x.test/a', download: 'contrato.pdf', naPagina: true }]))
+    expect(abrir).not.toHaveBeenCalled()
+    expect(document.querySelector('a[download]')).toBeNull()
     abrir.mockRestore()
+    clicar.mockRestore()
   })
 
   it('Baixar com erro avisa', async () => {
@@ -143,6 +189,27 @@ describe('ArquivosDoCliente', () => {
     await userEvent.click(within(linha).getByRole('button', { name: 'Apagar' }))
     await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar arquivo' }))
     await waitFor(() => expect(toast.warning).toHaveBeenCalledWith('A cópia não saiu.'))
+  })
+
+  it('dois problemas iguais aparecem os dois, sem chave repetida na lista', async () => {
+    const erroDoConsole = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(enviarArquivo).mockResolvedValue({ erro: 'Sem permissão.' })
+    tela()
+    await screen.findByRole('table', { name: 'Arquivos' })
+    await userEvent.upload(screen.getByTestId('entrada-de-arquivo'), [arquivoDe('a.pdf'), arquivoDe('a.pdf')])
+    await waitFor(() => expect(screen.getAllByText('a.pdf: Sem permissão.')).toHaveLength(2))
+    expect(erroDoConsole.mock.calls.flat().join(' ')).not.toMatch(/same key/)
+    erroDoConsole.mockRestore()
+  })
+
+  it('cliente arquivado: só a central vê a área de soltar (como o banco)', async () => {
+    const arquivado = { ...CLIENTE, arquivado: true }
+    for (const [perfil, vê] of [[central, true], [admin, false], [consultor, false]]) {
+      const { unmount } = tela(perfil, arquivado)
+      await screen.findByRole('table', { name: 'Arquivos' })
+      expect(!!screen.queryByTestId('area-de-soltar')).toBe(vê)
+      unmount()
+    }
   })
 
   it('quem pode enviar vê a área de soltar; os outros não', async () => {

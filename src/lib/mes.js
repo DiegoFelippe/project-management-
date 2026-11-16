@@ -1,5 +1,5 @@
 // Mês de trabalho: "YYYY-MM-01". "Hoje" é sempre o de São Paulo, onde a equipe está.
-const FUSO = 'America/Sao_Paulo'
+export const FUSO = 'America/Sao_Paulo'
 
 export function mesAtual(agora = new Date()) {
   const partes = new Intl.DateTimeFormat('en-CA', { timeZone: FUSO, year: 'numeric', month: '2-digit' }).formatToParts(agora)

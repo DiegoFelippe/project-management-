@@ -8,22 +8,26 @@ import { Button } from '@/components/ui/button'
 import { apagarArquivo, enviarArquivo, linkParaBaixar, listarArquivos } from '@/data/arquivos'
 import { ARQUIVO_GRANDE_DEMAIS } from '@/lib/erros'
 import { TAMANHO_MAXIMO_ARQUIVO } from '@/lib/arquivos'
+import { FUSO } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
 import { cn } from '@/lib/utils'
 
-const QUANDO = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+const QUANDO = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, dateStyle: 'short', timeStyle: 'short' })
 const DECIMAL = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 })
 const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
 const LIMITE_EM_MB = TAMANHO_MAXIMO_ARQUIVO / 1048576
 
 function formatarTamanho(bytes) {
   if (bytes >= 1048576) return `${DECIMAL.format(bytes / 1048576)} MB`
-  return `${DECIMAL.format(bytes / 1024)} KB`
+  if (bytes >= 1024) return `${DECIMAL.format(bytes / 1024)} KB`
+  return `${bytes} B`
 }
 
-// Quem manda arquivo: a central e, na consultoria do cliente, a administração e o consultor dele (o banco confere).
+// Quem manda arquivo, como private.posso_enviar_arquivo (o banco confere): a central, mesmo com o cliente
+// arquivado; e, com o cliente ativo na consultoria dela, a administração e o consultor dele.
 function podeEnviar(perfil, cliente) {
   if (veTudo(perfil)) return true
+  if (cliente.arquivado) return false
   if (!cliente.consultoria_id || perfil.consultoria_id !== cliente.consultoria_id) return false
   return perfil.papel === 'admin' || perfil.papel === 'gestor' || perfil.id === cliente.consultor_id
 }
@@ -94,10 +98,18 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
     if (!enviando) enviar(Array.from(e.dataTransfer?.files ?? []))
   }
 
+  // Depois do await, o Safari bloqueia window.open (já não conta como clique). O link vem como download
+  // (Content-Disposition: attachment): um <a download> clicado aqui baixa sem sair da página.
   async function baixar(arquivo) {
     const { url, erro: falha } = await linkParaBaixar(arquivo)
     if (falha) return toast.error(falha)
-    window.open(url, '_blank', 'noopener')
+    const link = document.createElement('a')
+    link.href = url
+    link.download = arquivo.nome
+    link.rel = 'noopener'
+    document.body.append(link)
+    link.click()
+    link.remove()
   }
 
   async function apagar(arquivo) {
@@ -135,7 +147,7 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
       )}
       {problemas.length > 0 && (
         <ul role="alert" className="grid gap-1 text-sm text-destructive">
-          {problemas.map((p) => <li key={p}>{p}</li>)}
+          {problemas.map((p, i) => <li key={`${i}-${p}`}>{p}</li>)}
         </ul>
       )}
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
