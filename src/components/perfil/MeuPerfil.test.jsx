@@ -1,17 +1,20 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '@/auth/useAuth'
 import { listarAusencias } from '@/data/capacidade'
 import { trocarFoto } from '@/data/imagens'
-import { gerenciarAcesso } from '@/data/usuarios'
+import { atualizarMeuContato, gerenciarAcesso } from '@/data/usuarios'
 import MeuPerfil from './MeuPerfil'
 
-vi.mock('@/data/usuarios', () => ({ gerenciarAcesso: vi.fn() }))
+vi.mock('@/data/usuarios', () => ({ gerenciarAcesso: vi.fn(), atualizarMeuContato: vi.fn() }))
 vi.mock('@/data/capacidade', () => ({ listarAusencias: vi.fn() }))
 vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn(), tirarFoto: vi.fn() }))
 
-const perfil = { id: 'me', nome: 'Diego Felippe', email: 'diego@exemplo.test', papel: 'admin', consultoria: { nome: 'Acme' } }
+const perfil = {
+  id: 'me', nome: 'Diego Felippe', email: 'diego@exemplo.test', papel: 'admin', consultoria: { nome: 'Acme' },
+  telefone: '(11) 97777-0000', cidade: 'Santos', uf: 'SP', cargo: 'Consultor sênior', data_entrada: '2026-01-10', carga_semanal: 40,
+}
 let recarregarPerfil, definirSenha, aoFechar
 
 beforeAll(() => {
@@ -23,6 +26,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(gerenciarAcesso).mockResolvedValue({ erro: null })
   vi.mocked(trocarFoto).mockResolvedValue({ erro: null })
+  vi.mocked(atualizarMeuContato).mockResolvedValue({ erro: null })
   vi.mocked(listarAusencias).mockResolvedValue({ itens: [{ id: 'a1', perfil_id: 'me', de: '2026-12-20', ate: '2027-01-05', motivo: 'Férias' }], total: 1 })
   recarregarPerfil = vi.fn().mockResolvedValue(undefined)
   definirSenha = vi.fn().mockResolvedValue({ erro: null })
@@ -74,5 +78,42 @@ describe('Meu perfil', () => {
     expect(within(tabela).getByText('20/12/2026')).toBeInTheDocument()
     expect(within(tabela).getByText('Férias')).toBeInTheDocument()
     expect(within(tabela).queryByRole('button')).toBeNull()
+  })
+
+  it('mostra telefone, cidade e UF para editar; cargo, entrada e carga só para ler', () => {
+    expect(screen.getByLabelText('Telefone')).toHaveValue('(11) 97777-0000')
+    expect(screen.getByLabelText('Cidade')).toHaveValue('Santos')
+    expect(screen.getByLabelText('UF')).toHaveValue('SP')
+    expect(within(screen.getByRole('dialog')).getByText('Consultor sênior')).toBeInTheDocument()
+    expect(within(screen.getByRole('dialog')).getByText('10/01/2026')).toBeInTheDocument()
+    expect(within(screen.getByRole('dialog')).getByText('40 h por semana')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Cargo')).not.toBeInTheDocument()
+  })
+
+  it('Salvar contato grava telefone, cidade e UF e atualiza quem está usando', async () => {
+    await userEvent.clear(screen.getByLabelText('Telefone'))
+    await userEvent.type(screen.getByLabelText('Telefone'), '(13) 3333-4444')
+    await userEvent.clear(screen.getByLabelText('Cidade'))
+    await userEvent.selectOptions(screen.getByLabelText('UF'), 'RJ')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar contato' }))
+    expect(atualizarMeuContato).toHaveBeenCalledWith({ telefone: '(13) 3333-4444', cidade: '', uf: 'RJ' })
+    await waitFor(() => expect(recarregarPerfil).toHaveBeenCalled())
+    expect(aoFechar).not.toHaveBeenCalled()
+  })
+
+  it('erro ao salvar o contato aparece na janela', async () => {
+    vi.mocked(atualizarMeuContato).mockResolvedValue({ erro: 'Você não tem permissão para isso.' })
+    await userEvent.type(screen.getByLabelText('Telefone'), '9')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar contato' }))
+    expect(await screen.findByText('Você não tem permissão para isso.')).toBeInTheDocument()
+    expect(recarregarPerfil).not.toHaveBeenCalled()
+  })
+
+  it('o Salvar de baixo também grava o contato que mudou, e só ele', async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(atualizarMeuContato).not.toHaveBeenCalled()
+    await userEvent.type(screen.getByLabelText('Telefone'), '9')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(atualizarMeuContato).toHaveBeenCalledWith({ telefone: '(11) 97777-00009', cidade: 'Santos', uf: 'SP' })
   })
 })

@@ -1,14 +1,18 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { contarClientesAtivos } from '@/data/clientes'
 import { trocarFoto } from '@/data/imagens'
-import { gerenciarAcesso, listarUsuarios } from '@/data/usuarios'
+import { definirCarga, listarAusencias } from '@/data/capacidade'
+import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { renderizarTela } from '@/test/renderizar'
 import Usuarios from './Usuarios'
 
 vi.mock('@/data/usuarios', () => ({
   listarUsuarios: vi.fn(), criarAcesso: vi.fn(), gerenciarAcesso: vi.fn(), reenviarConvite: vi.fn(),
+}))
+vi.mock('@/data/capacidade', () => ({
+  definirCarga: vi.fn(), listarAusencias: vi.fn(), criarAusencia: vi.fn(), editarAusencia: vi.fn(), apagarAusencia: vi.fn(),
 }))
 vi.mock('@/data/clientes', () => ({ contarClientesAtivos: vi.fn() }))
 vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn().mockResolvedValue({ erro: null }), tirarFoto: vi.fn() }))
@@ -24,24 +28,132 @@ beforeAll(() => {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(contarClientesAtivos).mockResolvedValue(0)
+  vi.mocked(listarAusencias).mockResolvedValue({ itens: [], total: 0 })
   vi.mocked(listarUsuarios).mockResolvedValue({
     itens: [
-      { id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [] },
-      { id: 'p2', nome: 'Bruno', email: 'bruno@x.test', papel: 'gestor', ativo: true, times: [] },
+      {
+        id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [], consultoria_id: 'c1',
+        cargo: 'Analista', telefone: '(11) 98888-1111', cidade: 'Santos', uf: 'SP', data_entrada: '2026-01-10', carga_semanal: 40,
+      },
+      { id: 'p2', nome: 'Bruno', email: 'bruno@x.test', papel: 'gestor', ativo: true, times: [], consultoria_id: 'c1', carga_semanal: 44 },
     ],
     total: 2,
   })
 })
 
 describe('Usuários', () => {
-  it('lista as pessoas numa tabela e Editar abre o formulário com a pessoa escolhida', async () => {
+  it('lista as pessoas numa tabela, com Cargo e Telefone, e Editar abre a ficha da pessoa escolhida', async () => {
     renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
     const tabela = await screen.findByRole('table', { name: 'Usuários' })
     expect(within(tabela).getAllByRole('row')).toHaveLength(3)
+    expect(within(tabela).getByRole('columnheader', { name: 'Cargo' })).toBeInTheDocument()
+    expect(within(tabela).getByRole('columnheader', { name: 'Telefone' })).toBeInTheDocument()
+    const ana = within(tabela).getByRole('row', { name: /Ana/ })
+    expect(within(ana).getByText('Analista')).toBeInTheDocument()
+    expect(within(ana).getByText('(11) 98888-1111')).toBeInTheDocument()
     await userEvent.click(within(screen.getByRole('row', { name: /Bruno/ })).getByRole('button', { name: 'Editar' }))
-    const janela = screen.getByRole('dialog', { name: 'Editar acesso' })
+    const janela = screen.getByRole('dialog', { name: 'Editar Bruno' })
     expect(within(janela).getByLabelText('Nome')).toHaveValue('Bruno')
     expect(within(janela).getByLabelText('E-mail')).toHaveValue('bruno@x.test')
+  })
+
+  it('Editar abre a ficha com cargo, telefone, cidade, UF, data de entrada e carga da linha', async () => {
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Editar' }))
+    const janela = screen.getByRole('dialog', { name: 'Editar Ana' })
+    expect(within(janela).getByLabelText('Cargo')).toHaveValue('Analista')
+    expect(within(janela).getByLabelText('Telefone')).toHaveValue('(11) 98888-1111')
+    expect(within(janela).getByLabelText('Cidade')).toHaveValue('Santos')
+    expect(within(janela).getByLabelText('UF')).toHaveValue('SP')
+    expect(within(janela).getByLabelText('Data de entrada')).toHaveValue('2026-01-10')
+    expect(within(janela).getByLabelText('Carga semanal (horas)')).toHaveValue('40')
+  })
+
+  it('salvar chama gerenciarAcesso uma vez só com o que mudou, e definirCarga só se a carga mudou', async () => {
+    vi.mocked(gerenciarAcesso).mockResolvedValue({ erro: null })
+    vi.mocked(definirCarga).mockResolvedValue({ erro: null })
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Editar' }))
+    await userEvent.clear(screen.getByLabelText('Telefone'))
+    await userEvent.type(screen.getByLabelText('Telefone'), '(11) 90000-0000')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(gerenciarAcesso).toHaveBeenCalledTimes(1)
+    expect(gerenciarAcesso).toHaveBeenCalledWith('editar', 'p1', { telefone: '(11) 90000-0000' })
+    expect(definirCarga).not.toHaveBeenCalled()
+    await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Editar' }))
+    await userEvent.clear(screen.getByLabelText('Carga semanal (horas)'))
+    await userEvent.type(screen.getByLabelText('Carga semanal (horas)'), '32,5')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(gerenciarAcesso).toHaveBeenCalledTimes(1)
+    expect(definirCarga).toHaveBeenCalledWith('p1', 32.5)
+  })
+
+  it('mostra o primeiro erro ao salvar e mantém a ficha aberta', async () => {
+    vi.mocked(gerenciarAcesso).mockResolvedValue({ erro: 'Você não tem permissão para isso.' })
+    vi.mocked(definirCarga).mockResolvedValue({ erro: null })
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Editar' }))
+    await userEvent.type(screen.getByLabelText('Cargo'), ' sênior')
+    await userEvent.clear(screen.getByLabelText('Carga semanal (horas)'))
+    await userEvent.type(screen.getByLabelText('Carga semanal (horas)'), '30')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(await screen.findByText('Você não tem permissão para isso.')).toBeInTheDocument()
+    expect(definirCarga).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Editar Ana' })).toBeInTheDocument()
+  })
+
+  it('gestor edita uma pessoa da consultoria e vê a Capacidade; a ficha tem Reenviar convite e Desativar só para quem pode', async () => {
+    vi.mocked(reenviarConvite).mockResolvedValue({ erro: null })
+    vi.mocked(listarUsuarios).mockResolvedValue({
+      itens: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, convite_pendente: true, times: [], consultoria_id: 'c1' }],
+      total: 1,
+    })
+    renderizarTela(<Usuarios />, { perfil: { id: 'g1', papel: 'gestor', consultoria_id: 'c1' } })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Editar' }))
+    const janela = screen.getByRole('dialog', { name: 'Editar Ana' })
+    expect(within(janela).getByRole('heading', { name: 'Capacidade' })).toBeInTheDocument()
+    expect(within(janela).queryByRole('button', { name: /Desativar/ })).not.toBeInTheDocument()
+    await userEvent.click(within(janela).getByRole('button', { name: /Reenviar convite/ }))
+    expect(reenviarConvite).toHaveBeenCalledWith('p1')
+  })
+
+  it('Desativar pela ficha pede confirmação e fecha a ficha', async () => {
+    vi.mocked(gerenciarAcesso).mockResolvedValue({ erro: null })
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Editar' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Editar Ana' })).getByRole('button', { name: /Desativar/ }))
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Desativar' }))
+    expect(gerenciarAcesso).toHaveBeenCalledWith('desativar', 'p1')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Editar Ana' })).not.toBeInTheDocument())
+  })
+
+  it('Novo acesso manda os campos da ficha e grava a carga depois de criar', async () => {
+    vi.mocked(criarAcesso).mockResolvedValue({ pessoaId: 'p9' })
+    vi.mocked(definirCarga).mockResolvedValue({ erro: null })
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await userEvent.click(await screen.findByRole('button', { name: /Novo acesso/ }))
+    const janela = screen.getByRole('dialog', { name: 'Novo acesso' })
+    await userEvent.type(within(janela).getByLabelText('Nome'), 'Rita Alves')
+    await userEvent.type(within(janela).getByLabelText('E-mail'), 'rita@x.test')
+    await userEvent.type(within(janela).getByLabelText('Cargo'), 'Analista')
+    await userEvent.selectOptions(within(janela).getByLabelText('UF'), 'MG')
+    await userEvent.clear(within(janela).getByLabelText('Carga semanal (horas)'))
+    await userEvent.type(within(janela).getByLabelText('Carga semanal (horas)'), '30')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Enviar convite' }))
+    expect(criarAcesso).toHaveBeenCalledWith(expect.objectContaining({ nome: 'Rita Alves', cargo: 'Analista', uf: 'MG', papel: 'pessoa' }))
+    await waitFor(() => expect(definirCarga).toHaveBeenCalledWith('p9', 30))
+  })
+
+  it('Novo acesso com a carga padrão não chama definirCarga', async () => {
+    vi.mocked(criarAcesso).mockResolvedValue({ pessoaId: 'p9' })
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await userEvent.click(await screen.findByRole('button', { name: /Novo acesso/ }))
+    const janela = screen.getByRole('dialog', { name: 'Novo acesso' })
+    await userEvent.type(within(janela).getByLabelText('Nome'), 'Rita Alves')
+    await userEvent.type(within(janela).getByLabelText('E-mail'), 'rita@x.test')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Enviar convite' }))
+    await waitFor(() => expect(criarAcesso).toHaveBeenCalled())
+    expect(definirCarga).not.toHaveBeenCalled()
   })
 
   it('a foto escolhida no Editar vai para o Storage', async () => {

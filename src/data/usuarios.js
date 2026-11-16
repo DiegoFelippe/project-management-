@@ -1,10 +1,11 @@
 // Pessoas com acesso, criação de acesso e reenvio de convite (as duas últimas pelas Edge Functions).
-import { traduzirErroFuncao } from '@/lib/erros'
+import { traduzirErroBanco, traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
 import { buscarPagina } from './paginar'
 
 const CAMPOS =
   'id, nome, email, foto, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ativo, ' +
+  'telefone, cidade, uf, cargo, data_entrada, carga_semanal, ' +
   'consultoria:consultorias(nome), ' +
   'times:time_membros!time_membros_pessoa_id_fkey(time:times(id, nome))'
 
@@ -36,8 +37,14 @@ export async function reenviarConvite(pessoaId) {
   return { erro: status === 200 ? null : traduzirErroFuncao(corpo.codigo) }
 }
 
-// editar ({ nome?, papel? }), desativar, reativar ou mover_para_central (Edge Function gerenciar-acesso).
+// editar ({ nome?, papel?, cargo?, telefone?, cidade?, uf?, data_entrada? }), desativar, reativar ou mover_para_central (Edge Function gerenciar-acesso).
 export async function gerenciarAcesso(acao, pessoaId, extra = {}) {
   const { status, corpo } = await chamarFuncao('gerenciar-acesso', { acao, pessoa_id: pessoaId, ...extra })
   return { erro: status === 200 ? null : traduzirErroFuncao(corpo.codigo) }
+}
+
+// A pessoa que está usando muda o próprio contato (Meu perfil). Texto vazio limpa o campo.
+export async function atualizarMeuContato({ telefone, cidade, uf }) {
+  const { error } = await supabase.rpc('atualizar_meu_contato', { p_telefone: telefone, p_cidade: cidade, p_uf: uf })
+  return { erro: error ? traduzirErroBanco(error) : null }
 }

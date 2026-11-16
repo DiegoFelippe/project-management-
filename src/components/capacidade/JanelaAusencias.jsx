@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { apagarAusencia, criarAusencia, editarAusencia } from '@/data/capacidade'
@@ -57,8 +57,9 @@ function Formulario({ ausencia, aoSalvar, aoCancelar }) {
   )
 }
 
-// Ausências de uma pessoa (férias, licenças): lista, cria, edita e apaga. Quem pode é decidido no banco.
-export default function JanelaAusencias({ aberto, pessoa, aoFechar, aoMudar }) {
+// Lista, cria, edita e apaga as ausências de uma pessoa (férias, licenças). Quem pode é decidido no banco.
+// `rodape` (opcional) são botões extras ao lado de "Nova ausência" (ex.: Fechar).
+export function GerirAusencias({ pessoa, aoMudar, rodape }) {
   const [formulario, setFormulario] = useState(null) // null | 'nova' | ausência
   const [apagando, setApagando] = useState(null)
   const [versao, setVersao] = useState(0)
@@ -80,29 +81,21 @@ export default function JanelaAusencias({ aberto, pessoa, aoFechar, aoMudar }) {
 
   return (
     <>
-      <Dialog open={aberto} onOpenChange={(abrir) => !abrir && aoFechar()}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Ausências de {pessoa.nome}</DialogTitle>
-            <DialogDescription>Nos dias de ausência a pessoa não conta na capacidade do mês.</DialogDescription>
-          </DialogHeader>
-          <AusenciasDaPessoa perfilId={pessoa.id} versao={versao} acoes={(a) => (
-            <>
-              <Button variant="ghost" size="sm" onClick={() => setFormulario(a)}><Pencil /> Editar</Button>
-              <Button variant="ghost" size="sm" className={BOTAO_PERIGO} onClick={() => setApagando(a)}><Trash2 /> Apagar</Button>
-            </>
-          )} />
-          {formulario ? (
-            <Formulario key={formulario === 'nova' ? 'nova' : formulario.id} ausencia={formulario === 'nova' ? null : formulario}
-              aoSalvar={salvar} aoCancelar={() => setFormulario(null)} />
-          ) : (
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={aoFechar}>Fechar</Button>
-              <Button type="button" onClick={() => setFormulario('nova')}><Plus /> Nova ausência</Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
+      <AusenciasDaPessoa perfilId={pessoa.id} versao={versao} acoes={(a) => (
+        <>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setFormulario(a)}><Pencil /> Editar</Button>
+          <Button type="button" variant="ghost" size="sm" className={BOTAO_PERIGO} onClick={() => setApagando(a)}><Trash2 /> Apagar</Button>
+        </>
+      )} />
+      {formulario ? (
+        <Formulario key={formulario === 'nova' ? 'nova' : formulario.id} ausencia={formulario === 'nova' ? null : formulario}
+          aoSalvar={salvar} aoCancelar={() => setFormulario(null)} />
+      ) : (
+        <div className="flex justify-end gap-2">
+          {rodape}
+          <Button type="button" onClick={() => setFormulario('nova')}><Plus /> Nova ausência</Button>
+        </div>
+      )}
       {apagando && (
         <ConfirmarAcao aberto titulo="Apagar esta ausência?" rotuloConfirmar="Apagar"
           descricao={`A ausência de ${formatarDia(apagando.de)} a ${formatarDia(apagando.ate)} (${apagando.motivo}) some, e esses dias voltam a contar na capacidade de ${pessoa.nome}.`}
@@ -114,5 +107,20 @@ export default function JanelaAusencias({ aberto, pessoa, aoFechar, aoMudar }) {
           }} />
       )}
     </>
+  )
+}
+
+export default function JanelaAusencias({ aberto, pessoa, aoFechar, aoMudar }) {
+  return (
+    <Dialog open={aberto} onOpenChange={(abrir) => !abrir && aoFechar()}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Ausências de {pessoa.nome}</DialogTitle>
+          <DialogDescription>Nos dias de ausência a pessoa não conta na capacidade do mês.</DialogDescription>
+        </DialogHeader>
+        <GerirAusencias pessoa={pessoa} aoMudar={aoMudar}
+          rodape={<Button type="button" variant="outline" onClick={aoFechar}>Fechar</Button>} />
+      </DialogContent>
+    </Dialog>
   )
 }

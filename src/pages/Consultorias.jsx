@@ -9,7 +9,8 @@ import { frase, juntar, useClientesAtivos } from '@/components/clientes/useClien
 import NovaConsultoria from '@/components/consultorias/NovaConsultoria'
 import EditarConsultoria from '@/components/consultorias/EditarConsultoria'
 import { Button } from '@/components/ui/button'
-import NovoAcesso from '@/components/usuarios/NovoAcesso'
+import FichaDoConsultor from '@/components/usuarios/FichaDoConsultor'
+import { definirCarga } from '@/data/capacidade'
 import { criarConsultoria, gerenciarConsultoria, listarConsultorias } from '@/data/consultorias'
 import { tirarLogo, trocarLogo } from '@/data/imagens'
 import { urlPublica } from '@/lib/imagem'
@@ -87,8 +88,12 @@ export default function Consultorias() {
     return resposta
   }
 
-  async function criarAdmin(dados) {
+  async function criarAdmin(dados, { carga } = {}) {
     const resposta = await criarAcesso(dados)
+    if (resposta.pessoaId && carga !== undefined) {
+      const { erro: falha } = await definirCarga(resposta.pessoaId, carga)
+      if (falha) toast.error(`O acesso foi criado, mas a carga semanal não foi salva: ${falha}`)
+    }
     if (resposta.pessoaId) {
       toast.success(`Administrador ${dados.nome} criado.`)
       setNovoAdminEm(null)
@@ -184,8 +189,10 @@ export default function Consultorias() {
           aoConfirmar={() => gerenciar(confirmando.acao, confirmando.c)} />
       )}
       <NovaConsultoria aberto={nova} aoFechar={() => setNova(false)} aoCriar={criar} />
-      <NovoAcesso key={novoAdminEm ?? 'nenhum'} aberto={Boolean(novoAdminEm)} aoFechar={() => setNovoAdminEm(null)}
-        papelDeQuemCria="central" consultoriaId={novoAdminEm} aoCriar={criarAdmin} />
+      {novoAdminEm && (
+        <FichaDoConsultor aberto titulo="Novo administrador" perfilDeQuem={{ papel: 'central' }}
+          consultoriaId={novoAdminEm} aoFechar={() => setNovoAdminEm(null)} aoCriar={criarAdmin} />
+      )}
     </>
   )
 }

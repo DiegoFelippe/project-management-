@@ -12,8 +12,9 @@ import { frase, juntar, useClientesAtivos } from '@/components/clientes/useClien
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import EditarAcesso from '@/components/usuarios/EditarAcesso'
-import NovoAcesso from '@/components/usuarios/NovoAcesso'
+import FichaDoConsultor from '@/components/usuarios/FichaDoConsultor'
+import { definirCarga } from '@/data/capacidade'
+import { listarNomesDeConsultorias } from '@/data/consultorias'
 import { tirarFoto, trocarFoto } from '@/data/imagens'
 import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
@@ -36,6 +37,7 @@ export default function Usuarios() {
   const [pagina, setPagina] = useState(1)
   const [erro, setErro] = useState(null)
   const [times, setTimes] = useState([])
+  const [consultorias, setConsultorias] = useState([])
   const [novo, setNovo] = useState(false)
   const [reenviando, setReenviando] = useState(null)
   const [filtro, setFiltro] = useState('ativos')
@@ -68,6 +70,12 @@ export default function Usuarios() {
       .catch(() => setTimes([]))
   }, [ehDono, perfil.consultoria_id, perfil.papel, perfil.id, versao])
 
+  // Consultorias para escolher ao criar um administrador (só quem vê tudo).
+  useEffect(() => {
+    if (!ehDono) return
+    listarNomesDeConsultorias().then(setConsultorias).catch(() => setConsultorias([]))
+  }, [ehDono])
+
   const meusTimes = useMemo(() => new Set(times.map((t) => t.id)), [times])
   // Desativar ou mover para a central: os clientes ativos da pessoa voltam a aguardar consultor (o banco conta).
   const saindo = confirmando && confirmando.acao !== 'reativar' ? confirmando.pessoa : null
@@ -91,12 +99,13 @@ export default function Usuarios() {
   // Só o administrador geral move para a central (admin, gestor ou pessoa ativos).
   const podeMover = (p) => ehAdminGeral && p.id !== perfil.id && p.ativo !== false && ['admin', 'gestor', 'pessoa'].includes(p.papel)
 
-  async function salvarEdicao(pessoa, { nome, papel, timesAdicionar, timesRemover, foto }) {
-    const mudancas = {}
-    if (nome !== pessoa.nome) mudancas.nome = nome
-    if (papel && papel !== pessoa.papel) mudancas.papel = papel
+  async function salvarEdicao(pessoa, { mudancas, carga, timesAdicionar, timesRemover, foto }) {
     if (Object.keys(mudancas).length) {
       const { erro: falha } = await gerenciarAcesso('editar', pessoa.id, mudancas)
+      if (falha) return { erro: falha }
+    }
+    if (carga !== undefined) {
+      const { erro: falha } = await definirCarga(pessoa.id, carga)
       if (falha) return { erro: falha }
     }
     for (const timeId of timesAdicionar) {
@@ -111,7 +120,7 @@ export default function Usuarios() {
       const { erro: falha } = foto.arquivo ? await trocarFoto(pessoa.id, foto.arquivo, pessoa.foto) : await tirarFoto(pessoa.id, pessoa.foto)
       if (falha) return { erro: falha }
     }
-    toast.success(`${nome} atualizado.`)
+    toast.success(`${mudancas.nome ?? pessoa.nome} atualizado.`)
     recarregar()
     return { erro: null }
   }
@@ -120,6 +129,7 @@ export default function Usuarios() {
     const resposta = await gerenciarAcesso(acao, pessoa.id)
     if (!resposta.erro) {
       toast.success(acao === 'desativar' ? `${pessoa.nome} foi desativado.` : `${pessoa.nome} foi reativado.`)
+      setEditando(null)
       recarregar()
     }
     return resposta
@@ -134,8 +144,12 @@ export default function Usuarios() {
     return resposta
   }
 
-  async function criar(dados) {
+  async function criar(dados, { carga } = {}) {
     const resposta = await criarAcesso(dados)
+    if (resposta.pessoaId && carga !== undefined) {
+      const { erro: falha } = await definirCarga(resposta.pessoaId, carga)
+      if (falha) toast.error(`O acesso foi criado, mas a carga semanal não foi salva: ${falha}`)
+    }
     if (resposta.pessoaId) {
       toast.success(dados.forma === 'convite'
         ? `Convite enviado para ${dados.email}.`
@@ -192,7 +206,7 @@ export default function Usuarios() {
         <ListaVazia>{filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}</ListaVazia>
       )}
       {lista.length > 0 && (
-        <Tabela rotulo="Usuários" colunas={ehDono ? ['Nome', 'Papel', 'Consultoria', 'Times', 'Situação'] : ['Nome', 'Papel', 'Times', 'Situação']}
+        <Tabela rotulo="Usuários" colunas={ehDono ? ['Nome', 'Cargo', 'Telefone', 'Papel', 'Consultoria', 'Times', 'Situação'] : ['Nome', 'Cargo', 'Telefone', 'Papel', 'Times', 'Situação']}
           paginacao={{ pagina, total, aoMudar: setPagina }}>
           {lista.map((p) => {
             const s = situacao(p)
@@ -208,6 +222,8 @@ export default function Usuarios() {
                     </div>
                   </div>
                 </Celula>
+                <Celula className="text-muted-foreground">{p.cargo || '—'}</Celula>
+                <Celula className="text-muted-foreground">{p.telefone || '—'}</Celula>
                 <Celula className="text-muted-foreground">{NOME_DO_PAPEL[p.papel]}</Celula>
                 {ehDono && <Celula className="text-muted-foreground">{p.consultoria?.nome ?? '—'}</Celula>}
                 <Celula>
@@ -248,7 +264,9 @@ export default function Usuarios() {
         </Tabela>
       )}
       {editando && (
-        <EditarAcesso key={editando.id} aberto pessoa={editando} papelDeQuemEdita={perfil.papel} times={ehDono ? [] : times}
+        <FichaDoConsultor key={editando.id} aberto pessoa={editando} perfilDeQuem={perfil} times={ehDono ? [] : times}
+          podeReenviar={!ehDono || podeEditar(editando)} podeDesativar={podeDesativar(editando)}
+          aoReenviar={() => reenviar(editando)} aoPedirAtivo={(acao) => setConfirmando({ pessoa: editando, acao })}
           aoFechar={() => setEditando(null)} aoSalvar={(dados) => salvarEdicao(editando, dados)} />
       )}
       {confirmando && (
@@ -264,10 +282,10 @@ export default function Usuarios() {
           rotuloConfirmar={confirmando.acao === 'mover' ? 'Mover para a central' : confirmando.acao === 'desativar' ? 'Desativar' : 'Reativar'}
           aoConfirmar={() => (confirmando.acao === 'mover' ? moverParaCentral(confirmando.pessoa) : mudarAtivo(confirmando.pessoa, confirmando.acao))} />
       )}
-      {(!ehDono || ehAdminGeral) && (
-        <NovoAcesso aberto={novo} aoFechar={() => setNovo(false)} papelDeQuemCria={perfil.papel} times={times}
-          consultoriaId={consultoriaId}
-          aoCriar={criar} aoColocarNosTimes={colocarNosTimes} />
+      {novo && (!ehDono || ehAdminGeral) && (
+        <FichaDoConsultor aberto perfilDeQuem={perfil} times={times} consultoriaId={consultoriaId}
+          consultorias={ehDono ? consultorias : undefined}
+          aoFechar={() => setNovo(false)} aoCriar={criar} aoColocarNosTimes={colocarNosTimes} />
       )}
     </>
   )

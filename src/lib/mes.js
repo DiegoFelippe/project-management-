@@ -26,3 +26,8 @@ export function formatarDia(dia) {
   const [a, m, d] = String(dia).split('-')
   return `${d}/${m}/${a}`
 }
+
+// "Hoje" em São Paulo, no formato "YYYY-MM-DD".
+export function hoje(agora = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: FUSO, year: 'numeric', month: '2-digit', day: '2-digit' }).format(agora)
+}
