@@ -186,6 +186,20 @@
   --shadow-lg: 0 4px 10px -2px rgb(15 23 42 / 0.08), 0 28px 60px -16px rgb(15 23 42 / 0.3);
 }
 
+/* Sombras do padrão Hub como variáveis; no escuro viram contorno de luz. */
+:root {
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 3px 10px -4px rgb(15 23 42 / 0.08);
+  --shadow-elevated: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --shadow-overlay: 0 8px 24px -4px rgb(0 0 0 / 0.12), 0 4px 8px -2px rgb(0 0 0 / 0.08);
+  --shadow-modal: 0 24px 48px -12px rgb(0 0 0 / 0.18), 0 0 0 1px rgb(0 0 0 / 0.04);
+}
+.dark {
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 0 0 1px rgb(255 255 255 / 0.04);
+  --shadow-elevated: 0 4px 16px -2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.05);
+  --shadow-overlay: 0 8px 32px -4px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.06);
+  --shadow-modal: 0 24px 64px -12px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.07);
+}
+
 @keyframes page-enter {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
@@ -196,6 +210,20 @@
   html { -webkit-text-size-adjust: 100%; }
   body { @apply bg-moldura text-foreground antialiased; }
   ::selection { background: color-mix(in oklab, var(--primary) 25%, transparent); }
+  /* Foco global do padrão Hub, na cor de destaque da consultoria. */
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+}
+
+/* Camada de componentes do padrão Hub (cores da consultoria: onde o Hub usa índigo, aqui é o --primary). */
+@layer components {
+  .card { @apply bg-card rounded-2xl border; box-shadow: var(--shadow-card); }
+  .section-label { @apply text-muted-foreground text-[10.5px] font-semibold tracking-[0.08em] uppercase; }
+  .form-label { @apply text-foreground/80 mb-1.5 block text-[12.5px] font-medium; }
+  .input {
+    @apply bg-card border-input text-foreground placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 text-[13.5px] transition-[color,box-shadow,border-color] outline-none;
+    @apply hover:border-primary/40 focus:border-primary/60 focus:ring-primary/15 focus:ring-2 disabled:bg-muted disabled:cursor-not-allowed disabled:opacity-60;
+    @apply aria-invalid:border-destructive aria-invalid:ring-destructive/20;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

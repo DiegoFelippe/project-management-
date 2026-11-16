@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TriangleAlert } from 'lucide-react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -26,9 +27,14 @@ export default function ConfirmarAcao({ aberto, aoFechar, titulo, descricao, rot
   return (
     <Dialog open={aberto} onOpenChange={(abrir) => !abrir && fechar()}>
       <DialogContent role="alertdialog" className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{titulo}</DialogTitle>
-          <DialogDescription>{descricao}</DialogDescription>
+        <DialogHeader className="flex-row items-start gap-3 text-left">
+          <span data-slot="confirmar-icone" className="bg-notice-soft text-notice grid size-10 shrink-0 place-items-center rounded-xl">
+            <TriangleAlert className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1 space-y-1">
+            <DialogTitle className="text-[15px] leading-tight tracking-normal [font-stretch:100%]">{titulo}</DialogTitle>
+            <DialogDescription className="text-[12.5px]">{descricao}</DialogDescription>
+          </div>
         </DialogHeader>
         {erro && <Aviso>{erro}</Aviso>}
         <DialogFooter>
