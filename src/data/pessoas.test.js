@@ -19,9 +19,15 @@ describe('buscarPessoas', () => {
     expect(banco.chamou('select', 'id, nome, email, papel, foto', { count: 'exact' })).toBe(true)
     expect(banco.chamou('eq', 'consultoria_id', 'c1')).toBe(true)
     expect(banco.chamou('in', 'papel', ['gestor', 'admin'])).toBe(true)
-    expect(banco.chamou('ilike', 'nome', '%gi%')).toBe(true)
+    expect(banco.chamou('ilike', 'nome_busca', '%gi%')).toBe(true)
     expect(banco.chamou('order', 'nome')).toBe(true)
     expect(banco.chamou('limit', 20)).toBe(true)
+  })
+
+  it('a busca ignora acento e maiúscula: "JOÃO" e "joao" pedem o mesmo padrão sobre nome_busca', async () => {
+    await buscarPessoas({ termo: 'JOÃO' })
+    expect(banco.chamou('ilike', 'nome_busca', '%joao%')).toBe(true)
+    expect(banco.chamadas.some((c) => c[0] === 'ilike' && c[1] === 'nome')).toBe(false)
   })
 
   it('sem termo não filtra por nome', async () => {

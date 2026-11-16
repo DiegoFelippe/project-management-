@@ -18,7 +18,7 @@ describe('buscarConsultorias', () => {
     expect(banco.chamou('from', 'consultorias')).toBe(true)
     expect(banco.chamou('select', 'id, nome', { count: 'exact' })).toBe(true)
     expect(banco.chamou('is', 'arquivada_em', null)).toBe(false)
-    expect(banco.chamou('ilike', 'nome', '%ac\\_me\\%%')).toBe(true)
+    expect(banco.chamou('ilike', 'nome_busca', '%ac\\_me\\%%')).toBe(true)
     expect(banco.chamou('order', 'nome')).toBe(true)
     expect(banco.chamou('limit', 20)).toBe(true)
   })
@@ -26,6 +26,11 @@ describe('buscarConsultorias', () => {
   it('sem termo não filtra por nome', async () => {
     await buscarConsultorias('')
     expect(banco.chamadas.some((c) => c[0] === 'ilike')).toBe(false)
+  })
+
+  it('a busca ignora acento e maiúscula, sobre nome_busca', async () => {
+    await buscarConsultorias('Açaí')
+    expect(banco.chamou('ilike', 'nome_busca', '%acai%')).toBe(true)
   })
 
   it('erro do banco sobe', async () => {
@@ -40,7 +45,7 @@ describe('buscarConsultoriasAtivas', () => {
     expect(await buscarConsultoriasAtivas('ac_me%')).toEqual({ itens: [{ id: 'k1', nome: 'Acme' }], total: 130 })
     expect(banco.chamou('select', 'id, nome', { count: 'exact' })).toBe(true)
     expect(banco.chamou('is', 'arquivada_em', null)).toBe(true)
-    expect(banco.chamou('ilike', 'nome', '%ac\\_me\\%%')).toBe(true)
+    expect(banco.chamou('ilike', 'nome_busca', '%ac\\_me\\%%')).toBe(true)
     expect(banco.chamou('limit', 20)).toBe(true)
   })
 

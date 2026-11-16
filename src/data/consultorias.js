@@ -1,15 +1,15 @@
 import { traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
-import { padraoParcial } from '@/lib/busca'
+import { padraoDeBusca } from '@/lib/busca'
 import { buscarPagina } from './paginar'
 
-// Consultorias por nome (ilike), no máximo `limite` por vez, numa consulta só. Devolve { itens: [{ id, nome }], total }
+// Consultorias por nome sem acento (ilike em nome_busca), no máximo `limite` por vez, numa consulta só. Devolve { itens: [{ id, nome }], total }
 // (total = quantas combinam, para o "N de TOTAL" do Seletor). `soAtivas` tira as arquivadas.
 async function buscarPorNome(termo, limite, soAtivas) {
   let consulta = supabase.from('consultorias').select('id, nome', { count: 'exact' }).order('nome').limit(limite)
   if (soAtivas) consulta = consulta.is('arquivada_em', null)
-  const padrao = padraoParcial(termo)
-  if (padrao) consulta = consulta.ilike('nome', padrao)
+  const padrao = padraoDeBusca(termo)
+  if (padrao) consulta = consulta.ilike('nome_busca', padrao)
   const { data, error, count } = await consulta
   if (error) throw error
   return { itens: data, total: count ?? 0 }
