@@ -20,3 +20,8 @@ export function formatarDuracao(milissegundos) {
   if (minutos < 60) return `${minutos} min`
   return `${Math.floor(minutos / 60)} h ${String(minutos % 60).padStart(2, '0')}`
 }
+
+// Mês já fechado: o reservado é a previsão de hoje, não a de então, então some; a ocupação vira "Utilização".
+export function colunasDoMes(passado) {
+  return ['Capacidade', ...(passado ? [] : ['Reservado']), 'Realizado', passado ? 'Utilização' : 'Ocupação']
+}

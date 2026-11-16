@@ -2,6 +2,7 @@ import { Archive, ArchiveRestore, Building2, Pencil, Plus, UserPlus } from 'luci
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
+import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import BarraDeFiltros, { AcaoPrincipal } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
@@ -12,16 +13,25 @@ import NovaConsultoria from '@/components/consultorias/NovaConsultoria'
 import EditarConsultoria from '@/components/consultorias/EditarConsultoria'
 import { Button } from '@/components/ui/button'
 import FichaDoConsultor from '@/components/usuarios/FichaDoConsultor'
-import { definirCarga } from '@/data/capacidade'
+import { consultoriasPorOcupacao, definirCarga } from '@/data/capacidade'
 import { criarConsultoria, gerenciarConsultoria, listarConsultorias } from '@/data/consultorias'
 import { tirarLogo, trocarLogo } from '@/data/imagens'
+import { useAuth } from '@/auth/useAuth'
+import { POR_PAGINA } from '@/data/paginar'
+import { colunasDoMes, formatarHoras, formatarOcupacao } from '@/lib/horas'
+import { mesAtual } from '@/lib/mes'
+import { veTudo } from '@/lib/papeis'
 import { urlPublica } from '@/lib/imagem'
 import { criarAcesso } from '@/data/usuarios'
 
 const ABAS = [{ valor: 'ativas', rotulo: 'Ativas' }, { valor: 'arquivadas', rotulo: 'Arquivadas' }]
+const ABA_OCUPACAO = { valor: 'ocupacao', rotulo: 'Ocupação do mês' }
 const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
 
 export default function Consultorias() {
+  const { perfil } = useAuth()
+  const abas = veTudo(perfil) ? [...ABAS, ABA_OCUPACAO] : ABAS
+  const [mes, setMes] = useState(mesAtual)
   const [resultado, setResultado] = useState(null)
   const [pagina, setPagina] = useState(1)
   const [erro, setErro] = useState(null)
@@ -30,6 +40,8 @@ export default function Consultorias() {
   const [filtro, setFiltro] = useState('ativas')
   const [editando, setEditando] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
+  const emOcupacao = filtro === 'ocupacao'
+  const passado = mes < mesAtual()
   const lista = resultado?.itens ?? []
   const total = resultado?.total ?? 0
   // Arquivar: os clientes ativos dela voltam para a central (o banco conta quantos).
@@ -68,18 +80,23 @@ export default function Consultorias() {
   // Uma página por vez, ativas ou arquivadas, filtrada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
     let ativo = true
-    listarConsultorias({ arquivadas: filtro === 'arquivadas', pagina })
+    // "Ocupação do mês": uma página do resumo por consultoria, calculado no banco.
+    const pedido = emOcupacao
+      ? consultoriasPorOcupacao({ limite: POR_PAGINA, deslocamento: (pagina - 1) * POR_PAGINA, mes })
+        .then((r) => ({ ...r, foraDaFaixa: r.itens.length === 0 }))
+      : listarConsultorias({ arquivadas: filtro === 'arquivadas', pagina })
+    pedido
       .then((r) => {
         if (!ativo) return
         if (r.foraDaFaixa && pagina > 1) return setPagina(1)
         setResultado(r)
         setErro(null)
       })
-      .catch(() => ativo && setErro('Não foi possível carregar as consultorias.'))
+      .catch(() => ativo && setErro(emOcupacao ? 'Não foi possível carregar a capacidade.' : 'Não foi possível carregar as consultorias.'))
     return () => {
       ativo = false
     }
-  }, [filtro, pagina, versao])
+  }, [filtro, emOcupacao, mes, pagina, versao])
 
   async function criar(dados) {
     const resposta = await criarConsultoria(dados)
@@ -108,25 +125,47 @@ export default function Consultorias() {
   return (
     <>
       <Cabecalho titulo="Consultorias"
-        descricao={resultado
+        descricao={resultado && !emOcupacao
           ? (filtro === 'ativas' ? plural(total, 'consultoria ativa', 'consultorias ativas') : plural(total, 'consultoria arquivada', 'consultorias arquivadas'))
           : null} />
       <BarraDeFiltros>
-        <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1) }} />
-        <AcaoPrincipal>
-          <Button onClick={() => setNova(true)}>
-            <Plus /> Nova consultoria
-          </Button>
-        </AcaoPrincipal>
+        <AbasSegmentadas rotulo="Mostrar" abas={abas} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1); setResultado(null) }} />
+        {emOcupacao && <NavegacaoDoMes mes={mes} aoMudar={(m) => { setMes(m); setPagina(1); setResultado(null) }} />}
+        {!emOcupacao && (
+          <AcaoPrincipal>
+            <Button onClick={() => setNova(true)}>
+              <Plus /> Nova consultoria
+            </Button>
+          </AcaoPrincipal>
+        )}
       </BarraDeFiltros>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as consultorias…" className="py-12" />}
       {resultado && lista.length === 0 && (
         <ListaVazia>
-          {filtro === 'ativas' ? 'Nenhuma consultoria ainda. Cadastre a primeira em "Nova consultoria".' : 'Nenhuma consultoria arquivada.'}
+          {emOcupacao ? 'Nenhuma consultoria ainda.' : filtro === 'ativas' ? 'Nenhuma consultoria ainda. Cadastre a primeira em "Nova consultoria".' : 'Nenhuma consultoria arquivada.'}
         </ListaVazia>
       )}
-      {lista.length > 0 && (
+      {lista.length > 0 && emOcupacao && (
+        <Tabela rotulo="Ocupação do mês" larguraMinima={880}
+          colunas={['Consultoria', 'Consultores', ...colunasDoMes(passado), 'Clientes', 'Aguardando']}
+          paginacao={{ pagina, total, aoMudar: setPagina }}>
+          {lista.map((c) => (
+            <Linha key={c.id}>
+              <Celula className="font-semibold">{c.nome}</Celula>
+              <Celula className="tabular-nums">{c.consultores}</Celula>
+              <Celula className="tabular-nums">{formatarHoras(c.capacidade)}</Celula>
+              {!passado && <Celula className="tabular-nums">{formatarHoras(c.reservado)}</Celula>}
+              <Celula className="tabular-nums">{formatarHoras(c.realizado)}</Celula>
+              <Celula className="tabular-nums font-semibold">{formatarOcupacao(c.ocupacao)}</Celula>
+              <Celula className="tabular-nums">{c.clientes}</Celula>
+              <Celula className="tabular-nums">{c.aguardando}</Celula>
+              <CelulaAcoes />
+            </Linha>
+          ))}
+        </Tabela>
+      )}
+      {lista.length > 0 && !emOcupacao && (
         <Tabela rotulo="Consultorias" colunas={['Consultoria', 'Administração', 'Pessoas', 'Times']} larguraMinima={880}
           paginacao={{ pagina, total, aoMudar: setPagina }}>
           {lista.map((c) => (

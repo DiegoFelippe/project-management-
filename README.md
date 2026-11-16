@@ -27,7 +27,8 @@ O design e o plano estão em `docs/superpowers/`.
 3. O **consultor** faz check-in e check-out no cliente (ou lança as horas depois). O check-in é de quem trabalhou.
 4. Em **Usuários**, no **Editar** da pessoa, ficam a carga semanal e as ausências (férias, feriados municipais); os
    nacionais o sistema calcula. O resumo do mês (com ‹ Anterior · Próximo ›) são as colunas Capacidade, Reservado,
-   Realizado e Ocupação da própria lista.
+   Realizado e Ocupação da própria lista (em mês passado, sem Reservado e como Utilização). O resumo por
+   consultoria (só central) fica em **Consultorias**, na aba "Ocupação do mês".
 5. Os números: **capacidade do mês** = dias úteis (sem sábado) x carga, menos ausências; **reservado** = previsão
    dos clientes que a pessoa atende; **realizado** = horas dos check-ins; **ocupação** = reservado / capacidade.
    Saem das funções do banco `consultores_por_ocupacao`, `consultorias_por_ocupacao` e, em Usuários,

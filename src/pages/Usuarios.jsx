@@ -1,10 +1,11 @@
-import { ChevronLeft, ChevronRight, Pencil, Plus, Send, UserCheck, UserX, Landmark } from 'lucide-react'
+import { Pencil, Plus, Send, UserCheck, UserX, Landmark } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import Avatar from '@/components/comum/Avatar'
 import BarraDeFiltros, { AcaoPrincipal } from '@/components/comum/BarraDeFiltros'
+import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
@@ -20,13 +21,12 @@ import { buscarConsultoriasAtivas } from '@/data/consultorias'
 import { tirarFoto, trocarFoto } from '@/data/imagens'
 import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
-import { formatarHoras, formatarOcupacao } from '@/lib/horas'
-import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
+import { colunasDoMes, formatarHoras, formatarOcupacao } from '@/lib/horas'
+import { mesAtual } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
 
 const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'desativados', rotulo: 'Desativados' }]
-const COLUNAS_DO_MES = ['Capacidade', 'Reservado', 'Realizado', 'Ocupação']
 const COR_DA_SITUACAO = {
   'Convite pendente': 'notice',
   'Senha provisória': 'secondary',
@@ -109,6 +109,7 @@ export default function Usuarios() {
     varios: '{n} clientes dela voltam para Aguardando consultor.',
     semNumero: 'Os clientes dela voltam para Aguardando consultor.',
   })
+  const passado = mes < mesAtual()
   const lista = resultado?.itens ?? []
   const total = resultado?.total ?? 0
 
@@ -209,11 +210,7 @@ export default function Usuarios() {
         descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'pessoa' : 'pessoas'}` : null} />
       <BarraDeFiltros>
         <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1) }} />
-        <div role="group" aria-label="Mês" className="inline-flex items-center gap-1 rounded-lg border bg-card p-1">
-          <Button variant="ghost" size="sm" onClick={() => setMes(deslocarMes(mes, -1))}><ChevronLeft /> Anterior</Button>
-          <span aria-live="polite" className="min-w-36 px-2 text-center text-sm font-semibold tabular-nums">{rotuloDoMes(mes)}</span>
-          <Button variant="ghost" size="sm" onClick={() => setMes(deslocarMes(mes, 1))}>Próximo <ChevronRight /></Button>
-        </div>
+        <NavegacaoDoMes mes={mes} aoMudar={setMes} />
         {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />}
         {(!ehDono || ehAdminGeral) && (
           <AcaoPrincipal>
@@ -231,7 +228,7 @@ export default function Usuarios() {
       )}
       {lista.length > 0 && (
         <Tabela rotulo="Usuários" larguraMinima={ehDono ? 1480 : 1320}
-          colunas={ehDono ? ['Nome', 'Cargo', 'Telefone', 'Papel', 'Consultoria', 'Times', ...COLUNAS_DO_MES, 'Situação'] : ['Nome', 'Cargo', 'Telefone', 'Papel', 'Times', ...COLUNAS_DO_MES, 'Situação']}
+          colunas={ehDono ? ['Nome', 'Cargo', 'Telefone', 'Papel', 'Consultoria', 'Times', ...colunasDoMes(passado), 'Situação'] : ['Nome', 'Cargo', 'Telefone', 'Papel', 'Times', ...colunasDoMes(passado), 'Situação']}
           paginacao={{ pagina, total, aoMudar: setPagina }}>
           {lista.map((p) => {
             const s = situacao(p)
@@ -262,7 +259,7 @@ export default function Usuarios() {
                   </div>
                 </Celula>
                 <Celula className="tabular-nums">{formatarHoras(n?.capacidade)}</Celula>
-                <Celula className="tabular-nums">{formatarHoras(n?.reservado)}</Celula>
+                {!passado && <Celula className="tabular-nums">{formatarHoras(n?.reservado)}</Celula>}
                 <Celula className="tabular-nums">{formatarHoras(n?.realizado)}</Celula>
                 <Celula className="tabular-nums font-semibold">{formatarOcupacao(n?.ocupacao)}</Celula>
                 <Celula><Badge variant={COR_DA_SITUACAO[s]}>{s}</Badge></Celula>

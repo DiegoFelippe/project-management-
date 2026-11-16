@@ -330,6 +330,19 @@ describe('Usuários', () => {
       expect(listarUsuarios).toHaveBeenCalledTimes(chamadasDaLista)
     })
 
+    it('em mês passado some o Reservado e a Ocupação vira Utilização; no mês atual é o contrário', async () => {
+      vi.mocked(ocupacaoDasPessoas).mockResolvedValue({ p1: NUMEROS })
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+      const tabela = await screen.findByRole('table', { name: 'Usuários' })
+      expect(within(tabela).getByRole('columnheader', { name: 'Reservado' })).toBeInTheDocument()
+      expect(within(tabela).getByRole('columnheader', { name: 'Ocupação' })).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: /Anterior/ }))
+      await waitFor(() => expect(within(tabela).getByRole('columnheader', { name: 'Utilização' })).toBeInTheDocument())
+      expect(within(tabela).queryByRole('columnheader', { name: 'Reservado' })).toBeNull()
+      expect(within(tabela).queryByRole('columnheader', { name: 'Ocupação' })).toBeNull()
+      await waitFor(() => expect(within(within(tabela).getByRole('row', { name: /Ana/ })).queryByText('80 h')).toBeNull())
+    })
+
     it('a linha da central mostra "—" nos quatro números', async () => {
       vi.mocked(listarUsuarios).mockResolvedValue({
         itens: [{ id: 'c1', nome: 'Cida', email: 'cida@x.test', papel: 'central', ativo: true, times: [], consultoria: null }],
