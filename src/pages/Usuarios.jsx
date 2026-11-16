@@ -1,4 +1,4 @@
-import { Pencil, Plus, Send, UserCheck, UserX, Landmark } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Plus, Send, UserCheck, UserX, Landmark } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
@@ -15,15 +15,18 @@ import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import FichaDoConsultor from '@/components/usuarios/FichaDoConsultor'
-import { definirCarga } from '@/data/capacidade'
+import { definirCarga, ocupacaoDasPessoas } from '@/data/capacidade'
 import { buscarConsultoriasAtivas } from '@/data/consultorias'
 import { tirarFoto, trocarFoto } from '@/data/imagens'
 import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
+import { formatarHoras, formatarOcupacao } from '@/lib/horas'
+import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
 
 const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'desativados', rotulo: 'Desativados' }]
+const COLUNAS_DO_MES = ['Capacidade', 'Reservado', 'Realizado', 'Ocupação']
 const COR_DA_SITUACAO = {
   'Convite pendente': 'notice',
   'Senha provisória': 'secondary',
@@ -45,6 +48,9 @@ export default function Usuarios() {
   const [filtro, setFiltro] = useState('ativos')
   const [editando, setEditando] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
+  const [mes, setMes] = useState(mesAtual)
+  const [numeros, setNumeros] = useState({ mes: null, porId: {} })
+  const [erroNumeros, setErroNumeros] = useState(false)
   const [versao, setVersao] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
 
@@ -63,6 +69,28 @@ export default function Usuarios() {
       ativo = false
     }
   }, [consultoriaId, filtro, pagina, versao])
+
+  // Capacidade do mês: uma chamada por (página, mês), com os ids das linhas da página (o banco calcula).
+  // Mudar o mês não muda a página. Se falhar, a lista segue com "—" e um aviso.
+  useEffect(() => {
+    const ids = (resultado?.itens ?? []).map((p) => p.id)
+    if (ids.length === 0) return
+    let ativo = true
+    ocupacaoDasPessoas({ ids, mes })
+      .then((porId) => {
+        if (!ativo) return
+        setNumeros({ mes, porId })
+        setErroNumeros(false)
+      })
+      .catch(() => {
+        if (!ativo) return
+        setNumeros({ mes, porId: {} })
+        setErroNumeros(true)
+      })
+    return () => {
+      ativo = false
+    }
+  }, [resultado, mes])
 
   // Times que aparecem no "Novo acesso": o gestor só os dele; o administrador, todos da consultoria.
   useEffect(() => {
@@ -181,6 +209,11 @@ export default function Usuarios() {
         descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'pessoa' : 'pessoas'}` : null} />
       <BarraDeFiltros>
         <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1) }} />
+        <div role="group" aria-label="Mês" className="inline-flex items-center gap-1 rounded-lg border bg-card p-1">
+          <Button variant="ghost" size="sm" onClick={() => setMes(deslocarMes(mes, -1))}><ChevronLeft /> Anterior</Button>
+          <span aria-live="polite" className="min-w-36 px-2 text-center text-sm font-semibold tabular-nums">{rotuloDoMes(mes)}</span>
+          <Button variant="ghost" size="sm" onClick={() => setMes(deslocarMes(mes, 1))}>Próximo <ChevronRight /></Button>
+        </div>
         {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />}
         {(!ehDono || ehAdminGeral) && (
           <AcaoPrincipal>
@@ -191,15 +224,19 @@ export default function Usuarios() {
         )}
       </BarraDeFiltros>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+      {erroNumeros && !erro && <p role="status" className="mb-3 text-sm text-muted-foreground">Não foi possível carregar a capacidade do mês.</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as pessoas…" className="py-12" />}
       {resultado && lista.length === 0 && (
         <ListaVazia>{filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}</ListaVazia>
       )}
       {lista.length > 0 && (
-        <Tabela rotulo="Usuários" colunas={ehDono ? ['Nome', 'Cargo', 'Telefone', 'Papel', 'Consultoria', 'Times', 'Situação'] : ['Nome', 'Cargo', 'Telefone', 'Papel', 'Times', 'Situação']}
+        <Tabela rotulo="Usuários" larguraMinima={ehDono ? 1480 : 1320}
+          colunas={ehDono ? ['Nome', 'Cargo', 'Telefone', 'Papel', 'Consultoria', 'Times', ...COLUNAS_DO_MES, 'Situação'] : ['Nome', 'Cargo', 'Telefone', 'Papel', 'Times', ...COLUNAS_DO_MES, 'Situação']}
           paginacao={{ pagina, total, aoMudar: setPagina }}>
           {lista.map((p) => {
             const s = situacao(p)
+            // Só vale o que veio para o mês mostrado; quem o banco não devolveu (central, dono) fica com "—".
+            const n = numeros.mes === mes ? numeros.porId[p.id] : undefined
             const timesVisiveis = ehDono || perfil.papel === 'admin' ? p.times : p.times.filter((t) => meusTimes.has(t.id))
             return (
               <Linha key={p.id}>
@@ -224,6 +261,10 @@ export default function Usuarios() {
                     ))}
                   </div>
                 </Celula>
+                <Celula className="tabular-nums">{formatarHoras(n?.capacidade)}</Celula>
+                <Celula className="tabular-nums">{formatarHoras(n?.reservado)}</Celula>
+                <Celula className="tabular-nums">{formatarHoras(n?.realizado)}</Celula>
+                <Celula className="tabular-nums font-semibold">{formatarOcupacao(n?.ocupacao)}</Celula>
                 <Celula><Badge variant={COR_DA_SITUACAO[s]}>{s}</Badge></Celula>
                 <CelulaAcoes>
                   {podeEditar(p) && p.ativo !== false && (

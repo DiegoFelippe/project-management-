@@ -1,8 +1,8 @@
-import { Building2, FolderKanban, Gauge, House, PlugZap, RadioTower, UserPlus, Users } from 'lucide-react'
+import { Building2, FolderKanban, House, PlugZap, RadioTower, UserPlus, Users } from 'lucide-react'
 
 // Regra do projeto (CLAUDE.md): todo ícone do trilho anima ao passar o mouse.
 // Item novo: escolha uma destas (keyframes "icone-<nome>" em src/index.css).
-export const ANIMACOES_DO_MENU = ['subir', 'balancar', 'pulsar', 'abrir', 'erguer', 'conectar', 'transmitir', 'medir', 'sair']
+export const ANIMACOES_DO_MENU = ['subir', 'balancar', 'pulsar', 'abrir', 'erguer', 'conectar', 'transmitir', 'sair']
 
 const TODOS = ['dono', 'central', 'admin', 'gestor', 'pessoa']
 const QUEM_ADMINISTRA = ['dono', 'central', 'admin', 'gestor']
@@ -11,7 +11,6 @@ const QUEM_ADMINISTRA = ['dono', 'central', 'admin', 'gestor']
 const ITENS = [
   { id: 'inicio', rotulo: 'Início', rota: '/', icone: House, animacao: 'subir', papeis: TODOS },
   { id: 'clientes', rotulo: 'Clientes', rota: '/clientes', icone: RadioTower, animacao: 'transmitir', papeis: TODOS },
-  { id: 'capacidade', rotulo: 'Capacidade', rota: '/capacidade', icone: Gauge, animacao: 'medir', papeis: QUEM_ADMINISTRA },
   { id: 'projetos', rotulo: 'Projetos', icone: FolderKanban, animacao: 'abrir', emBreve: true, papeis: TODOS },
   { id: 'times', rotulo: 'Times', rota: '/times', icone: Users, animacao: 'pulsar', papeis: QUEM_ADMINISTRA },
   { id: 'usuarios', rotulo: 'Usuários', rota: '/usuarios', icone: UserPlus, animacao: 'balancar', papeis: QUEM_ADMINISTRA },

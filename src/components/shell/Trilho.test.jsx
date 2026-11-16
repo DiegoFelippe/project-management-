@@ -20,7 +20,7 @@ describe('Trilho', () => {
       </AuthContext.Provider>,
     )
     const itens = container.querySelectorAll('[data-item-trilho]')
-    expect(itens.length).toBe(10) // 8 itens do dono + bolinha + Sair
+    expect(itens.length).toBe(9) // 7 itens do dono + bolinha + Sair
     for (const item of itens) {
       expect(item.querySelector('[class*="anim-"]'), item.textContent).not.toBeNull()
     }

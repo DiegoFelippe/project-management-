@@ -3,9 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { contarClientesAtivos } from '@/data/clientes'
 import { trocarFoto } from '@/data/imagens'
-import { definirCarga, listarAusencias } from '@/data/capacidade'
+import { definirCarga, listarAusencias, ocupacaoDasPessoas } from '@/data/capacidade'
 import { buscarConsultorias, buscarConsultoriasAtivas } from '@/data/consultorias'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
+import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
 import { escolherNoSeletor } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
 import Usuarios from './Usuarios'
@@ -14,7 +15,7 @@ vi.mock('@/data/usuarios', () => ({
   listarUsuarios: vi.fn(), criarAcesso: vi.fn(), gerenciarAcesso: vi.fn(), reenviarConvite: vi.fn(),
 }))
 vi.mock('@/data/capacidade', () => ({
-  definirCarga: vi.fn(), listarAusencias: vi.fn(), criarAusencia: vi.fn(), editarAusencia: vi.fn(), apagarAusencia: vi.fn(),
+  definirCarga: vi.fn(), listarAusencias: vi.fn(), ocupacaoDasPessoas: vi.fn(), criarAusencia: vi.fn(), editarAusencia: vi.fn(), apagarAusencia: vi.fn(),
 }))
 vi.mock('@/data/clientes', () => ({ contarClientesAtivos: vi.fn() }))
 vi.mock('@/data/consultorias', () => ({ buscarConsultorias: vi.fn(), buscarConsultoriasAtivas: vi.fn() }))
@@ -35,6 +36,7 @@ beforeEach(() => {
   vi.mocked(buscarConsultorias).mockResolvedValue({ itens: [{ id: 'k1', nome: 'Acme' }, { id: 'k2', nome: 'Velha Arquivada' }], total: 2 })
   vi.mocked(buscarConsultoriasAtivas).mockResolvedValue({ itens: [{ id: 'k1', nome: 'Acme' }], total: 1 })
   vi.mocked(listarAusencias).mockResolvedValue({ itens: [], total: 0 })
+  vi.mocked(ocupacaoDasPessoas).mockResolvedValue({})
   vi.mocked(listarUsuarios).mockResolvedValue({
     itens: [
       {
@@ -291,6 +293,61 @@ describe('Usuários', () => {
       expect(botoes(/Ana/)).toBeNull()
       expect(within(screen.getByRole('row', { name: /Cida/ })).queryByRole('button', { name: 'Editar' })).toBeNull()
       expect(screen.getByLabelText('Consultoria')).toBeInTheDocument()
+    })
+  })
+
+  describe('capacidade do mês', () => {
+    const NUMEROS = { capacidade: 160, reservado: 80, realizado: 40.5, ocupacao: 0.5, clientes: 3 }
+
+    it('mostra Capacidade, Reservado, Realizado e Ocupação do mês, com "—" para quem o banco não devolveu', async () => {
+      vi.mocked(ocupacaoDasPessoas).mockResolvedValue({ p1: NUMEROS })
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+      const tabela = await screen.findByRole('table', { name: 'Usuários' })
+      for (const nome of ['Capacidade', 'Reservado', 'Realizado', 'Ocupação']) {
+        expect(within(tabela).getByRole('columnheader', { name: nome })).toBeInTheDocument()
+      }
+      const ana = within(tabela).getByRole('row', { name: /Ana/ })
+      await waitFor(() => expect(within(ana).getByText('160 h')).toBeInTheDocument())
+      expect(within(ana).getByText('80 h')).toBeInTheDocument()
+      expect(within(ana).getByText('40,5 h')).toBeInTheDocument()
+      expect(within(ana).getByText('50%')).toBeInTheDocument()
+      const bruno = within(tabela).getByRole('row', { name: /Bruno/ })
+      expect(within(bruno).queryByText('160 h')).toBeNull()
+      expect(within(bruno).getAllByText('—').length).toBeGreaterThanOrEqual(4)
+      expect(ocupacaoDasPessoas).toHaveBeenCalledTimes(1)
+      expect(ocupacaoDasPessoas).toHaveBeenCalledWith({ ids: ['p1', 'p2'], mes: mesAtual() })
+    })
+
+    it('mudar o mês chama ocupacaoDasPessoas uma vez, com os ids da página e o mês novo, sem recarregar a lista', async () => {
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+      await screen.findByRole('row', { name: /Ana/ })
+      await waitFor(() => expect(ocupacaoDasPessoas).toHaveBeenCalledTimes(1))
+      const chamadasDaLista = vi.mocked(listarUsuarios).mock.calls.length
+      await userEvent.click(screen.getByRole('button', { name: /Próximo/ }))
+      await waitFor(() => expect(ocupacaoDasPessoas).toHaveBeenCalledTimes(2))
+      expect(ocupacaoDasPessoas).toHaveBeenLastCalledWith({ ids: ['p1', 'p2'], mes: deslocarMes(mesAtual(), 1) })
+      expect(screen.getByText(rotuloDoMes(deslocarMes(mesAtual(), 1)))).toBeInTheDocument()
+      expect(listarUsuarios).toHaveBeenCalledTimes(chamadasDaLista)
+    })
+
+    it('a linha da central mostra "—" nos quatro números', async () => {
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        itens: [{ id: 'c1', nome: 'Cida', email: 'cida@x.test', papel: 'central', ativo: true, times: [], consultoria: null }],
+        total: 1,
+      })
+      renderizarTela(<Usuarios />, { perfil: { id: 'd1', papel: 'dono', consultoria_id: null } })
+      const cida = await screen.findByRole('row', { name: /Cida/ })
+      await waitFor(() => expect(ocupacaoDasPessoas).toHaveBeenCalled())
+      expect(within(cida).queryByText(/ h$/)).toBeNull()
+      expect(within(cida).queryByText(/%$/)).toBeNull()
+    })
+
+    it('se a chamada falha, a lista continua com "—" e um aviso', async () => {
+      vi.mocked(ocupacaoDasPessoas).mockRejectedValue(new Error('falhou'))
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+      expect(await screen.findByText('Não foi possível carregar a capacidade do mês.')).toBeInTheDocument()
+      expect(screen.getByRole('table', { name: 'Usuários' })).toBeInTheDocument()
+      expect(screen.getByRole('row', { name: /Ana/ })).toBeInTheDocument()
     })
   })
 })

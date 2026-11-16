@@ -1,9 +1,8 @@
-import { CalendarOff, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import CampoData from '@/components/campos/CampoData'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
-import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -106,15 +105,5 @@ export function GerirAusencias({ pessoa, aoMudar }) {
           }} />
       )}
     </>
-  )
-}
-
-export default function JanelaAusencias({ aberto, pessoa, aoFechar, aoMudar }) {
-  return (
-    <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={`Ausências de ${pessoa.nome}`} icone={CalendarOff} largura="lg"
-      descricao="Nos dias de ausência a pessoa não conta na capacidade do mês."
-      rodape={<Button type="button" variant="outline" onClick={aoFechar}>Fechar</Button>}>
-      <GerirAusencias pessoa={pessoa} aoMudar={aoMudar} />
-    </JanelaFormulario>
   )
 }

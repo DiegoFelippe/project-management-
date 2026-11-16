@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { escolherData } from '@/test/campos'
 import { apagarAusencia, criarAusencia, editarAusencia, listarAusencias } from '@/data/capacidade'
-import JanelaAusencias from './JanelaAusencias'
+import { GerirAusencias } from './JanelaAusencias'
 
 vi.mock('@/data/capacidade', () => ({
   listarAusencias: vi.fn(), criarAusencia: vi.fn(), editarAusencia: vi.fn(), apagarAusencia: vi.fn(),
@@ -18,10 +18,10 @@ beforeEach(() => {
   vi.mocked(listarAusencias).mockResolvedValue({ itens: [AUSENCIA], total: 1 })
   for (const f of [criarAusencia, editarAusencia, apagarAusencia]) vi.mocked(f).mockResolvedValue({ erro: null })
   aoMudar = vi.fn()
-  render(<JanelaAusencias aberto pessoa={{ id: 'p1', nome: 'Ana' }} aoFechar={() => {}} aoMudar={aoMudar} />)
+  render(<GerirAusencias pessoa={{ id: 'p1', nome: 'Ana' }} aoMudar={aoMudar} />)
 })
 
-describe('JanelaAusencias', () => {
+describe('GerirAusencias', () => {
   it('lista as ausências da pessoa', async () => {
     const tabela = await screen.findByRole('table', { name: 'Ausências' })
     expect(listarAusencias).toHaveBeenCalledWith('p1', { pagina: 1 })
