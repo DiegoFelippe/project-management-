@@ -47,7 +47,8 @@ export function useAcoesDoCliente({ aoMudar, aoApagar }) {
     const resposta = await apagarCliente(cliente.id)
     if (!resposta.erro) {
       toast.success(`Cliente ${cliente.nome} apagado.`)
-      // O cliente já era: se a pasta dele no armazenamento não limpar, só avisa (a central pode tentar de novo).
+      // O cliente já era (só sai sem arquivos): a limpeza tira da pasta dele os objetos que ficaram sem linha. Se
+      // não limpar, só avisa (a central pode tentar de novo).
       const limpeza = await limparPastaDoCliente(cliente.id).catch(() => ({ erro: true }))
       if (limpeza.erro) {
         toast.warning('O cliente foi apagado, mas alguns arquivos não saíram do armazenamento. Avise o suporte.')
@@ -134,7 +135,7 @@ export function useAcoesDoCliente({ aoMudar, aoApagar }) {
       )}
       {apagando && (
         <ConfirmarAcao aberto aoFechar={() => setApagando(null)} titulo={`Apagar o cliente ${apagando.nome}?`}
-          descricao="O cliente some de vez, e os arquivos dele também. Se já tiver horas registradas, não dá para apagar: arquive."
+          descricao="O cliente some de vez. Só dá para apagar cliente sem horas nem arquivos registrados; se tiver, arquive em vez de apagar."
           rotuloConfirmar="Apagar cliente" aoConfirmar={() => apagar(apagando)} />
       )}
     </>

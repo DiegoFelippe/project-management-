@@ -85,8 +85,9 @@ export function traduzirErroBanco(erro, { sobre = 'time' } = {}) {
       ? 'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).'
       : 'Já existe um time com esse nome.'
   }
+  // Check-ins e arquivos seguram o cliente (on delete restrict).
   if (erro?.code === '23503' && sobre === 'cliente') {
-    return 'Este cliente tem horas registradas. Arquive em vez de apagar.'
+    return 'Este cliente tem horas ou arquivos registrados. Arquive em vez de apagar.'
   }
   if (erro?.code === '23514') return sobre === 'checkin' ? CHECKIN_DE_MAIS_DE_24H : 'Confira os campos destacados.'
   if (erro?.code === '23P01') return 'Esse horário se sobrepõe a outro check-in seu.'

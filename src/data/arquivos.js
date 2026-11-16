@@ -74,6 +74,6 @@ export async function apagarArquivo(arquivo) {
   return { erro: null }
 }
 
-// Logo depois de apagar o cliente (as linhas saem junto; os objetos ficam): tira os objetos da pasta dele.
-// Com o cliente ainda lá, não tira o que tem linha.
+// Logo depois de apagar o cliente (o banco só apaga cliente sem arquivos): tira da pasta dele os objetos que
+// ficaram sem linha (quando tirar o objeto falhou). Com o cliente ainda lá, não tira o que tem linha.
 export const limparPastaDoCliente = (clienteId) => limparPasta(storage(), clienteId)

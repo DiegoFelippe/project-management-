@@ -1,8 +1,9 @@
 // Arquivos do cliente no Supabase local de verdade (Storage + cliente_arquivos): o envio sobe o objeto e grava a
 // linha, o download é por link assinado, outra consultoria não baixa, apagar tira a linha e o objeto, e arquivo
-// acima de 25 MB é recusado; depois de apagar o cliente, a central limpa a pasta dele. Os passos e os campos são
-// os mesmos de src/data/arquivos.js; o caminho, a limpeza da pasta (limparPastaDoCliente = limparPasta no bucket
-// "arquivos") e as mensagens vêm do mesmo código do app (src/lib/arquivos.js e src/lib/erros.js).
+// acima de 25 MB é recusado; cliente com arquivo não é apagado (restrict) e, depois de apagar o cliente sem
+// arquivos, a central limpa o que sobrou na pasta dele. Os passos e os campos são os mesmos de
+// src/data/arquivos.js; o caminho, a limpeza da pasta (limparPastaDoCliente = limparPasta no bucket "arquivos") e
+// as mensagens vêm do mesmo código do app (src/lib/arquivos.js e src/lib/erros.js).
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { caminhoDoArquivo, limparPasta, TAMANHO_MAXIMO_ARQUIVO } from '../../src/lib/arquivos.js'
 import { traduzirErroBanco } from '../../src/lib/erros.js'
@@ -234,12 +235,27 @@ describe('objetos sem linha e cliente apagado', () => {
     expect((await admin.from('cliente_arquivos').select('id').eq('id', comLinha.id)).data).toHaveLength(1)
   })
 
-  it('a central apaga o cliente com arquivo; limparPastaDoCliente deixa a pasta vazia', async () => {
+  it('cliente com arquivo não é apagado: o erro pede para arquivar', async () => {
+    const { data, error } = await comoCentral.from('clientes').delete().eq('id', clienteApagado).select('id')
+    expect(data).toBeNull()
+    expect(error?.code).toBe('23503')
+    expect(traduzirErroBanco(error, { sobre: 'cliente' }))
+      .toBe('Este cliente tem horas ou arquivos registrados. Arquive em vez de apagar.')
+    expect((await admin.from('clientes').select('id').eq('id', clienteApagado)).data).toHaveLength(1)
+    expect(await existe(comLinha.caminho)).toBe(true)
+  })
+
+  it('depois de apagar o arquivo, a central apaga o cliente e limparPastaDoCliente deixa a pasta vazia', async () => {
     const semLinha = await subirSemLinha(comoPessoa, clienteApagado, 'Rascunho.txt')
+    // A linha sai pela regra de quem apaga; o objeto fica sem linha (como quando tirar o objeto falha).
+    const { data: linhas, error: erroLinha } = await comoCentral
+      .from('cliente_arquivos').delete().eq('id', comLinha.id).select('caminho')
+    expect(erroLinha).toBeNull()
+    expect(linhas).toHaveLength(1)
+
     const { data, error } = await comoCentral.from('clientes').delete().eq('id', clienteApagado).select('id')
     expect(error).toBeNull()
     expect(data).toHaveLength(1)
-    expect((await admin.from('cliente_arquivos').select('id').eq('cliente_id', clienteApagado)).data).toEqual([])
     // Quem subiu não alcança mais os objetos do cliente apagado; a central, sim.
     expect((await comoPessoa.storage.from(BUCKET).list(clienteApagado)).data).toEqual([])
     expect((await comoCentral.storage.from(BUCKET).list(clienteApagado)).data).toHaveLength(2)

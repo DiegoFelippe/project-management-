@@ -3,7 +3,7 @@
 -- a consultoria vê os dela e os da central; uma consultoria nunca vê os de outra. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(94);
+select plan(98);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -331,7 +331,7 @@ with d as (delete from storage.objects where bucket_id = 'arquivos' and name = t
 select is(count(*), 0::bigint, 'mas nem a central tira o objeto que ainda tem linha') from d;
 reset role;
 
--- ── Cliente apagado: as linhas saem junto, os objetos ficam para a central tirar ──
+-- ── Cliente apagado: com arquivo, não apaga (restrict); sem arquivo, apaga e o objeto fica para a central tirar ──
 
 select testes.como('pessoa_a');
 select lives_ok($$select testes.enviar('f_del', 'c_del')$$, 'a consultora envia arquivo ao cliente que vai ser apagado');
@@ -339,8 +339,13 @@ select lives_ok($$select testes.objeto('f_del', 'c_del')$$, 'e sobe o objeto');
 reset role;
 
 select testes.como('central');
+select throws_ok($$delete from public.clientes where id = testes.id('c_del')$$, '23503', null,
+  'cliente com arquivo não é apagado (arquive em vez de apagar)');
+select is(testes.linhas(array['f_del']), 1::bigint, 'o arquivo continua lá');
+with d as (delete from public.cliente_arquivos where id = testes.id('f_del') returning 1)
+select is(count(*), 1::bigint, 'a central apaga o arquivo do cliente') from d;
 with d as (delete from public.clientes where id = testes.id('c_del') returning 1)
-select is(count(*), 1::bigint, 'a central apaga o cliente (as linhas dos arquivos saem junto)') from d;
+select is(count(*), 1::bigint, 'sem arquivo, a central apaga o cliente') from d;
 reset role;
 
 select testes.como('pessoa_a');
@@ -447,6 +452,9 @@ reset role;
 -- ── Estrutura ────────────────────────────────────────────────────────────────
 
 select has_index('public', 'cliente_arquivos', 'cliente_arquivos_cliente_idx', 'Arquivos do cliente por data de envio');
+select is((select confdeltype from pg_constraint
+    where conrelid = 'public.cliente_arquivos'::regclass and conname = 'cliente_arquivos_cliente_id_fkey'),
+  'r'::"char", 'o arquivo segura o cliente (on delete restrict, como o check-in)');
 
 select * from finish();
 rollback;

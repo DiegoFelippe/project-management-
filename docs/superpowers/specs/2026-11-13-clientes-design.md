@@ -346,6 +346,13 @@ Painéis estratégicos da central: leem `cliente_eventos`, `checkins` e a capaci
 - **Administrador e gestor também têm "Meus clientes" e "Meus check-ins"**, porque qualquer usuário ativo da
   consultoria pode ser consultor.
 - **Filtro de consultor** na lista de clientes da consultoria (todos, sem consultor ou um específico).
+- **Arquivos seguram o cliente** (migração `20261116202311`): como em "Ligações futuras", `cliente_arquivos.cliente_id`
+  é `on delete restrict` (o plano tinha `cascade`). Cliente com arquivos não é apagado: o erro e a confirmação
+  pedem para arquivar. Depois de apagar um cliente sem arquivos, o app ainda chama `limparPastaDoCliente`, que tira
+  da pasta dele os objetos que ficaram sem linha (quando tirar o objeto falhou).
+- **`consultor(clientes)` e `consultor_do_checkin(checkins)` devolvem só id, nome, foto e ativo** (migração
+  `20261116202139`): a ficha (telefone, cidade/UF, cargo, data de entrada) e o e-mail não saem por essas relações,
+  que mostram o consultor a quem não o enxerga em perfis (o gestor sem times).
 
 ## Página do cliente em abas (pedido do Diego, 16/11)
 

@@ -88,7 +88,7 @@ describe('traduzirErroBanco com contexto', () => {
       'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).',
     )
     expect(traduzirErroBanco({ code: '23503' }, { sobre: 'cliente' })).toBe(
-      'Este cliente tem horas registradas. Arquive em vez de apagar.',
+      'Este cliente tem horas ou arquivos registrados. Arquive em vez de apagar.',
     )
     expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')
     expect(traduzirErroBanco({ code: '23514' }, { sobre: 'checkin' })).toBe(

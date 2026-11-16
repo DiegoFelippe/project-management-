@@ -262,14 +262,16 @@ describe('Cliente (página)', () => {
     expect(screen.getByRole('tab', { name: 'Geral' })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('apagar o cliente avisa que os arquivos também somem e limpa a pasta dele', async () => {
+  it('apagar o cliente avisa que só dá sem horas nem arquivos (senão, arquivar) e limpa a pasta dele', async () => {
     vi.mocked(apagarCliente).mockResolvedValue({ erro: null })
     vi.mocked(limparPastaDoCliente).mockResolvedValue({ erro: null })
     tela()
     await screen.findByRole('heading', { name: 'Provedor Alfa' })
     await userEvent.click(screen.getByRole('button', { name: 'Apagar' }))
     const janela = screen.getByRole('alertdialog')
-    expect(within(janela).getByText(/arquivos/)).toBeInTheDocument()
+    expect(within(janela).getByText(
+      'O cliente some de vez. Só dá para apagar cliente sem horas nem arquivos registrados; se tiver, arquive em vez de apagar.',
+    )).toBeInTheDocument()
     await userEvent.click(within(janela).getByRole('button', { name: 'Apagar cliente' }))
     await waitFor(() => expect(limparPastaDoCliente).toHaveBeenCalledWith('k1'))
     expect(toast.warning).not.toHaveBeenCalled()
