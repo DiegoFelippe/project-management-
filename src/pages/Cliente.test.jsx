@@ -116,6 +116,14 @@ describe('Cliente (página)', () => {
     expect(within(linha).getByText('1,5 h')).toBeInTheDocument()
   })
 
+  it('o gestor sem times vê o nome de quem fez cada check-in', async () => {
+    tela({ id: 'g1', papel: 'gestor', consultoria_id: 's1' })
+    const tabela = await screen.findByRole('table', { name: 'Check-ins' })
+    expect(within(within(tabela).getByRole('row', { name: /Reunião/ })).getByText('Ana')).toBeInTheDocument()
+    expect(within(within(tabela).getByRole('row', { name: /Ajuste/ })).getByText('Beto')).toBeInTheDocument()
+    expect(within(tabela).queryByText('—')).not.toBeInTheDocument()
+  })
+
   it('a central só vê os check-ins, sem Editar nem Apagar', async () => {
     tela()
     const tabela = await screen.findByRole('table', { name: 'Check-ins' })

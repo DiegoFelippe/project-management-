@@ -15,6 +15,10 @@ const admin = clienteAdmin()
 const CAMPOS_DA_LISTA =
   'id, nome, cidade, horas_mes, consultoria_id, consultor_id, consultoria:consultorias(id, nome), ' +
   'consultor(id, nome, foto, ativo), realizado_no_mes'
+// Os mesmos campos de src/data/checkins.js.
+const CAMPOS_DOS_CHECKINS =
+  'id, inicio, fim, descricao, consultor_id, consultoria_id, consultor:consultor_do_checkin(nome), ' +
+  'cliente:cliente_do_checkin(id, nome)'
 
 let A, B
 let central, gestorA, pessoaA, adminB
@@ -134,9 +138,25 @@ describe('clientes de ponta a ponta', () => {
 
     const { data: dela } = await comoPessoa
       .from('checkins')
-      .select('id, inicio, fim, descricao, consultor_id, consultoria_id, consultor:perfis(nome), cliente:cliente_do_checkin(id, nome)')
+      .select(CAMPOS_DOS_CHECKINS)
       .order('inicio', { ascending: false })
     expect(dela[0].cliente.nome).toBe('Cooperativa Chapecó')
+    expect(dela[0].consultor.nome).toBe('Aaa pessoa')
+  })
+
+  it('o gestor sem times vê o nome de quem fez o check-in (pela relação calculada, não por perfis)', async () => {
+    const { data, error } = await comoGestor
+      .from('checkins')
+      .select(`${CAMPOS_DOS_CHECKINS}, pelo_perfil:perfis(nome)`)
+      .eq('cliente_id', clienteId)
+    expect(error).toBeNull()
+    expect(data).toHaveLength(1)
+    expect(data[0].consultor.nome).toBe('Aaa pessoa')
+    // Em perfis o gestor só enxerga quem criou e as pessoas dos times dele: por isso a relação calculada.
+    expect(data[0].pelo_perfil).toBeNull()
+
+    const { data: deB } = await comoAdminB.from('checkins').select(CAMPOS_DOS_CHECKINS).eq('cliente_id', clienteId)
+    expect(deB).toHaveLength(0)
   })
 
   it('central pede as consultorias por ocupação e A vem primeiro se estiver menos ocupada', async () => {

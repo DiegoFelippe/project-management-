@@ -3,7 +3,7 @@
 -- arquivado, consultor desativado ou fora da consultoria, consultoria arquivada). Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(66);
+select plan(74);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -89,6 +89,7 @@ select testes.consultoria('B');
 select testes.perfil('central', 'central', null);
 select testes.perfil('admin_a', 'admin', 'A');
 select testes.perfil('gestor_a2', 'gestor', 'A');
+select testes.perfil('gestor_sem', 'gestor', 'A');
 select testes.perfil('pessoa_a', 'pessoa', 'A');
 select testes.perfil('pessoa_a2', 'pessoa', 'A');
 select testes.perfil('pessoa_a3', 'pessoa', 'A');
@@ -177,6 +178,29 @@ select is((select count(*) from public.checkins where id in (select id from test
   'outra consultoria não vê os check-ins');
 reset role;
 
+-- ── Nome do consultor no check-in ────────────────────────────────────────────
+-- O gestor só enxerga em perfis quem ele criou e as pessoas dos times dele; o nome de quem fez o check-in
+-- vem de consultor_do_checkin, que relê o check-in guardado.
+
+select testes.como('gestor_sem');
+select is((select count(*) from public.checkins where id = testes.id('k1')), 1::bigint,
+  'gestor sem times vê o check-in da consultoria');
+select is((select count(*) from public.perfis where id = testes.id('pessoa_a2')), 0::bigint,
+  'mas não enxerga a consultora em perfis (ela não está em time dele)');
+select is((select (public.consultor_do_checkin(k)).nome from public.checkins k where k.id = testes.id('k1')),
+  'Pessoa pessoa_a2', 'consultor_do_checkin mostra o nome da consultora ao gestor sem times');
+reset role;
+
+select testes.como('pessoa_a2');
+select is((select (public.consultor_do_checkin(k)).nome from public.checkins k where k.id = testes.id('k1')),
+  'Pessoa pessoa_a2', 'a consultora vê o próprio nome no check-in');
+reset role;
+
+select testes.como('central');
+select is((select (public.consultor_do_checkin(k)).nome from public.checkins k where k.id = testes.id('k1')),
+  'Pessoa pessoa_a2', 'a central vê o nome do consultor do check-in');
+reset role;
+
 select testes.como('central');
 select is((select count(*) from public.checkins where id in (testes.id('k1'), testes.id('k2'))), 2::bigint,
   'a central vê os check-ins de todas as consultorias');
@@ -242,7 +266,15 @@ grant select on forjado to authenticated;
 select testes.como('admin_b');
 select is((select count(*) from forjado f, public.cliente_do_checkin(f.k)), 0::bigint,
   'outra consultoria não descobre o cliente pelo check-in');
+select is((select count(*) from forjado f, public.consultor_do_checkin(f.k)), 0::bigint,
+  'nem o consultor pelo check-in');
 reset role;
+select testes.como('pessoa_a');
+select is((select count(*) from forjado f, public.consultor_do_checkin(f.k)), 0::bigint,
+  'pessoa da consultoria não descobre o consultor de um check-in que não é dela');
+reset role;
+select ok(not has_function_privilege('anon', 'public.consultor_do_checkin(public.checkins)', 'execute'),
+  'consultor_do_checkin não roda sem login');
 
 -- ── Check-in aberto quando o cliente troca de consultor, muda de consultoria ou é arquivado ──
 

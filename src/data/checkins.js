@@ -3,8 +3,10 @@ import { traduzirErroBanco } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import { buscarPagina } from './paginar'
 
+// consultor e cliente vêm das relações calculadas do banco: o gestor vê os check-ins da consultoria toda,
+// mas em perfis só enxerga quem criou e as pessoas dos times dele.
 const CAMPOS_DA_LISTA =
-  'id, inicio, fim, descricao, consultor_id, consultoria_id, consultor:perfis(nome), ' +
+  'id, inicio, fim, descricao, consultor_id, consultoria_id, consultor:consultor_do_checkin(nome), ' +
   'cliente:cliente_do_checkin(id, nome)'
 
 const traduzir = (erro) => traduzirErroBanco(erro, { sobre: 'checkin' })
