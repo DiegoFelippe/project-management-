@@ -88,7 +88,7 @@ select testes.como('gestor_a');
 select is((select count(*) from public.integracoes), 0::bigint, 'o gestor não vê integrações');
 reset role;
 select testes.como('dono');
-select is((select count(*) from public.integracoes), 2::bigint, 'o dono vê as de todas as consultorias');
+select is((select count(*) from public.integracoes where consultoria_id in (testes.id('A'), testes.id('B'))), 2::bigint, 'o dono vê as de todas as consultorias');
 reset role;
 
 -- Desconectar apaga a linha e o segredo
