@@ -5,11 +5,11 @@ const ids = (papel) => itensDoMenu(papel).map((item) => item.id)
 
 describe('itensDoMenu', () => {
   it('cada papel vê os seus itens', () => {
-    expect(ids('pessoa')).toEqual(['inicio', 'projetos'])
-    expect(ids('gestor')).toEqual(['inicio', 'projetos', 'times', 'usuarios'])
-    expect(ids('admin')).toEqual(['inicio', 'projetos', 'times', 'usuarios', 'integracoes'])
-    expect(ids('central')).toEqual(['inicio', 'projetos', 'times', 'usuarios', 'consultorias'])
-    expect(ids('dono')).toEqual(['inicio', 'projetos', 'times', 'usuarios', 'consultorias', 'integracoes'])
+    expect(ids('pessoa')).toEqual(['inicio', 'clientes', 'projetos'])
+    expect(ids('gestor')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios'])
+    expect(ids('admin')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios', 'integracoes'])
+    expect(ids('central')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios', 'consultorias'])
+    expect(ids('dono')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios', 'consultorias', 'integracoes'])
   })
 
   it('projetos ainda está em breve', () => {
@@ -28,6 +28,7 @@ describe('tituloDaRota', () => {
   it('dá o nome da tela pelo endereço', () => {
     expect(tituloDaRota('/times/0b5c')).toBe('Times')
     expect(tituloDaRota('/')).toBe('Início')
+    expect(tituloDaRota('/clientes')).toBe('Clientes')
     expect(tituloDaRota('/usuarios')).toBe('Usuários')
     expect(tituloDaRota('/consultorias')).toBe('Consultorias')
     expect(tituloDaRota('/integracoes')).toBe('Integrações')
@@ -38,6 +39,11 @@ describe('animação no hover', () => {
   it('Integrações ganhou animação própria (conectar)', () => {
     expect(itensDoMenu('admin').find((item) => item.id === 'integracoes').animacao).toBe('conectar')
     expect(ANIMACOES_DO_MENU).toContain('conectar')
+  })
+
+  it('Clientes usa a animação transmitir', () => {
+    expect(itensDoMenu('pessoa').find((item) => item.id === 'clientes').animacao).toBe('transmitir')
+    expect(ANIMACOES_DO_MENU).toContain('transmitir')
   })
 
   it('todo item do menu tem uma animação da lista (regra do projeto)', () => {
