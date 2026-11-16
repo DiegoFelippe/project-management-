@@ -329,3 +329,10 @@
 .botao-animado > svg.lucide-plus { transition: transform 0.2s ease-out; }
 .botao-animado:hover:not(:disabled) > svg.lucide-plus,
 .botao-animado:focus-visible > svg.lucide-plus { animation: none; transform: rotate(90deg); }
+
+/* Listas que abrem sobre um campo (data, hora, seletor): entram com um leve zoom. */
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.97) translateY(-2px); }
+  to { opacity: 1; transform: none; }
+}
+.pop-in { animation: pop-in 0.14s ease-out; }
