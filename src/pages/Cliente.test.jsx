@@ -1,8 +1,10 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apagarCheckin, editarCheckin, listarCheckins, meuCheckinAberto } from '@/data/checkins'
-import { buscarCliente, listarEventos } from '@/data/clientes'
+import { limparPastaDoCliente, listarArquivos } from '@/data/arquivos'
+import { apagarCliente, buscarCliente, listarEventos } from '@/data/clientes'
 import { renderizarTela } from '@/test/renderizar'
 import Cliente from './Cliente'
 
@@ -15,6 +17,10 @@ vi.mock('@/data/checkins', () => ({
   meuCheckinAberto: vi.fn(), fazerCheckin: vi.fn(), fazerCheckout: vi.fn(), lancarHoras: vi.fn(),
   listarCheckins: vi.fn(), editarCheckin: vi.fn(), apagarCheckin: vi.fn(),
 }))
+vi.mock('@/data/arquivos', () => ({
+  listarArquivos: vi.fn(), enviarArquivo: vi.fn(), linkParaBaixar: vi.fn(), apagarArquivo: vi.fn(), limparPastaDoCliente: vi.fn(),
+}))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
 vi.mock('@/data/capacidade', () => ({ consultoriasPorOcupacao: vi.fn(), consultoresPorOcupacao: vi.fn() }))
 
 const CLIENTE = {
@@ -51,6 +57,7 @@ beforeEach(() => {
   vi.mocked(listarCheckins).mockResolvedValue({ itens: CHECKINS, total: 2 })
   vi.mocked(listarEventos).mockResolvedValue({ itens: EVENTOS, total: 2 })
   vi.mocked(meuCheckinAberto).mockResolvedValue(null)
+  vi.mocked(listarArquivos).mockResolvedValue({ itens: [], total: 0 })
   vi.mocked(editarCheckin).mockResolvedValue({ erro: null })
   vi.mocked(apagarCheckin).mockResolvedValue({ erro: null })
 })
@@ -90,7 +97,7 @@ describe('Cliente (página)', () => {
   })
 
   it('o histórico mostra o que aconteceu, com quem fez', async () => {
-    tela()
+    tela(central, '/clientes/k1?aba=historico')
     const tabela = await screen.findByRole('table', { name: 'Histórico' })
     expect(listarEventos).toHaveBeenCalledWith('k1', { pagina: 1 })
     expect(within(tabela).getByText('Mandado para STI Consult')).toBeInTheDocument()
@@ -103,12 +110,12 @@ describe('Cliente (página)', () => {
       itens: [{ id: 'e3', tipo: 'movido', em: '2026-11-02T10:00:00Z', de_consultoria: null, para_consultoria: 'STI Consult', de_consultor: null, autor: 'Central' }],
       total: 1,
     })
-    tela()
+    tela(central, '/clientes/k1?aba=historico')
     expect(await screen.findByText('Movido para STI Consult')).toBeInTheDocument()
   })
 
   it('lista os check-ins do cliente com consultor e horas', async () => {
-    tela()
+    tela(central, '/clientes/k1?aba=checkins')
     const tabela = await screen.findByRole('table', { name: 'Check-ins' })
     expect(listarCheckins).toHaveBeenCalledWith({ clienteId: 'k1', pagina: 1 })
     const linha = within(tabela).getByRole('row', { name: /Reunião/ })
@@ -117,7 +124,7 @@ describe('Cliente (página)', () => {
   })
 
   it('o gestor sem times vê o nome de quem fez cada check-in', async () => {
-    tela({ id: 'g1', papel: 'gestor', consultoria_id: 's1' })
+    tela({ id: 'g1', papel: 'gestor', consultoria_id: 's1' }, '/clientes/k1?aba=checkins')
     const tabela = await screen.findByRole('table', { name: 'Check-ins' })
     expect(within(within(tabela).getByRole('row', { name: /Reunião/ })).getByText('Ana')).toBeInTheDocument()
     expect(within(within(tabela).getByRole('row', { name: /Ajuste/ })).getByText('Beto')).toBeInTheDocument()
@@ -125,14 +132,14 @@ describe('Cliente (página)', () => {
   })
 
   it('a central só vê os check-ins, sem Editar nem Apagar', async () => {
-    tela()
+    tela(central, '/clientes/k1?aba=checkins')
     const tabela = await screen.findByRole('table', { name: 'Check-ins' })
     expect(within(tabela).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
     expect(within(tabela).queryByRole('button', { name: 'Apagar' })).not.toBeInTheDocument()
   })
 
   it('o consultor edita e apaga só os próprios check-ins', async () => {
-    tela(consultor)
+    tela(consultor, '/clientes/k1?aba=checkins')
     const tabela = await screen.findByRole('table', { name: 'Check-ins' })
     const dele = within(tabela).getByRole('row', { name: /Reunião/ })
     const de_outro = within(tabela).getByRole('row', { name: /Ajuste/ })
@@ -142,7 +149,7 @@ describe('Cliente (página)', () => {
   })
 
   it('o consultor que mudou de consultoria não edita nem apaga os check-ins da antiga', async () => {
-    tela({ id: 'p1', papel: 'pessoa', consultoria_id: 's2' })
+    tela({ id: 'p1', papel: 'pessoa', consultoria_id: 's2' }, '/clientes/k1?aba=checkins')
     const tabela = await screen.findByRole('table', { name: 'Check-ins' })
     const dele = within(tabela).getByRole('row', { name: /Reunião/ })
     expect(within(dele).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
@@ -150,7 +157,7 @@ describe('Cliente (página)', () => {
   })
 
   it('Editar check-in abre preenchido e salva com editarCheckin', async () => {
-    tela(adminDaSti)
+    tela(adminDaSti, '/clientes/k1?aba=checkins')
     const dele = within(await screen.findByRole('table', { name: 'Check-ins' })).getByRole('row', { name: /Reunião/ })
     await userEvent.click(within(dele).getByRole('button', { name: 'Editar' }))
     const janela = screen.getByRole('dialog', { name: 'Editar check-in em Provedor Alfa' })
@@ -165,7 +172,7 @@ describe('Cliente (página)', () => {
       itens: [{ ...CHECKINS[1], id: 'c3', fim: null, descricao: null, inicio: new Date(Date.now() - 3_600_000).toISOString() }],
       total: 1,
     })
-    tela(adminDaSti)
+    tela(adminDaSti, '/clientes/k1?aba=checkins')
     const linha = within(await screen.findByRole('table', { name: 'Check-ins' })).getByRole('row', { name: /Em aberto/ })
     await userEvent.click(within(linha).getByRole('button', { name: 'Editar' }))
     const janela = screen.getByRole('dialog', { name: 'Editar check-in em Provedor Alfa' })
@@ -175,7 +182,7 @@ describe('Cliente (página)', () => {
   })
 
   it('Apagar check-in pede confirmação antes', async () => {
-    tela(adminDaSti)
+    tela(adminDaSti, '/clientes/k1?aba=checkins')
     const dele = within(await screen.findByRole('table', { name: 'Check-ins' })).getByRole('row', { name: /Reunião/ })
     await userEvent.click(within(dele).getByRole('button', { name: 'Apagar' }))
     expect(apagarCheckin).not.toHaveBeenCalled()
@@ -192,7 +199,7 @@ describe('Cliente (página)', () => {
   })
 
   it('o administrador troca o consultor e ajusta a previsão', async () => {
-    tela(adminDaSti)
+    tela(adminDaSti, '/clientes/k1?aba=checkins')
     await screen.findByRole('heading', { name: 'Provedor Alfa' })
     expect(screen.getByRole('button', { name: 'Trocar consultor' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ajustar previsão' })).toBeInTheDocument()
@@ -207,5 +214,62 @@ describe('Cliente (página)', () => {
     tela(outraPessoa)
     await screen.findByRole('heading', { name: 'Provedor Alfa' })
     expect(screen.queryByRole('button', { name: 'Fazer check-in' })).not.toBeInTheDocument()
+  })
+
+  it('mostra as abas na ordem e abre Geral com os dados e as ações', async () => {
+    tela()
+    await screen.findByRole('heading', { name: 'Provedor Alfa' })
+    expect(screen.getAllByRole('tab').map((a) => a.textContent)).toEqual(['Geral', 'Check-ins', 'Arquivos', 'Histórico'])
+    expect(screen.getByRole('tab', { name: 'Geral' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('table', { name: 'Check-ins' })).not.toBeInTheDocument()
+    expect(screen.getByText('Alfa Telecom Ltda')).toBeInTheDocument()
+  })
+
+  it('?aba=arquivos abre Arquivos', async () => {
+    vi.mocked(listarArquivos).mockResolvedValue({
+      itens: [{ id: 'a1', nome: 'contrato.pdf', tamanho: 100, enviado_em: '2026-11-10T12:00:00Z', consultoria_id: 's1', caminho: 'k1/a', autor: 'Ana' }],
+      total: 1,
+    })
+    tela(central, '/clientes/k1?aba=arquivos')
+    expect(await screen.findByRole('table', { name: 'Arquivos' })).toBeInTheDocument()
+    expect(listarArquivos).toHaveBeenCalledWith('k1', { pagina: 1 })
+  })
+
+  it('trocar de aba mantém o cliente carregado', async () => {
+    tela()
+    await screen.findByRole('heading', { name: 'Provedor Alfa' })
+    await userEvent.click(screen.getByRole('tab', { name: 'Histórico' }))
+    expect(await screen.findByRole('table', { name: 'Histórico' })).toBeInTheDocument()
+    expect(buscarCliente).toHaveBeenCalledTimes(1)
+  })
+
+  it('aba desconhecida volta para Geral', async () => {
+    tela(central, '/clientes/k1?aba=nada')
+    await screen.findByRole('heading', { name: 'Provedor Alfa' })
+    expect(screen.getByRole('tab', { name: 'Geral' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('apagar o cliente avisa que os arquivos também somem e limpa a pasta dele', async () => {
+    vi.mocked(apagarCliente).mockResolvedValue({ erro: null })
+    vi.mocked(limparPastaDoCliente).mockResolvedValue({ erro: null })
+    tela()
+    await screen.findByRole('heading', { name: 'Provedor Alfa' })
+    await userEvent.click(screen.getByRole('button', { name: 'Apagar' }))
+    const janela = screen.getByRole('alertdialog')
+    expect(within(janela).getByText(/arquivos/)).toBeInTheDocument()
+    await userEvent.click(within(janela).getByRole('button', { name: 'Apagar cliente' }))
+    await waitFor(() => expect(limparPastaDoCliente).toHaveBeenCalledWith('k1'))
+    expect(toast.warning).not.toHaveBeenCalled()
+  })
+
+  it('se a pasta não limpar, avisa mas o cliente continua apagado', async () => {
+    vi.mocked(apagarCliente).mockResolvedValue({ erro: null })
+    vi.mocked(limparPastaDoCliente).mockResolvedValue({ erro: 'ficou' })
+    tela()
+    await screen.findByRole('heading', { name: 'Provedor Alfa' })
+    await userEvent.click(screen.getByRole('button', { name: 'Apagar' }))
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar cliente' }))
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledWith(
+      'O cliente foi apagado, mas alguns arquivos não saíram do armazenamento. Avise o suporte.'))
   })
 })

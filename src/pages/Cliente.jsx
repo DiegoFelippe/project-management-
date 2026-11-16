@@ -4,6 +4,8 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import Cabecalho from '@/components/comum/Cabecalho'
+import AbasDoCliente from '@/components/clientes/AbasDoCliente'
+import ArquivosDoCliente from '@/components/clientes/ArquivosDoCliente'
 import { AcoesDaLinha } from '@/components/clientes/AcoesDoCliente'
 import { useAcoesDoCliente } from '@/components/clientes/useAcoesDoCliente'
 import CheckinsDoCliente from '@/components/clientes/CheckinsDoCliente'
@@ -104,6 +106,55 @@ export default function Cliente() {
   const acoes = { cliente, central, gestao, aberto, idDoAviso, abrir, aoMudar: recarregar }
   const passou = cliente.realizado_no_mes > cliente.horas_mes
 
+  // Para uma aba nova (ex.: Agenda), basta uma linha aqui, na ordem em que ela aparece.
+  const abas = [
+    {
+      id: 'geral',
+      rotulo: 'Geral',
+      conteudo: (
+      <>
+        <section aria-label="Resumo" className="mb-4 flex flex-wrap gap-x-8 gap-y-2 rounded-xl border bg-card p-4 shadow-xs">
+          <dl className="contents">
+            <Campo rotulo="Situação">{situacaoDe(cliente)}</Campo>
+            <Campo rotulo="Consultoria">{cliente.consultoria?.nome}</Campo>
+            <Campo rotulo="Consultor">
+              {cliente.consultor && (
+                <>
+                  {cliente.consultor.nome}
+                  {cliente.consultor.ativo === false && <span className="ml-1 text-xs">(desativado)</span>}
+                </>
+              )}
+            </Campo>
+          </dl>
+        </section>
+        <div className="mb-6 grid gap-4 md:grid-cols-3">
+          <Bloco titulo="Empresa">
+            <Campo rotulo="CNPJ">{cliente.cnpj && formatarCnpj(cliente.cnpj)}</Campo>
+            <Campo rotulo="Cidade">{cliente.cidade && `${cliente.cidade}${cliente.uf ? `/${cliente.uf}` : ''}`}</Campo>
+            <Campo rotulo="Observações">{cliente.observacoes}</Campo>
+          </Bloco>
+          <Bloco titulo="Contato">
+            <Campo rotulo="Nome">{cliente.contato_nome}</Campo>
+            <Campo rotulo="Telefone">{cliente.contato_telefone}</Campo>
+            <Campo rotulo="E-mail">{cliente.contato_email}</Campo>
+          </Bloco>
+          <Bloco titulo="Previsão no mês">
+            <Campo rotulo="Realizado de previsto">
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="tabular-nums">{`${formatarHoras(cliente.realizado_no_mes)} de ${formatarHoras(cliente.horas_mes)}`}</span>
+                {passou && <Badge variant="notice">Passou da previsão</Badge>}
+              </span>
+            </Campo>
+          </Bloco>
+        </div>
+      </>
+      ),
+    },
+    { id: 'checkins', rotulo: 'Check-ins', conteudo: <CheckinsDoCliente cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar} /> },
+    { id: 'arquivos', rotulo: 'Arquivos', conteudo: <ArquivosDoCliente cliente={cliente} perfil={perfil} /> },
+    { id: 'historico', rotulo: 'Histórico', conteudo: <HistoricoDoCliente clienteId={cliente.id} versao={versao} /> },
+  ]
+
   return (
     <>
       {voltar}
@@ -117,44 +168,7 @@ export default function Cliente() {
           {' '}Faça o check-out para começar outro.
         </p>
       )}
-      <section aria-label="Resumo" className="mb-4 flex flex-wrap gap-x-8 gap-y-2 rounded-xl border bg-card p-4 shadow-xs">
-        <dl className="contents">
-          <Campo rotulo="Situação">{situacaoDe(cliente)}</Campo>
-          <Campo rotulo="Consultoria">{cliente.consultoria?.nome}</Campo>
-          <Campo rotulo="Consultor">
-            {cliente.consultor && (
-              <>
-                {cliente.consultor.nome}
-                {cliente.consultor.ativo === false && <span className="ml-1 text-xs">(desativado)</span>}
-              </>
-            )}
-          </Campo>
-        </dl>
-      </section>
-      <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <Bloco titulo="Empresa">
-          <Campo rotulo="CNPJ">{cliente.cnpj && formatarCnpj(cliente.cnpj)}</Campo>
-          <Campo rotulo="Cidade">{cliente.cidade && `${cliente.cidade}${cliente.uf ? `/${cliente.uf}` : ''}`}</Campo>
-          <Campo rotulo="Observações">{cliente.observacoes}</Campo>
-        </Bloco>
-        <Bloco titulo="Contato">
-          <Campo rotulo="Nome">{cliente.contato_nome}</Campo>
-          <Campo rotulo="Telefone">{cliente.contato_telefone}</Campo>
-          <Campo rotulo="E-mail">{cliente.contato_email}</Campo>
-        </Bloco>
-        <Bloco titulo="Previsão no mês">
-          <Campo rotulo="Realizado de previsto">
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="tabular-nums">{`${formatarHoras(cliente.realizado_no_mes)} de ${formatarHoras(cliente.horas_mes)}`}</span>
-              {passou && <Badge variant="notice">Passou da previsão</Badge>}
-            </span>
-          </Campo>
-        </Bloco>
-      </div>
-      <div className="grid gap-6">
-        <CheckinsDoCliente cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar} />
-        <HistoricoDoCliente clienteId={cliente.id} versao={versao} />
-      </div>
+      <AbasDoCliente abas={abas} />
       {janelas}
     </>
   )

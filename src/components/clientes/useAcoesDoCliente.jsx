@@ -5,6 +5,7 @@ import {
   ajustarPrevisao, apagarCliente, arquivarCliente, criarCliente, editarCliente, escolherConsultor,
   mandarParaConsultoria, reativarCliente,
 } from '@/data/clientes'
+import { limparPastaDoCliente } from '@/data/arquivos'
 import { lancarHoras } from '@/data/checkins'
 import FormularioCliente from './FormularioCliente'
 import JanelaCheckin from './JanelaCheckin'
@@ -46,6 +47,11 @@ export function useAcoesDoCliente({ aoMudar, aoApagar }) {
     const resposta = await apagarCliente(cliente.id)
     if (!resposta.erro) {
       toast.success(`Cliente ${cliente.nome} apagado.`)
+      // O cliente já era: se a pasta dele no armazenamento não limpar, só avisa (a central pode tentar de novo).
+      const limpeza = await limparPastaDoCliente(cliente.id).catch(() => ({ erro: true }))
+      if (limpeza.erro) {
+        toast.warning('O cliente foi apagado, mas alguns arquivos não saíram do armazenamento. Avise o suporte.')
+      }
       if (aoApagar) aoApagar(cliente)
       else recarregar()
     }
@@ -128,7 +134,7 @@ export function useAcoesDoCliente({ aoMudar, aoApagar }) {
       )}
       {apagando && (
         <ConfirmarAcao aberto aoFechar={() => setApagando(null)} titulo={`Apagar o cliente ${apagando.nome}?`}
-          descricao="O cliente some de vez. Se já tiver horas registradas, não dá para apagar: arquive."
+          descricao="O cliente some de vez, e os arquivos dele também. Se já tiver horas registradas, não dá para apagar: arquive."
           rotuloConfirmar="Apagar cliente" aoConfirmar={() => apagar(apagando)} />
       )}
     </>
