@@ -373,3 +373,48 @@ muda. "Pode" (16/11) para o resumo abaixo.
     arquivos de outra.
   - Quem apaga: quem enviou, admin/gestor da consultoria do arquivo e a central.
 - A aba aberta fica no endereço (`?aba=agenda`), para voltar à mesma aba ao recarregar.
+
+## Ficha do consultor (pedido do Diego, 16/11 — Entrega 4)
+
+Decisões do Diego: **todo consultor tem login** (consultor = usuário da consultoria); quer **uma ficha só** para
+cadastrar a pessoa com todas as informações e o acesso; campos novos: **telefone, cidade/UF, cargo e data de
+entrada**; área de atuação "não precisa ter agora". "Pode" (16/11) para o resumo abaixo.
+
+- **Campos novos em `perfis`:** `telefone` (até 30), `cidade` (até 120), `uf` (uma das 27), `cargo` (até 80),
+  `data_entrada` (data, não no futuro). Todos opcionais.
+- **Ficha única** na tela **Usuários** (o nome do menu não muda), usada no **Novo acesso** e no **Editar**
+  (preenchida), em blocos: **Dados** (nome, cargo, data de entrada), **Contato** (e-mail, telefone, cidade/UF),
+  **Capacidade** (carga semanal e ausências), **Papel e times**, **Acesso** (no Novo: convite ou senha
+  provisória; no Editar: reenviar convite, desativar/reativar).
+- **Quem preenche:** as mesmas regras de hoje para o nome e o papel (`gerenciar-acesso`/`criar-acesso`): o
+  dono cuida de administradores e da central; a central, dos administradores; o administrador, de gestores e
+  pessoas da consultoria; o gestor, das pessoas que vê. Capacidade: as regras de `definir_carga` e das
+  ausências (admin/gestor da consultoria e central).
+- **Meu perfil:** cada pessoa atualiza o próprio telefone e cidade/UF; cargo, data de entrada e carga ficam com
+  quem administra.
+- **Lista de Usuários:** ganha as colunas **Cargo** e **Telefone**.
+
+### Papéis na ficha (lembrete do Diego, 16/11: "lembrar dos papéis" do fluxo central → consultorias)
+
+| Quem cria ou edita | Papéis que pode dar | Onde a pessoa fica |
+| --- | --- | --- |
+| Administrador geral (dono) | Central; Administrador de qualquer consultoria | central ou a consultoria escolhida |
+| Central | Administrador de qualquer consultoria | a consultoria escolhida |
+| Administrador da consultoria | Gestor; Pessoa | a própria consultoria |
+| Gestor | Pessoa | a própria consultoria, nos times dele |
+
+- Consultor = pessoa de uma consultoria (pessoa, gestor ou administrador): a ficha mostra Capacidade (carga e
+  ausências) e Times. Quem é da central (ou o dono) não pertence a consultoria nem atende clientes: a ficha não
+  mostra Capacidade nem Times.
+- Uma consultoria nunca vê as pessoas de outra; a central vê todas (só olha, menos os administradores, que ela
+  cuida).
+
+### Regras acrescentadas na revisão final (16/11)
+
+- Check-in de uma consultoria antiga: quem saiu da consultoria continua vendo os próprios check-ins antigos, mas
+  não edita nem apaga (só o admin/gestor daquela consultoria corrige).
+- Reativar um cliente confere de novo: consultoria arquivada → o cliente volta para a central; consultor que não
+  é mais válido → o cliente volta para "aguardando consultor".
+- Check-out com horário de fim editável (no máximo 24 h depois do início), para não travar quem esqueceu.
+- As confirmações de arquivar consultoria, desativar pessoa e mover para a central dizem quantos clientes
+  voltam para a central ou para "aguardando consultor".

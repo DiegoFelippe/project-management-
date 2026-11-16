@@ -790,3 +790,56 @@ Design: seção "Página do cliente em abas" do design. Mesmas Restrições glob
   historico_por_periodo < /dev/null`). **Passo 4:** `npm run test:db`, `npm test`, `npm run lint`, `npm run
   build` → PASSA. **Passo 5:** commit `Agenda do cliente`. **Conferência no navegador pelo controlador** (abas,
   arquivo real, gráficos e agenda com os dados de teste).
+
+---
+
+## Entrega 4 — Ficha do consultor (pedido de 16/11)
+
+Design: seção "Ficha do consultor" do design. Mesmas Restrições globais.
+
+### Task 20: Campos do perfil no banco e nas Edge Functions
+
+**Arquivos:**
+- Criar: `supabase/migrations/<data>_ficha_do_consultor.sql`, `supabase/tests/database/ficha.test.sql`
+- Modificar: `supabase/functions/_shared/validar.ts`, `criar-acesso/index.ts`, `gerenciar-acesso/index.ts`,
+  `_shared/usuarios.ts`, `tests/integracao/` (arquivo novo `ficha.test.js`)
+
+**Interfaces:**
+- Produz:
+  - `perfis`: `telefone text check (telefone is null or char_length(telefone) <= 30)`, `cidade text` (≤120),
+    `uf text` (nula ou uma das 27), `cargo text` (≤80), `data_entrada date` (não no futuro — gatilho, fuso São
+    Paulo). Sem `grant update` novo para `authenticated`.
+  - `public.atualizar_meu_contato(p_telefone text, p_cidade text, p_uf text) returns void` (`security definer`):
+    só o próprio perfil, liberado; texto vazio vira nulo.
+  - `criar-acesso` aceita `telefone`, `cidade`, `uf`, `cargo`, `data_entrada` (validados em `validar.ts`) e grava
+    no perfil novo.
+  - `gerenciar-acesso` ação `editar` aceita os mesmos campos com o mesmo poder que hoje permite mudar o nome
+    (`'tudo'` ou `'nome'`); em si mesmo (`euMesmo`), continua só nome (o resto pelo `atualizar_meu_contato`).
+- [ ] **Passo 1: Testes** (pgTAP: checks e `atualizar_meu_contato` só no próprio perfil; integração: criar acesso
+  com os campos e lê-los; editar pelo admin; gestor edita pessoa que vê; pessoa não edita outra; UF inválida →
+  400 `dados_invalidos` campo `uf`; data no futuro → 400).
+- [ ] **Passo 2:** FALHA. **Passo 3:** migração (cópia do banco antes; `migration new` + `migration up`), Edge
+  Functions e `npm run functions:reiniciar`. **Passo 4:** `npm run test:db`, `npm run test:integracao` → PASSA.
+  **Passo 5:** commit `Ficha do consultor: campos do perfil no banco`.
+
+### Task 21: Ficha única em Usuários e Meu perfil
+
+**Arquivos:**
+- Modificar: `src/components/usuarios/NovoAcesso.jsx`, `src/components/usuarios/EditarAcesso.jsx` (ou um
+  `FichaDoConsultor.jsx` comum aos dois), `src/pages/Usuarios.jsx`, `src/data/usuarios.js`,
+  `src/components/perfil/MeuPerfil.jsx` (+ testes)
+
+**Interfaces:**
+- Consome: Task 20; `definirCarga`, ausências (`src/components/capacidade/JanelaAusencias.jsx` ou o componente de
+  lista de ausências) da Task 14.
+- Produz: a ficha em blocos (Dados, Contato, Capacidade, Papel e times, Acesso) no Novo e no Editar
+  (preenchida); o bloco Capacidade só aparece para quem pode (admin/gestor da consultoria, central) e só no
+  Editar para as ausências (no Novo, só a carga, gravada depois de criar o acesso); colunas Cargo e Telefone na
+  lista; `MeuPerfil` com telefone e cidade/UF editáveis (`atualizar_meu_contato`).
+- [ ] **Passo 1: Testes**: Editar abre com cargo, telefone, cidade/UF, data de entrada e carga da linha; salvar
+  chama `gerenciarAcesso('editar', id, { ... })` só com o que mudou e `definirCarga` se a carga mudou; Novo envia
+  os campos novos; pessoa sem poder não vê o bloco Capacidade; Meu perfil salva telefone e cidade/UF; a lista
+  mostra Cargo e Telefone.
+- [ ] **Passo 2:** FALHA. **Passo 3:** implementar. **Passo 4:** `npm test`, `npm run lint`, `npm run build` →
+  PASSA. **Passo 5:** commit `Ficha do consultor em Usuários e Meu perfil`. **Conferência no navegador pelo
+  controlador.**
