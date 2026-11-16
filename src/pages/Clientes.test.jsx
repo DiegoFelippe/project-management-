@@ -53,6 +53,13 @@ beforeEach(() => {
 })
 afterEach(() => vi.useRealTimers())
 
+describe('Clientes (link para a página)', () => {
+  it('o nome do cliente leva para a página dele', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    expect(await screen.findByRole('link', { name: 'Provedor Alfa' })).toHaveAttribute('href', '/clientes/k1')
+  })
+})
+
 describe('Clientes (central)', () => {
   it('mostra a tabela, as abas, o botão Novo cliente e as colunas', async () => {
     renderizarTela(<Clientes />, { perfil: central })

@@ -3,7 +3,7 @@ import { traduzirErroBanco } from '@/lib/erros'
 import { normalizarCnpj } from '@/lib/cnpj'
 import { supabase } from '@/lib/supabase'
 import { padraoDeBusca } from '@/lib/busca'
-import { buscarPagina } from './paginar'
+import { buscarPagina, POR_PAGINA } from './paginar'
 
 const CAMPOS_DA_LISTA =
   'id, nome, razao_social, cnpj, cidade, uf, horas_mes, enviado_em, consultor_desde, arquivado, ' +
@@ -106,16 +106,14 @@ export async function apagarCliente(id) {
   return resultadoDaEscrita(await supabase.from('clientes').delete().eq('id', id).select('id'))
 }
 
-// Histórico do cliente, do mais novo para o mais antigo.
+// Histórico do cliente, do mais novo para o mais antigo. Os nomes vêm resolvidos pelo banco, que esconde
+// (devolve null) o que é de outra consultoria. Devolve { itens, total }.
 export async function listarEventos(clienteId, { pagina = 1 } = {}) {
-  const consulta = supabase
-    .from('cliente_eventos')
-    .select(
-      'id, tipo, de_consultoria, para_consultoria, de_consultor, para_consultor, de_horas, para_horas, autor, em',
-      { count: 'exact' },
-    )
-    .eq('cliente_id', clienteId)
-    .order('em', { ascending: false })
-    .order('id')
-  return buscarPagina(consulta, pagina)
+  const { data, error } = await supabase.rpc('historico_do_cliente', {
+    p_cliente: clienteId,
+    p_limite: POR_PAGINA,
+    p_deslocamento: (pagina - 1) * POR_PAGINA,
+  })
+  if (error) throw error
+  return { itens: data, total: data.length > 0 ? Number(data[0].total) : 0 }
 }
