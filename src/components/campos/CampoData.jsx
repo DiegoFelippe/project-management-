@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import {
   addDays, addMonths, addYears, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, isToday,
@@ -40,6 +40,8 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
   const [hoje] = useState(() => new Date())
   const gatilho = useRef(null)
   const grade = useRef(null)
+  const focar = useRef(false) // o foco do teclado só vai para o dia quando a mudança veio das setas ou de uma escolha, não dos botões de mês
+  const valorId = useId()
 
   const dias = useMemo(() => eachDayOfInterval({ start: startOfWeek(startOfMonth(visao)), end: endOfWeek(endOfMonth(visao)) }), [visao])
   const chave = (d) => format(d, 'yyyy-MM-dd')
@@ -47,7 +49,7 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
   const emitir = (v) => aoMudar(v)
 
   useEffect(() => {
-    if (aberto && foco) grade.current?.querySelector(`[data-dia="${chave(foco)}"]`)?.focus()
+    if (aberto && foco && focar.current) { focar.current = false; grade.current?.querySelector(`[data-dia="${chave(foco)}"]`)?.focus() }
   }, [foco, aberto])
 
   function alternar() {
@@ -67,22 +69,32 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
     if (!passo || !foco) return
     e.preventDefault()
     const novo = addDays(foco, passo)
+    focar.current = true
     setFoco(novo)
     if (!isSameMonth(novo, visao)) setVisao(novo)
   }
 
   const inicioAnos = visao.getFullYear() - (visao.getFullYear() % 12)
-  const mover = (dir) => setVisao((v) => (modo === 'dias' ? addMonths(v, dir) : addYears(v, dir * (modo === 'meses' ? 1 : 12))))
+  // Nos dias, o foco do teclado vai junto para o mesmo dia do outro mês (o fim do mês, se o dia não existir; dentro de min e max).
+  function mover(dir) {
+    if (modo !== 'dias') { setVisao((v) => addYears(v, dir * (modo === 'meses' ? 1 : 12))); return }
+    const nova = addMonths(visao, dir)
+    let alvo = addMonths(foco ?? visao, dir)
+    if (minimo && chave(alvo) < chave(minimo) && isSameMonth(minimo, alvo)) alvo = minimo
+    if (maximo && chave(alvo) > chave(maximo) && isSameMonth(maximo, alvo)) alvo = maximo
+    setVisao(nova)
+    setFoco(alvo)
+  }
   const nomeSeta = (dir) => (modo === 'dias' ? (dir < 0 ? 'Mês anterior' : 'Próximo mês') : modo === 'meses' ? (dir < 0 ? 'Ano anterior' : 'Próximo ano') : (dir < 0 ? 'Anos anteriores' : 'Próximos anos'))
   const botaoTitulo = 'hover:bg-accent rounded-lg px-2 py-1 text-[13.5px] font-semibold tabular-nums'
   const limpar = !obrigatorio && escolhida && !desabilitado
 
   return (
     <>
-      <button ref={gatilho} id={id} type="button" disabled={desabilitado} onClick={alternar} aria-label={rotulo} aria-haspopup="dialog" aria-expanded={aberto}
+      <button ref={gatilho} id={id} type="button" disabled={desabilitado} onClick={alternar} aria-label={rotulo} aria-describedby={valorId} aria-haspopup="dialog" aria-expanded={aberto}
         className={cn('input botao-animado flex cursor-pointer items-center gap-2 text-left', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
         <CalendarDays className={cn('size-3.5 shrink-0', escolhida ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
-        <span className={cn('min-w-0 flex-1 truncate', !escolhida && 'text-muted-foreground')}>
+        <span id={valorId} className={cn('min-w-0 flex-1 truncate', !escolhida && 'text-muted-foreground')}>
           {escolhida ? format(escolhida, comHora ? "d 'de' MMM 'de' yyyy', ' HH:mm" : "d 'de' MMM 'de' yyyy", { locale: ptBR }) : placeholder}
         </span>
         {limpar && (
@@ -113,7 +125,7 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
                 const d = setMonth(visao, i)
                 const off = (minimo && format(d, 'yyyy-MM') < format(minimo, 'yyyy-MM')) || (maximo && format(d, 'yyyy-MM') > format(maximo, 'yyyy-MM'))
                 return (
-                  <BotaoCampo key={i} disabled={off} onClick={() => { setVisao(d); setFoco(d); setModo('dias') }}
+                  <BotaoCampo key={i} disabled={off} onClick={() => { focar.current = true; setVisao(d); setFoco(d); setModo('dias') }}
                     className={cn('h-11 text-[12.5px] font-medium', celula(escolhida && isSameMonth(escolhida, d), off, isSameMonth(hoje, d)))}>
                     {maiuscula(format(d, 'MMM', { locale: ptBR }).replace('.', ''))}
                   </BotaoCampo>

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Clock, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Flutuante, { BotaoCampo } from './Flutuante'
@@ -28,6 +28,7 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
   const [digitado, setDigitado] = useState('')
   const gatilho = useRef(null)
   const colunas = useRef(null)
+  const valorId = useId()
   const base = Array.from({ length: Math.ceil(60 / passo) }, (_, i) => String(i * passo).padStart(2, '0'))
   const minutos = atual && !base.includes(atual.m) ? [...base, atual.m].sort() : base
 
@@ -48,11 +49,11 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
 
   return (
     <>
-      <button ref={gatilho} id={id} type="button" disabled={desabilitado} aria-label={rotulo} aria-haspopup="dialog" aria-expanded={aberto}
+      <button ref={gatilho} id={id} type="button" disabled={desabilitado} aria-label={rotulo} aria-describedby={valorId} aria-haspopup="dialog" aria-expanded={aberto}
         onClick={() => { setDigitado(''); setAberto((a) => !a) }}
         className={cn('input botao-animado flex cursor-pointer items-center text-left', compacto ? 'gap-1.5 py-1.5 text-[12.5px]' : 'gap-2', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
         <Clock className={cn('shrink-0', compacto ? 'size-3' : 'size-3.5', atual ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
-        <span className={cn('min-w-0 flex-1 truncate tabular-nums', !atual && 'text-muted-foreground')}>{atual ? `${atual.h}:${atual.m}` : placeholder}</span>
+        <span id={valorId} className={cn('min-w-0 flex-1 truncate tabular-nums', !atual && 'text-muted-foreground')}>{atual ? `${atual.h}:${atual.m}` : placeholder}</span>
         {limpar && !compacto && (
           <span role="button" tabIndex={0} aria-label="Limpar horário" onClick={(e) => { e.stopPropagation(); aoMudar('') }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); aoMudar('') } }}
@@ -66,7 +67,7 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
         <Flutuante ancora={gatilho} aoFechar={() => setAberto(false)} aoAbrir={centralizar} largura={LARGURA} altura={330} rotulo="Escolher horário" className="p-3">
           <input value={digitado} onChange={(e) => setDigitado(e.target.value.replace(/[^\d:]/g, '').slice(0, 5))} inputMode="numeric" aria-label="Digitar horário"
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmarDigitado() } }} onBlur={confirmarDigitado}
-            placeholder={atual ? `${atual.h}:${atual.m}` : 'Digite, ex.: 1330'} className="input mb-2.5 py-1.5 text-[12.5px] tabular-nums" />
+            placeholder={atual ? `${atual.h}:${atual.m}` : 'Digite, ex.: 1330'} className="input mb-2.5 py-1.5 text-base tabular-nums sm:text-[12.5px]" />
           <div ref={colunas} className="grid grid-cols-2 gap-2">
             {[['Hora', HORAS, atual?.h, (h) => aoMudar(`${h}:${atual?.m ?? '00'}`)], ['Minuto', minutos, atual?.m, (m) => aoMudar(`${atual?.h ?? '08'}:${m}`)]].map(([titulo, itens, marcado, escolher]) => (
               <div key={titulo}>

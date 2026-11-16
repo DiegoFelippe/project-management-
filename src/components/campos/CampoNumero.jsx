@@ -31,7 +31,7 @@ export default function CampoNumero({ id, valor, aoMudar, min = 0, max = 9999, p
             onChange={(e) => aoMudar(decimal ? e.target.value.replace('.', ',').replace(/[^\d,]/g, '').replace(/,(?=.*,)/g, '').slice(0, 12) : e.target.value.replace(/\D/g, '').slice(0, String(max).length))}
             onKeyDown={(e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); somar(e.key === 'ArrowUp' ? 1 : -1) } }}
             onBlur={() => { if (n != null && escrever(limitar(n)) !== valor) mudar(n) }}
-            className="text-foreground placeholder:text-muted-foreground/50 w-12 bg-transparent py-2 text-center text-[14px] font-semibold tabular-nums outline-none" />
+            className="text-foreground placeholder:text-muted-foreground/50 w-12 bg-transparent py-2 text-center text-base font-semibold tabular-nums outline-none sm:text-[14px]" />
           {unidade && <span className="text-muted-foreground text-[12.5px] select-none">{unidade}</span>}
         </span>
         <BotaoCampo onClick={() => somar(1)} disabled={desabilitado || (n != null && n >= max)} aria-label="Aumentar" title="Aumentar" className={lado}>

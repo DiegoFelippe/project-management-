@@ -220,7 +220,7 @@
   .section-label { @apply text-muted-foreground text-[10.5px] font-semibold tracking-[0.08em] uppercase; }
   .form-label { @apply text-foreground/80 mb-1.5 block text-[12.5px] font-medium; }
   .input {
-    @apply bg-card border-input text-foreground placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 text-[13.5px] transition-[color,box-shadow,border-color] outline-none;
+    @apply bg-card border-input text-foreground placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 text-base transition-[color,box-shadow,border-color] outline-none sm:text-[13.5px];
     @apply hover:border-primary/40 focus:border-primary/60 focus:ring-primary/15 focus:ring-2 disabled:bg-muted disabled:cursor-not-allowed disabled:opacity-60;
     @apply aria-invalid:border-destructive aria-invalid:ring-destructive/20;
   }

@@ -16,6 +16,8 @@ describe('CampoHora', () => {
     const campo = screen.getByLabelText('Início')
     expect(campo).toHaveAttribute('aria-haspopup', 'dialog')
     expect(campo).toHaveTextContent('08:30')
+    expect(campo).toHaveAccessibleName('Início')
+    expect(campo).toHaveAccessibleDescription('08:30')
   })
 
   it('escolher hora e minuto devolve HH:mm', async () => {

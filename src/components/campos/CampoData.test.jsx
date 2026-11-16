@@ -18,6 +18,28 @@ describe('CampoData', () => {
     expect(campo).toHaveAttribute('aria-haspopup', 'dialog')
     expect(campo).toHaveAttribute('aria-expanded', 'false')
     expect(campo).toHaveTextContent('16 de nov de 2026')
+    expect(campo).toHaveAccessibleName('Prazo')
+    expect(campo).toHaveAccessibleDescription('16 de nov de 2026')
+  })
+
+  it('Mês anterior e Próximo mês levam o foco do teclado junto (o mesmo dia, limitado ao fim do mês)', async () => {
+    render(<Controlado inicial="2026-01-31" />)
+    await userEvent.click(screen.getByRole('button', { name: /31 de jan/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }))
+    const dia = screen.getByRole('button', { name: '28 de fevereiro de 2026' })
+    expect(dia).toHaveAttribute('tabindex', '0')
+    expect(document.querySelectorAll('[data-dia][tabindex="0"]')).toHaveLength(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
+    expect(screen.getByRole('button', { name: '28 de janeiro de 2026' })).toHaveAttribute('tabindex', '0')
+  })
+
+  it('ao mudar de mês o foco respeita min e max', async () => {
+    render(<Controlado inicial="2026-11-16" min="2026-11-10" max="2026-12-05" />)
+    await userEvent.click(screen.getByRole('button', { name: /16 de nov/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }))
+    expect(screen.getByRole('button', { name: '5 de dezembro de 2026' })).toHaveAttribute('tabindex', '0')
+    await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
+    expect(screen.getByRole('button', { name: '10 de novembro de 2026' })).toHaveAttribute('tabindex', '0')
   })
 
   it('escolher um dia devolve o texto yyyy-MM-dd e fecha', async () => {
