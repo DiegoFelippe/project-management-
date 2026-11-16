@@ -303,11 +303,19 @@ describe('Clientes: check-in do consultor', () => {
       id: 'a1', cliente_id: 'k1', inicio: new Date(Date.now() - 3_900_000).toISOString(), cliente: { nome: 'Provedor Alfa' },
     })
     renderizarTela(<Clientes />, { perfil: pessoa })
-    const alfa = await screen.findByRole('row', { name: /^Provedor Alfa/ })
+    const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
     expect(await within(alfa).findByRole('button', { name: /Fazer check-out · 1 h 05/ })).toBeInTheDocument()
-    const beta = within(linha('^Provedor Beta')).getByRole('button', { name: 'Fazer check-in' })
+    const beta = within(linha('Provedor Beta')).getByRole('button', { name: 'Fazer check-in' })
     expect(beta).toBeDisabled()
-    expect(beta).toHaveAccessibleDescription('Check-in aberto em Provedor Alfa. Faça o check-out primeiro.')
+    const aviso = /Você está com check-in aberto em Provedor Alfa desde \d{2}:\d{2}\. Faça o check-out para começar outro\./
+    expect(screen.getAllByText(aviso)).toHaveLength(1)
+    expect(beta).toHaveAccessibleDescription(screen.getByText(aviso).textContent)
+  })
+
+  it('sem check-in aberto não mostra o aviso', async () => {
+    renderizarTela(<Clientes />, { perfil: pessoa })
+    await screen.findByRole('row', { name: /Provedor Alfa/ })
+    expect(screen.queryByText(/Você está com check-in aberto/)).not.toBeInTheDocument()
   })
 
   it('Lançar horas abre a janela e chama lancarHoras com o cliente', async () => {

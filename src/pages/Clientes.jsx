@@ -1,5 +1,5 @@
 import { Archive, ArchiveRestore, ArrowRightLeft, Clock, History, Pencil, Plus, Search, Send, Trash2, UserCheck } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import { GraficoCarregando } from '@/components/comum/Carregando'
@@ -35,6 +35,8 @@ const ABAS_DO_CONSULTOR = [['meus', 'Meus clientes'], ['checkins', 'Meus check-i
 const ABAS_DA_CONSULTORIA = [['aguardando', 'Aguardando consultor'], ['atendimento', 'Em atendimento'], ...ABAS_DO_CONSULTOR]
 const ABAS_DA_PESSOA = ABAS_DO_CONSULTOR
 
+const HORA = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' })
+
 function abasDoPapel(perfil) {
   if (veTudo(perfil)) return ABAS_DA_CENTRAL
   if (perfil.papel === 'pessoa') return ABAS_DA_PESSOA
@@ -65,7 +67,7 @@ const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-d
 
 // Ações da linha por papel: a central (e o dono) distribui e cuida do cadastro; admin e gestor escolhem o
 // consultor e ajustam a previsão; em Meus clientes, quem atende faz check-in/check-out e lança horas.
-function AcoesDaLinha({ cliente, aba, central, gestao, aberto, abrir, aoMudar }) {
+function AcoesDaLinha({ cliente, aba, central, gestao, aberto, idDoAviso, abrir, aoMudar }) {
   if (central) {
     return (
       <>
@@ -88,7 +90,7 @@ function AcoesDaLinha({ cliente, aba, central, gestao, aberto, abrir, aoMudar })
   if (aba === 'meus') {
     return (
       <>
-        <BotaoCheckin key={aberto?.id ?? 'livre'} cliente={cliente} aberto={aberto} aoMudar={aoMudar} />
+        <BotaoCheckin key={aberto?.id ?? 'livre'} cliente={cliente} aberto={aberto} idDoAviso={idDoAviso} aoMudar={aoMudar} />
         <Button variant="ghost" size="sm" onClick={() => abrir('lancar', cliente)}><History /> Lançar horas</Button>
       </>
     )
@@ -131,6 +133,7 @@ export default function Clientes() {
   const [ajustando, setAjustando] = useState(null)
   const [lancando, setLancando] = useState(null)
   const [aberto, setAberto] = useState(null) // meu check-in aberto
+  const idDoAviso = useId()
   const consultorQueAtende = !central
   const emCheckins = aba === 'checkins'
   // O filtro de consultor só faz sentido onde já há consultor (e não nas listas só minhas).
@@ -295,6 +298,12 @@ export default function Clientes() {
             aoMudar={(valor, nome) => setConsultor({ valor, nome })} />
         )}
       </div>
+      {aba === 'meus' && aberto && (
+        <p id={idDoAviso} className="mb-3 text-sm text-muted-foreground">
+          Você está com check-in aberto em {aberto.cliente?.nome ?? 'outro cliente'} desde {HORA.format(new Date(aberto.inicio))}.
+          {' '}Faça o check-out para começar outro.
+        </p>
+      )}
       {emCheckins && <MeusCheckins consultorId={perfil.id} aoMudar={recarregar} />}
       {!emCheckins && erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!emCheckins && !erro && clientes === null && <GraficoCarregando texto="Carregando os clientes…" className="py-12" />}
@@ -323,7 +332,7 @@ export default function Clientes() {
                   </>
                 ) : '—'}
               </Celula>
-              <CelulaAcoes><AcoesDaLinha cliente={c} aba={aba} central={central} gestao={gestao} aberto={aberto} abrir={abrir} aoMudar={recarregar} /></CelulaAcoes>
+              <CelulaAcoes><AcoesDaLinha cliente={c} aba={aba} central={central} gestao={gestao} aberto={aberto} idDoAviso={idDoAviso} abrir={abrir} aoMudar={recarregar} /></CelulaAcoes>
             </Linha>
           ))}
         </Tabela>

@@ -60,13 +60,21 @@ describe('BotaoCheckin', () => {
     expect(aoMudar).toHaveBeenCalled()
   })
 
-  it('com aberto em outro cliente fica desabilitado, com a dica', () => {
+  it('com aberto em outro cliente fica desabilitado e descrito pelo aviso da tela', () => {
     const aberto = { id: 'a1', cliente_id: 'k9', inicio: new Date().toISOString(), cliente: { nome: 'Beta' } }
-    render(<BotaoCheckin cliente={cliente} aberto={aberto} aoMudar={vi.fn()} />)
+    render(
+      <>
+        <p id="aviso">Você está com check-in aberto em Beta.</p>
+        <BotaoCheckin cliente={cliente} aberto={aberto} aoMudar={vi.fn()} idDoAviso="aviso" />
+      </>,
+    )
     const botao = screen.getByRole('button', { name: 'Fazer check-in' })
     expect(botao).toBeDisabled()
-    const dica = 'Check-in aberto em Beta. Faça o check-out primeiro.'
-    expect(screen.getByText(dica)).toBeInTheDocument()
-    expect(botao).toHaveAccessibleDescription(dica)
+    expect(botao).toHaveAccessibleDescription('Você está com check-in aberto em Beta.')
+  })
+
+  it('sem check-in aberto não aponta para aviso nenhum', () => {
+    render(<BotaoCheckin cliente={cliente} aberto={null} aoMudar={vi.fn()} idDoAviso="aviso" />)
+    expect(screen.getByRole('button', { name: 'Fazer check-in' })).not.toHaveAttribute('aria-describedby')
   })
 })

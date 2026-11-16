@@ -1,5 +1,5 @@
 import { LogIn, LogOut } from 'lucide-react'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { fazerCheckin, fazerCheckout } from '@/data/checkins'
@@ -9,12 +9,12 @@ import JanelaCheckin from './JanelaCheckin'
 // "Fazer check-in" no cliente; se o check-in aberto é deste cliente vira "Fazer check-out · 1 h 05"
 // (o tempo atualiza a cada 30 s, só na tela). Com outro cliente aberto, fica desabilitado.
 // Quem usa deve passar key={aberto?.id} para o relógio recomeçar quando o check-in aberto muda.
+// idDoAviso: id do aviso da tela (check-in aberto em outro cliente) que explica o botão desabilitado.
 // aoMudar() é chamado depois de um check-in ou check-out feito, para a tela recarregar.
-export default function BotaoCheckin({ cliente, aberto, aoMudar }) {
+export default function BotaoCheckin({ cliente, aberto, aoMudar, idDoAviso }) {
   const [agora, setAgora] = useState(() => Date.now())
   const [saindo, setSaindo] = useState(false)
   const [enviando, setEnviando] = useState(false)
-  const idDaDica = useId()
   const esteAberto = aberto?.cliente_id === cliente.id
 
   useEffect(() => {
@@ -54,14 +54,10 @@ export default function BotaoCheckin({ cliente, aberto, aoMudar }) {
   }
 
   const emOutro = Boolean(aberto)
-  // O botão desabilitado não recebe mouse nem foco, então o motivo fica escrito ao lado e ligado a ele.
-  const dica = emOutro ? `Check-in aberto em ${aberto.cliente?.nome ?? 'outro cliente'}. Faça o check-out primeiro.` : null
+  // Desabilitado não recebe mouse nem foco: o motivo é o aviso único da tela, ligado ao botão.
   return (
-    <span className="inline-flex flex-col items-end align-middle">
-      <Button variant="ghost" size="sm" disabled={emOutro || enviando} onClick={entrar} aria-describedby={dica ? idDaDica : undefined}>
-        <LogIn /> Fazer check-in
-      </Button>
-      {dica && <span id={idDaDica} className="max-w-48 whitespace-normal text-right text-xs text-muted-foreground">{dica}</span>}
-    </span>
+    <Button variant="ghost" size="sm" disabled={emOutro || enviando} onClick={entrar} aria-describedby={emOutro ? idDoAviso : undefined}>
+      <LogIn /> Fazer check-in
+    </Button>
   )
 }
