@@ -44,16 +44,14 @@ function paraColunas(dados) {
 // Uma página de clientes, filtrada e paginada no banco.
 export async function listarClientes({ aba, consultoriaId, consultorId, busca, pagina = 1 } = {}) {
   let consulta = supabase.from('clientes').select(CAMPOS_DA_LISTA, { count: 'exact' }).order('nome').order('id')
-  if (aba === 'distribuir') consulta = consulta.is('consultoria_id', null).eq('arquivado', false)
-  else if (aba === 'nas_consultorias') consulta = consulta.not('consultoria_id', 'is', null).eq('arquivado', false)
-  else if (aba === 'arquivados') consulta = consulta.eq('arquivado', true)
+  // Só a aba Arquivados mostra arquivados; todas as outras ficam com os ativos.
+  consulta = consulta.eq('arquivado', aba === 'arquivados')
+  if (aba === 'distribuir') consulta = consulta.is('consultoria_id', null)
+  else if (aba === 'nas_consultorias') consulta = consulta.not('consultoria_id', 'is', null)
   else if (aba === 'aguardando') consulta = consulta.not('consultoria_id', 'is', null).is('consultor_id', null)
-  else if (aba === 'atendimento') consulta = consulta.not('consultor_id', 'is', null).eq('arquivado', false)
-  else if (aba === 'meus') {
-    // O id de quem olha vem de quem chama (perfil.id); sem ele, não há o que listar.
-    if (!consultorId) return { itens: [], total: 0 }
-    consulta = consulta.eq('arquivado', false)
-  }
+  else if (aba === 'atendimento') consulta = consulta.not('consultor_id', 'is', null)
+  // O id de quem olha vem de quem chama (perfil.id); sem ele, não há o que listar.
+  else if (aba === 'meus' && !consultorId) return { itens: [], total: 0 }
   if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
   if (consultorId === 'sem') consulta = consulta.is('consultor_id', null)
   else if (consultorId) consulta = consulta.eq('consultor_id', consultorId)
