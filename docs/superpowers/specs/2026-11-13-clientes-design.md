@@ -334,3 +334,11 @@ Painéis estratégicos da central: leem `cliente_eventos`, `checkins` e a capaci
   - meses passados na Capacidade mostram só capacidade e realizado; carga semanal sem histórico por enquanto;
   - consultoria ou consultor sem capacidade vai para o fim da sugestão; a marca "Novo" fica enquanto o
     cliente aguarda consultor.
+
+## O que mudou na construção
+
+- **Função extra `historico_do_cliente`** (migração `20261116170023`): devolve o histórico do cliente com os
+  nomes visíveis só para a própria consultoria, para a página do cliente.
+- **Administrador e gestor também têm "Meus clientes" e "Meus check-ins"**, porque qualquer usuário ativo da
+  consultoria pode ser consultor.
+- **Filtro de consultor** na lista de clientes da consultoria (todos, sem consultor ou um específico).

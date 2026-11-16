@@ -1,5 +1,6 @@
 // Dados de exemplo só para o Supabase local: npm run exemplo:local
-// Cria a "Consultoria Exemplo" com admin, gestor, duas pessoas e o time Implantação.
+// Cria a "Consultoria Exemplo" com admin, gestor, duas pessoas e o time Implantação,
+// e a central de exemplo (central@exemplo.test, fora de qualquer consultoria).
 // Todos entram com a senha abaixo (logins @exemplo.test). Nunca rode isto na nuvem.
 import { createClient } from '@supabase/supabase-js'
 import { lerStatusLocal } from './supabase-local.mjs'
@@ -31,6 +32,30 @@ const admin = createClient(status.API_URL, status.SECRET_KEY, { auth: { persistS
 function parar(mensagem) {
   console.error(mensagem)
   process.exit(1)
+}
+
+// A central de exemplo é garantida sempre, mesmo com a Consultoria Exemplo já criada.
+const CENTRAL = { email: 'central@exemplo.test', nome: 'Cora Central' }
+const { data: centralExiste } = await admin.from('perfis').select('id').eq('email', CENTRAL.email).maybeSingle()
+if (centralExiste) {
+  console.log(`${CENTRAL.email} já existe.`)
+} else {
+  const { data, error } = await admin.auth.admin.createUser({
+    email: CENTRAL.email,
+    password: SENHA_EXEMPLO,
+    email_confirm: true,
+    user_metadata: { nome: CENTRAL.nome },
+  })
+  if (error) parar(`Não consegui criar ${CENTRAL.email}: ${error.message}`)
+  const { error: erroCentral } = await admin.from('perfis').insert({
+    id: data.user.id,
+    consultoria_id: null,
+    nome: CENTRAL.nome,
+    email: CENTRAL.email,
+    papel: 'central',
+  })
+  if (erroCentral) parar(`Não consegui criar o perfil de ${CENTRAL.email}: ${erroCentral.message}`)
+  console.log(`${CENTRAL.email} criada (central).`)
 }
 
 const { data: jaExiste } = await admin.from('consultorias').select('id').eq('nome', NOME_CONSULTORIA).maybeSingle()

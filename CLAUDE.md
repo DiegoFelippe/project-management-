@@ -85,6 +85,17 @@ times e consultorias.** Nada pode depender de "são poucos registros".
 - **Migração nova:** `npx supabase migration up` (aplica só o que falta, sem apagar nada).
 - Os testes de integração só apagam o que eles mesmos criaram (`limparTudo`); o pgTAP roda em transação.
 
+## Clientes
+
+- **A central cadastra e manda; a consultoria escolhe o consultor** (administrador ou gestor, pela menor
+  ocupação). A central nunca escolhe o consultor.
+- **Check-in é de quem trabalhou** e fica na consultoria daquele momento; mudança de consultor, consultoria ou
+  arquivamento com check-in aberto fecha o check-in na hora.
+- **Uma consultoria nunca vê clientes, horas ou nomes de outra.** Quem não é da central só alcança dados de
+  colegas pelas funções do banco, não por leitura direta.
+- **Ocupação, capacidade e sugestões vêm do banco**: `consultores_por_ocupacao` e `consultorias_por_ocupacao`.
+  Nunca recalcular na tela.
+
 ## Segurança
 
 - A chave secreta do Supabase nunca vai para `src/` nem para o git; o navegador usa só a publicável.

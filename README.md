@@ -8,15 +8,29 @@ Depois o código vai para a Vercel e o banco para o Supabase na nuvem.
 
 | Papel | O que faz |
 | --- | --- |
-| Dono da plataforma | Vê tudo. Cadastra as consultorias e o administrador de cada uma (menu Consultorias). |
-| Administrador da consultoria | Cria gestores e pessoas e vê a consultoria inteira. |
-| Gestor | Cria os times dele e os acessos das pessoas, só mexe nos times dele. |
-| Pessoa | Entra para trabalhar nos times em que está. |
+| Administrador geral (`dono`) | Vê tudo e tem todos os poderes da central. Cadastra as consultorias e o administrador de cada uma (menu Consultorias). |
+| Central | Fica fora das consultorias e vê todas. Cadastra clientes, manda cada um para uma consultoria (com a sugestão de menor ocupação), cria e arquiva consultorias. |
+| Administrador da consultoria | Cria gestores e pessoas, vê a consultoria inteira, escolhe o consultor de cada cliente e cuida da capacidade. |
+| Gestor | Cria os times dele e os acessos das pessoas, só mexe nos times dele. Também escolhe consultores e vê a capacidade da consultoria. |
+| Pessoa (consultor) | Entra para trabalhar nos times em que está. Faz check-in e check-out nos clientes dela e lança horas. |
 
 Uma consultoria nunca vê nada de outra: as regras ficam no banco (RLS) e são testadas em `supabase/tests`.
 Ninguém se cadastra sozinho; o acesso é criado por convite (e-mail) ou com senha provisória
 (trocada no primeiro acesso). Google entra se o e-mail já tiver acesso. SSO: só o botão, por enquanto.
 O design e o plano estão em `docs/superpowers/`.
+
+## Clientes e capacidade
+
+1. A **central** cadastra o cliente (CNPJ, contato, previsão de horas por mês) e o manda para uma consultoria;
+   a janela já sugere a de menor ocupação.
+2. O **administrador ou gestor** da consultoria escolhe o consultor, também pela menor ocupação.
+3. O **consultor** faz check-in e check-out no cliente (ou lança as horas depois). O check-in é de quem trabalhou.
+4. Na **Capacidade**, cada pessoa tem carga semanal e ausências (férias, feriados municipais); os nacionais o sistema calcula.
+5. Os números: **capacidade do mês** = dias úteis (sem sábado) x carga, menos ausências; **reservado** = previsão
+   dos clientes que a pessoa atende; **realizado** = horas dos check-ins; **ocupação** = reservado / capacidade.
+   Saem das funções do banco `consultores_por_ocupacao` e `consultorias_por_ocupacao`.
+
+Uma consultoria nunca vê clientes, horas ou nomes de outra. Desenho: `docs/superpowers/specs/2026-11-13-clientes-design.md`.
 
 ## Versões
 
@@ -46,7 +60,7 @@ npm run exemplo:local                            # consultoria de exemplo, só l
 ```
 
 Logins de exemplo (só no Docker local): `admin@exemplo.test`, `gestor@exemplo.test`, `ana@exemplo.test`
-e `bruno@exemplo.test`, todos com a senha `exemplo-123`.
+`bruno@exemplo.test` e `central@exemplo.test` (a central, fora das consultorias), todos com a senha `exemplo-123`.
 
 Abra http://localhost:5173. Embaixo do contador aparece "Banco: conectado…" quando o app fala com o Supabase.
 
