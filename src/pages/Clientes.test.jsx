@@ -1,14 +1,20 @@
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { apagarCliente, arquivarCliente, criarCliente, editarCliente, listarClientes, reativarCliente } from '@/data/clientes'
+import { consultoriasPorOcupacao, consultoresPorOcupacao } from '@/data/capacidade'
+import {
+  ajustarPrevisao, apagarCliente, arquivarCliente, criarCliente, editarCliente, escolherConsultor, listarClientes,
+  mandarParaConsultoria, reativarCliente,
+} from '@/data/clientes'
 import { renderizarTela } from '@/test/renderizar'
 import Clientes from './Clientes'
 
 vi.mock('@/data/clientes', () => ({
   listarClientes: vi.fn(), criarCliente: vi.fn(), editarCliente: vi.fn(),
   arquivarCliente: vi.fn(), reativarCliente: vi.fn(), apagarCliente: vi.fn(),
+  mandarParaConsultoria: vi.fn(), escolherConsultor: vi.fn(), ajustarPrevisao: vi.fn(),
 }))
+vi.mock('@/data/capacidade', () => ({ consultoriasPorOcupacao: vi.fn(), consultoresPorOcupacao: vi.fn() }))
 vi.mock('@/data/consultorias', () => ({ listarNomesDeConsultorias: vi.fn().mockResolvedValue([]) }))
 
 const base = {
@@ -25,7 +31,15 @@ const linha = (nome) => screen.getByRole('row', { name: new RegExp(nome) })
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listarClientes).mockResolvedValue({ itens: CLIENTES, total: 2 })
-  for (const f of [criarCliente, editarCliente, arquivarCliente, reativarCliente, apagarCliente]) {
+  vi.mocked(consultoriasPorOcupacao).mockResolvedValue({ itens: [
+    { id: 's1', nome: 'STI', capacidade: 100, reservado: 50, ocupacao: 0.5 },
+    { id: 's2', nome: 'Outra', capacidade: 100, reservado: 70, ocupacao: 0.7 },
+  ], total: 2 })
+  vi.mocked(consultoresPorOcupacao).mockResolvedValue({ itens: [
+    { id: 'p1', nome: 'Ana', capacidade: 100, reservado: 40, ocupacao: 0.4 },
+    { id: 'p2', nome: 'Beto', capacidade: 100, reservado: 60, ocupacao: 0.6 },
+  ], total: 2 })
+  for (const f of [criarCliente, editarCliente, arquivarCliente, reativarCliente, apagarCliente, mandarParaConsultoria, escolherConsultor, ajustarPrevisao]) {
     vi.mocked(f).mockResolvedValue({ erro: null })
   }
 })
@@ -157,5 +171,97 @@ describe('Clientes (outros papéis)', () => {
     renderizarTela(<Clientes />, { perfil: { id: 'p9', papel: 'pessoa', consultoria_id: 'x' } })
     await screen.findByRole('table', { name: 'Clientes' })
     expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'meus', consultorId: 'p9' }))
+  })
+})
+
+describe('Clientes: distribuir e escolher consultor', () => {
+  const gestor = { id: 'g1', papel: 'gestor', consultoria_id: 's1' }
+  const NA_CONSULTORIA = CLIENTES.map((c) => ({ ...c, consultoria_id: 's1', consultoria: { id: 's1', nome: 'STI' } }))
+
+  it('central: Mandar para consultoria abre a janela com a sugestão e confirma', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Mandar para consultoria' }))
+    const janela = await screen.findByRole('dialog', { name: 'Mandar Provedor Alfa para uma consultoria' })
+    await userEvent.click(within(janela).getByRole('radio', { name: /Outra/ }))
+    await userEvent.click(within(janela).getByRole('button', { name: 'Mandar para Outra' }))
+    expect(mandarParaConsultoria).toHaveBeenCalledWith('k1', 's2')
+  })
+
+  it('central: Mover aparece em Nas consultorias, com a consultoria atual marcada', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA, total: 2 })
+    renderizarTela(<Clientes />, { perfil: central })
+    await userEvent.click(await screen.findByRole('button', { name: 'Nas consultorias' }))
+    await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Mover' }))
+    const janela = await screen.findByRole('dialog', { name: 'Mover Provedor Alfa para outra consultoria' })
+    expect(await within(janela).findByText('Atual')).toBeInTheDocument()
+    await userEvent.click(within(janela).getByRole('button', { name: 'Mover para Outra' }))
+    expect(mandarParaConsultoria).toHaveBeenCalledWith('k1', 's2')
+  })
+
+  it('gestor: Aguardando mostra Novo e Escolher consultor chama escolherConsultor', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA, total: 2 })
+    renderizarTela(<Clientes />, { perfil: gestor })
+    const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    expect(within(alfa).getByText('Novo')).toBeInTheDocument()
+    await userEvent.click(within(alfa).getByRole('button', { name: 'Escolher consultor' }))
+    const janela = await screen.findByRole('dialog', { name: 'Escolher o consultor de Provedor Alfa' })
+    expect(consultoresPorOcupacao).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1' }))
+    await userEvent.click(await within(janela).findByRole('button', { name: 'Escolher Ana' }))
+    expect(escolherConsultor).toHaveBeenCalledWith('k1', 'p1')
+  })
+
+  it('gestor: Em atendimento tem Trocar consultor e Ajustar previsão, sem Novo', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA.map((c) => ({ ...c, consultor: { id: 'p9', nome: 'Zé', ativo: true } })), total: 2 })
+    renderizarTela(<Clientes />, { perfil: gestor })
+    await userEvent.click(await screen.findByRole('button', { name: 'Em atendimento' }))
+    const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    expect(within(alfa).queryByText('Novo')).not.toBeInTheDocument()
+    expect(within(alfa).getByRole('button', { name: 'Trocar consultor' })).toBeInTheDocument()
+    await userEvent.click(within(alfa).getByRole('button', { name: 'Ajustar previsão' }))
+    const janela = screen.getByRole('dialog', { name: /previsão/i })
+    const campo = within(janela).getByLabelText('Previsão de horas por mês')
+    expect(campo).toHaveValue('40')
+    await userEvent.clear(campo)
+    await userEvent.type(campo, '0')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
+    expect(ajustarPrevisao).not.toHaveBeenCalled()
+    expect(within(janela).getByText(/maior que zero/)).toBeInTheDocument()
+    await userEvent.clear(campo)
+    await userEvent.type(campo, '800')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
+    expect(ajustarPrevisao).not.toHaveBeenCalled()
+    await userEvent.clear(campo)
+    await userEvent.type(campo, '40,5')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
+    expect(ajustarPrevisao).toHaveBeenCalledWith('k1', 40.5)
+  })
+
+  it('pessoa não tem ações de distribuir, consultor ou previsão', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA, total: 2 })
+    renderizarTela(<Clientes />, { perfil: { id: 'p9', papel: 'pessoa', consultoria_id: 's1' } })
+    await screen.findByRole('table', { name: 'Clientes' })
+    for (const nome of ['Mandar para consultoria', 'Mover', 'Escolher consultor', 'Trocar consultor', 'Ajustar previsão']) {
+      expect(screen.queryByRole('button', { name: nome })).not.toBeInTheDocument()
+    }
+    expect(screen.queryByLabelText('Consultor')).not.toBeInTheDocument()
+  })
+
+  it('filtro Consultor: Sem consultor pede consultorId sem e volta para a página 1', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA, total: 31 })
+    renderizarTela(<Clientes />, { perfil: central })
+    await userEvent.click(await screen.findByRole('button', { name: 'Nas consultorias' }))
+    await userEvent.click(await screen.findByRole('button', { name: /Próxima/ }))
+    await userEvent.selectOptions(screen.getByLabelText('Consultor'), 'sem')
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ consultorId: 'sem', pagina: 1 }))
+  })
+
+  it('filtro Consultor: escolher uma pessoa na busca filtra por ela (consultoria do gestor)', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA, total: 2 })
+    renderizarTela(<Clientes />, { perfil: gestor })
+    await userEvent.click(await screen.findByRole('button', { name: 'Em atendimento' }))
+    await userEvent.selectOptions(await screen.findByLabelText('Consultor'), 'escolher')
+    expect(consultoresPorOcupacao).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1' }))
+    await userEvent.click(await screen.findByRole('radio', { name: /Beto/ }))
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ consultorId: 'p2', pagina: 1 }))
   })
 })

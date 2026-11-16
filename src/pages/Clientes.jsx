@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowRightLeft, Clock, Pencil, Plus, Search, Send, Trash2, UserCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
@@ -7,17 +7,24 @@ import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import FiltroConsultor from '@/components/clientes/FiltroConsultor'
 import FormularioCliente from '@/components/clientes/FormularioCliente'
+import JanelaConsultor from '@/components/clientes/JanelaConsultor'
+import JanelaMandar from '@/components/clientes/JanelaMandar'
+import JanelaPrevisao from '@/components/clientes/JanelaPrevisao'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { apagarCliente, arquivarCliente, criarCliente, editarCliente, listarClientes, reativarCliente } from '@/data/clientes'
+import {
+  ajustarPrevisao, apagarCliente, arquivarCliente, criarCliente, editarCliente, escolherConsultor, listarClientes,
+  mandarParaConsultoria, reativarCliente,
+} from '@/data/clientes'
 import { formatarCnpj } from '@/lib/cnpj'
 import { formatarHoras } from '@/lib/horas'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
 
-// Abas por papel. As ações de cada papel entram em ACOES_POR_PAPEL (as de admin, gestor e pessoa vêm depois).
+// Abas por papel. A pessoa ganha o check-in na tarefa seguinte.
 const ABAS_DA_CENTRAL = [['distribuir', 'A distribuir'], ['nas_consultorias', 'Nas consultorias'], ['arquivados', 'Arquivados']]
 const ABAS_DA_CONSULTORIA = [['aguardando', 'Aguardando consultor'], ['atendimento', 'Em atendimento']]
 const ABAS_DA_PESSOA = [['meus', 'Meus clientes']]
@@ -46,14 +53,56 @@ function Previsao({ cliente }) {
   )
 }
 
+const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
+
+// Ações da linha por papel: a central (e o dono) distribui e cuida do cadastro; admin e gestor escolhem o
+// consultor e ajustam a previsão; a pessoa não tem ações aqui.
+function AcoesDaLinha({ cliente, aba, central, gestao, abrir }) {
+  if (central) {
+    return (
+      <>
+        {aba === 'distribuir' && (
+          <Button variant="ghost" size="sm" onClick={() => abrir('mandar', cliente)}><Send /> Mandar para consultoria</Button>
+        )}
+        {aba === 'nas_consultorias' && (
+          <Button variant="ghost" size="sm" onClick={() => abrir('mandar', cliente)}><ArrowRightLeft /> Mover</Button>
+        )}
+        <Button variant="ghost" size="sm" onClick={() => abrir('formulario', cliente)}><Pencil /> Editar</Button>
+        {cliente.arquivado ? (
+          <Button variant="ghost" size="sm" onClick={() => abrir('reativar', cliente)}><ArchiveRestore /> Reativar</Button>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={() => abrir('arquivar', cliente)}><Archive /> Arquivar</Button>
+        )}
+        <Button variant="ghost" size="sm" onClick={() => abrir('apagar', cliente)} className={BOTAO_PERIGO}><Trash2 /> Apagar</Button>
+      </>
+    )
+  }
+  if (!gestao) return null
+  return (
+    <>
+      {aba === 'aguardando' && (
+        <Button variant="ghost" size="sm" onClick={() => abrir('consultor', cliente)}><UserCheck /> Escolher consultor</Button>
+      )}
+      {aba === 'atendimento' && (
+        <>
+          <Button variant="ghost" size="sm" onClick={() => abrir('consultor', cliente)}><ArrowRightLeft /> Trocar consultor</Button>
+          <Button variant="ghost" size="sm" onClick={() => abrir('previsao', cliente)}><Clock /> Ajustar previsão</Button>
+        </>
+      )}
+    </>
+  )
+}
+
 export default function Clientes() {
   const { perfil } = useAuth()
   const central = veTudo(perfil)
+  const gestao = !central && perfil.papel !== 'pessoa'
   const abas = abasDoPapel(perfil)
   const [aba, setAba] = useState(abas[0][0])
   const [busca, setBusca] = useState('')
   const buscaAtrasada = useAtraso(busca.trim(), 300)
   const [consultoriaId, setConsultoriaId] = useState('')
+  const [consultor, setConsultor] = useState({ valor: '', nome: null }) // '' = todos, 'sem' ou o id
   const [pagina, setPagina] = useState(1)
   const [resultado, setResultado] = useState(null)
   const [erro, setErro] = useState(null)
@@ -61,6 +110,12 @@ export default function Clientes() {
   const [formulario, setFormulario] = useState(null) // { cliente? }
   const [arquivando, setArquivando] = useState(null)
   const [apagando, setApagando] = useState(null)
+  const [mandando, setMandando] = useState(null)
+  const [escolhendo, setEscolhendo] = useState(null)
+  const [ajustando, setAjustando] = useState(null)
+  // O filtro de consultor só faz sentido onde já há consultor.
+  const mostraFiltroConsultor = perfil.papel !== 'pessoa' && aba !== 'distribuir' && aba !== 'aguardando'
+  const consultorFiltrado = mostraFiltroConsultor ? consultor.valor : ''
   const recarregar = () => setVersao((v) => v + 1)
 
   // Uma página por vez, filtrada e paginada no banco (regra "Escala" no CLAUDE.md).
@@ -70,7 +125,7 @@ export default function Clientes() {
       aba,
       busca: buscaAtrasada || undefined,
       consultoriaId: consultoriaId || undefined,
-      consultorId: aba === 'meus' ? perfil.id : undefined,
+      consultorId: aba === 'meus' ? perfil.id : consultorFiltrado || undefined,
       pagina,
     })
       .then((r) => {
@@ -83,10 +138,10 @@ export default function Clientes() {
     return () => {
       ativo = false
     }
-  }, [aba, buscaAtrasada, consultoriaId, pagina, versao, perfil.id])
+  }, [aba, buscaAtrasada, consultoriaId, consultorFiltrado, pagina, versao, perfil.id])
 
   // Qualquer mudança de filtro volta para a página 1.
-  const filtros = `${aba}|${buscaAtrasada}|${consultoriaId}`
+  const filtros = `${aba}|${buscaAtrasada}|${consultoriaId}|${consultorFiltrado}`
   const [filtrosAnteriores, setFiltrosAnteriores] = useState(filtros)
   if (filtros !== filtrosAnteriores) {
     setFiltrosAnteriores(filtros)
@@ -120,29 +175,41 @@ export default function Clientes() {
     return resposta
   }
 
-  // Ações da linha por papel. Admin, gestor e pessoa ganham as deles nas próximas tarefas.
-  function Acoes({ cliente }) {
-    if (!central) return null
-    return (
-      <>
-        <Button variant="ghost" size="sm" onClick={() => setFormulario({ cliente })}>
-          <Pencil /> Editar
-        </Button>
-        {cliente.arquivado ? (
-          <Button variant="ghost" size="sm" onClick={() => arquivarOuReativar(cliente)}>
-            <ArchiveRestore /> Reativar
-          </Button>
-        ) : (
-          <Button variant="ghost" size="sm" onClick={() => setArquivando(cliente)}>
-            <Archive /> Arquivar
-          </Button>
-        )}
-        <Button variant="ghost" size="sm" onClick={() => setApagando(cliente)}
-          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-          <Trash2 /> Apagar
-        </Button>
-      </>
-    )
+  function abrir(acao, cliente) {
+    if (acao === 'formulario') setFormulario({ cliente })
+    else if (acao === 'arquivar') setArquivando(cliente)
+    else if (acao === 'reativar') arquivarOuReativar(cliente)
+    else if (acao === 'apagar') setApagando(cliente)
+    else if (acao === 'mandar') setMandando(cliente)
+    else if (acao === 'consultor') setEscolhendo(cliente)
+    else if (acao === 'previsao') setAjustando(cliente)
+  }
+
+  async function mandar(cliente, consultoriaId, consultoria) {
+    const resposta = await mandarParaConsultoria(cliente.id, consultoriaId)
+    if (!resposta.erro) {
+      toast.success(`Cliente ${cliente.nome} ${cliente.consultoria ? 'movido' : 'enviado'} para ${consultoria.nome}.`)
+      recarregar()
+    }
+    return resposta
+  }
+
+  async function escolher(cliente, consultorId, pessoa) {
+    const resposta = await escolherConsultor(cliente.id, consultorId)
+    if (!resposta.erro) {
+      toast.success(`${pessoa.nome} é o consultor de ${cliente.nome}.`)
+      recarregar()
+    }
+    return resposta
+  }
+
+  async function ajustar(cliente, horas) {
+    const resposta = await ajustarPrevisao(cliente.id, horas)
+    if (!resposta.erro) {
+      toast.success(`Previsão de ${cliente.nome} ajustada.`)
+      recarregar()
+    }
+    return resposta
   }
 
   const clientes = resultado?.itens ?? null
@@ -174,7 +241,16 @@ export default function Clientes() {
           <Input type="search" aria-label="Buscar clientes" placeholder="Buscar por nome, cidade ou CNPJ" className="h-10 pl-9"
             value={busca} onChange={(e) => setBusca(e.target.value)} />
         </div>
-        {central && <div className="[&>div]:mb-0"><FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} /></div>}
+        {central && (
+          <div className="[&>div]:mb-0">
+            <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setConsultor({ valor: '', nome: null }) }} />
+          </div>
+        )}
+        {mostraFiltroConsultor && (
+          <FiltroConsultor valor={consultor.valor} nome={consultor.nome}
+            consultoriaId={central ? (consultoriaId || null) : perfil.consultoria_id}
+            aoMudar={(valor, nome) => setConsultor({ valor, nome })} />
+        )}
       </div>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!erro && clientes === null && <GraficoCarregando texto="Carregando os clientes…" className="py-12" />}
@@ -185,7 +261,10 @@ export default function Clientes() {
           {clientes.map((c) => (
             <Linha key={c.id}>
               <Celula>
-                <p className="font-semibold">{c.nome}</p>
+                <p className="flex items-center gap-2 font-semibold">
+                  {c.nome}
+                  {aba === 'aguardando' && <Badge variant="notice">Novo</Badge>}
+                </p>
                 {c.razao_social && <p className="truncate text-xs text-muted-foreground">{c.razao_social}</p>}
               </Celula>
               <Celula className="tabular-nums text-muted-foreground">{c.cnpj ? formatarCnpj(c.cnpj) : '—'}</Celula>
@@ -200,7 +279,7 @@ export default function Clientes() {
                   </>
                 ) : '—'}
               </Celula>
-              <CelulaAcoes><Acoes cliente={c} /></CelulaAcoes>
+              <CelulaAcoes><AcoesDaLinha cliente={c} aba={aba} central={central} gestao={gestao} abrir={abrir} /></CelulaAcoes>
             </Linha>
           ))}
         </Tabela>
@@ -208,6 +287,18 @@ export default function Clientes() {
       {formulario && (
         <FormularioCliente key={formulario.cliente?.id ?? 'novo'} aberto cliente={formulario.cliente}
           aoFechar={() => setFormulario(null)} aoSalvar={(dados) => salvar(formulario.cliente, dados)} />
+      )}
+      {mandando && (
+        <JanelaMandar key={mandando.id} aberto cliente={mandando} aoFechar={() => setMandando(null)}
+          aoMandar={(id, item) => mandar(mandando, id, item)} />
+      )}
+      {escolhendo && (
+        <JanelaConsultor key={escolhendo.id} aberto cliente={escolhendo} aoFechar={() => setEscolhendo(null)}
+          aoEscolher={(id, item) => escolher(escolhendo, id, item)} />
+      )}
+      {ajustando && (
+        <JanelaPrevisao key={ajustando.id} aberto cliente={ajustando} aoFechar={() => setAjustando(null)}
+          aoSalvar={(horas) => ajustar(ajustando, horas)} />
       )}
       {arquivando && (
         <ConfirmarAcao aberto aoFechar={() => setArquivando(null)} titulo={`Arquivar o cliente ${arquivando.nome}?`}
