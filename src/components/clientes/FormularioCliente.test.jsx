@@ -56,6 +56,15 @@ describe('FormularioCliente', () => {
     expect(aoSalvar).not.toHaveBeenCalled()
   })
 
+  it.each(['0', '-5'])('previsão %s não é aceita e não envia', async (valor) => {
+    const { aoSalvar } = abrir({ cliente: CLIENTE })
+    await userEvent.clear(screen.getByLabelText('Previsão de horas por mês'))
+    await userEvent.type(screen.getByLabelText('Previsão de horas por mês'), valor)
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(screen.getByText('Informe a previsão de horas por mês.')).toBeInTheDocument()
+    expect(aoSalvar).not.toHaveBeenCalled()
+  })
+
   it('erro devolvido por quem salva aparece e a janela continua', async () => {
     const aoSalvar = vi.fn().mockResolvedValue({ erro: 'Já existe um cliente com este CNPJ.' })
     const { aoFechar } = abrir({ cliente: CLIENTE, aoSalvar })

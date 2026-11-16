@@ -36,7 +36,7 @@ export default function FormularioCliente({ aberto, aoFechar, cliente, aoSalvar 
     evento.preventDefault()
     if (nome.trim().length < 2) return setErro('Use pelo menos 2 caracteres no nome.')
     if (cnpj.trim() !== '' && !cnpjValido(cnpj)) return setErro('CNPJ inválido.')
-    if (horas === '' || Number.isNaN(Number(horas)) || Number(horas) < 0) {
+    if (horas === '' || Number.isNaN(Number(horas)) || Number(horas) <= 0) {
       return setErro('Informe a previsão de horas por mês.')
     }
     setErro(null)
