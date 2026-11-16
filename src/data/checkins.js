@@ -1,7 +1,7 @@
 // Check-ins (horas atendidas). O banco confere quem pode, sobreposição, futuro e tamanho.
 import { traduzirErroBanco } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
-import { deslocarMes } from '@/lib/mes'
+import { limitesDoMesEmSP } from '@/lib/mes'
 import { buscarPagina } from './paginar'
 
 const TAMANHO_DO_BLOCO = 1000
@@ -76,13 +76,10 @@ export async function listarCheckins({ clienteId, consultorId, pagina = 1 } = {}
   return buscarPagina(consulta, pagina)
 }
 
-// Limites do mês no fuso de São Paulo (sem horário de verão desde 2019: sempre -03:00).
-const limitesDoMes = (mes) => [`${mes}T00:00:00-03:00`, `${deslocarMes(mes, 1)}T00:00:00-03:00`]
-
 // Todos os check-ins do cliente com início no mês, do mais antigo ao mais novo. Sem paginação na tela: busca em
 // blocos de 1000 (o limite da API) até acabar.
 export async function checkinsDoMes(clienteId, mes) {
-  const [de, ate] = limitesDoMes(mes)
+  const [de, ate] = limitesDoMesEmSP(mes)
   const itens = []
   for (let a = 0; ; a += TAMANHO_DO_BLOCO) {
     const { data, error } = await supabase

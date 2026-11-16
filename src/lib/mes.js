@@ -13,6 +13,36 @@ export function deslocarMes(mes, quantidade) {
   return `${data.getUTCFullYear()}-${String(data.getUTCMonth() + 1).padStart(2, '0')}-01`
 }
 
+// Deslocamento de São Paulo em relação a UTC naquele instante, em minutos (-180 para "GMT-03:00"), pelo fuso do
+// Intl: acompanha o horário de verão (o de 2018/2019 era -02:00) e qualquer mudança futura da regra.
+const DESLOCAMENTO = new Intl.DateTimeFormat('en-US', { timeZone: FUSO, timeZoneName: 'longOffset' })
+
+function deslocamentoEmSP(instante) {
+  const nome = DESLOCAMENTO.formatToParts(instante).find((p) => p.type === 'timeZoneName').value
+  const [, sinal, horas, minutos] = nome.match(/^GMT(?:([+-])(\d{2}):?(\d{2})?)?$/) ?? []
+  if (!sinal) return 0
+  return (sinal === '-' ? -1 : 1) * (Number(horas) * 60 + Number(minutos ?? 0))
+}
+
+const doisDigitos = (n) => String(n).padStart(2, '0')
+
+// Meia-noite de "YYYY-MM-DD" em São Paulo, como "YYYY-MM-DDT00:00:00-03:00". O deslocamento é o do instante da
+// meia-noite local: tenta o da meia-noite em UTC e confere de novo (na virada do horário de verão eles diferem).
+function meiaNoiteEmSP(dia) {
+  const meiaNoiteUtc = Date.parse(`${dia}T00:00:00Z`)
+  let deslocamento = deslocamentoEmSP(new Date(meiaNoiteUtc))
+  deslocamento = deslocamentoEmSP(new Date(meiaNoiteUtc - deslocamento * 60000))
+  const absoluto = Math.abs(deslocamento)
+  const sinal = deslocamento < 0 ? '-' : '+'
+  return `${dia}T00:00:00${sinal}${doisDigitos(Math.floor(absoluto / 60))}:${doisDigitos(absoluto % 60)}`
+}
+
+// Limites do mês "YYYY-MM-01" no fuso de São Paulo: [início do mês, início do mês seguinte), para filtrar
+// instantes (timestamptz) do mês com gte/lt.
+export function limitesDoMesEmSP(mes) {
+  return [meiaNoiteEmSP(mes.slice(0, 10)), meiaNoiteEmSP(deslocarMes(mes, 1))]
+}
+
 // "2026-11-01" -> "Novembro de 2026" (só a primeira letra maiúscula; o capitalize do CSS faria "Novembro De 2026").
 export function rotuloDoMes(mes) {
   const [ano, numero] = mes.split('-').map(Number)

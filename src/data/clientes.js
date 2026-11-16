@@ -3,7 +3,7 @@ import { traduzirErroBanco } from '@/lib/erros'
 import { normalizarCnpj } from '@/lib/cnpj'
 import { supabase } from '@/lib/supabase'
 import { padraoDeBusca } from '@/lib/busca'
-import { deslocarMes } from '@/lib/mes'
+import { limitesDoMesEmSP } from '@/lib/mes'
 import { buscarPagina, POR_PAGINA } from './paginar'
 
 const CAMPOS_DA_LISTA =
@@ -134,8 +134,7 @@ const EVENTOS_POR_PAGINA = 50
 const PAGINAS_DE_EVENTOS = 4
 
 export async function eventosDoMes(clienteId, mes) {
-  const de = `${mes}T00:00:00-03:00`
-  const ate = `${deslocarMes(mes, 1)}T00:00:00-03:00`
+  const [de, ate] = limitesDoMesEmSP(mes)
   const itens = []
   let total = 0
   for (let pagina = 0; pagina < PAGINAS_DE_EVENTOS; pagina++) {

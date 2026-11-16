@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { contarClientesAtivos, listarClientes } from './clientes'
+import { contarClientesAtivos, eventosDoMes, listarClientes } from './clientes'
 
-vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn() } }))
+vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 
 let banco
 beforeEach(() => {
@@ -60,5 +60,15 @@ describe('contarClientesAtivos', () => {
   it('erro do banco vira exceção', async () => {
     banco.resposta = { data: null, error: { code: '42501' }, count: null }
     await expect(contarClientesAtivos({ consultorId: 'p1' })).rejects.toEqual({ code: '42501' })
+  })
+})
+
+describe('eventosDoMes', () => {
+  it('pede o histórico entre os limites do mês em São Paulo (o deslocamento vem do fuso)', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: [], error: null })
+    await eventosDoMes('k1', '2018-12-01')
+    expect(supabase.rpc).toHaveBeenCalledWith('historico_do_cliente', expect.objectContaining({
+      p_cliente: 'k1', p_de: '2018-12-01T00:00:00-02:00', p_ate: '2019-01-01T00:00:00-02:00',
+    }))
   })
 })
