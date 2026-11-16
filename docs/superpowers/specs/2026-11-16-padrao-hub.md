@@ -1,5 +1,7 @@
 # Padrão Hub — referência para botões, formulários e abas (pedido do Diego, 16/11)
 
+Decisão do Diego (16/11): manter as cores da consultoria (azul, opção C); do Hub vem só o padrão de layout (formato dos botões, estrutura dos formulários e abas). Onde este texto diz "índigo" ou "<destaque>", use o azul da consultoria (`--primary`).
+
 Fonte: design system do Hub em `~/Documents/Karina/.claude/skills/hub-design/` (SKILL.md, references/botoes.md,
 campos.md, janelas.md, menus.md, cores-e-texto.md; assets/janela-modelo.jsx, pagina-modelo.jsx) e
 `~/Documents/Karina/src/index.css`. Screenshots em `~/Documents/Karina/.playwright-mcp/` (motivos-hub-form.png,
