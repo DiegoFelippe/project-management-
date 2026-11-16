@@ -5,42 +5,58 @@ export const POR_PAGINA_DE_OPCOES = 8
 
 // Opções de uma janela de escolha: busca que espera 300 ms e "Mostrar mais" (+8) sem perder o que já veio.
 // carregar({ busca, limite, deslocamento }) devolve { itens, total }.
+// Cada busca nova abre uma "geração": respostas de uma geração anterior (inicial ou de "mais") são descartadas.
 export function useOpcoes(carregar) {
   const [busca, setBusca] = useState('')
   const buscaAtrasada = useAtraso(busca.trim(), 300)
   const [estado, setEstado] = useState({ itens: null, total: 0, erro: null })
-  const [carregandoMais, setCarregandoMais] = useState(false)
+  const [maisDe, setMaisDe] = useState(null) // { busca } do "Mostrar mais" em andamento
+  const carregandoMais = maisDe?.busca === buscaAtrasada
   const carregarRef = useRef(carregar)
+  const geracao = useRef(0)
+  const itensAtuais = useRef(null)
   useEffect(() => {
     carregarRef.current = carregar
   })
 
   useEffect(() => {
-    let ativo = true
+    const minha = ++geracao.current
+    itensAtuais.current = null
     carregarRef.current({ busca: buscaAtrasada || undefined, limite: POR_PAGINA_DE_OPCOES, deslocamento: 0 })
-      .then((r) => ativo && setEstado({ itens: r.itens, total: r.total, erro: null }))
-      .catch(() => ativo && setEstado({ itens: [], total: 0, erro: 'Não foi possível carregar as opções.' }))
-    return () => {
-      ativo = false
-    }
+      .then((r) => {
+        if (minha !== geracao.current) return
+        itensAtuais.current = r.itens
+        setEstado({ itens: r.itens, total: r.total, erro: null })
+      })
+      .catch(() => {
+        if (minha !== geracao.current) return
+        itensAtuais.current = []
+        setEstado({ itens: [], total: 0, erro: 'Não foi possível carregar as opções.' })
+      })
   }, [buscaAtrasada])
 
-  const deslocamento = estado.itens?.length ?? 0
   const mostrarMais = useCallback(async () => {
-    setCarregandoMais(true)
+    const minha = geracao.current
+    const atuais = itensAtuais.current
+    if (!atuais) return
+    const marca = { busca: buscaAtrasada }
+    setMaisDe(marca)
     try {
       const r = await carregarRef.current({
         busca: buscaAtrasada || undefined,
         limite: POR_PAGINA_DE_OPCOES,
-        deslocamento,
+        deslocamento: atuais.length,
       })
-      setEstado((e) => ({ itens: [...(e.itens ?? []), ...r.itens], total: r.total, erro: null }))
+      if (minha !== geracao.current) return
+      const vistos = new Set(itensAtuais.current.map((i) => i.id))
+      itensAtuais.current = [...itensAtuais.current, ...r.itens.filter((i) => !vistos.has(i.id))]
+      setEstado({ itens: itensAtuais.current, total: r.total, erro: null })
     } catch {
-      setEstado((e) => ({ ...e, erro: 'Não foi possível carregar mais opções.' }))
+      if (minha === geracao.current) setEstado((e) => ({ ...e, erro: 'Não foi possível carregar mais opções.' }))
     } finally {
-      setCarregandoMais(false)
+      setMaisDe((m) => (m === marca ? null : m))
     }
-  }, [buscaAtrasada, deslocamento])
+  }, [buscaAtrasada])
 
   return { busca, setBusca, ...estado, carregandoMais, mostrarMais }
 }

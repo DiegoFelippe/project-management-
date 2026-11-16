@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Aviso } from '@/components/auth/TelaDeAcesso'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,7 +11,7 @@ import { rotuloDeOcupacao } from './rotulos'
 import { useOpcoes } from './useOpcoes'
 
 function Busca({ consultoriaId, valor, aoEscolher }) {
-  const { busca, setBusca, itens, total, carregandoMais, mostrarMais } =
+  const { busca, setBusca, itens, total, erro, carregandoMais, mostrarMais } =
     useOpcoes((parametros) => consultoresPorOcupacao({ ...parametros, consultoriaId: consultoriaId ?? null }))
   return (
     <>
@@ -20,7 +21,8 @@ function Busca({ consultoriaId, valor, aoEscolher }) {
           value={busca} onChange={(e) => setBusca(e.target.value)} />
       </div>
       {itens === null && <p className="text-sm text-muted-foreground">Carregando…</p>}
-      {itens?.length === 0 && <p className="text-sm text-muted-foreground">Nenhum consultor encontrado.</p>}
+      {erro && <Aviso>{erro}</Aviso>}
+      {itens?.length === 0 && !erro && <p className="text-sm text-muted-foreground">Nenhum consultor encontrado.</p>}
       {itens?.length > 0 && (
         <ListaDeOcupacao itens={itens} total={total} escolhido={valor} semSugestao rotuloDoValor={rotuloDeOcupacao}
           carregandoMais={carregandoMais} aoEscolher={aoEscolher} aoMostrarMais={mostrarMais} />
