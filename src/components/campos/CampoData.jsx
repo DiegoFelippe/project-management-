@@ -95,7 +95,7 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
       </button>
 
       {aberto && (
-        <Flutuante ancora={gatilho} aoFechar={() => setAberto(false)} largura={LARGURA} altura={comHora ? 420 : 370} rotulo="Escolher data" className="p-3">
+        <Flutuante ancora={gatilho} aoFechar={() => setAberto(false)} aoAbrir={() => grade.current?.querySelector('[tabindex="0"]')?.focus()} largura={LARGURA} altura={comHora ? 420 : 370} rotulo="Escolher data" className="p-3">
           <div className="mb-2 flex items-center gap-1">
             <BotaoCampo onClick={() => mover(-1)} aria-label={nomeSeta(-1)} className="text-muted-foreground hover:bg-accent grid size-8 place-items-center rounded-lg"><ChevronLeft className="size-4" aria-hidden="true" /></BotaoCampo>
             <div className="flex flex-1 items-center justify-center gap-1">

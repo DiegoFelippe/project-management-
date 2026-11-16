@@ -28,6 +28,16 @@ describe('CampoHora', () => {
     expect(aoMudar).toHaveBeenLastCalledWith('14:45')
   })
 
+  it('ao abrir, leva a hora e o minuto escolhidos para a vista', async () => {
+    const rolar = vi.fn()
+    Element.prototype.scrollIntoView = rolar
+    render(<Controlado inicial="14:30" />)
+    await userEvent.click(screen.getByRole('button', { name: /14:30/ }))
+    expect(rolar).toHaveBeenCalledTimes(2)
+    expect(rolar.mock.contexts.map((b) => b.textContent)).toEqual(['14', '30'])
+    delete Element.prototype.scrollIntoView
+  })
+
   it('os minutos seguem o passo', async () => {
     render(<Controlado inicial="08:00" passo={15} />)
     await userEvent.click(screen.getByRole('button', { name: /08:00/ }))

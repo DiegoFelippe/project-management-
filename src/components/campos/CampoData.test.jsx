@@ -37,15 +37,23 @@ describe('CampoData', () => {
     expect(screen.getByRole('button', { name: '15 de novembro de 2026' })).toBeEnabled()
   })
 
-  it('navega entre meses e as setas do teclado movem o dia', async () => {
-    const aoMudar = vi.fn()
-    render(<Controlado inicial="2026-11-30" aoMudar={aoMudar} />)
+  it('navega entre meses', async () => {
+    render(<Controlado inicial="2026-11-30" />)
     await userEvent.click(screen.getByRole('button', { name: /30 de nov/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }))
     expect(screen.getByRole('button', { name: '15 de dezembro de 2026' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
-    screen.getByRole('button', { name: '30 de novembro de 2026' }).focus()
-    await userEvent.keyboard('{ArrowRight}{Enter}')
+    expect(screen.getByRole('button', { name: '15 de novembro de 2026' })).toBeInTheDocument()
+  })
+
+  it('ao abrir o foco vai para o dia escolhido e as setas do teclado movem o dia', async () => {
+    const aoMudar = vi.fn()
+    render(<Controlado inicial="2026-11-30" aoMudar={aoMudar} />)
+    await userEvent.click(screen.getByRole('button', { name: /30 de nov/ }))
+    expect(screen.getByRole('button', { name: '30 de novembro de 2026' })).toHaveFocus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByRole('button', { name: '1 de dezembro de 2026' })).toHaveFocus()
+    await userEvent.keyboard('{Enter}')
     expect(aoMudar).toHaveBeenCalledWith('2026-12-01')
   })
 

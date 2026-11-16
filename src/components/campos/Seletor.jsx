@@ -54,7 +54,8 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
     if (desabilitado) return
     setTermo('')
     setRemoto(null)
-    setAtivo(-1)
+    const i = opcoes.findIndex((o) => String(o.valor) === String(valor ?? ''))
+    setAtivo(i < 0 ? -1 : i + (todos && i >= 0 ? 1 : 0))
     setAberto(true)
   }
 

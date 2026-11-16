@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Clock, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Flutuante, { BotaoCampo } from './Flutuante'
@@ -32,9 +32,7 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
   const minutos = atual && !base.includes(atual.m) ? [...base, atual.m].sort() : base
 
   // Leva a hora e o minuto escolhidos para o meio das colunas ao abrir.
-  useLayoutEffect(() => {
-    if (aberto) colunas.current?.querySelectorAll('[aria-pressed="true"]').forEach((b) => b.scrollIntoView?.({ block: 'center' }))
-  }, [aberto])
+  const centralizar = () => colunas.current?.querySelectorAll('[aria-pressed="true"]').forEach((b) => b.scrollIntoView?.({ block: 'center' }))
 
   function confirmarDigitado() {
     const digitos = digitado.replace(/\D/g, '')
@@ -65,7 +63,7 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
       </button>
 
       {aberto && (
-        <Flutuante ancora={gatilho} aoFechar={() => setAberto(false)} largura={LARGURA} altura={330} rotulo="Escolher horário" className="p-3">
+        <Flutuante ancora={gatilho} aoFechar={() => setAberto(false)} aoAbrir={centralizar} largura={LARGURA} altura={330} rotulo="Escolher horário" className="p-3">
           <input value={digitado} onChange={(e) => setDigitado(e.target.value.replace(/[^\d:]/g, '').slice(0, 5))} inputMode="numeric" aria-label="Digitar horário"
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmarDigitado() } }} onBlur={confirmarDigitado}
             placeholder={atual ? `${atual.h}:${atual.m}` : 'Digite, ex.: 1330'} className="input mb-2.5 py-1.5 text-[12.5px] tabular-nums" />

@@ -54,6 +54,17 @@ describe('Seletor', () => {
     expect(screen.queryByRole('listbox')).toBeNull()
   })
 
+  it('ao abrir, a opção escolhida já é a ativa e entra na vista', async () => {
+    const rolar = vi.fn()
+    Element.prototype.scrollIntoView = rolar
+    render(<Controlado inicial="b" />)
+    await userEvent.click(screen.getByRole('button'))
+    expect(rolar.mock.contexts.at(-1).textContent).toMatch(/Bruno Lima/)
+    await userEvent.keyboard('{ArrowDown}{Enter}')
+    delete Element.prototype.scrollIntoView
+    expect(screen.getByRole('button')).toHaveTextContent('Carla Dias')
+  })
+
   it('rotuloTodos oferece a opção vazia', async () => {
     const aoMudar = vi.fn()
     render(<Controlado inicial="a" aoMudar={aoMudar} rotuloTodos="Todos os consultores" tamanho="sm" />)

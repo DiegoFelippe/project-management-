@@ -22,10 +22,11 @@ export function BotaoCampo({ className, ...props }) {
 
 // `ancora`: ref do botão do campo. `aoFechar` roda no clique fora, no Esc (só a lista de cima fecha) e
 // quando a janela de baixo some.
-export default function Flutuante({ ancora, aoFechar, largura, altura, alargar = false, role = 'dialog', rotulo, className, children, ...resto }) {
+export default function Flutuante({ ancora, aoFechar, largura, altura, alargar = false, aoAbrir, role = 'dialog', rotulo, className, children, ...resto }) {
   const lista = useRef(null)
   const fechar = useRef(aoFechar)
-  useEffect(() => { fechar.current = aoFechar })
+  useEffect(() => { fechar.current = aoFechar; abrir.current = aoAbrir })
+  const abrir = useRef(aoAbrir)
   const [lugar, setLugar] = useState(null) // { janela, posicao }: só depois de medir o campo
 
   useLayoutEffect(() => {
@@ -61,6 +62,10 @@ export default function Flutuante({ ancora, aoFechar, largura, altura, alargar =
       window.removeEventListener('keydown', tecla, true)
     }
   }, [ancora])
+
+  // A lista só existe depois de medir o campo: foco e rolagem iniciais rodam aqui, com ela já montada.
+  const pronta = !!lugar
+  useEffect(() => { if (pronta) abrir.current?.(lista.current) }, [pronta])
 
   if (!lugar) return null
   return createPortal(
