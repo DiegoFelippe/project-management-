@@ -14,6 +14,7 @@ import NovoTime from '@/components/times/NovoTime'
 import { Button } from '@/components/ui/button'
 import { listarPessoas } from '@/data/pessoas'
 import { apagarTime, criarTime, editarTime, listarTimes } from '@/data/times'
+import { veTudo } from '@/lib/papeis'
 
 // Rostos: o gestor e os primeiros membros (amostra que vem do banco); o número é o total contado no banco.
 function Rostos({ time }) {
@@ -39,7 +40,7 @@ function Rostos({ time }) {
 
 export default function Times() {
   const { perfil } = useAuth()
-  const ehDono = perfil.papel === 'dono'
+  const ehDono = veTudo(perfil)
   const [consultoriaId, setConsultoriaId] = useState(ehDono ? '' : perfil.consultoria_id)
   const [resultado, setResultado] = useState(null)
   const [pagina, setPagina] = useState(1)

@@ -1,4 +1,4 @@
-import { Pencil, Plus, Send, UserCheck, UserX } from 'lucide-react'
+import { Pencil, Plus, Send, UserCheck, UserX, Landmark } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
@@ -16,6 +16,7 @@ import NovoAcesso from '@/components/usuarios/NovoAcesso'
 import { tirarFoto, trocarFoto } from '@/data/imagens'
 import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
+import { veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
 
 const COR_DA_SITUACAO = {
@@ -27,7 +28,8 @@ const COR_DA_SITUACAO = {
 
 export default function Usuarios() {
   const { perfil } = useAuth()
-  const ehDono = perfil.papel === 'dono'
+  const ehDono = veTudo(perfil)
+  const ehAdminGeral = perfil.papel === 'dono'
   const [consultoriaId, setConsultoriaId] = useState(ehDono ? '' : perfil.consultoria_id)
   const [resultado, setResultado] = useState(null)
   const [pagina, setPagina] = useState(1)
@@ -71,10 +73,14 @@ export default function Usuarios() {
 
   // Quem mexe em quem (as Edge Functions conferem de novo): dono → administradores; administrador →
   // gestores e pessoas; gestor → só o nome e os times dele das pessoas que vê. Ninguém mexe em si mesmo.
+  const papeisQueGerencio = ehAdminGeral ? ['admin', 'central'] : ['admin']
   const podeEditar = (p) =>
     p.id !== perfil.id &&
-    (ehDono ? p.papel === 'admin' : perfil.papel === 'admin' ? p.papel !== 'admin' : p.papel === 'pessoa')
-  const podeDesativar = (p) => p.id !== perfil.id && (ehDono ? p.papel === 'admin' : perfil.papel === 'admin' && p.papel !== 'admin')
+    (ehDono ? papeisQueGerencio.includes(p.papel) : perfil.papel === 'admin' ? p.papel !== 'admin' : p.papel === 'pessoa')
+  const podeDesativar = (p) =>
+    p.id !== perfil.id && (ehDono ? papeisQueGerencio.includes(p.papel) : perfil.papel === 'admin' && p.papel !== 'admin')
+  // Só o administrador geral move para a central (admin, gestor ou pessoa ativos).
+  const podeMover = (p) => ehAdminGeral && p.id !== perfil.id && p.ativo !== false && ['admin', 'gestor', 'pessoa'].includes(p.papel)
 
   async function salvarEdicao(pessoa, { nome, papel, timesAdicionar, timesRemover, foto }) {
     const mudancas = {}
@@ -105,6 +111,15 @@ export default function Usuarios() {
     const resposta = await gerenciarAcesso(acao, pessoa.id)
     if (!resposta.erro) {
       toast.success(acao === 'desativar' ? `${pessoa.nome} foi desativado.` : `${pessoa.nome} foi reativado.`)
+      recarregar()
+    }
+    return resposta
+  }
+
+  async function moverParaCentral(pessoa) {
+    const resposta = await gerenciarAcesso('mover_para_central', pessoa.id)
+    if (!resposta.erro) {
+      toast.success(`${pessoa.nome} agora é da central.`)
       recarregar()
     }
     return resposta
@@ -145,7 +160,7 @@ export default function Usuarios() {
     <>
       <Cabecalho titulo="Usuários"
         descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'pessoa' : 'pessoas'}` : null}>
-        {!ehDono && (
+        {(!ehDono || ehAdminGeral) && (
           <Button onClick={() => setNovo(true)}>
             <Plus /> Novo acesso
           </Button>
@@ -168,7 +183,7 @@ export default function Usuarios() {
         <ListaVazia>{filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}</ListaVazia>
       )}
       {lista.length > 0 && (
-        <Tabela rotulo="Usuários" colunas={['Nome', 'Papel', 'Times', 'Situação']}
+        <Tabela rotulo="Usuários" colunas={ehDono ? ['Nome', 'Papel', 'Consultoria', 'Times', 'Situação'] : ['Nome', 'Papel', 'Times', 'Situação']}
           paginacao={{ pagina, total, aoMudar: setPagina }}>
           {lista.map((p) => {
             const s = situacao(p)
@@ -185,6 +200,7 @@ export default function Usuarios() {
                   </div>
                 </Celula>
                 <Celula className="text-muted-foreground">{NOME_DO_PAPEL[p.papel]}</Celula>
+                {ehDono && <Celula className="text-muted-foreground">{p.consultoria?.nome ?? '—'}</Celula>}
                 <Celula>
                   <div className="flex flex-wrap gap-1">
                     {timesVisiveis.length === 0 && <span className="text-muted-foreground">—</span>}
@@ -206,7 +222,12 @@ export default function Usuarios() {
                       {p.ativo === false ? <><UserCheck /> Reativar</> : <><UserX /> Desativar</>}
                     </Button>
                   )}
-                  {p.convite_pendente && p.ativo !== false && !ehDono && (
+                  {podeMover(p) && (
+                    <Button variant="ghost" size="sm" onClick={() => setConfirmando({ pessoa: p, acao: 'mover' })}>
+                      <Landmark /> Mover para a central
+                    </Button>
+                  )}
+                  {p.convite_pendente && p.ativo !== false && (!ehDono || podeEditar(p)) && (
                     <Button variant="ghost" size="sm" disabled={reenviando === p.id} onClick={() => reenviar(p)}>
                       <Send /> Reenviar convite
                     </Button>
@@ -223,15 +244,19 @@ export default function Usuarios() {
       )}
       {confirmando && (
         <ConfirmarAcao aberto aoFechar={() => setConfirmando(null)} perigo={confirmando.acao === 'desativar'}
-          titulo={confirmando.acao === 'desativar' ? `Desativar ${confirmando.pessoa.nome}?` : `Reativar ${confirmando.pessoa.nome}?`}
-          descricao={confirmando.acao === 'desativar'
-            ? 'A pessoa não entra mais e some das listas de ativos. Nada é apagado: os times e o histórico ficam, e dá para reativar depois.'
-            : 'A pessoa volta a entrar, do jeito que estava antes de ser desativada.'}
-          rotuloConfirmar={confirmando.acao === 'desativar' ? 'Desativar' : 'Reativar'}
-          aoConfirmar={() => mudarAtivo(confirmando.pessoa, confirmando.acao)} />
+          titulo={confirmando.acao === 'mover' ? `Mover ${confirmando.pessoa.nome} para a central?`
+            : confirmando.acao === 'desativar' ? `Desativar ${confirmando.pessoa.nome}?` : `Reativar ${confirmando.pessoa.nome}?`}
+          descricao={confirmando.acao === 'mover'
+            ? 'A pessoa sai da consultoria e dos times, passa a ver todas as consultorias e pode criar consultorias e cadastrar clientes. Só dá para desfazer criando um acesso novo.'
+            : confirmando.acao === 'desativar'
+              ? 'A pessoa não entra mais e some das listas de ativos. Nada é apagado: os times e o histórico ficam, e dá para reativar depois.'
+              : 'A pessoa volta a entrar, do jeito que estava antes de ser desativada.'}
+          rotuloConfirmar={confirmando.acao === 'mover' ? 'Mover para a central' : confirmando.acao === 'desativar' ? 'Desativar' : 'Reativar'}
+          aoConfirmar={() => (confirmando.acao === 'mover' ? moverParaCentral(confirmando.pessoa) : mudarAtivo(confirmando.pessoa, confirmando.acao))} />
       )}
-      {!ehDono && (
+      {(!ehDono || ehAdminGeral) && (
         <NovoAcesso aberto={novo} aoFechar={() => setNovo(false)} papelDeQuemCria={perfil.papel} times={times}
+          consultoriaId={consultoriaId}
           aoCriar={criar} aoColocarNosTimes={colocarNosTimes} />
       )}
     </>

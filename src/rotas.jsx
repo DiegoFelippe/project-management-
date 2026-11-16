@@ -22,12 +22,12 @@ export default function Rotas() {
         <Route path="/trocar-senha" element={<TrocarSenha />} />
         <Route element={<Moldura />}>
           <Route path="/" element={<Inicio />} />
-          <Route element={<RotaProtegida papeis={['dono', 'admin', 'gestor']} />}>
+          <Route element={<RotaProtegida papeis={['dono', 'central', 'admin', 'gestor']} />}>
             <Route path="/times" element={<Times />} />
             <Route path="/times/:id" element={<Time />} />
             <Route path="/usuarios" element={<Usuarios />} />
           </Route>
-          <Route element={<RotaProtegida papeis={['dono']} />}>
+          <Route element={<RotaProtegida papeis={['dono', 'central']} />}>
             <Route path="/consultorias" element={<Consultorias />} />
           </Route>
           <Route element={<RotaProtegida papeis={['dono', 'admin']} />}>

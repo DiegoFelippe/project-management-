@@ -8,14 +8,18 @@ import { Label } from '@/components/ui/label'
 import { SelectNativo } from '@/components/ui/select-nativo'
 import { cn } from '@/lib/utils'
 
-// Quem cria o quê: gestor → pessoa; administrador → pessoa ou gestor; dono → administrador.
+// Quem cria o quê: gestor → pessoa; administrador → pessoa ou gestor; dono → administrador ou central; central → administrador.
 const PAPEIS_POR_QUEM_CRIA = {
   gestor: [{ valor: 'pessoa', rotulo: 'Pessoa' }],
   admin: [
     { valor: 'pessoa', rotulo: 'Pessoa' },
     { valor: 'gestor', rotulo: 'Gestor' },
   ],
-  dono: [{ valor: 'admin', rotulo: 'Administrador' }],
+  dono: [
+    { valor: 'admin', rotulo: 'Administrador' },
+    { valor: 'central', rotulo: 'Central' },
+  ],
+  central: [{ valor: 'admin', rotulo: 'Administrador' }],
 }
 
 
@@ -23,7 +27,7 @@ const vazio = (papel) => ({ forma: 'convite', nome: '', email: '', papel, times:
 
 export default function NovoAcesso({ aberto, aoFechar, papelDeQuemCria, times = [], consultoriaId, aoCriar, aoColocarNosTimes }) {
   const papeis = PAPEIS_POR_QUEM_CRIA[papelDeQuemCria] ?? []
-  const escolheTimes = papelDeQuemCria !== 'dono'
+  const escolheTimes = papelDeQuemCria !== 'dono' && papelDeQuemCria !== 'central'
   const [dados, setDados] = useState(() => vazio(papeis[0]?.valor))
   const [erros, setErros] = useState({})
   const [erro, setErro] = useState(null)
@@ -56,6 +60,7 @@ export default function NovoAcesso({ aberto, aoFechar, papelDeQuemCria, times = 
   async function enviar(evento) {
     evento.preventDefault()
     if (enviando || !validar()) return
+    if (!escolheTimes && dados.papel === 'admin' && !consultoriaId) return setErro('Escolha uma consultoria no filtro da tela para criar o administrador.')
     setErro(null)
     setJaExiste(null)
     setEnviando(true)
@@ -67,7 +72,7 @@ export default function NovoAcesso({ aberto, aoFechar, papelDeQuemCria, times = 
       times: escolheTimes ? dados.times : [],
     }
     if (dados.forma === 'senha') pedido.senha = dados.senha
-    if (papelDeQuemCria === 'dono') pedido.consultoria_id = consultoriaId
+    if (!escolheTimes && dados.papel === 'admin') pedido.consultoria_id = consultoriaId
     const resposta = await aoCriar(pedido)
     setEnviando(false)
     if (resposta?.codigo === 'ja_na_consultoria') {
@@ -91,7 +96,7 @@ export default function NovoAcesso({ aberto, aoFechar, papelDeQuemCria, times = 
     <Dialog open={aberto} onOpenChange={(abrir) => !abrir && fechar()}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{papelDeQuemCria === 'dono' ? 'Novo administrador' : 'Novo acesso'}</DialogTitle>
+          <DialogTitle>{papelDeQuemCria === 'central' ? 'Novo administrador' : 'Novo acesso'}</DialogTitle>
           <DialogDescription>
             {dados.forma === 'convite'
               ? 'A pessoa recebe um e-mail para criar a senha (ou entrar com o Google, se o e-mail for o mesmo).'

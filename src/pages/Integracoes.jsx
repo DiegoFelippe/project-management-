@@ -23,6 +23,7 @@ import {
   salvarIntegracao,
   testarIntegracao,
 } from '@/data/integracoes'
+import { veTudo } from '@/lib/papeis'
 
 const INTEGRACOES = [
   { tipo: 'ia', nome: 'Inteligência artificial', descricao: 'Claude (Anthropic) ou OpenAI, para os recursos de IA.', icone: Sparkles },
@@ -53,7 +54,7 @@ function avisarResultado(resposta, sucesso) {
 
 export default function Integracoes() {
   const { perfil } = useAuth()
-  const ehDono = perfil.papel === 'dono'
+  const ehDono = veTudo(perfil)
   const [consultoriaId, setConsultoriaId] = useState(ehDono ? '' : perfil.consultoria_id)
   const [integracoes, setIntegracoes] = useState(null)
   const [erro, setErro] = useState(null)

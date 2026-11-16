@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ANIMACOES_DO_MENU, itensDoMenu, tituloDaRota } from './menu'
+import { ANIMACOES_DO_MENU, NOME_DO_PAPEL, itensDoMenu, tituloDaRota } from './menu'
 
 const ids = (papel) => itensDoMenu(papel).map((item) => item.id)
 
@@ -8,11 +8,19 @@ describe('itensDoMenu', () => {
     expect(ids('pessoa')).toEqual(['inicio', 'projetos'])
     expect(ids('gestor')).toEqual(['inicio', 'projetos', 'times', 'usuarios'])
     expect(ids('admin')).toEqual(['inicio', 'projetos', 'times', 'usuarios', 'integracoes'])
+    expect(ids('central')).toEqual(['inicio', 'projetos', 'times', 'usuarios', 'consultorias'])
     expect(ids('dono')).toEqual(['inicio', 'projetos', 'times', 'usuarios', 'consultorias', 'integracoes'])
   })
 
   it('projetos ainda está em breve', () => {
     expect(itensDoMenu('gestor').find((item) => item.id === 'projetos').emBreve).toBe(true)
+  })
+})
+
+describe('NOME_DO_PAPEL', () => {
+  it('o dono é o Administrador geral', () => {
+    expect(NOME_DO_PAPEL.dono).toBe('Administrador geral')
+    expect(NOME_DO_PAPEL.central).toBe('Central')
   })
 })
 

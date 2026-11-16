@@ -5,6 +5,7 @@ import { buscarPagina } from './paginar'
 
 const CAMPOS =
   'id, nome, email, foto, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ativo, ' +
+  'consultoria:consultorias(nome), ' +
   'times:time_membros!time_membros_pessoa_id_fkey(time:times(id, nome))'
 
 const redirectTo = () => `${window.location.origin}/definir-senha`
@@ -35,7 +36,7 @@ export async function reenviarConvite(pessoaId) {
   return { erro: status === 200 ? null : traduzirErroFuncao(corpo.codigo) }
 }
 
-// editar ({ nome?, papel? }), desativar ou reativar (Edge Function gerenciar-acesso).
+// editar ({ nome?, papel? }), desativar, reativar ou mover_para_central (Edge Function gerenciar-acesso).
 export async function gerenciarAcesso(acao, pessoaId, extra = {}) {
   const { status, corpo } = await chamarFuncao('gerenciar-acesso', { acao, pessoa_id: pessoaId, ...extra })
   return { erro: status === 200 ? null : traduzirErroFuncao(corpo.codigo) }

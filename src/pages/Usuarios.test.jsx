@@ -64,4 +64,47 @@ describe('Usuários', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Desativados' }))
     expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: false, pagina: 1 })
   })
+
+  describe('central e administrador geral', () => {
+    const LINHAS = {
+      itens: [
+        { id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'admin', ativo: true, times: [], consultoria: { nome: 'Acme' } },
+        { id: 'p2', nome: 'Cida', email: 'cida@x.test', papel: 'central', ativo: true, times: [], consultoria: null },
+      ],
+      total: 2,
+    }
+    beforeEach(() => {
+      vi.mocked(listarUsuarios).mockResolvedValue(LINHAS)
+      vi.mocked(gerenciarAcesso).mockResolvedValue({ erro: null })
+    })
+    const botoes = (nome) => within(screen.getByRole('row', { name: nome })).queryByRole('button', { name: /Mover para a central/ })
+
+    it('o dono move um administrador para a central, depois de confirmar', async () => {
+      renderizarTela(<Usuarios />, { perfil: { id: 'd1', papel: 'dono', consultoria_id: null } })
+      await userEvent.click(await within(await screen.findByRole('row', { name: /Ana/ })).findByRole('button', { name: /Mover para a central/ }))
+      const janela = screen.getByRole('alertdialog')
+      expect(janela).toHaveTextContent(/sai da consultoria e dos times/)
+      expect(gerenciarAcesso).not.toHaveBeenCalled()
+      await userEvent.click(within(janela).getByRole('button', { name: 'Mover para a central' }))
+      expect(gerenciarAcesso).toHaveBeenCalledWith('mover_para_central', 'p1')
+    })
+
+    it('o dono edita e desativa a pessoa da central, que mostra consultoria —', async () => {
+      renderizarTela(<Usuarios />, { perfil: { id: 'd1', papel: 'dono', consultoria_id: null } })
+      const linha = await screen.findByRole('row', { name: /Cida/ })
+      expect(within(linha).getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+      expect(within(linha).getByRole('button', { name: 'Desativar' })).toBeInTheDocument()
+      expect(botoes(/Cida/)).toBeNull()
+    })
+
+    it('a central só edita e desativa administradores, não move, e vê o filtro de consultoria', async () => {
+      renderizarTela(<Usuarios />, { perfil: { id: 'c9', papel: 'central', consultoria_id: null } })
+      const ana = await screen.findByRole('row', { name: /Ana/ })
+      expect(within(ana).getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+      expect(within(ana).getByRole('button', { name: 'Desativar' })).toBeInTheDocument()
+      expect(botoes(/Ana/)).toBeNull()
+      expect(within(screen.getByRole('row', { name: /Cida/ })).queryByRole('button', { name: 'Editar' })).toBeNull()
+      expect(screen.getByLabelText('Consultoria')).toBeInTheDocument()
+    })
+  })
 })

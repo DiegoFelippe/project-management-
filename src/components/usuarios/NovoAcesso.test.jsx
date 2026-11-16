@@ -39,9 +39,9 @@ describe('NovoAcesso', () => {
     expect(opcoesDoPapel()).toEqual(['Pessoa', 'Gestor'])
   })
 
-  it('dono cria administrador, sem times', async () => {
+  it('dono cria administrador ou central, sem times', async () => {
     const { aoCriar } = montar({ papelDeQuemCria: 'dono', consultoriaId: 'c1', times: [] })
-    expect(opcoesDoPapel()).toEqual(['Administrador'])
+    expect(opcoesDoPapel()).toEqual(['Administrador', 'Central'])
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Nome'), 'Rita Alves')
     await userEvent.type(screen.getByLabelText('E-mail'), 'rita@acme.com.br')
@@ -49,6 +49,26 @@ describe('NovoAcesso', () => {
     expect(aoCriar).toHaveBeenCalledWith(
       expect.objectContaining({ papel: 'admin', times: [], consultoria_id: 'c1' }),
     )
+  })
+
+  it('dono criando central não manda consultoria', async () => {
+    const { aoCriar } = montar({ papelDeQuemCria: 'dono', consultoriaId: 'c1', times: [] })
+    await userEvent.selectOptions(screen.getByLabelText('Papel'), 'central')
+    await userEvent.type(screen.getByLabelText('Nome'), 'Rita Alves')
+    await userEvent.type(screen.getByLabelText('E-mail'), 'rita@acme.com.br')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
+    const pedido = aoCriar.mock.calls[0][0]
+    expect(pedido.papel).toBe('central')
+    expect(pedido).not.toHaveProperty('consultoria_id')
+  })
+
+  it('central cria só administrador, na consultoria escolhida', async () => {
+    const { aoCriar } = montar({ papelDeQuemCria: 'central', consultoriaId: 'c1', times: [] })
+    expect(opcoesDoPapel()).toEqual(['Administrador'])
+    await userEvent.type(screen.getByLabelText('Nome'), 'Rita Alves')
+    await userEvent.type(screen.getByLabelText('E-mail'), 'rita@acme.com.br')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
+    expect(aoCriar).toHaveBeenCalledWith(expect.objectContaining({ papel: 'admin', consultoria_id: 'c1' }))
   })
 
   it('criar com senha mostra a senha provisória e muda o botão', async () => {

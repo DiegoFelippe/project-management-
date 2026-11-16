@@ -21,7 +21,7 @@ export default function EditarAcesso({ aberto, aoFechar, pessoa, papelDeQuemEdit
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
   const mudaPapel = papelDeQuemEdita === 'admin'
-  const mudaTimes = papelDeQuemEdita !== 'dono'
+  const mudaTimes = papelDeQuemEdita !== 'dono' && papelDeQuemEdita !== 'central'
 
   const alternar = (id) => setMarcados((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id]))
 

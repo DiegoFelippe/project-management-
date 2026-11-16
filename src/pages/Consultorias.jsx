@@ -177,7 +177,7 @@ export default function Consultorias() {
       )}
       <NovaConsultoria aberto={nova} aoFechar={() => setNova(false)} aoCriar={criar} />
       <NovoAcesso key={novoAdminEm ?? 'nenhum'} aberto={Boolean(novoAdminEm)} aoFechar={() => setNovoAdminEm(null)}
-        papelDeQuemCria="dono" consultoriaId={novoAdminEm} aoCriar={criarAdmin} />
+        papelDeQuemCria="central" consultoriaId={novoAdminEm} aoCriar={criarAdmin} />
     </>
   )
 }

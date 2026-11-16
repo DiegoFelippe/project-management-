@@ -3,7 +3,7 @@ import { Label } from '@/components/ui/label'
 import { SelectNativo } from '@/components/ui/select-nativo'
 import { listarNomesDeConsultorias } from '@/data/consultorias'
 
-// Só o dono vê: escolhe de qual consultoria olhar ("" = todas).
+// Só quem vê tudo (administrador geral e central): escolhe de qual consultoria olhar ("" = todas).
 export default function FiltroConsultoria({ valor, aoMudar }) {
   const [consultorias, setConsultorias] = useState([])
 
