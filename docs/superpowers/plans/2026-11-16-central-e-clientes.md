@@ -87,7 +87,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 
 ## Entrega 1 — Central
 
-### Tarefa 1: Papel `central` no banco
+### Task 1: Papel `central` no banco
 
 **Arquivos:**
 - Criar: `supabase/migrations/<data>_central.sql` (`npx supabase migration new central < /dev/null`)
@@ -127,7 +127,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 - [ ] **Passo 4:** `npx supabase migration up` e `npm run test:db` → PASSA (todos os arquivos).
 - [ ] **Passo 5:** commit `Papel central no banco: vê todas as consultorias`.
 
-### Tarefa 2: Central nas Edge Functions
+### Task 2: Central nas Edge Functions
 
 **Arquivos:**
 - Modificar: `supabase/functions/_shared/clientes.ts` (`Papel` ganha `'central'`),
@@ -164,7 +164,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 - [ ] **Passo 4:** `npm run test:integracao` → PASSA (todos).
 - [ ] **Passo 5:** commit `Central nas Edge Functions: cria consultorias e administradores`.
 
-### Tarefa 3: Central nas telas
+### Task 3: Central nas telas
 
 **Arquivos:**
 - Criar: `src/lib/papeis.js`, `src/lib/papeis.test.js`
@@ -205,7 +205,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 
 ## Entrega 2 — Clientes, capacidade e check-ins
 
-### Tarefa 4: Tabela de clientes, histórico e regras
+### Task 4: Tabela de clientes, histórico e regras
 
 **Arquivos:**
 - Criar: `supabase/migrations/<data>_clientes.sql`, `supabase/tests/database/clientes.test.sql`
@@ -290,7 +290,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 - [ ] **Passo 4:** `npx supabase migration up`; `npm run test:db` → PASSA.
 - [ ] **Passo 5:** commit `Clientes no banco: central cadastra, consultoria escolhe o consultor`.
 
-### Tarefa 5: Capacidade (carga, ausências e feriados)
+### Task 5: Capacidade (carga, ausências e feriados)
 
 **Arquivos:**
 - Criar: `supabase/migrations/<data>_capacidade.sql`, `supabase/tests/database/capacidade.test.sql`
@@ -329,7 +329,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 - [ ] **Passo 4:** `npx supabase migration up`; `npm run test:db` → PASSA.
 - [ ] **Passo 5:** commit `Capacidade no banco: carga semanal, ausências e feriados`.
 
-### Tarefa 6: Check-ins e "quando alguém sai"
+### Task 6: Check-ins e "quando alguém sai"
 
 **Arquivos:**
 - Criar: `supabase/migrations/<data>_checkins.sql`, `supabase/tests/database/checkins.test.sql`
@@ -390,7 +390,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
   `acesso.test.sql`, que desativam pessoas e arquivam consultorias).
 - [ ] **Passo 5:** commit `Check-ins no banco e o que acontece quando alguém sai`.
 
-### Tarefa 7: Ocupação e sugestão
+### Task 7: Ocupação e sugestão
 
 **Arquivos:**
 - Criar: `supabase/migrations/<data>_ocupacao.sql`, `supabase/tests/database/ocupacao.test.sql`,
@@ -435,7 +435,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 - [ ] **Passo 4:** migração; `npx supabase migration up`; `npm run test:db` → PASSA.
 - [ ] **Passo 5:** commit `Ocupação de consultores e consultorias para a sugestão`.
 
-### Tarefa 8: CNPJ, horas e mensagens no navegador
+### Task 8: CNPJ, horas e mensagens no navegador
 
 **Arquivos:**
 - Criar: `src/lib/cnpj.js`, `src/lib/cnpj.test.js`, `src/lib/horas.js`, `src/lib/horas.test.js`
@@ -466,7 +466,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 - [ ] **Passo 2:** `npm test -- src/lib` → FALHA. **Passo 3:** implementar. **Passo 4:** PASSA.
 - [ ] **Passo 5:** commit `CNPJ, horas e mensagens de cliente no navegador`.
 
-### Tarefa 9: Funções de dados e caminho completo de verdade
+### Task 9: Funções de dados e caminho completo de verdade
 
 **Arquivos:**
 - Criar: `src/data/clientes.js`, `src/data/capacidade.js`, `src/data/checkins.js`,
@@ -518,7 +518,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 - [ ] **Passo 4:** `npm run test:integracao` → PASSA (todos; a limpeza não pode falhar por chave estrangeira).
 - [ ] **Passo 5:** commit `Funções de dados de clientes, capacidade e check-ins`.
 
-### Tarefa 10: Tela Clientes e formulário (central)
+### Task 10: Tela Clientes e formulário (central)
 
 **Arquivos:**
 - Criar: `src/pages/Clientes.jsx`, `src/pages/Clientes.test.jsx`, `src/components/clientes/FormularioCliente.jsx`,
@@ -549,7 +549,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
   `@keyframes icone-transmitir` com dois pulsos de escala). **Passo 4:** `npm test` e `npm run lint` → PASSA.
 - [ ] **Passo 5:** commit `Tela Clientes: lista, cadastro, edição, arquivar e apagar`.
 
-### Tarefa 11: Mandar para consultoria e escolher consultor
+### Task 11: Mandar para consultoria e escolher consultor
 
 **Arquivos:**
 - Criar: `src/components/clientes/ListaDeOcupacao.jsx`, `JanelaMandar.jsx`, `JanelaConsultor.jsx` e testes
@@ -580,7 +580,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 - [ ] **Passo 2:** FALHA. **Passo 3:** implementar. **Passo 4:** `npm test`, `npm run lint` → PASSA.
 - [ ] **Passo 5:** commit `Distribuir com sugestão: central escolhe a consultoria, gestor o consultor`.
 
-### Tarefa 12: Check-in, check-out e lançar horas
+### Task 12: Check-in, check-out e lançar horas
 
 **Arquivos:**
 - Criar: `src/components/clientes/BotaoCheckin.jsx`, `JanelaCheckin.jsx` e testes
@@ -602,7 +602,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 - [ ] **Passo 2:** FALHA. **Passo 3:** implementar. **Passo 4:** PASSA. **Passo 5:** commit `Check-in e
   lançamento de horas do consultor`.
 
-### Tarefa 13: Página do cliente
+### Task 13: Página do cliente
 
 **Arquivos:**
 - Criar: `src/pages/Cliente.jsx`, `src/pages/Cliente.test.jsx`
@@ -622,7 +622,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 - [ ] **Passo 2:** FALHA. **Passo 3:** implementar. **Passo 4:** PASSA. **Passo 5:** commit `Página do cliente
   com check-ins e histórico`.
 
-### Tarefa 14: Capacidade e ausências
+### Task 14: Capacidade e ausências
 
 **Arquivos:**
 - Criar: `src/pages/Capacidade.jsx` (+ teste), `src/components/capacidade/EditarCarga.jsx`,
@@ -645,7 +645,7 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
 - [ ] **Passo 2:** FALHA. **Passo 3:** implementar. **Passo 4:** `npm test`, `npm run lint` → PASSA.
 - [ ] **Passo 5:** commit `Capacidade: carga semanal, ausências e ocupação`.
 
-### Tarefa 15: Documentação e verificação final
+### Task 15: Documentação e verificação final
 
 **Arquivos:**
 - Modificar: `README.md` (tabela "Quem é quem" com Administrador geral e Central; comandos iguais),
