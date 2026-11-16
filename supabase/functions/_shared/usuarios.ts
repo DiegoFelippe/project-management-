@@ -73,8 +73,8 @@ export type NovoAcesso = {
   email: string
   senha?: string
   redirectTo: string
-  papel: 'admin' | 'gestor' | 'pessoa'
-  consultoriaId: string
+  papel: 'central' | 'admin' | 'gestor' | 'pessoa'
+  consultoriaId: string | null
   criadoPor: string
   times: string[]
 }

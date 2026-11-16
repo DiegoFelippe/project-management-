@@ -1,5 +1,5 @@
 // POST /functions/v1/gerenciar-consultoria — { acao: 'renomear' | 'arquivar' | 'reativar', consultoria_id, nome? }
-// Só o dono. Arquivar bloqueia o login de quem está ativo nela; reativar desbloqueia só quem continua
+// Só o dono e a central. Arquivar bloqueia o login de quem está ativo nela; reativar desbloqueia só quem continua
 // ativo (quem foi desativado individualmente segue desativado). Nada é apagado.
 import { clienteAdmin, quemChama } from '../_shared/clientes.ts'
 import { Falha, lerJson, responder, servir } from '../_shared/http.ts'
@@ -8,7 +8,7 @@ import { validarNome, validarUuid } from '../_shared/validar.ts'
 servir(async (req) => {
   const admin = clienteAdmin()
   const quem = await quemChama(req, admin)
-  if (quem.papel !== 'dono') throw new Falha(403, 'sem_permissao')
+  if (quem.papel !== 'dono' && quem.papel !== 'central') throw new Falha(403, 'sem_permissao')
 
   const corpo = await lerJson(req)
   const acao = corpo.acao

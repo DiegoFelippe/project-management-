@@ -2,7 +2,7 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
 import { Falha } from './http.ts'
 
-export type Papel = 'dono' | 'admin' | 'gestor' | 'pessoa'
+export type Papel = 'dono' | 'central' | 'admin' | 'gestor' | 'pessoa'
 
 export type Perfil = {
   id: string

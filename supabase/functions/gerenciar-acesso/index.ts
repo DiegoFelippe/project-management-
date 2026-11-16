@@ -1,5 +1,5 @@
-// POST /functions/v1/gerenciar-acesso — { acao: 'editar' | 'desativar' | 'reativar', pessoa_id, nome?, papel? }
-// Dono cuida dos administradores; administrador, de gestores e pessoas da consultoria dele;
+// POST /functions/v1/gerenciar-acesso — { acao: 'editar' | 'desativar' | 'reativar' | 'mover_para_central', pessoa_id, nome?, papel? }
+// Dono cuida dos administradores e da central; a central, dos administradores; só o dono move alguém para a central; administrador, de gestores e pessoas da consultoria dele;
 // gestor só muda o nome das pessoas que vê. Em si mesmo ("Meu perfil"), cada um muda só o próprio nome:
 // não troca o próprio papel nem se desativa. E-mail não muda.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
@@ -21,7 +21,8 @@ async function gestorVePessoa(admin: SupabaseClient, gestorId: string, pessoaId:
 }
 
 async function poderSobre(admin: SupabaseClient, quem: Perfil, alvo: Perfil): Promise<Poder> {
-  if (quem.papel === 'dono') return alvo.papel === 'admin' ? 'tudo' : null
+  if (quem.papel === 'dono') return alvo.papel === 'admin' || alvo.papel === 'central' ? 'tudo' : null
+  if (quem.papel === 'central') return alvo.papel === 'admin' ? 'tudo' : null
   if (!quem.consultoria_id || alvo.consultoria_id !== quem.consultoria_id) return null
   if (quem.papel === 'admin') return alvo.papel === 'gestor' || alvo.papel === 'pessoa' ? 'tudo' : null
   if (quem.papel === 'gestor' && alvo.papel === 'pessoa') {
@@ -35,15 +36,28 @@ function erroDoBanco(erro: { message?: string }) {
   return erro
 }
 
+// Só o dono. O alvo precisa estar ativo e ser admin, gestor ou pessoa; vira central, sem consultoria.
+async function moverParaCentral(admin: SupabaseClient, quem: Perfil, pessoaId: string) {
+  if (quem.papel !== 'dono' || pessoaId === quem.id) throw new Falha(403, 'sem_permissao')
+  const { data: alvo } = await admin.from('perfis').select('papel, ativo').eq('id', pessoaId).maybeSingle()
+  if (!alvo || !alvo.ativo || !['admin', 'gestor', 'pessoa'].includes(alvo.papel)) {
+    throw new Falha(403, 'sem_permissao')
+  }
+  const { error } = await admin.from('perfis').update({ papel: 'central', consultoria_id: null }).eq('id', pessoaId)
+  if (error) throw erroDoBanco(error)
+  return responder(200, { ok: true })
+}
+
 servir(async (req) => {
   const admin = clienteAdmin()
   const quem = await quemChama(req, admin)
   const corpo = await lerJson(req)
   const acao = corpo.acao
-  if (acao !== 'editar' && acao !== 'desativar' && acao !== 'reativar') {
+  if (acao !== 'editar' && acao !== 'desativar' && acao !== 'reativar' && acao !== 'mover_para_central') {
     throw new Falha(400, 'dados_invalidos', { campo: 'acao' })
   }
   const pessoaId = validarUuid(corpo.pessoa_id, 'pessoa_id')
+  if (acao === 'mover_para_central') return await moverParaCentral(admin, quem, pessoaId)
   const euMesmo = pessoaId === quem.id
   if (euMesmo && acao !== 'editar') throw new Falha(403, 'sem_permissao')
 

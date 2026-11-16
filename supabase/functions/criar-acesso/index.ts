@@ -1,5 +1,5 @@
 // POST /functions/v1/criar-acesso
-// Dono cria administradores de uma consultoria; admin cria gestores e pessoas; gestor cria pessoas
+// Dono cria administradores de uma consultoria e acessos de central; central cria administradores; admin cria gestores e pessoas; gestor cria pessoas
 // nos times dele. O acesso é sempre da consultoria de quem cria (ou da escolhida pelo dono).
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
 import { clienteAdmin, quemChama, type Perfil } from '../_shared/clientes.ts'
@@ -21,10 +21,17 @@ async function exigirTimes(
 }
 
 // Confere o que quem chama pode criar e devolve a consultoria do novo acesso.
-async function consultoriaDoPedido(admin: SupabaseClient, quem: Perfil, dados: DadosAcesso): Promise<string> {
+// A central não tem consultoria: devolve null.
+async function consultoriaDoPedido(admin: SupabaseClient, quem: Perfil, dados: DadosAcesso): Promise<string | null> {
   switch (quem.papel) {
-    case 'dono': {
-      if (dados.papel !== 'admin' || dados.times.length) throw new Falha(403, 'sem_permissao')
+    case 'dono':
+    case 'central': {
+      const podeCentral = quem.papel === 'dono' && dados.papel === 'central'
+      if ((dados.papel !== 'admin' && !podeCentral) || dados.times.length) throw new Falha(403, 'sem_permissao')
+      if (podeCentral) {
+        if (dados.consultoria_id) throw new Falha(400, 'dados_invalidos', { campo: 'consultoria_id' })
+        return null
+      }
       if (!dados.consultoria_id) throw new Falha(400, 'dados_invalidos', { campo: 'consultoria_id' })
       const { data } = await admin.from('consultorias').select('id').eq('id', dados.consultoria_id).maybeSingle()
       if (!data) throw new Falha(400, 'dados_invalidos', { campo: 'consultoria_id' })

@@ -3,7 +3,7 @@ import { Falha } from './http.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PAPEIS_CRIAVEIS = ['admin', 'gestor', 'pessoa'] as const
+const PAPEIS_CRIAVEIS = ['central', 'admin', 'gestor', 'pessoa'] as const
 
 export type Forma = 'convite' | 'senha'
 
