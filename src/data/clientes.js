@@ -60,6 +60,17 @@ export async function listarClientes({ aba, consultoriaId, consultorId, busca, p
   return buscarPagina(consulta, pagina)
 }
 
+// Quantos clientes ativos (não arquivados) uma consultoria ou um consultor tem: contados no banco, sem
+// trazer linhas. Serve às confirmações que dizem o que acontece com os clientes.
+export async function contarClientesAtivos({ consultoriaId, consultorId }) {
+  let consulta = supabase.from('clientes').select('id', { count: 'exact', head: true }).eq('arquivado', false)
+  if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
+  if (consultorId) consulta = consulta.eq('consultor_id', consultorId)
+  const { count, error } = await consulta
+  if (error) throw error
+  return count ?? 0
+}
+
 export async function buscarCliente(id) {
   const { data, error } = await supabase.from('clientes').select(CAMPOS_DO_CLIENTE).eq('id', id).maybeSingle()
   if (error) throw error

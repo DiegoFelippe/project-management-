@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { contarClientesAtivos } from '@/data/clientes'
 import { trocarFoto } from '@/data/imagens'
 import { gerenciarAcesso, listarUsuarios } from '@/data/usuarios'
 import { renderizarTela } from '@/test/renderizar'
@@ -9,6 +10,7 @@ import Usuarios from './Usuarios'
 vi.mock('@/data/usuarios', () => ({
   listarUsuarios: vi.fn(), criarAcesso: vi.fn(), gerenciarAcesso: vi.fn(), reenviarConvite: vi.fn(),
 }))
+vi.mock('@/data/clientes', () => ({ contarClientesAtivos: vi.fn() }))
 vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn().mockResolvedValue({ erro: null }), tirarFoto: vi.fn() }))
 vi.mock('@/data/times', () => ({
   listarOpcoesDeTimes: vi.fn().mockResolvedValue([]), adicionarMembro: vi.fn(), removerMembro: vi.fn(),
@@ -21,6 +23,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(contarClientesAtivos).mockResolvedValue(0)
   vi.mocked(listarUsuarios).mockResolvedValue({
     itens: [
       { id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [] },
@@ -63,6 +66,54 @@ describe('Usuários', () => {
     expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: true, pagina: 2 })
     await userEvent.click(screen.getByRole('button', { name: 'Desativados' }))
     expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: false, pagina: 1 })
+  })
+
+  describe('o que acontece com os clientes', () => {
+    const admin = { id: 'a1', papel: 'admin', consultoria_id: 'c1' }
+    beforeEach(() => vi.mocked(gerenciarAcesso).mockResolvedValue({ erro: null }))
+
+    it('Desativar diz quantos clientes da pessoa voltam para Aguardando consultor', async () => {
+      vi.mocked(contarClientesAtivos).mockResolvedValue(4)
+      renderizarTela(<Usuarios />, { perfil: admin })
+      await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Desativar' }))
+      const janela = screen.getByRole('alertdialog')
+      expect(await within(janela).findByText(/4 clientes dela voltam para Aguardando consultor\./)).toBeInTheDocument()
+      expect(contarClientesAtivos).toHaveBeenCalledWith({ consultorId: 'p1' })
+      await userEvent.click(within(janela).getByRole('button', { name: 'Desativar' }))
+      expect(gerenciarAcesso).toHaveBeenCalledWith('desativar', 'p1')
+    })
+
+    it('Desativar com 1 cliente fala no singular', async () => {
+      vi.mocked(contarClientesAtivos).mockResolvedValue(1)
+      renderizarTela(<Usuarios />, { perfil: admin })
+      await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Desativar' }))
+      expect(await screen.findByText(/1 cliente dela volta para Aguardando consultor\./)).toBeInTheDocument()
+    })
+
+    it('Reativar não promete devolver os clientes', async () => {
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        itens: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: false, times: [] }], total: 1,
+      })
+      renderizarTela(<Usuarios />, { perfil: admin })
+      await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Reativar' }))
+      const janela = screen.getByRole('alertdialog')
+      expect(janela).not.toHaveTextContent(/do jeito que estava antes/)
+      expect(janela).toHaveTextContent(/Os clientes que eram dela não voltam/)
+      expect(contarClientesAtivos).not.toHaveBeenCalled()
+    })
+
+    it('Mover para a central diz quantos clientes voltam para Aguardando consultor', async () => {
+      vi.mocked(contarClientesAtivos).mockResolvedValue(2)
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        itens: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'admin', ativo: true, times: [], consultoria: { nome: 'Acme' } }],
+        total: 1,
+      })
+      renderizarTela(<Usuarios />, { perfil: { id: 'd1', papel: 'dono', consultoria_id: null } })
+      await userEvent.click(await within(await screen.findByRole('row', { name: /Ana/ })).findByRole('button', { name: /Mover para a central/ }))
+      expect(await within(screen.getByRole('alertdialog')).findByText(/2 clientes dela voltam para Aguardando consultor\./))
+        .toBeInTheDocument()
+      expect(contarClientesAtivos).toHaveBeenCalledWith({ consultorId: 'p1' })
+    })
   })
 
   describe('central e administrador geral', () => {

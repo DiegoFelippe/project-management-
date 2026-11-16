@@ -5,6 +5,7 @@ import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import { frase, juntar, useClientesAtivos } from '@/components/clientes/useClientesAtivos'
 import NovaConsultoria from '@/components/consultorias/NovaConsultoria'
 import EditarConsultoria from '@/components/consultorias/EditarConsultoria'
 import { Button } from '@/components/ui/button'
@@ -27,6 +28,13 @@ export default function Consultorias() {
   const [confirmando, setConfirmando] = useState(null)
   const lista = resultado?.itens ?? []
   const total = resultado?.total ?? 0
+  // Arquivar: os clientes ativos dela voltam para a central (o banco conta quantos).
+  const clientesAtivos = useClientesAtivos(confirmando?.acao === 'arquivar' ? { consultoriaId: confirmando.c.id } : null)
+  const sobreOsClientes = frase(clientesAtivos, {
+    um: '1 cliente ativo volta para a central (A distribuir) e não volta ao reativar.',
+    varios: '{n} clientes ativos voltam para a central (A distribuir) e não voltam ao reativar.',
+    semNumero: 'Os clientes ativos dela voltam para a central (A distribuir) e não voltam ao reativar.',
+  })
 
   async function gerenciar(acao, c, extra) {
     const resposta = await gerenciarConsultoria(acao, c.id, extra)
@@ -170,7 +178,7 @@ export default function Consultorias() {
         <ConfirmarAcao aberto aoFechar={() => setConfirmando(null)} perigo={confirmando.acao === 'arquivar'}
           titulo={confirmando.acao === 'arquivar' ? `Arquivar ${confirmando.c.nome}?` : `Reativar ${confirmando.c.nome}?`}
           descricao={confirmando.acao === 'arquivar'
-            ? 'Ninguém dela entra mais e ela some das listas. Nada é apagado: pessoas, times e histórico ficam, e dá para reativar depois.'
+            ? juntar('Ninguém dela entra mais e ela some das listas. Nada é apagado: pessoas, times e histórico ficam, e dá para reativar depois.', sobreOsClientes)
             : 'As pessoas ativas dela voltam a entrar. Quem foi desativado individualmente continua desativado.'}
           rotuloConfirmar={confirmando.acao === 'arquivar' ? 'Arquivar' : 'Reativar'}
           aoConfirmar={() => gerenciar(confirmando.acao, confirmando.c)} />

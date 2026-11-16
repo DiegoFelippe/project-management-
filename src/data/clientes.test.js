@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { listarClientes } from './clientes'
+import { contarClientesAtivos, listarClientes } from './clientes'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn() } }))
 
@@ -37,5 +37,28 @@ describe('listarClientes: abas', () => {
     await listarClientes({ aba: 'aguardando' })
     expect(banco.chamou('not', 'consultoria_id', 'is', null)).toBe(true)
     expect(banco.chamou('is', 'consultor_id', null)).toBe(true)
+  })
+})
+
+describe('contarClientesAtivos', () => {
+  it('conta no banco só os ativos da consultoria, sem trazer linhas', async () => {
+    banco.resposta = { data: null, error: null, count: 7 }
+    expect(await contarClientesAtivos({ consultoriaId: 's1' })).toBe(7)
+    expect(banco.chamou('from', 'clientes')).toBe(true)
+    expect(banco.chamou('select', 'id', { count: 'exact', head: true })).toBe(true)
+    expect(banco.chamou('eq', 'arquivado', false)).toBe(true)
+    expect(banco.chamou('eq', 'consultoria_id', 's1')).toBe(true)
+  })
+
+  it('conta os ativos de um consultor', async () => {
+    banco.resposta = { data: null, error: null, count: 1 }
+    expect(await contarClientesAtivos({ consultorId: 'p1' })).toBe(1)
+    expect(banco.chamou('eq', 'consultor_id', 'p1')).toBe(true)
+    expect(banco.chamou('eq', 'arquivado', false)).toBe(true)
+  })
+
+  it('erro do banco vira exceção', async () => {
+    banco.resposta = { data: null, error: { code: '42501' }, count: null }
+    await expect(contarClientesAtivos({ consultorId: 'p1' })).rejects.toEqual({ code: '42501' })
   })
 })

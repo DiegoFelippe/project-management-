@@ -8,6 +8,7 @@ import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import { frase, juntar, useClientesAtivos } from '@/components/clientes/useClientesAtivos'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -68,6 +69,14 @@ export default function Usuarios() {
   }, [ehDono, perfil.consultoria_id, perfil.papel, perfil.id, versao])
 
   const meusTimes = useMemo(() => new Set(times.map((t) => t.id)), [times])
+  // Desativar ou mover para a central: os clientes ativos da pessoa voltam a aguardar consultor (o banco conta).
+  const saindo = confirmando && confirmando.acao !== 'reativar' ? confirmando.pessoa : null
+  const clientesAtivos = useClientesAtivos(saindo ? { consultorId: saindo.id } : null)
+  const sobreOsClientes = frase(clientesAtivos, {
+    um: '1 cliente dela volta para Aguardando consultor.',
+    varios: '{n} clientes dela voltam para Aguardando consultor.',
+    semNumero: 'Os clientes dela voltam para Aguardando consultor.',
+  })
   const lista = resultado?.itens ?? []
   const total = resultado?.total ?? 0
 
@@ -247,10 +256,11 @@ export default function Usuarios() {
           titulo={confirmando.acao === 'mover' ? `Mover ${confirmando.pessoa.nome} para a central?`
             : confirmando.acao === 'desativar' ? `Desativar ${confirmando.pessoa.nome}?` : `Reativar ${confirmando.pessoa.nome}?`}
           descricao={confirmando.acao === 'mover'
-            ? 'A pessoa sai da consultoria e dos times, passa a ver todas as consultorias e pode criar consultorias e cadastrar clientes. Só dá para desfazer criando um acesso novo.'
+            ? juntar('A pessoa sai da consultoria e dos times, passa a ver todas as consultorias e pode criar consultorias e cadastrar clientes.',
+              sobreOsClientes, 'Só dá para desfazer criando um acesso novo.')
             : confirmando.acao === 'desativar'
-              ? 'A pessoa não entra mais e some das listas de ativos. Nada é apagado: os times e o histórico ficam, e dá para reativar depois.'
-              : 'A pessoa volta a entrar, do jeito que estava antes de ser desativada.'}
+              ? juntar('A pessoa não entra mais e some das listas de ativos. Nada é apagado: os times e o histórico ficam, e dá para reativar depois.', sobreOsClientes)
+              : 'A pessoa volta a entrar, com o mesmo papel e os mesmos times. Os clientes que eram dela não voltam: continuam com quem os recebeu ou em Aguardando consultor.'}
           rotuloConfirmar={confirmando.acao === 'mover' ? 'Mover para a central' : confirmando.acao === 'desativar' ? 'Desativar' : 'Reativar'}
           aoConfirmar={() => (confirmando.acao === 'mover' ? moverParaCentral(confirmando.pessoa) : mudarAtivo(confirmando.pessoa, confirmando.acao))} />
       )}

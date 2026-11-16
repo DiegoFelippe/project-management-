@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { contarClientesAtivos } from '@/data/clientes'
 import { gerenciarConsultoria, listarConsultorias } from '@/data/consultorias'
 import { trocarLogo } from '@/data/imagens'
 import { renderizarTela } from '@/test/renderizar'
@@ -10,6 +11,7 @@ vi.mock('@/data/consultorias', () => ({
   listarConsultorias: vi.fn(), criarConsultoria: vi.fn(), gerenciarConsultoria: vi.fn(),
 }))
 vi.mock('@/data/usuarios', () => ({ criarAcesso: vi.fn() }))
+vi.mock('@/data/clientes', () => ({ contarClientesAtivos: vi.fn() }))
 vi.mock('@/data/imagens', () => ({ trocarLogo: vi.fn().mockResolvedValue({ erro: null }), tirarLogo: vi.fn() }))
 
 beforeAll(() => {
@@ -30,6 +32,7 @@ beforeEach(() => {
     total: 2,
   })
   vi.mocked(gerenciarConsultoria).mockResolvedValue({ erro: null })
+  vi.mocked(contarClientesAtivos).mockResolvedValue(0)
 })
 
 describe('Consultorias', () => {
@@ -62,6 +65,29 @@ describe('Consultorias', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(trocarLogo).toHaveBeenCalledWith('c1', arquivo, undefined)
     expect(gerenciarConsultoria).not.toHaveBeenCalled()
+  })
+
+  it('Arquivar diz quantos clientes ativos voltam para a central (contados no banco)', async () => {
+    vi.mocked(contarClientesAtivos).mockResolvedValue(3)
+    renderizarTela(<Consultorias />, { perfil: dono })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Acme/ })).getByRole('button', { name: 'Arquivar' }))
+    const janela = screen.getByRole('alertdialog')
+    expect(await within(janela).findByText(/3 clientes ativos voltam para a central \(A distribuir\) e não voltam ao reativar\./))
+      .toBeInTheDocument()
+    expect(contarClientesAtivos).toHaveBeenCalledWith({ consultoriaId: 'c1' })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Arquivar' }))
+    expect(gerenciarConsultoria).toHaveBeenCalledWith('arquivar', 'c1', undefined)
+  })
+
+  it('Arquivar com 1 cliente ativo fala no singular; sem clientes, não fala deles', async () => {
+    vi.mocked(contarClientesAtivos).mockResolvedValueOnce(1)
+    renderizarTela(<Consultorias />, { perfil: dono })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Acme/ })).getByRole('button', { name: 'Arquivar' }))
+    expect(await screen.findByText(/1 cliente ativo volta para a central \(A distribuir\) e não volta ao reativar\./)).toBeInTheDocument()
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(within(screen.getByRole('row', { name: /Beta/ })).getByRole('button', { name: 'Arquivar' }))
+    await vi.waitFor(() => expect(contarClientesAtivos).toHaveBeenLastCalledWith({ consultoriaId: 'c2' }))
+    await vi.waitFor(() => expect(screen.getByRole('alertdialog')).not.toHaveTextContent(/clientes? ativos?/))
   })
 
   it('pagina no banco, e Arquivadas pede as arquivadas desde a página 1', async () => {
