@@ -38,6 +38,22 @@ Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na 
 - Os itens do trilho têm animação própria (seção acima) e são marcados com `data-item-trilho`.
 - `src/components/ui/button.test.jsx` varre o código e falha se algum `<button>` ficar sem animação.
 
+## Padrão Hub: botões, formulários, campos e abas
+
+Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/2026-11-16-padrao-hub.md`.
+
+- **Cores continuam as da consultoria** (`--primary` etc. em `src/index.css`); do Hub vem só o layout.
+- **Todo formulário é uma `JanelaFormulario`** (`src/components/comum/JanelaFormulario.jsx`), com o corpo em
+  `SecaoFormulario`. Rodapé: **Cancelar** (outline) + botão principal, que mostra "Salvando…" enquanto grava.
+  O botão de enviar fica no rodapé e liga ao formulário por `form="<id>"`.
+- **Campos só de `src/components/campos/`**: `Seletor`, `CampoData`, `CampoHora`, `CampoNumero`, `Caixa`, `Chave`.
+  **Nunca** `<select>` nem `type="date|time|number|datetime-local"` nativos.
+- **`Seletor` com muitas opções** usa `buscar` (busca no banco), nunca a lista inteira.
+- **Listas** abrem com `BarraDeFiltros` (abas, busca, filtros e botão principal no fim). As abas são
+  `AbasSegmentadas`; `comoAbas` só nas abas de página, como as do cliente.
+- **Testes que guardam isto:** `src/components/campos/camposNativos.test.js` (varre `src/` atrás de campo nativo),
+  `src/components/ui/button.test.jsx` e `src/components/comum/formulariosEnvio.test.jsx`.
+
 ## Listas: sempre em tabela, e Editar abre o formulário preenchido
 
 - **Toda lista de itens é uma tabela no padrão da tela Usuários** (pessoas, times, consultorias, pessoas
