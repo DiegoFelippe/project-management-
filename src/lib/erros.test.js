@@ -78,3 +78,34 @@ describe('mensagens do CRUD', () => {
   })
 })
 
+describe('traduzirErroBanco com contexto', () => {
+  it('mantém o padrão de time', () => {
+    expect(traduzirErroBanco({ code: '23505' }, { sobre: 'time' })).toBe('Já existe um time com esse nome.')
+  })
+
+  it('traduz cliente', () => {
+    expect(traduzirErroBanco({ code: '23505' }, { sobre: 'cliente' })).toBe(
+      'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).',
+    )
+    expect(traduzirErroBanco({ code: '23503' }, { sobre: 'cliente' })).toBe(
+      'Este cliente tem horas registradas. Arquive em vez de apagar.',
+    )
+    expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')
+    expect(traduzirErroBanco({ code: '23P01' }, { sobre: 'checkin' })).toBe(
+      'Esse horário se sobrepõe a outro check-in seu.',
+    )
+  })
+
+  it('traduz as mensagens do banco', () => {
+    const msg = (message) => traduzirErroBanco({ code: 'P0001', message }, { sobre: 'cliente' })
+    expect(msg('consultor_invalido')).toBe('Escolha um consultor ativo desta consultoria.')
+    expect(msg('so_central_muda')).toBe('Só a central muda os dados do cliente.')
+    expect(msg('consultoria_arquivada')).toBe('Essa consultoria está arquivada.')
+    expect(msg('checkin_sem_cliente')).toBe('Você não é o consultor deste cliente.')
+    expect(msg('checkin_no_futuro')).toBe('O horário não pode estar no futuro.')
+    expect(msg('sem_permissao')).toBe('Você não tem permissão para isso.')
+    expect(msg('consultoria_escolhe_consultor')).toBe('Quem escolhe o consultor é a consultoria.')
+    expect(msg('outra_coisa')).toBe('Algo deu errado. Tente de novo.')
+  })
+})
+

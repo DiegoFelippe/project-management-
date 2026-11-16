@@ -43,8 +43,31 @@ export function traduzirErroFuncao(codigo) {
   return ERROS_FUNCAO[codigo] ?? PADRAO
 }
 
-export function traduzirErroBanco(erro) {
-  if (erro?.code === '23505') return 'Já existe um time com esse nome.'
+// Mensagens levantadas pelo banco (raise exception '<texto>').
+const ERROS_MENSAGEM_BANCO = {
+  so_central_muda: 'Só a central muda os dados do cliente.',
+  consultor_invalido: 'Escolha um consultor ativo desta consultoria.',
+  consultoria_arquivada: 'Essa consultoria está arquivada.',
+  checkin_sem_cliente: 'Você não é o consultor deste cliente.',
+  checkin_no_futuro: 'O horário não pode estar no futuro.',
+  consultoria_escolhe_consultor: 'Quem escolhe o consultor é a consultoria.',
+  sem_permissao: ERROS_FUNCAO.sem_permissao,
+}
+
+// `sobre`: 'time' (padrão) | 'cliente' | 'checkin' — muda o texto de alguns códigos.
+export function traduzirErroBanco(erro, { sobre = 'time' } = {}) {
+  const mensagem = ERROS_MENSAGEM_BANCO[erro?.message]
+  if (mensagem) return mensagem
+  if (erro?.code === '23505') {
+    return sobre === 'cliente'
+      ? 'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).'
+      : 'Já existe um time com esse nome.'
+  }
+  if (erro?.code === '23503' && sobre === 'cliente') {
+    return 'Este cliente tem horas registradas. Arquive em vez de apagar.'
+  }
+  if (erro?.code === '23514') return 'Confira os campos destacados.'
+  if (erro?.code === '23P01') return 'Esse horário se sobrepõe a outro check-in seu.'
   if (erro?.code === '42501') return ERROS_FUNCAO.sem_permissao
   return PADRAO
 }
