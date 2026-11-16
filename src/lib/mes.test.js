@@ -14,7 +14,8 @@ describe('mes', () => {
   })
 
   it('rótulos em português', () => {
-    expect(rotuloDoMes('2026-11-01')).toBe('novembro de 2026')
+    expect(rotuloDoMes('2026-11-01')).toBe('Novembro de 2026')
+    expect(rotuloDoMes('2027-03-01')).toBe('Março de 2027')
     expect(formatarDia('2026-11-05')).toBe('05/11/2026')
   })
 })

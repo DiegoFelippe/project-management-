@@ -39,7 +39,8 @@ describe('Capacidade', () => {
     expect(within(tabela).getByRole('columnheader', { name: 'Consultoria' })).toBeInTheDocument()
     expect(within(tabela).getByRole('columnheader', { name: 'Reservado' })).toBeInTheDocument()
     expect(within(tabela).getByText('50%')).toBeInTheDocument()
-    expect(screen.getByText('novembro de 2026')).toBeInTheDocument()
+    // Só a primeira letra maiúscula ("Novembro de 2026", não "Novembro De 2026" do capitalize).
+    expect(screen.getByText('Novembro de 2026')).not.toHaveClass('capitalize')
     expect(consultoresPorOcupacao).toHaveBeenCalledWith(expect.objectContaining({ mes: MES_ATUAL, limite: 15, deslocamento: 0 }))
   })
 
@@ -73,7 +74,7 @@ describe('Capacidade', () => {
     renderizarTela(<Capacidade />, { perfil: central })
     await screen.findByRole('table', { name: 'Capacidade' })
     await userEvent.click(screen.getByRole('button', { name: /Próximo/ }))
-    expect(await screen.findByText('dezembro de 2026')).toBeInTheDocument()
+    expect(await screen.findByText('Dezembro de 2026')).toBeInTheDocument()
     expect(consultoresPorOcupacao).toHaveBeenLastCalledWith(expect.objectContaining({ mes: '2026-12-01' }))
   })
 
@@ -98,11 +99,22 @@ describe('Capacidade', () => {
     renderizarTela(<Capacidade />, { perfil: central })
     await screen.findByRole('table', { name: 'Capacidade' })
     await userEvent.click(screen.getByRole('button', { name: /Anterior/ }))
-    expect(await screen.findByText('outubro de 2026')).toBeInTheDocument()
+    expect(await screen.findByText('Outubro de 2026')).toBeInTheDocument()
     expect(consultoresPorOcupacao).toHaveBeenLastCalledWith(expect.objectContaining({ mes: '2026-10-01' }))
     const tabela = await screen.findByRole('table', { name: 'Capacidade' })
     expect(within(tabela).queryByRole('columnheader', { name: 'Reservado' })).toBeNull()
     expect(within(tabela).getByRole('columnheader', { name: 'Utilização' })).toBeInTheDocument()
+  })
+
+  it('página que ficou vazia (fora da faixa) volta para a página 1', async () => {
+    vi.mocked(consultoresPorOcupacao).mockImplementation(async ({ deslocamento }) =>
+      deslocamento === 0 ? { itens: [ANA], total: 40 } : { itens: [], total: 0 })
+    renderizarTela(<Capacidade />, { perfil: central })
+    await userEvent.click(await screen.findByRole('button', { name: /Próxima/ }))
+    await vi.waitFor(() => expect(consultoresPorOcupacao).toHaveBeenCalledWith(expect.objectContaining({ deslocamento: 15 })))
+    await vi.waitFor(() => expect(consultoresPorOcupacao).toHaveBeenLastCalledWith(expect.objectContaining({ deslocamento: 0 })))
+    expect(await screen.findByRole('table', { name: 'Capacidade' })).toBeInTheDocument()
+    expect(screen.getByText('1–15 de 40')).toBeInTheDocument()
   })
 
   it('a paginação pede o deslocamento 15 na página 2', async () => {

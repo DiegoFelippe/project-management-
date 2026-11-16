@@ -46,7 +46,8 @@ export default function Capacidade() {
     pedido
       .then((r) => {
         if (!ativo) return
-        if (r.itens.length === 0 && r.total > 0 && pagina > 1) return setPagina(1)
+        // Página fora da faixa (ex.: a busca ou o mês mudou o total): a função devolve vazio e total 0.
+        if (r.itens.length === 0 && pagina > 1) return setPagina(1)
         setResultado(r)
         setErro(null)
       })
@@ -93,7 +94,7 @@ export default function Capacidade() {
         )}
         <div role="group" aria-label="Mês" className="inline-flex items-center gap-1 rounded-lg border bg-card p-1">
           <Button variant="ghost" size="sm" onClick={() => setMes(deslocarMes(mes, -1))}><ChevronLeft /> Anterior</Button>
-          <span aria-live="polite" className="min-w-36 px-2 text-center text-sm font-semibold capitalize tabular-nums">{rotuloDoMes(mes)}</span>
+          <span aria-live="polite" className="min-w-36 px-2 text-center text-sm font-semibold tabular-nums">{rotuloDoMes(mes)}</span>
           <Button variant="ghost" size="sm" onClick={() => setMes(deslocarMes(mes, 1))}>Próximo <ChevronRight /></Button>
         </div>
         <div className="relative w-full max-w-xs">

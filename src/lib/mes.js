@@ -13,10 +13,12 @@ export function deslocarMes(mes, quantidade) {
   return `${data.getUTCFullYear()}-${String(data.getUTCMonth() + 1).padStart(2, '0')}-01`
 }
 
-// "2026-11-01" -> "novembro de 2026"
+// "2026-11-01" -> "Novembro de 2026" (só a primeira letra maiúscula; o capitalize do CSS faria "Novembro De 2026").
 export function rotuloDoMes(mes) {
   const [ano, numero] = mes.split('-').map(Number)
-  return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(new Date(Date.UTC(ano, numero - 1, 1)))
+  const rotulo = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', month: 'long', year: 'numeric' })
+    .format(new Date(Date.UTC(ano, numero - 1, 1)))
+  return rotulo.charAt(0).toUpperCase() + rotulo.slice(1)
 }
 
 // "2026-11-16" -> "16/11/2026", sem passar por fuso (a data do banco não tem hora).
