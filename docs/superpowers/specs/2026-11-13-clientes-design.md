@@ -187,6 +187,10 @@ qualquer momento: arquivar ↔ reativar (central)
   a contar como "aguardando consultor" na ocupação da consultoria.
 - **Consultoria arquivada:** os clientes ativos dela voltam para "A distribuir" na central (a confirmação diz
   quantos) e os check-ins abertos são fechados. Os check-ins feitos continuam guardados.
+- **Cliente arquivado** guarda a consultoria e o consultor de quando foi arquivado; quem sai depois não mexe
+  nele. **Ao reativar**, o que não vale mais sai: consultoria arquivada → volta para "A distribuir";
+  consultor desativado, movido para a central ou para outra consultoria → "aguardando consultor" (as duas
+  coisas ficam no histórico). Check-in só em cliente da consultoria atual de quem o faz.
 
 ### Meses
 
