@@ -106,24 +106,49 @@ export async function registrarEmail(email) {
   for (const linha of data ?? []) criados.usuarios.add(linha.id)
 }
 
+// Cada passo da limpeza é conferido: um erro aqui deixava sobras de teste no banco local em silêncio.
+export function conferirLimpeza(acao, { error }) {
+  if (!error) return
+  const codigo = error.code ?? error.status ?? 'sem código'
+  throw new Error(`limparTudo: não foi possível ${acao} (${codigo}: ${error.message}). ` +
+    'Os dados de teste que sobraram continuam no banco local.')
+}
+
 export async function limparTudo() {
   const consultorias = [...criados.consultorias]
   // Check-ins e clientes seguram consultorias e clientes (restrict): saem antes.
   const clientes = new Set(criados.clientes)
   if (consultorias.length) {
-    const { data } = await admin.from('clientes').select('id').in('consultoria_id', consultorias)
-    for (const linha of data ?? []) clientes.add(linha.id)
+    const resposta = await admin.from('clientes').select('id').in('consultoria_id', consultorias)
+    conferirLimpeza('ler os clientes das consultorias de teste', resposta)
+    for (const linha of resposta.data ?? []) clientes.add(linha.id)
   }
-  if (clientes.size) await admin.from('checkins').delete().in('cliente_id', [...clientes])
-  if (consultorias.length) await admin.from('checkins').delete().in('consultoria_id', consultorias)
-  if (clientes.size) await admin.from('clientes').delete().in('id', [...clientes])
+  if (clientes.size) {
+    conferirLimpeza('apagar os check-ins dos clientes de teste',
+      await admin.from('checkins').delete().in('cliente_id', [...clientes]))
+  }
   if (consultorias.length) {
-    await admin.from('times').delete().in('consultoria_id', consultorias)
-    const { data } = await admin.from('perfis').select('id').in('consultoria_id', consultorias)
-    for (const linha of data ?? []) criados.usuarios.add(linha.id)
+    conferirLimpeza('apagar os check-ins das consultorias de teste',
+      await admin.from('checkins').delete().in('consultoria_id', consultorias))
   }
-  for (const id of criados.usuarios) await admin.auth.admin.deleteUser(id)
-  if (consultorias.length) await admin.from('consultorias').delete().in('id', consultorias)
+  if (clientes.size) {
+    conferirLimpeza('apagar os clientes de teste', await admin.from('clientes').delete().in('id', [...clientes]))
+  }
+  if (consultorias.length) {
+    conferirLimpeza('apagar os times das consultorias de teste',
+      await admin.from('times').delete().in('consultoria_id', consultorias))
+    const resposta = await admin.from('perfis').select('id').in('consultoria_id', consultorias)
+    conferirLimpeza('ler as pessoas das consultorias de teste', resposta)
+    for (const linha of resposta.data ?? []) criados.usuarios.add(linha.id)
+  }
+  for (const id of criados.usuarios) {
+    const resposta = await admin.auth.admin.deleteUser(id)
+    // Usuário que já não existe é o que se queria.
+    if (resposta.error?.status !== 404) conferirLimpeza(`apagar o usuário de teste ${id}`, resposta)
+  }
+  if (consultorias.length) {
+    conferirLimpeza('apagar as consultorias de teste', await admin.from('consultorias').delete().in('id', consultorias))
+  }
   criados.consultorias.clear()
   criados.usuarios.clear()
   criados.clientes.clear()
