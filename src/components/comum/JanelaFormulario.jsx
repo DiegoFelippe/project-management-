@@ -1,9 +1,13 @@
+import { useRef } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Loader2, XIcon } from 'lucide-react'
 import { DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
-const LARGURAS = { md: 'sm:max-w-lg', lg: 'sm:max-w-2xl', xl: 'sm:max-w-4xl' }
+const LARGURAS = { md: 'sm:max-w-[min(32rem,calc(100%-2rem))]', lg: 'sm:max-w-[min(42rem,calc(100%-2rem))]', xl: 'sm:max-w-[min(56rem,calc(100%-2rem))]' }
+
+// Primeiro foco do corpo da janela.
+const FOCAVEL = 'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 // Padrão Hub: todo formulário é uma janela. Cabeçalho (ícone, título, descrição, fechar), corpo rolável e
 // rodapé à direita. Esc e o X fecham; clique fora NÃO fecha (para não perder o que foi digitado).
@@ -11,6 +15,14 @@ const LARGURAS = { md: 'sm:max-w-lg', lg: 'sm:max-w-2xl', xl: 'sm:max-w-4xl' }
 // Convenção de envio: enquanto `enviando`, Esc e X não fecham, e o botão principal que quem chama põe no
 // `rodape` mostra "Salvando…" (e fica desabilitado). O componente só mostra o spinner e marca aria-busy.
 export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, icone: Icone, largura = 'md', rodape, enviando = false, children }) {
+  const corpo = useRef(null)
+  // Ao abrir, o foco vai para o primeiro campo do corpo (e não para o X do cabeçalho, onde um Enter fecharia a janela).
+  function focarPrimeiroCampo(e) {
+    const campo = corpo.current?.querySelector(FOCAVEL)
+    if (!campo) return
+    e.preventDefault()
+    campo.focus()
+  }
   return (
     <DialogPrimitive.Root open={aberto} onOpenChange={(abrir) => !abrir && !enviando && aoFechar()}>
       <DialogPortal>
@@ -18,6 +30,7 @@ export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, 
         <DialogPrimitive.Content
           data-slot="janela-formulario"
           aria-busy={enviando || undefined}
+          onOpenAutoFocus={focarPrimeiroCampo}
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => enviando && e.preventDefault()}
           {...(descricao ? {} : { 'aria-describedby': undefined })}
@@ -44,7 +57,7 @@ export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, 
               <span className="sr-only">Fechar</span>
             </DialogPrimitive.Close>
           </header>
-          <div data-slot="janela-corpo" className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">{children}</div>
+          <div ref={corpo} data-slot="janela-corpo" className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">{children}</div>
           {rodape && (
             <footer data-slot="janela-rodape" className="bg-muted/40 flex items-center justify-end gap-2 rounded-b-2xl border-t px-6 py-3.5">
               {enviando && <Loader2 className="text-muted-foreground size-4 animate-spin" aria-hidden="true" />}

@@ -27,6 +27,25 @@ describe('JanelaFormulario', () => {
     expect(screen.getByRole('button', { name: 'Salvar time' })).toBeInTheDocument()
   })
 
+  it('ao abrir, o foco vai para o primeiro campo do corpo (o X continua no cabeçalho)', () => {
+    montar()
+    expect(screen.getByLabelText('Nome')).toHaveFocus()
+  })
+
+  it('sem campo no corpo, o foco cai no que o Radix escolher (não quebra)', () => {
+    render(<JanelaFormulario aberto aoFechar={() => {}} titulo="Aviso"><p>Só texto</p></JanelaFormulario>)
+    expect(screen.getByRole('dialog', { name: 'Aviso' })).toBeInTheDocument()
+    expect(document.activeElement).not.toBe(document.body)
+  })
+
+  it('larguras lg e xl não encostam nas bordas entre 640 e 900px', () => {
+    for (const largura of ['md', 'lg', 'xl']) {
+      const { unmount } = render(<JanelaFormulario aberto aoFechar={() => {}} titulo={`J ${largura}`} largura={largura}><p>x</p></JanelaFormulario>)
+      expect(screen.getByRole('dialog').className).toMatch(/sm:max-w-\[min\([\d.]+rem,calc\(100%-2rem\)\)\]/)
+      unmount()
+    }
+  })
+
   it('o X fecha', async () => {
     const { aoFechar } = montar()
     await userEvent.click(screen.getByRole('button', { name: 'Fechar' }))
