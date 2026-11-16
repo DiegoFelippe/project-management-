@@ -70,7 +70,8 @@ o convite por e-mail, mas não vê o calendário compartilhado.
   - **Dia/Semana:** grade de horas (fuso de São Paulo), linha da hora atual, eventos posicionados pela hora, eventos
     do dia inteiro no alto, sobrepostos lado a lado. **Mês:** grade com até 3 eventos por dia e "+N".
     **Ano:** 12 mini meses com marca nos dias com evento.
-  - Cor de cada evento = cor do consultor (paleta fixa de 8 cores, pela ordem da pessoa; a mesma usada no Google).
+  - Cor de cada evento = cor do consultor (paleta fixa de 8 cores, a próxima livre na consultoria). No Google a cor
+    é de quem vê: no Mac cada pessoa escolhe a cor de cada calendário compartilhado.
   - Clicar num horário vazio abre "Novo evento" já com dia e hora; clicar num evento abre o detalhe (popover no
     computador, janela no celular) com Editar, Apagar, "Entrar no Meet", "Abrir gravação" e "Pasta da reunião".
   - Celular (390 px): lateral vira gaveta; visão padrão Dia.

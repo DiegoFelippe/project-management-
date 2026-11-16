@@ -123,7 +123,9 @@ mensagem em português)`.
 `apagarEvento(db, google|null, quem, id)`), `supabase/functions/agenda/index.ts`, `supabase/config.toml`,
 `src/data/agenda.js` (+ `salvarEvento`, `apagarEvento`), `tests/integracao/agenda.test.js`.
 
-- Permissão pelo papel (tabela CRUD do design); cliente só se a pessoa o vê e não arquivado; convidados validados.
+- Permissão pelo papel (tabela CRUD do design); cliente só se a pessoa o vê e não arquivado; convidados validados;
+  evento `recorrente` (veio do Google) não se edita nem se apaga no app (`{ erro: 'Este evento se repete; altere
+  no Google.' }`). Ação `tentarDeNovo(id)`: reunião em `erro` volta para `aguardando` (mesmas permissões de editar).
 - Com Google: grava no Google primeiro (calendário do consultor; consultor e contato do cliente como convidados;
   Meet + `ligarGravacao` quando `gravar`), depois no banco; Google recusou → nada muda, `{ erro }` em português.
   Sem Google: só no banco. Mudar o consultor move o evento de calendário.
