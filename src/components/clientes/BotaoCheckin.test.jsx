@@ -65,6 +65,8 @@ describe('BotaoCheckin', () => {
     render(<BotaoCheckin cliente={cliente} aberto={aberto} aoMudar={vi.fn()} />)
     const botao = screen.getByRole('button', { name: 'Fazer check-in' })
     expect(botao).toBeDisabled()
-    expect(botao).toHaveAttribute('title', 'Você tem um check-in aberto em Beta. Faça o check-out primeiro.')
+    const dica = 'Check-in aberto em Beta. Faça o check-out primeiro.'
+    expect(screen.getByText(dica)).toBeInTheDocument()
+    expect(botao).toHaveAccessibleDescription(dica)
   })
 })

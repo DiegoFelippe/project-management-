@@ -303,9 +303,11 @@ describe('Clientes: check-in do consultor', () => {
       id: 'a1', cliente_id: 'k1', inicio: new Date(Date.now() - 3_900_000).toISOString(), cliente: { nome: 'Provedor Alfa' },
     })
     renderizarTela(<Clientes />, { perfil: pessoa })
-    const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    const alfa = await screen.findByRole('row', { name: /^Provedor Alfa/ })
     expect(await within(alfa).findByRole('button', { name: /Fazer check-out · 1 h 05/ })).toBeInTheDocument()
-    expect(within(linha('Provedor Beta')).getByRole('button', { name: 'Fazer check-in' })).toBeDisabled()
+    const beta = within(linha('^Provedor Beta')).getByRole('button', { name: 'Fazer check-in' })
+    expect(beta).toBeDisabled()
+    expect(beta).toHaveAccessibleDescription('Check-in aberto em Provedor Alfa. Faça o check-out primeiro.')
   })
 
   it('Lançar horas abre a janela e chama lancarHoras com o cliente', async () => {

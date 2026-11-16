@@ -1,5 +1,5 @@
 import { LogIn, LogOut } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { fazerCheckin, fazerCheckout } from '@/data/checkins'
@@ -14,6 +14,7 @@ export default function BotaoCheckin({ cliente, aberto, aoMudar }) {
   const [agora, setAgora] = useState(() => Date.now())
   const [saindo, setSaindo] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const idDaDica = useId()
   const esteAberto = aberto?.cliente_id === cliente.id
 
   useEffect(() => {
@@ -53,10 +54,14 @@ export default function BotaoCheckin({ cliente, aberto, aoMudar }) {
   }
 
   const emOutro = Boolean(aberto)
+  // O botão desabilitado não recebe mouse nem foco, então o motivo fica escrito ao lado e ligado a ele.
+  const dica = emOutro ? `Check-in aberto em ${aberto.cliente?.nome ?? 'outro cliente'}. Faça o check-out primeiro.` : null
   return (
-    <Button variant="ghost" size="sm" disabled={emOutro || enviando} onClick={entrar}
-      title={emOutro ? `Você tem um check-in aberto em ${aberto.cliente?.nome ?? 'outro cliente'}. Faça o check-out primeiro.` : undefined}>
-      <LogIn /> Fazer check-in
-    </Button>
+    <span className="inline-flex flex-col items-end align-middle">
+      <Button variant="ghost" size="sm" disabled={emOutro || enviando} onClick={entrar} aria-describedby={dica ? idDaDica : undefined}>
+        <LogIn /> Fazer check-in
+      </Button>
+      {dica && <span id={idDaDica} className="max-w-48 whitespace-normal text-right text-xs text-muted-foreground">{dica}</span>}
+    </span>
   )
 }
