@@ -8,7 +8,7 @@ export const status = lerStatusLocal()
 const semSessao = { auth: { persistSession: false, autoRefreshToken: false } }
 const admin = createClient(status.API_URL, status.SECRET_KEY, semSessao)
 
-const criados = { consultorias: new Set(), usuarios: new Set() }
+const criados = { consultorias: new Set(), usuarios: new Set(), clientes: new Set() }
 
 export const REDIRECT = 'http://localhost:5173/definir-senha'
 export const SENHA_TESTE = 'teste-1234'
@@ -95,6 +95,11 @@ export function registrarConsultoria(id) {
   if (id) criados.consultorias.add(id)
 }
 
+// Clientes criados pelos testes entram na limpeza pelo id (os das consultorias de teste também são apagados).
+export function registrarCliente(id) {
+  if (id) criados.clientes.add(id)
+}
+
 // Usuários criados pelas funções (não pelos ajudantes) entram na limpeza pelo e-mail.
 export async function registrarEmail(email) {
   const { data } = await admin.from('perfis').select('id').eq('email', email)
@@ -103,6 +108,15 @@ export async function registrarEmail(email) {
 
 export async function limparTudo() {
   const consultorias = [...criados.consultorias]
+  // Check-ins e clientes seguram consultorias e clientes (restrict): saem antes.
+  const clientes = new Set(criados.clientes)
+  if (consultorias.length) {
+    const { data } = await admin.from('clientes').select('id').in('consultoria_id', consultorias)
+    for (const linha of data ?? []) clientes.add(linha.id)
+  }
+  if (clientes.size) await admin.from('checkins').delete().in('cliente_id', [...clientes])
+  if (consultorias.length) await admin.from('checkins').delete().in('consultoria_id', consultorias)
+  if (clientes.size) await admin.from('clientes').delete().in('id', [...clientes])
   if (consultorias.length) {
     await admin.from('times').delete().in('consultoria_id', consultorias)
     const { data } = await admin.from('perfis').select('id').in('consultoria_id', consultorias)
@@ -112,4 +126,5 @@ export async function limparTudo() {
   if (consultorias.length) await admin.from('consultorias').delete().in('id', consultorias)
   criados.consultorias.clear()
   criados.usuarios.clear()
+  criados.clientes.clear()
 }
