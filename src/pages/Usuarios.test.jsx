@@ -4,8 +4,9 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { contarClientesAtivos } from '@/data/clientes'
 import { trocarFoto } from '@/data/imagens'
 import { definirCarga, listarAusencias } from '@/data/capacidade'
-import { listarNomesDeConsultorias } from '@/data/consultorias'
+import { buscarConsultoriasAtivas, listarNomesDeConsultorias } from '@/data/consultorias'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
+import { escolherNoSeletor } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
 import Usuarios from './Usuarios'
 
@@ -16,7 +17,7 @@ vi.mock('@/data/capacidade', () => ({
   definirCarga: vi.fn(), listarAusencias: vi.fn(), criarAusencia: vi.fn(), editarAusencia: vi.fn(), apagarAusencia: vi.fn(),
 }))
 vi.mock('@/data/clientes', () => ({ contarClientesAtivos: vi.fn() }))
-vi.mock('@/data/consultorias', () => ({ listarNomesDeConsultorias: vi.fn() }))
+vi.mock('@/data/consultorias', () => ({ listarNomesDeConsultorias: vi.fn(), buscarConsultoriasAtivas: vi.fn() }))
 vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn().mockResolvedValue({ erro: null }), tirarFoto: vi.fn() }))
 vi.mock('@/data/times', () => ({
   listarOpcoesDeTimes: vi.fn().mockResolvedValue([]), adicionarMembro: vi.fn(), removerMembro: vi.fn(),
@@ -30,9 +31,9 @@ beforeAll(() => {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(contarClientesAtivos).mockResolvedValue(0)
-  // O filtro da lista mostra todas; o seletor da ficha pede só as ativas.
-  vi.mocked(listarNomesDeConsultorias).mockImplementation(async ({ ativas } = {}) =>
-    ativas ? [{ id: 'k1', nome: 'Acme' }] : [{ id: 'k1', nome: 'Acme' }, { id: 'k2', nome: 'Velha Arquivada' }])
+  // O filtro da lista mostra todas; o seletor da ficha busca no banco só as ativas.
+  vi.mocked(listarNomesDeConsultorias).mockImplementation(async () => [{ id: 'k1', nome: 'Acme' }, { id: 'k2', nome: 'Velha Arquivada' }])
+  vi.mocked(buscarConsultoriasAtivas).mockResolvedValue({ itens: [{ id: 'k1', nome: 'Acme' }], total: 1 })
   vi.mocked(listarAusencias).mockResolvedValue({ itens: [], total: 0 })
   vi.mocked(listarUsuarios).mockResolvedValue({
     itens: [
@@ -69,8 +70,8 @@ describe('Usuários', () => {
     expect(within(janela).getByLabelText('Cargo')).toHaveValue('Analista')
     expect(within(janela).getByLabelText('Telefone')).toHaveValue('(11) 98888-1111')
     expect(within(janela).getByLabelText('Cidade')).toHaveValue('Santos')
-    expect(within(janela).getByLabelText('UF')).toHaveValue('SP')
-    expect(within(janela).getByLabelText('Data de entrada')).toHaveValue('2026-01-10')
+    expect(within(janela).getByLabelText('UF')).toHaveTextContent('SP')
+    expect(within(janela).getByLabelText('Data de entrada')).toHaveTextContent('10 de jan de 2026')
     expect(within(janela).getByLabelText('Carga semanal (horas)')).toHaveValue('40')
   })
 
@@ -141,7 +142,7 @@ describe('Usuários', () => {
     await userEvent.type(within(janela).getByLabelText('Nome'), 'Rita Alves')
     await userEvent.type(within(janela).getByLabelText('E-mail'), 'rita@x.test')
     await userEvent.type(within(janela).getByLabelText('Cargo'), 'Analista')
-    await userEvent.selectOptions(within(janela).getByLabelText('UF'), 'MG')
+    await escolherNoSeletor(userEvent, 'UF', 'MG')
     await userEvent.clear(within(janela).getByLabelText('Carga semanal (horas)'))
     await userEvent.type(within(janela).getByLabelText('Carga semanal (horas)'), '30')
     await userEvent.click(within(janela).getByRole('button', { name: 'Enviar convite' }))
@@ -271,8 +272,9 @@ describe('Usuários', () => {
       const janela = screen.getByRole('dialog', { name: 'Novo acesso' })
       // O filtro fica escondido (aria-hidden) enquanto a janela está aberta: as opções saem direto do elemento.
       const opcoes = (seletor) => [...seletor.querySelectorAll('option')].map((o) => o.textContent)
-      await waitFor(() => expect(opcoes(within(janela).getByLabelText('Consultoria'))).toEqual(['Escolha…', 'Acme']))
-      expect(listarNomesDeConsultorias).toHaveBeenCalledWith({ ativas: true })
+      await userEvent.click(within(janela).getByLabelText('Consultoria'))
+      expect((await within(janela).findAllByRole('option')).map((o) => o.textContent)).toEqual(['Acme'])
+      expect(buscarConsultoriasAtivas).toHaveBeenCalledWith('')
       await waitFor(() => expect(opcoes(document.getElementById('filtro-consultoria'))).toEqual(['Todas', 'Acme', 'Velha Arquivada']))
     })
 

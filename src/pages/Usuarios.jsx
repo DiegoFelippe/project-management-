@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import FichaDoConsultor from '@/components/usuarios/FichaDoConsultor'
 import { definirCarga } from '@/data/capacidade'
-import { listarNomesDeConsultorias } from '@/data/consultorias'
+import { buscarConsultoriasAtivas } from '@/data/consultorias'
 import { tirarFoto, trocarFoto } from '@/data/imagens'
 import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
@@ -37,7 +37,6 @@ export default function Usuarios() {
   const [pagina, setPagina] = useState(1)
   const [erro, setErro] = useState(null)
   const [times, setTimes] = useState([])
-  const [consultorias, setConsultorias] = useState([])
   const [novo, setNovo] = useState(false)
   const [reenviando, setReenviando] = useState(null)
   const [filtro, setFiltro] = useState('ativos')
@@ -69,12 +68,6 @@ export default function Usuarios() {
       .then((lista) => setTimes(perfil.papel === 'gestor' ? lista.filter((t) => t.gestor_id === perfil.id) : lista))
       .catch(() => setTimes([]))
   }, [ehDono, perfil.consultoria_id, perfil.papel, perfil.id, versao])
-
-  // Consultorias para escolher ao criar um administrador (só quem vê tudo): só as ativas.
-  useEffect(() => {
-    if (!ehDono) return
-    listarNomesDeConsultorias({ ativas: true }).then(setConsultorias).catch(() => setConsultorias([]))
-  }, [ehDono])
 
   const meusTimes = useMemo(() => new Set(times.map((t) => t.id)), [times])
   // Desativar ou mover para a central: os clientes ativos da pessoa voltam a aguardar consultor (o banco conta).
@@ -284,7 +277,7 @@ export default function Usuarios() {
       )}
       {novo && (!ehDono || ehAdminGeral) && (
         <FichaDoConsultor aberto perfilDeQuem={perfil} times={times} consultoriaId={consultoriaId}
-          consultorias={ehDono ? consultorias : undefined}
+          buscarConsultorias={ehDono ? buscarConsultoriasAtivas : undefined}
           aoFechar={() => setNovo(false)} aoCriar={criar} aoColocarNosTimes={colocarNosTimes} />
       )}
     </>

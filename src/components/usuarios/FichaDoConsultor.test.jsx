@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { listarAusencias } from '@/data/capacidade'
+import { escolherData, escolherNoSeletor } from '@/test/campos'
 import FichaDoConsultor from './FichaDoConsultor'
 
 vi.mock('@/data/capacidade', () => ({
@@ -36,7 +37,14 @@ function montarNovo(props = {}) {
   return funcoes
 }
 
-const opcoesDoPapel = () => within(screen.getByLabelText('Papel')).getAllByRole('option').map((o) => o.textContent)
+// Abre o Seletor `nome`, lê as opções da lista e fecha com Esc.
+async function opcoesDo(nome) {
+  await userEvent.click(screen.getByLabelText(nome))
+  const textos = screen.getAllByRole('option').map((o) => o.textContent)
+  await userEvent.keyboard('{Escape}')
+  return textos
+}
+const opcoesDoPapel = () => opcoesDo('Papel')
 
 async function preencher({ senha } = {}) {
   await userEvent.type(screen.getByLabelText('Nome'), 'João Pereira')
@@ -53,19 +61,19 @@ describe('FichaDoConsultor: Novo acesso', () => {
     expect(blocos).toEqual(['Dados', 'Contato', 'Capacidade', 'Papel e times', 'Acesso'])
   })
 
-  it('gestor só cria pessoa', () => {
+  it('gestor só cria pessoa', async () => {
     montarNovo()
-    expect(opcoesDoPapel()).toEqual(['Pessoa'])
+    expect(await opcoesDoPapel()).toEqual(['Pessoa'])
   })
 
-  it('admin cria pessoa ou gestor', () => {
+  it('admin cria pessoa ou gestor', async () => {
     montarNovo({ perfilDeQuem: ADMIN })
-    expect(opcoesDoPapel()).toEqual(['Pessoa', 'Gestor'])
+    expect(await opcoesDoPapel()).toEqual(['Pessoa', 'Gestor'])
   })
 
   it('dono cria administrador ou central, sem times', async () => {
     const { aoCriar } = montarNovo({ perfilDeQuem: { id: 'd1', papel: 'dono' }, consultoriaId: 'c1', times: [] })
-    expect(opcoesDoPapel()).toEqual(['Administrador', 'Central'])
+    expect(await opcoesDoPapel()).toEqual(['Administrador', 'Central'])
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Nome'), 'Rita Alves')
     await userEvent.type(screen.getByLabelText('E-mail'), 'rita@acme.com.br')
@@ -78,7 +86,7 @@ describe('FichaDoConsultor: Novo acesso', () => {
 
   it('dono criando central não manda consultoria e não vê Capacidade', async () => {
     const { aoCriar } = montarNovo({ perfilDeQuem: { id: 'd1', papel: 'dono' }, consultoriaId: 'c1', times: [] })
-    await userEvent.selectOptions(screen.getByLabelText('Papel'), 'central')
+    await escolherNoSeletor(userEvent, 'Papel', 'Central')
     expect(screen.queryByLabelText('Carga semanal (horas)')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Capacidade' })).not.toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Nome'), 'Rita Alves')
@@ -91,7 +99,7 @@ describe('FichaDoConsultor: Novo acesso', () => {
 
   it('central cria só administrador, na consultoria escolhida', async () => {
     const { aoCriar } = montarNovo({ perfilDeQuem: { id: 'c9', papel: 'central' }, consultoriaId: 'c1', times: [] })
-    expect(opcoesDoPapel()).toEqual(['Administrador'])
+    expect(await opcoesDoPapel()).toEqual(['Administrador'])
     await userEvent.type(screen.getByLabelText('Nome'), 'Rita Alves')
     await userEvent.type(screen.getByLabelText('E-mail'), 'rita@acme.com.br')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
@@ -101,14 +109,14 @@ describe('FichaDoConsultor: Novo acesso', () => {
   it('quem vê tudo escolhe a consultoria do administrador dentro da ficha', async () => {
     const { aoCriar } = montarNovo({
       perfilDeQuem: { id: 'c9', papel: 'central' }, consultoriaId: '', times: [],
-      consultorias: [{ id: 'c1', nome: 'Acme' }, { id: 'c2', nome: 'Beta' }],
+      buscarConsultorias: vi.fn().mockResolvedValue({ itens: [{ id: 'c1', nome: 'Acme' }, { id: 'c2', nome: 'Beta' }], total: 2 }),
     })
     await userEvent.type(screen.getByLabelText('Nome'), 'Rita Alves')
     await userEvent.type(screen.getByLabelText('E-mail'), 'rita@acme.com.br')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
     expect(aoCriar).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent(/Escolha uma consultoria/)
-    await userEvent.selectOptions(screen.getByLabelText('Consultoria'), 'c2')
+    await escolherNoSeletor(userEvent, 'Consultoria', 'Beta')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
     expect(aoCriar).toHaveBeenCalledWith(expect.objectContaining({ consultoria_id: 'c2' }), expect.anything())
   })
@@ -142,8 +150,8 @@ describe('FichaDoConsultor: Novo acesso', () => {
     await userEvent.type(screen.getByLabelText('Cargo'), 'Analista')
     await userEvent.type(screen.getByLabelText('Telefone'), '(11) 99999-0000')
     await userEvent.type(screen.getByLabelText('Cidade'), 'Campinas')
-    await userEvent.selectOptions(screen.getByLabelText('UF'), 'SP')
-    await userEvent.type(screen.getByLabelText('Data de entrada'), '2026-03-02')
+    await escolherNoSeletor(userEvent, 'UF', 'SP')
+    await escolherData(userEvent, 'Data de entrada', '2026-03-02')
     await userEvent.clear(screen.getByLabelText('Carga semanal (horas)'))
     await userEvent.type(screen.getByLabelText('Carga semanal (horas)'), '30,5')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
@@ -169,7 +177,7 @@ describe('FichaDoConsultor: Novo acesso', () => {
     expect(await screen.findByText('Use de 0 a 60 horas.')).toBeInTheDocument()
     await userEvent.clear(screen.getByLabelText('Carga semanal (horas)'))
     await userEvent.type(screen.getByLabelText('Carga semanal (horas)'), '40')
-    await userEvent.type(screen.getByLabelText('Data de entrada'), '2999-01-01')
+    await escolherData(userEvent, 'Data de entrada', '2099-01-01')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
     expect(await screen.findByText('A data de entrada não pode ser no futuro.')).toBeInTheDocument()
     expect(aoCriar).not.toHaveBeenCalled()
@@ -225,25 +233,25 @@ describe('FichaDoConsultor: Editar', () => {
     expect(screen.getByRole('dialog', { name: 'Editar Ana Lima' })).toBeInTheDocument()
     expect(screen.getByLabelText('Nome')).toHaveValue('Ana Lima')
     expect(screen.getByLabelText('Cargo')).toHaveValue('Analista')
-    expect(screen.getByLabelText('Data de entrada')).toHaveValue('2026-01-10')
+    expect(screen.getByLabelText('Data de entrada')).toHaveTextContent('10 de jan de 2026')
     expect(screen.getByLabelText('E-mail')).toBeDisabled()
     expect(screen.getByLabelText('E-mail')).toHaveValue('ana@exemplo.test')
     expect(screen.getByLabelText('Telefone')).toHaveValue('(11) 98888-1111')
     expect(screen.getByLabelText('Cidade')).toHaveValue('Santos')
-    expect(screen.getByLabelText('UF')).toHaveValue('SP')
+    expect(screen.getByLabelText('UF')).toHaveTextContent('SP')
     expect(screen.getByLabelText('Carga semanal (horas)')).toHaveValue('40')
   })
 
-  it('o select de UF tem as 27 UFs mais a opção vazia', () => {
+  it('a lista de UF tem as 27 UFs mais a opção vazia', async () => {
     montarEditar()
-    expect(within(screen.getByLabelText('UF')).getAllByRole('option')).toHaveLength(28)
+    expect(await opcoesDo('UF')).toHaveLength(28)
   })
 
   it('admin muda nome, papel e times, e manda só o que mudou', async () => {
     const { aoSalvar } = montarEditar()
     await userEvent.clear(screen.getByLabelText('Nome'))
     await userEvent.type(screen.getByLabelText('Nome'), 'Ana Souza')
-    await userEvent.selectOptions(screen.getByLabelText('Papel'), 'gestor')
+    await escolherNoSeletor(userEvent, 'Papel', 'Gestor')
     await userEvent.click(screen.getByRole('checkbox', { name: /Implantação/ }))
     await userEvent.click(screen.getByRole('checkbox', { name: /Suporte/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
@@ -264,7 +272,7 @@ describe('FichaDoConsultor: Editar', () => {
     await userEvent.clear(screen.getByLabelText('Cargo'))
     await userEvent.clear(screen.getByLabelText('Telefone'))
     await userEvent.clear(screen.getByLabelText('Cidade'))
-    await userEvent.selectOptions(screen.getByLabelText('UF'), 'RJ')
+    await escolherNoSeletor(userEvent, 'UF', 'RJ')
     await userEvent.clear(screen.getByLabelText('Carga semanal (horas)'))
     await userEvent.type(screen.getByLabelText('Carga semanal (horas)'), '35,5')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))

@@ -1,9 +1,10 @@
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { CalendarOff, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import CampoData from '@/components/campos/CampoData'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
+import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { apagarAusencia, criarAusencia, editarAusencia } from '@/data/capacidade'
@@ -37,11 +38,11 @@ function Formulario({ ausencia, aoSalvar, aoCancelar }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor="ausencia-de">De</Label>
-          <Input id="ausencia-de" type="date" className="h-10" value={de} onChange={(e) => setDe(e.target.value)} />
+          <CampoData id="ausencia-de" valor={de} aoMudar={setDe} />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="ausencia-ate">Até</Label>
-          <Input id="ausencia-ate" type="date" className="h-10" value={ate} onChange={(e) => setAte(e.target.value)} />
+          <CampoData id="ausencia-ate" valor={ate} aoMudar={setAte} />
         </div>
       </div>
       <div className="grid gap-2">
@@ -58,8 +59,7 @@ function Formulario({ ausencia, aoSalvar, aoCancelar }) {
 }
 
 // Lista, cria, edita e apaga as ausências de uma pessoa (férias, licenças). Quem pode é decidido no banco.
-// `rodape` (opcional) são botões extras ao lado de "Nova ausência" (ex.: Fechar).
-export function GerirAusencias({ pessoa, aoMudar, rodape }) {
+export function GerirAusencias({ pessoa, aoMudar }) {
   const [formulario, setFormulario] = useState(null) // null | 'nova' | ausência
   const [apagando, setApagando] = useState(null)
   const [versao, setVersao] = useState(0)
@@ -92,7 +92,6 @@ export function GerirAusencias({ pessoa, aoMudar, rodape }) {
           aoSalvar={salvar} aoCancelar={() => setFormulario(null)} />
       ) : (
         <div className="flex justify-end gap-2">
-          {rodape}
           <Button type="button" onClick={() => setFormulario('nova')}><Plus /> Nova ausência</Button>
         </div>
       )}
@@ -112,15 +111,10 @@ export function GerirAusencias({ pessoa, aoMudar, rodape }) {
 
 export default function JanelaAusencias({ aberto, pessoa, aoFechar, aoMudar }) {
   return (
-    <Dialog open={aberto} onOpenChange={(abrir) => !abrir && aoFechar()}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Ausências de {pessoa.nome}</DialogTitle>
-          <DialogDescription>Nos dias de ausência a pessoa não conta na capacidade do mês.</DialogDescription>
-        </DialogHeader>
-        <GerirAusencias pessoa={pessoa} aoMudar={aoMudar}
-          rodape={<Button type="button" variant="outline" onClick={aoFechar}>Fechar</Button>} />
-      </DialogContent>
-    </Dialog>
+    <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={`Ausências de ${pessoa.nome}`} icone={CalendarOff} largura="lg"
+      descricao="Nos dias de ausência a pessoa não conta na capacidade do mês."
+      rodape={<Button type="button" variant="outline" onClick={aoFechar}>Fechar</Button>}>
+      <GerirAusencias pessoa={pessoa} aoMudar={aoMudar} />
+    </JanelaFormulario>
   )
 }

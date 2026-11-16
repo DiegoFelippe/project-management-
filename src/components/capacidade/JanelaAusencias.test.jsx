@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { escolherData } from '@/test/campos'
 import { apagarAusencia, criarAusencia, editarAusencia, listarAusencias } from '@/data/capacidade'
 import JanelaAusencias from './JanelaAusencias'
 
@@ -30,8 +31,8 @@ describe('JanelaAusencias', () => {
 
   it('cria uma ausência com de, até e motivo', async () => {
     await userEvent.click(await screen.findByRole('button', { name: /Nova ausência/ }))
-    await userEvent.type(screen.getByLabelText('De'), '2026-12-01')
-    await userEvent.type(screen.getByLabelText('Até'), '2026-12-03')
+    await escolherData(userEvent, 'De', '2026-12-01')
+    await escolherData(userEvent, 'Até', '2026-12-03')
     await userEvent.type(screen.getByLabelText('Motivo'), 'Licença')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar ausência' }))
     expect(criarAusencia).toHaveBeenCalledWith({ perfilId: 'p1', de: '2026-12-01', ate: '2026-12-03', motivo: 'Licença' })
@@ -41,8 +42,8 @@ describe('JanelaAusencias', () => {
 
   it('recusa motivo de 1 caractere', async () => {
     await userEvent.click(await screen.findByRole('button', { name: /Nova ausência/ }))
-    await userEvent.type(screen.getByLabelText('De'), '2026-12-01')
-    await userEvent.type(screen.getByLabelText('Até'), '2026-12-03')
+    await escolherData(userEvent, 'De', '2026-12-01')
+    await escolherData(userEvent, 'Até', '2026-12-03')
     await userEvent.type(screen.getByLabelText('Motivo'), 'F')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar ausência' }))
     expect(screen.getByRole('alert')).toHaveTextContent('O motivo precisa ter de 2 a 120 caracteres.')
@@ -51,8 +52,8 @@ describe('JanelaAusencias', () => {
 
   it('recusa data final antes da inicial', async () => {
     await userEvent.click(await screen.findByRole('button', { name: /Nova ausência/ }))
-    await userEvent.type(screen.getByLabelText('De'), '2026-12-10')
-    await userEvent.type(screen.getByLabelText('Até'), '2026-12-03')
+    await escolherData(userEvent, 'De', '2026-12-10')
+    await escolherData(userEvent, 'Até', '2026-12-03')
     await userEvent.type(screen.getByLabelText('Motivo'), 'Licença')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar ausência' }))
     expect(screen.getByRole('alert')).toHaveTextContent('A data final não pode ser antes da inicial.')
@@ -61,7 +62,7 @@ describe('JanelaAusencias', () => {
 
   it('Editar abre o formulário preenchido e salva', async () => {
     await userEvent.click(await screen.findByRole('button', { name: /Editar/ }))
-    expect(screen.getByLabelText('De')).toHaveValue('2026-12-20')
+    expect(screen.getByLabelText('De')).toHaveTextContent('20 de dez de 2026')
     expect(screen.getByLabelText('Motivo')).toHaveValue('Férias')
     await userEvent.clear(screen.getByLabelText('Motivo'))
     await userEvent.type(screen.getByLabelText('Motivo'), 'Recesso')

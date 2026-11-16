@@ -1,5 +1,6 @@
 import { traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
+import { padraoParcial } from '@/lib/busca'
 import { buscarPagina } from './paginar'
 
 // Para o filtro de quem vê tudo nas listas (todas, inclusive as arquivadas) e, com { ativas: true }, para o seletor
@@ -10,6 +11,17 @@ export async function listarNomesDeConsultorias({ ativas = false } = {}) {
   const { data, error } = await consulta.order('nome')
   if (error) throw error
   return data
+}
+
+// Seletor de consultoria com busca no banco (acesso novo de administrador): só as ativas, pelo nome (ilike), no
+// máximo `limite` por vez. Devolve { itens: [{ id, nome }], total } (total = quantas combinam, para "N de TOTAL").
+export async function buscarConsultoriasAtivas(termo = '', limite = 20) {
+  let consulta = supabase.from('consultorias').select('id, nome', { count: 'exact' }).is('arquivada_em', null).order('nome').limit(limite)
+  const padrao = padraoParcial(termo)
+  if (padrao) consulta = consulta.ilike('nome', padrao)
+  const { data, error, count } = await consulta
+  if (error) throw error
+  return { itens: data, total: count ?? 0 }
 }
 
 // Tela Consultorias (só o dono enxerga todas): uma página, ativas ou arquivadas. Pessoas e times
