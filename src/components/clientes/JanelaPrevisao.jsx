@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { Gauge } from 'lucide-react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import CampoNumero from '@/components/campos/CampoNumero'
+import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { lerHoras, MAXIMO_DE_HORAS_NO_MES } from './rotulos'
 
@@ -26,24 +27,21 @@ export default function JanelaPrevisao({ aberto, cliente, aoFechar, aoSalvar }) 
   }
 
   return (
-    <Dialog open={aberto} onOpenChange={(abrir) => !abrir && aoFechar()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Ajustar a previsão de {cliente.nome}</DialogTitle>
-          <DialogDescription>Quantas horas por mês estão previstas para este cliente.</DialogDescription>
-        </DialogHeader>
-        <form noValidate onSubmit={salvar} className="grid gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="previsao-horas">Previsão de horas por mês</Label>
-            <Input id="previsao-horas" className="h-10" inputMode="decimal" value={horas} onChange={(e) => setHoras(e.target.value)} />
-          </div>
-          {erro && <Aviso>{erro}</Aviso>}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={aoFechar}>Cancelar</Button>
-            <Button type="submit" disabled={enviando}>Salvar</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={`Ajustar a previsão de ${cliente.nome}`} icone={Gauge} enviando={enviando}
+      descricao="Quantas horas por mês estão previstas para este cliente."
+      rodape={(
+        <>
+          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
+          <Button type="submit" form="form-previsao" disabled={enviando}>{enviando ? 'Salvando…' : 'Salvar'}</Button>
+        </>
+      )}>
+      <form id="form-previsao" noValidate onSubmit={salvar} className="space-y-5">
+        <div className="grid gap-2">
+          <Label htmlFor="previsao-horas">Previsão de horas por mês</Label>
+          <CampoNumero id="previsao-horas" valor={horas} aoMudar={setHoras} min={0} max={999} passo={0.5} decimal unidade="h" />
+        </div>
+        {erro && <Aviso>{erro}</Aviso>}
+      </form>
+    </JanelaFormulario>
   )
 }

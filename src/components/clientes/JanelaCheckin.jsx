@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { Clock } from 'lucide-react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import CampoData from '@/components/campos/CampoData'
+import CampoHora from '@/components/campos/CampoHora'
+import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CHECKIN_DE_MAIS_DE_24H } from '@/lib/erros'
 import { horasEntre } from '@/lib/horas'
@@ -85,57 +87,52 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
   const campoDataDoFim = (
     <div className="grid gap-2">
       <Label htmlFor="checkin-data-fim">Data do fim</Label>
-      <Input id="checkin-data-fim" type="date" className="h-10" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+      <CampoData id="checkin-data-fim" valor={dataFim} aoMudar={setDataFim} />
     </div>
   )
   const campoFim = (
     <div className="grid gap-2">
       <Label htmlFor="checkin-fim">Fim</Label>
-      <Input id="checkin-fim" type="time" className="h-10" value={fim} onChange={(e) => setFim(e.target.value)} />
+      <CampoHora id="checkin-fim" valor={fim} aoMudar={setFim} />
     </div>
   )
 
   return (
-    <Dialog open={aberto} onOpenChange={(abrir) => !abrir && aoFechar()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{textos.titulo} {nomeDoCliente}</DialogTitle>
-          <DialogDescription>
-            {modo === 'editar' && fechando ? 'Informe o fim e o que foi feito para fechar o check-in.' : textos.descricao}
-          </DialogDescription>
-        </DialogHeader>
-        <form noValidate onSubmit={salvar} className="grid gap-4">
-          {checkout ? (
-            <div className="grid grid-cols-2 gap-3">
-              {campoDataDoFim}
-              {campoFim}
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-3 grid gap-2 sm:col-span-1">
-                <Label htmlFor="checkin-data">Data</Label>
-                <Input id="checkin-data" type="date" className="h-10" value={data} onChange={(e) => setData(e.target.value)} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="checkin-inicio">Início</Label>
-                <Input id="checkin-inicio" type="time" className="h-10" value={inicio} onChange={(e) => setInicio(e.target.value)} />
-              </div>
-              {campoFim}
-              {comDataDoFim && <div className="col-span-3">{campoDataDoFim}</div>}
-            </div>
-          )}
-          <div className="grid gap-2">
-            <Label htmlFor="checkin-descricao">O que foi feito</Label>
-            <textarea id="checkin-descricao" rows={4} value={descricao} onChange={(e) => setDescricao(e.target.value)}
-              className="border-input bg-card focus-visible:border-ring focus-visible:ring-ring/30 w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none hover:border-primary/40 focus-visible:ring-4" />
+    <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={`${textos.titulo} ${nomeDoCliente}`} icone={Clock} largura="lg" enviando={enviando}
+      descricao={modo === 'editar' && fechando ? 'Informe o fim e o que foi feito para fechar o check-in.' : textos.descricao}
+      rodape={(
+        <>
+          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
+          <Button type="submit" form="form-checkin" disabled={enviando}>{enviando ? 'Salvando…' : textos.botao}</Button>
+        </>
+      )}>
+      <form id="form-checkin" noValidate onSubmit={salvar} className="space-y-5">
+        {checkout ? (
+          <div className="grid grid-cols-2 gap-3">
+            {campoDataDoFim}
+            {campoFim}
           </div>
-          {erro && <Aviso>{erro}</Aviso>}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={aoFechar}>Cancelar</Button>
-            <Button type="submit" disabled={enviando}>{textos.botao}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-3 grid gap-2 sm:col-span-1">
+              <Label htmlFor="checkin-data">Data</Label>
+              <CampoData id="checkin-data" valor={data} aoMudar={setData} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="checkin-inicio">Início</Label>
+              <CampoHora id="checkin-inicio" valor={inicio} aoMudar={setInicio} />
+            </div>
+            {campoFim}
+            {comDataDoFim && <div className="col-span-3">{campoDataDoFim}</div>}
+          </div>
+        )}
+        <div className="grid gap-2">
+          <Label htmlFor="checkin-descricao">O que foi feito</Label>
+          <textarea id="checkin-descricao" rows={4} value={descricao} onChange={(e) => setDescricao(e.target.value)}
+            className="border-input bg-card focus-visible:border-ring focus-visible:ring-ring/30 w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none hover:border-primary/40 focus-visible:ring-4" />
+        </div>
+        {erro && <Aviso>{erro}</Aviso>}
+      </form>
+    </JanelaFormulario>
   )
 }

@@ -1,8 +1,8 @@
-import { Search } from 'lucide-react'
+import { Search, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { formatarOcupacao } from '@/lib/horas'
 import ListaDeOcupacao from './ListaDeOcupacao'
@@ -35,39 +35,35 @@ export default function EscolhaDeOcupacao({
   }
 
   return (
-    <Dialog open={aberto} onOpenChange={(abrir) => !abrir && aoFechar()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{titulo}</DialogTitle>
-          <DialogDescription>{descricao}</DialogDescription>
-        </DialogHeader>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input type="search" aria-label={rotuloDaBusca} placeholder={rotuloDaBusca} className="h-10 pl-9"
-            value={busca} onChange={(e) => setBusca(e.target.value)} />
-        </div>
-        {erroDaLista && <Aviso>{erroDaLista}</Aviso>}
-        {itens === null && <p className="text-sm text-muted-foreground">Carregando…</p>}
-        {itens?.length === 0 && !erroDaLista && <p className="text-sm text-muted-foreground">Nenhuma opção encontrada.</p>}
-        {itens?.length > 0 && (
-          <ListaDeOcupacao itens={itens} total={total} escolhido={escolhido?.id} atualId={atualId} rotuloDoValor={rotuloDoValor}
-            carregandoMais={carregandoMais} aoEscolher={setManual} aoMostrarMais={mostrarMais} />
-        )}
-        {escolhido && (
-          <p aria-live="polite" className="rounded-md bg-muted px-3 py-2 text-sm">
-            {previa
-              ? frasePrevia(escolhido.nome, formatarOcupacao(previa.antes), formatarOcupacao(previa.depois))
-              : fraseSemCapacidade(escolhido.nome)}
-          </p>
-        )}
-        {erro && <Aviso>{erro}</Aviso>}
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={aoFechar}>Cancelar</Button>
+    <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={titulo} descricao={descricao} icone={Users} largura="lg" enviando={enviando}
+      rodape={(
+        <>
+          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
           <Button type="button" disabled={!escolhido || enviando} onClick={confirmar}>
-            {escolhido ? rotuloDoBotao(escolhido) : 'Escolher'}
+            {enviando ? 'Salvando…' : escolhido ? rotuloDoBotao(escolhido) : 'Escolher'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      )}>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input type="search" aria-label={rotuloDaBusca} placeholder={rotuloDaBusca} className="h-10 pl-9"
+          value={busca} onChange={(e) => setBusca(e.target.value)} />
+      </div>
+      {erroDaLista && <Aviso>{erroDaLista}</Aviso>}
+      {itens === null && <p className="text-sm text-muted-foreground">Carregando…</p>}
+      {itens?.length === 0 && !erroDaLista && <p className="text-sm text-muted-foreground">Nenhuma opção encontrada.</p>}
+      {itens?.length > 0 && (
+        <ListaDeOcupacao itens={itens} total={total} escolhido={escolhido?.id} atualId={atualId} rotuloDoValor={rotuloDoValor}
+          carregandoMais={carregandoMais} aoEscolher={setManual} aoMostrarMais={mostrarMais} />
+      )}
+      {escolhido && (
+        <p aria-live="polite" className="rounded-md bg-muted px-3 py-2 text-sm">
+          {previa
+            ? frasePrevia(escolhido.nome, formatarOcupacao(previa.antes), formatarOcupacao(previa.depois))
+            : fraseSemCapacidade(escolhido.nome)}
+        </p>
+      )}
+      {erro && <Aviso>{erro}</Aviso>}
+    </JanelaFormulario>
   )
 }

@@ -7,6 +7,7 @@ import {
   mandarParaConsultoria, reativarCliente,
 } from '@/data/clientes'
 import { fazerCheckin, lancarHoras, meuCheckinAberto } from '@/data/checkins'
+import { escolherData, escolherHora } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
 import Clientes from './Clientes'
 
@@ -81,7 +82,7 @@ describe('Clientes (central)', () => {
     const janela = screen.getByRole('dialog', { name: 'Editar cliente' })
     expect(within(janela).getByLabelText('Nome')).toHaveValue('Provedor Alfa')
     expect(within(janela).getByLabelText('CNPJ')).toHaveValue('11.222.333/0001-81')
-    expect(within(janela).getByLabelText('Previsão de horas por mês')).toHaveValue(40)
+    expect(within(janela).getByLabelText('Previsão de horas por mês')).toHaveValue('40')
     await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
     expect(editarCliente).toHaveBeenCalledWith('k1', expect.objectContaining({ nome: 'Provedor Alfa', horasMes: 40 }))
   })
@@ -355,13 +356,13 @@ describe('Clientes: check-in do consultor', () => {
     renderizarTela(<Clientes />, { perfil: pessoa })
     await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Lançar horas' }))
     const janela = screen.getByRole('dialog', { name: 'Lançar horas em Provedor Alfa' })
-    fireEvent.change(within(janela).getByLabelText('Data'), { target: { value: '2026-11-10' } })
-    fireEvent.change(within(janela).getByLabelText('Início'), { target: { value: '10:00' } })
-    fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '09:00' } })
+    await escolherData(userEvent, 'Data', '2026-11-10')
+    await escolherHora(userEvent, 'Início', '10:00')
+    await escolherHora(userEvent, 'Fim', '09:00')
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
     await userEvent.click(within(janela).getByRole('button', { name: 'Lançar horas' }))
     expect(within(janela).getByText('O fim precisa ser depois do início.')).toBeInTheDocument()
-    fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '11:00' } })
+    await escolherHora(userEvent, 'Fim', '11:00')
     await userEvent.click(within(janela).getByRole('button', { name: 'Lançar horas' }))
     expect(lancarHoras).toHaveBeenCalledWith({
       clienteId: 'k1', inicio: new Date('2026-11-10T10:00').toISOString(), fim: new Date('2026-11-10T11:00').toISOString(),
@@ -374,9 +375,9 @@ describe('Clientes: check-in do consultor', () => {
     renderizarTela(<Clientes />, { perfil: pessoa })
     await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Lançar horas' }))
     const janela = screen.getByRole('dialog')
-    fireEvent.change(within(janela).getByLabelText('Data'), { target: { value: '2026-11-10' } })
-    fireEvent.change(within(janela).getByLabelText('Início'), { target: { value: '09:00' } })
-    fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '11:00' } })
+    await escolherData(userEvent, 'Data', '2026-11-10')
+    await escolherHora(userEvent, 'Início', '09:00')
+    await escolherHora(userEvent, 'Fim', '11:00')
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
     await userEvent.click(within(janela).getByRole('button', { name: 'Lançar horas' }))
     expect(await within(janela).findByText('Esse horário se sobrepõe a outro check-in seu.')).toBeInTheDocument()

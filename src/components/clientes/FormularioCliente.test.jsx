@@ -26,12 +26,19 @@ describe('FormularioCliente', () => {
     expect(screen.getByRole('dialog', { name: 'Editar cliente' })).toBeInTheDocument()
     expect(screen.getByLabelText('Nome')).toHaveValue('Provedor Alfa')
     expect(screen.getByLabelText('CNPJ')).toHaveValue('11.222.333/0001-81')
-    expect(screen.getByLabelText('Previsão de horas por mês')).toHaveValue(40)
+    expect(screen.getByLabelText('Previsão de horas por mês')).toHaveValue('40')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(aoSalvar).toHaveBeenCalledWith(expect.objectContaining({
       nome: 'Provedor Alfa', razaoSocial: 'Alfa Telecom Ltda', cnpj: '11222333000181', cidade: 'Natal', uf: 'RN', horasMes: 40,
     }))
     expect(aoFechar).toHaveBeenCalled()
+  })
+
+  it('o Salvar do rodapé é o botão de envio do formulário (o Enter nos campos também envia)', () => {
+    abrir({ cliente: CLIENTE })
+    const salvar = screen.getByRole('button', { name: 'Salvar' })
+    expect(salvar).toHaveAttribute('type', 'submit')
+    expect(salvar.form).toBe(screen.getByLabelText('Cidade').form)
   })
 
   it('nome com 1 letra', async () => {
@@ -56,7 +63,7 @@ describe('FormularioCliente', () => {
     expect(aoSalvar).not.toHaveBeenCalled()
   })
 
-  it.each(['0', '-5'])('previsão %s não é aceita e não envia', async (valor) => {
+  it.each(['0', '0,0'])('previsão %s não é aceita e não envia', async (valor) => {
     const { aoSalvar } = abrir({ cliente: CLIENTE })
     await userEvent.clear(screen.getByLabelText('Previsão de horas por mês'))
     await userEvent.type(screen.getByLabelText('Previsão de horas por mês'), valor)

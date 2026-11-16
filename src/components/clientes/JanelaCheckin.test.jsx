@@ -1,12 +1,13 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { escolherData, escolherHora } from '@/test/campos'
 import JanelaCheckin from './JanelaCheckin'
 
-function preencher(janela, { data, inicio, fim }) {
-  fireEvent.change(within(janela).getByLabelText('Data'), { target: { value: data } })
-  fireEvent.change(within(janela).getByLabelText('Início'), { target: { value: inicio } })
-  fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: fim } })
+async function preencher(_janela, { data, inicio, fim }) {
+  await escolherData(userEvent, 'Data', data)
+  await escolherHora(userEvent, 'Início', inicio)
+  await escolherHora(userEvent, 'Fim', fim)
 }
 
 describe('JanelaCheckin: check-out', () => {
@@ -22,8 +23,8 @@ describe('JanelaCheckin: check-out', () => {
   it('exige o que foi feito e, sem mexer no fim, fecha agora (com os segundos)', async () => {
     const { aoSalvar, aoFechar, janela } = abrir(aberto('2026-11-10T10:00'))
     expect(within(janela).queryByLabelText('Início')).not.toBeInTheDocument()
-    expect(within(janela).getByLabelText('Data do fim')).toHaveValue('2026-11-10')
-    expect(within(janela).getByLabelText('Fim')).toHaveValue('12:34')
+    expect(within(janela).getByLabelText('Data do fim')).toHaveTextContent('10 de nov de 2026')
+    expect(within(janela).getByLabelText('Fim')).toHaveTextContent('12:34')
     await enviar(janela)
     expect(aoSalvar).not.toHaveBeenCalled()
     expect(within(janela).getByText('Conte o que foi feito.')).toBeInTheDocument()
@@ -35,8 +36,8 @@ describe('JanelaCheckin: check-out', () => {
 
   it('check-out esquecido há mais de 24 h: o fim vem preenchido com início + 24 h e fecha assim', async () => {
     const { aoSalvar, janela } = abrir(aberto('2026-11-09T06:15'))
-    expect(within(janela).getByLabelText('Data do fim')).toHaveValue('2026-11-10')
-    expect(within(janela).getByLabelText('Fim')).toHaveValue('06:15')
+    expect(within(janela).getByLabelText('Data do fim')).toHaveTextContent('10 de nov de 2026')
+    expect(within(janela).getByLabelText('Fim')).toHaveTextContent('06:15')
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Levantamento inicial')
     await enviar(janela)
     expect(aoSalvar).toHaveBeenCalledWith({ fim: new Date('2026-11-10T06:15').toISOString(), descricao: 'Levantamento inicial' })
@@ -44,8 +45,8 @@ describe('JanelaCheckin: check-out', () => {
 
   it('o fim é editável: manda o horário escolhido', async () => {
     const { aoSalvar, janela } = abrir(aberto('2026-11-09T22:00'))
-    fireEvent.change(within(janela).getByLabelText('Data do fim'), { target: { value: '2026-11-10' } })
-    fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '01:30' } })
+    await escolherData(userEvent, 'Data do fim', '2026-11-10')
+    await escolherHora(userEvent, 'Fim', '01:30')
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Virada de sistema')
     await enviar(janela)
     expect(aoSalvar).toHaveBeenCalledWith({ fim: new Date('2026-11-10T01:30').toISOString(), descricao: 'Virada de sistema' })
@@ -54,15 +55,15 @@ describe('JanelaCheckin: check-out', () => {
   it('confere o fim escolhido: antes do início, no futuro e mais de 24 h', async () => {
     const { aoSalvar, janela } = abrir(aberto('2026-11-09T06:15'))
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Levantamento')
-    fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '12:00' } })
+    await escolherHora(userEvent, 'Fim', '12:00')
     await enviar(janela)
     expect(within(janela).getByText('Um check-in não pode passar de 24 h. Ajuste o horário de fim.')).toBeInTheDocument()
-    fireEvent.change(within(janela).getByLabelText('Data do fim'), { target: { value: '2026-11-09' } })
-    fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '06:00' } })
+    await escolherData(userEvent, 'Data do fim', '2026-11-09')
+    await escolherHora(userEvent, 'Fim', '06:00')
     await enviar(janela)
     expect(within(janela).getByText('O fim precisa ser depois do início.')).toBeInTheDocument()
-    fireEvent.change(within(janela).getByLabelText('Data do fim'), { target: { value: '2026-11-10' } })
-    fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '13:00' } })
+    await escolherData(userEvent, 'Data do fim', '2026-11-10')
+    await escolherHora(userEvent, 'Fim', '13:00')
     await enviar(janela)
     expect(within(janela).getByText('O horário não pode estar no futuro.')).toBeInTheDocument()
     expect(aoSalvar).not.toHaveBeenCalled()
@@ -87,7 +88,7 @@ describe('JanelaCheckin: lançar horas', () => {
 
   it('fim antes do início mostra o erro e não envia', async () => {
     const { aoSalvar, janela } = abrir()
-    preencher(janela, { data: '2026-11-10', inicio: '10:00', fim: '09:00' })
+    await preencher(janela, { data: '2026-11-10', inicio: '10:00', fim: '09:00' })
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
     await enviar(janela)
     expect(within(janela).getByText('O fim precisa ser depois do início.')).toBeInTheDocument()
@@ -96,7 +97,7 @@ describe('JanelaCheckin: lançar horas', () => {
 
   it('não aceita horário no futuro', async () => {
     const { aoSalvar, janela } = abrir()
-    preencher(janela, { data: '2999-01-01', inicio: '09:00', fim: '10:00' })
+    await preencher(janela, { data: '2099-01-01', inicio: '09:00', fim: '10:00' })
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
     await enviar(janela)
     expect(within(janela).getByText('O horário não pode estar no futuro.')).toBeInTheDocument()
@@ -105,7 +106,7 @@ describe('JanelaCheckin: lançar horas', () => {
 
   it('o que foi feito precisa de pelo menos 2 caracteres (o banco recusa menos)', async () => {
     const { aoSalvar, janela } = abrir()
-    preencher(janela, { data: '2026-11-10', inicio: '09:00', fim: '10:00' })
+    await preencher(janela, { data: '2026-11-10', inicio: '09:00', fim: '10:00' })
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), ' x ')
     await enviar(janela)
     expect(within(janela).getByText('Conte o que foi feito.')).toBeInTheDocument()
@@ -116,7 +117,7 @@ describe('JanelaCheckin: lançar horas', () => {
     const { aoSalvar, janela } = abrir()
     await enviar(janela)
     expect(within(janela).getByText('Informe a data, o início e o fim.')).toBeInTheDocument()
-    preencher(janela, { data: '2026-11-10', inicio: '09:00', fim: '10:00' })
+    await preencher(janela, { data: '2026-11-10', inicio: '09:00', fim: '10:00' })
     await enviar(janela)
     expect(within(janela).getByText('Conte o que foi feito.')).toBeInTheDocument()
     expect(aoSalvar).not.toHaveBeenCalled()
@@ -124,7 +125,7 @@ describe('JanelaCheckin: lançar horas', () => {
 
   it('envia início e fim em ISO, no horário local', async () => {
     const { aoSalvar, janela } = abrir()
-    preencher(janela, { data: '2026-11-10', inicio: '09:00', fim: '10:30' })
+    await preencher(janela, { data: '2026-11-10', inicio: '09:00', fim: '10:30' })
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
     await enviar(janela)
     expect(aoSalvar).toHaveBeenCalledWith({
@@ -136,7 +137,7 @@ describe('JanelaCheckin: lançar horas', () => {
 
   it('mostra a mensagem de sobreposição devolvida pelo banco', async () => {
     const { janela } = abrir(vi.fn().mockResolvedValue({ erro: 'Esse horário se sobrepõe a outro check-in seu.' }))
-    preencher(janela, { data: '2026-11-10', inicio: '09:00', fim: '10:30' })
+    await preencher(janela, { data: '2026-11-10', inicio: '09:00', fim: '10:30' })
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
     await enviar(janela)
     expect(await within(janela).findByText('Esse horário se sobrepõe a outro check-in seu.')).toBeInTheDocument()
@@ -157,9 +158,9 @@ describe('JanelaCheckin: editar', () => {
 
   it('abre preenchida com o check-in e, sem mexer nos horários, manda só a descrição', async () => {
     const { aoSalvar, janela } = abrir()
-    expect(within(janela).getByLabelText('Data')).toHaveValue('2026-11-10')
-    expect(within(janela).getByLabelText('Início')).toHaveValue('09:00')
-    expect(within(janela).getByLabelText('Fim')).toHaveValue('10:30')
+    expect(within(janela).getByLabelText('Data')).toHaveTextContent('10 de nov de 2026')
+    expect(within(janela).getByLabelText('Início')).toHaveTextContent('09:00')
+    expect(within(janela).getByLabelText('Fim')).toHaveTextContent('10:30')
     expect(within(janela).getByLabelText('O que foi feito')).toHaveValue('Reunião')
     await salvar(janela)
     expect(aoSalvar).toHaveBeenCalledWith({ descricao: 'Reunião' })
@@ -167,21 +168,21 @@ describe('JanelaCheckin: editar', () => {
 
   it('mudou só o fim: manda só o fim', async () => {
     const { aoSalvar, janela } = abrir()
-    fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '10:45' } })
+    await escolherHora(userEvent, 'Fim', '10:45')
     await salvar(janela)
     expect(aoSalvar).toHaveBeenCalledWith({ fim: new Date('2026-11-10T10:45').toISOString(), descricao: 'Reunião' })
   })
 
   it('mudou só o início: manda só o início', async () => {
     const { aoSalvar, janela } = abrir()
-    fireEvent.change(within(janela).getByLabelText('Início'), { target: { value: '08:30' } })
+    await escolherHora(userEvent, 'Início', '08:30')
     await salvar(janela)
     expect(aoSalvar).toHaveBeenCalledWith({ inicio: new Date('2026-11-10T08:30').toISOString(), descricao: 'Reunião' })
   })
 
   it('mudou a data: o início e o fim vão para o novo dia', async () => {
     const { aoSalvar, janela } = abrir()
-    fireEvent.change(within(janela).getByLabelText('Data'), { target: { value: '2026-11-09' } })
+    await escolherData(userEvent, 'Data', '2026-11-09')
     await salvar(janela)
     expect(aoSalvar).toHaveBeenCalledWith({
       inicio: new Date('2026-11-09T09:00').toISOString(), fim: new Date('2026-11-09T10:30').toISOString(), descricao: 'Reunião',
@@ -194,7 +195,7 @@ describe('JanelaCheckin: editar', () => {
 
     it('Editar fecha o check-in: o fim vem preenchido com agora', async () => {
       const { aoSalvar, janela } = abrir({ id: 'c2', inicio: new Date('2026-11-10T09:00').toISOString(), fim: null, descricao: null })
-      expect(within(janela).getByLabelText('Fim')).toHaveValue('12:34')
+      expect(within(janela).getByLabelText('Fim')).toHaveTextContent('12:34')
       await salvar(janela)
       expect(within(janela).getByText('Conte o que foi feito.')).toBeInTheDocument()
       await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Suporte')
@@ -204,8 +205,8 @@ describe('JanelaCheckin: editar', () => {
 
     it('aberto há mais de 24 h: o fim vem com início + 24 h, na data do fim', async () => {
       const { aoSalvar, janela } = abrir({ id: 'c3', inicio: new Date('2026-11-08T20:00').toISOString(), fim: null, descricao: 'Migração' })
-      expect(within(janela).getByLabelText('Data do fim')).toHaveValue('2026-11-09')
-      expect(within(janela).getByLabelText('Fim')).toHaveValue('20:00')
+      expect(within(janela).getByLabelText('Data do fim')).toHaveTextContent('9 de nov de 2026')
+      expect(within(janela).getByLabelText('Fim')).toHaveTextContent('20:00')
       await salvar(janela)
       expect(aoSalvar).toHaveBeenCalledWith({ fim: new Date('2026-11-09T20:00').toISOString(), descricao: 'Migração' })
     })
