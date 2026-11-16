@@ -10,11 +10,14 @@ vi.mock('@/data/capacidade', () => ({
 
 const AUSENCIA = { id: 'a1', perfil_id: 'p1', de: '2026-12-20', ate: '2027-01-05', motivo: 'Férias' }
 
+let aoMudar
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listarAusencias).mockResolvedValue({ itens: [AUSENCIA], total: 1 })
   for (const f of [criarAusencia, editarAusencia, apagarAusencia]) vi.mocked(f).mockResolvedValue({ erro: null })
-  render(<JanelaAusencias aberto pessoa={{ id: 'p1', nome: 'Ana' }} aoFechar={() => {}} />)
+  aoMudar = vi.fn()
+  render(<JanelaAusencias aberto pessoa={{ id: 'p1', nome: 'Ana' }} aoFechar={() => {}} aoMudar={aoMudar} />)
 })
 
 describe('JanelaAusencias', () => {
@@ -32,6 +35,18 @@ describe('JanelaAusencias', () => {
     await userEvent.type(screen.getByLabelText('Motivo'), 'Licença')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar ausência' }))
     expect(criarAusencia).toHaveBeenCalledWith({ perfilId: 'p1', de: '2026-12-01', ate: '2026-12-03', motivo: 'Licença' })
+    await vi.waitFor(() => expect(listarAusencias).toHaveBeenCalledTimes(2))
+    expect(aoMudar).toHaveBeenCalledTimes(1)
+  })
+
+  it('recusa motivo de 1 caractere', async () => {
+    await userEvent.click(await screen.findByRole('button', { name: /Nova ausência/ }))
+    await userEvent.type(screen.getByLabelText('De'), '2026-12-01')
+    await userEvent.type(screen.getByLabelText('Até'), '2026-12-03')
+    await userEvent.type(screen.getByLabelText('Motivo'), 'F')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar ausência' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('O motivo precisa ter de 2 a 120 caracteres.')
+    expect(criarAusencia).not.toHaveBeenCalled()
   })
 
   it('recusa data final antes da inicial', async () => {
@@ -52,6 +67,8 @@ describe('JanelaAusencias', () => {
     await userEvent.type(screen.getByLabelText('Motivo'), 'Recesso')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar ausência' }))
     expect(editarAusencia).toHaveBeenCalledWith('a1', { de: '2026-12-20', ate: '2027-01-05', motivo: 'Recesso' })
+    await vi.waitFor(() => expect(listarAusencias).toHaveBeenCalledTimes(2))
+    expect(aoMudar).toHaveBeenCalledTimes(1)
   })
 
   it('Apagar pede confirmação', async () => {
@@ -60,5 +77,7 @@ describe('JanelaAusencias', () => {
     const confirmacao = screen.getByRole('alertdialog')
     await userEvent.click(within(confirmacao).getByRole('button', { name: 'Apagar' }))
     expect(apagarAusencia).toHaveBeenCalledWith('a1')
+    await vi.waitFor(() => expect(listarAusencias).toHaveBeenCalledTimes(2))
+    expect(aoMudar).toHaveBeenCalledTimes(1)
   })
 })

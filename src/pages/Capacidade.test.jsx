@@ -55,9 +55,26 @@ describe('Capacidade', () => {
     renderizarTela(<Capacidade />, { perfil: central })
     await screen.findByRole('table', { name: 'Capacidade' })
     await userEvent.click(screen.getByRole('button', { name: 'Consultorias' }))
-    const tabela = await screen.findByText('STI')
-    expect(tabela).toBeInTheDocument()
-    expect(consultoriasPorOcupacao).toHaveBeenCalled()
+    expect(await screen.findByRole('columnheader', { name: 'Aguardando' })).toBeInTheDocument()
+    expect(screen.getByText('320 h')).toBeInTheDocument()
+    expect(consultoriasPorOcupacao).toHaveBeenLastCalledWith(expect.objectContaining({ limite: 15, deslocamento: 0, mes: MES_ATUAL }))
+  })
+
+  it('a busca por nome espera 300 ms e volta para o começo', async () => {
+    renderizarTela(<Capacidade />, { perfil: central })
+    await screen.findByRole('table', { name: 'Capacidade' })
+    await userEvent.type(screen.getByLabelText('Buscar consultores'), 'Ana')
+    expect(consultoresPorOcupacao).not.toHaveBeenCalledWith(expect.objectContaining({ busca: expect.any(String) }))
+    await vi.waitFor(() => expect(consultoresPorOcupacao).toHaveBeenLastCalledWith(expect.objectContaining({ busca: 'Ana' })), { timeout: 1000 })
+    expect(consultoresPorOcupacao).toHaveBeenLastCalledWith(expect.objectContaining({ busca: 'Ana', deslocamento: 0 }))
+  })
+
+  it('Próximo avança o mês', async () => {
+    renderizarTela(<Capacidade />, { perfil: central })
+    await screen.findByRole('table', { name: 'Capacidade' })
+    await userEvent.click(screen.getByRole('button', { name: /Próximo/ }))
+    expect(await screen.findByText('dezembro de 2026')).toBeInTheDocument()
+    expect(consultoresPorOcupacao).toHaveBeenLastCalledWith(expect.objectContaining({ mes: '2026-12-01' }))
   })
 
   it('Editar carga abre com a carga da linha e salva', async () => {
