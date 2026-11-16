@@ -4,6 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { contarClientesAtivos } from '@/data/clientes'
 import { trocarFoto } from '@/data/imagens'
 import { definirCarga, listarAusencias } from '@/data/capacidade'
+import { listarNomesDeConsultorias } from '@/data/consultorias'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { renderizarTela } from '@/test/renderizar'
 import Usuarios from './Usuarios'
@@ -15,6 +16,7 @@ vi.mock('@/data/capacidade', () => ({
   definirCarga: vi.fn(), listarAusencias: vi.fn(), criarAusencia: vi.fn(), editarAusencia: vi.fn(), apagarAusencia: vi.fn(),
 }))
 vi.mock('@/data/clientes', () => ({ contarClientesAtivos: vi.fn() }))
+vi.mock('@/data/consultorias', () => ({ listarNomesDeConsultorias: vi.fn() }))
 vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn().mockResolvedValue({ erro: null }), tirarFoto: vi.fn() }))
 vi.mock('@/data/times', () => ({
   listarOpcoesDeTimes: vi.fn().mockResolvedValue([]), adicionarMembro: vi.fn(), removerMembro: vi.fn(),
@@ -28,6 +30,9 @@ beforeAll(() => {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(contarClientesAtivos).mockResolvedValue(0)
+  // O filtro da lista mostra todas; o seletor da ficha pede só as ativas.
+  vi.mocked(listarNomesDeConsultorias).mockImplementation(async ({ ativas } = {}) =>
+    ativas ? [{ id: 'k1', nome: 'Acme' }] : [{ id: 'k1', nome: 'Acme' }, { id: 'k2', nome: 'Velha Arquivada' }])
   vi.mocked(listarAusencias).mockResolvedValue({ itens: [], total: 0 })
   vi.mocked(listarUsuarios).mockResolvedValue({
     itens: [
@@ -258,6 +263,17 @@ describe('Usuários', () => {
       expect(within(linha).getByRole('button', { name: 'Editar' })).toBeInTheDocument()
       expect(within(linha).getByRole('button', { name: 'Desativar' })).toBeInTheDocument()
       expect(botoes(/Cida/)).toBeNull()
+    })
+
+    it('na ficha do dono, o seletor de consultoria mostra só as ativas; o filtro da lista, todas', async () => {
+      renderizarTela(<Usuarios />, { perfil: { id: 'd1', papel: 'dono', consultoria_id: null } })
+      await userEvent.click(await screen.findByRole('button', { name: /Novo acesso/ }))
+      const janela = screen.getByRole('dialog', { name: 'Novo acesso' })
+      // O filtro fica escondido (aria-hidden) enquanto a janela está aberta: as opções saem direto do elemento.
+      const opcoes = (seletor) => [...seletor.querySelectorAll('option')].map((o) => o.textContent)
+      await waitFor(() => expect(opcoes(within(janela).getByLabelText('Consultoria'))).toEqual(['Escolha…', 'Acme']))
+      expect(listarNomesDeConsultorias).toHaveBeenCalledWith({ ativas: true })
+      await waitFor(() => expect(opcoes(document.getElementById('filtro-consultoria'))).toEqual(['Todas', 'Acme', 'Velha Arquivada']))
     })
 
     it('a central só edita e desativa administradores, não move, e vê o filtro de consultoria', async () => {

@@ -33,8 +33,14 @@ async function consultoriaDoPedido(admin: SupabaseClient, quem: Perfil, dados: D
         return null
       }
       if (!dados.consultoria_id) throw new Falha(400, 'dados_invalidos', { campo: 'consultoria_id' })
-      const { data } = await admin.from('consultorias').select('id').eq('id', dados.consultoria_id).maybeSingle()
+      const { data } = await admin
+        .from('consultorias')
+        .select('id, arquivada_em')
+        .eq('id', dados.consultoria_id)
+        .maybeSingle()
       if (!data) throw new Falha(400, 'dados_invalidos', { campo: 'consultoria_id' })
+      // Consultoria arquivada não recebe acesso novo (quem é dela não entra): reative antes.
+      if (data.arquivada_em) throw new Falha(409, 'consultoria_arquivada')
       return data.id
     }
     case 'admin': {

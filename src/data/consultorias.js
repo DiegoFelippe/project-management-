@@ -2,9 +2,12 @@ import { traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
 import { buscarPagina } from './paginar'
 
-// Para o filtro do dono nas telas Times e Usuários.
-export async function listarNomesDeConsultorias() {
-  const { data, error } = await supabase.from('consultorias').select('id, nome').order('nome')
+// Para o filtro de quem vê tudo nas listas (todas, inclusive as arquivadas) e, com { ativas: true }, para o seletor
+// da ficha em Usuários (acesso novo só em consultoria ativa; a criar-acesso confere de novo).
+export async function listarNomesDeConsultorias({ ativas = false } = {}) {
+  let consulta = supabase.from('consultorias').select('id, nome')
+  if (ativas) consulta = consulta.is('arquivada_em', null)
+  const { data, error } = await consulta.order('nome')
   if (error) throw error
   return data
 }

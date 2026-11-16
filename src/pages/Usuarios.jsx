@@ -70,10 +70,10 @@ export default function Usuarios() {
       .catch(() => setTimes([]))
   }, [ehDono, perfil.consultoria_id, perfil.papel, perfil.id, versao])
 
-  // Consultorias para escolher ao criar um administrador (só quem vê tudo).
+  // Consultorias para escolher ao criar um administrador (só quem vê tudo): só as ativas.
   useEffect(() => {
     if (!ehDono) return
-    listarNomesDeConsultorias().then(setConsultorias).catch(() => setConsultorias([]))
+    listarNomesDeConsultorias({ ativas: true }).then(setConsultorias).catch(() => setConsultorias([]))
   }, [ehDono])
 
   const meusTimes = useMemo(() => new Set(times.map((t) => t.id)), [times])

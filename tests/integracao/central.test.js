@@ -85,6 +85,20 @@ describe('central nas funções', () => {
     expect(g.status).toBe(403)
   })
 
+  it('dono e central não criam administrador em consultoria arquivada', async () => {
+    const arquivada = await criarConsultoriaDeTeste()
+    const { error } = await admin.from('consultorias').update({ arquivada_em: new Date().toISOString() }).eq('id', arquivada)
+    expect(error).toBeNull()
+    for (const cliente of [comoDono, comoCentral]) {
+      const email = emailDeTeste('arq')
+      const r = await criarAcesso(cliente, { nome: 'Admin Barrado', email, papel: 'admin', consultoria_id: arquivada })
+      expect(r.status).toBe(409)
+      expect(r.corpo.codigo).toBe('consultoria_arquivada')
+      const { count } = await admin.from('perfis').select('*', { count: 'exact', head: true }).eq('email', email)
+      expect(count).toBe(0)
+    }
+  })
+
   it('dono cria acesso de central', async () => {
     const r = await criarAcesso(comoDono, { nome: 'Central Nova', email: emailDeTeste('cen'), papel: 'central' })
     expect(r.status).toBe(201)
