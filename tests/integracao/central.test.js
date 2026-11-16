@@ -15,7 +15,7 @@ import {
 
 const admin = clienteAdmin()
 let A
-let dono, central, outraCentral, adminA, adminMover, gestorComTime
+let dono, central, outraCentral, adminA, adminMover, gestorComTime, pessoaMembro, timeA
 let comoDono, comoCentral, comoAdminA
 
 const acesso = (cliente, corpo) => chamarFuncao(cliente, 'gerenciar-acesso', corpo)
@@ -36,7 +36,9 @@ beforeAll(async () => {
   adminA = await criarPerfilDeTeste({ papel: 'admin', consultoriaId: A })
   adminMover = await criarPerfilDeTeste({ papel: 'admin', consultoriaId: A })
   gestorComTime = await criarPerfilDeTeste({ papel: 'gestor', consultoriaId: A })
-  await criarTimeDeTeste({ consultoriaId: A, gestorId: gestorComTime.id })
+  timeA = await criarTimeDeTeste({ consultoriaId: A, gestorId: gestorComTime.id })
+  pessoaMembro = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: A })
+  await admin.from('time_membros').insert({ time_id: timeA, pessoa_id: pessoaMembro.id })
   comoDono = await entrarComo(dono)
   comoCentral = await entrarComo(central)
   comoAdminA = await entrarComo(adminA)
@@ -98,6 +100,14 @@ describe('central nas funções', () => {
     const r = await acesso(comoDono, { acao: 'mover_para_central', pessoa_id: adminMover.id })
     expect(r.status).toBe(200)
     expect(await perfil(adminMover.id)).toMatchObject({ papel: 'central', consultoria_id: null })
+  })
+
+  it('mover para a central tira a pessoa dos times', async () => {
+    const r = await acesso(comoDono, { acao: 'mover_para_central', pessoa_id: pessoaMembro.id })
+    expect(r.status).toBe(200)
+    expect(await perfil(pessoaMembro.id)).toMatchObject({ papel: 'central', consultoria_id: null })
+    const { count } = await admin.from('time_membros').select('*', { count: 'exact', head: true }).eq('pessoa_id', pessoaMembro.id)
+    expect(count).toBe(0)
   })
 
   it('dono não move gestor que gerencia time', async () => {

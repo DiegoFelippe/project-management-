@@ -45,6 +45,9 @@ async function moverParaCentral(admin: SupabaseClient, quem: Perfil, pessoaId: s
   }
   const { error } = await admin.from('perfis').update({ papel: 'central', consultoria_id: null }).eq('id', pessoaId)
   if (error) throw erroDoBanco(error)
+  // Quem é da central não é membro de time de consultoria.
+  const { error: erroTimes } = await admin.from('time_membros').delete().eq('pessoa_id', pessoaId)
+  if (erroTimes) throw erroTimes
   return responder(200, { ok: true })
 }
 
