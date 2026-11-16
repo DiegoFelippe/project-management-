@@ -28,6 +28,17 @@ export function consultoresPorOcupacao({ consultoriaId, busca, limite = 8, deslo
   })
 }
 
+// Ocupação de uma página de pessoas (até 100 ids) numa chamada só: { [id]: { capacidade, reservado, realizado,
+// ocupacao, clientes } }. Quem a pessoa que chama não pode ver não aparece.
+export async function ocupacaoDasPessoas({ ids, mes } = {}) {
+  if (!ids?.length) return {}
+  const { data, error } = await supabase.rpc('ocupacao_das_pessoas', { p_ids: ids, p_mes: mes ?? null })
+  if (error) throw error
+  return Object.fromEntries(
+    (data ?? []).map(({ id, ...resto }) => [id, resto]),
+  )
+}
+
 export function consultoriasPorOcupacao({ busca, limite = 8, deslocamento = 0, mes } = {}) {
   return ocupacao('consultorias_por_ocupacao', {
     p_busca: busca ?? null,
