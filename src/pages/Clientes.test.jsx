@@ -300,6 +300,19 @@ describe('Clientes: distribuir e escolher consultor', () => {
   })
 })
 
+describe('Clientes: filtro Consultor ao trocar de aba', () => {
+  it('a pessoa escolhida continua no campo, com o nome, ao sair da aba e voltar', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    await userEvent.click(await screen.findByRole('button', { name: 'Nas consultorias' }))
+    await escolherNoSeletor(userEvent, 'Consultor', 'Beto')
+    await userEvent.click(screen.getByRole('button', { name: 'A distribuir' }))
+    expect(screen.queryByLabelText('Consultor')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Nas consultorias' }))
+    expect(await screen.findByLabelText('Consultor')).toHaveTextContent('Beto')
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ consultorId: 'p2' }))
+  })
+})
+
 describe('Clientes: check-in do consultor', () => {
   const pessoa = { id: 'p9', papel: 'pessoa', consultoria_id: 's1' }
   const MEUS = CLIENTES.map((c) => ({ ...c, consultoria_id: 's1', consultor_id: 'p9', consultor: { id: 'p9', nome: 'Eu', ativo: true } }))

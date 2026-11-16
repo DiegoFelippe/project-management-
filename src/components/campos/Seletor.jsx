@@ -61,7 +61,7 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
 
   function escolher(opcao) {
     setEscolhido(opcao)
-    aoMudar(opcao.valor)
+    aoMudar(opcao.valor, opcao)
     setAberto(false)
     gatilho.current?.focus()
   }

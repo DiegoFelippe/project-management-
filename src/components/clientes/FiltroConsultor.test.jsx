@@ -40,12 +40,12 @@ describe('FiltroConsultor', () => {
     expect(screen.queryByRole('option', { name: 'Sem consultor' })).not.toBeInTheDocument()
   })
 
-  it('escolher uma pessoa avisa o id dela', async () => {
+  it('escolher uma pessoa avisa o id e o nome dela', async () => {
     const aoMudar = vi.fn()
     render(<FiltroConsultor valor="" consultoriaId={null} aoMudar={aoMudar} />)
     await userEvent.click(screen.getByLabelText('Consultor'))
     await userEvent.click(await screen.findByRole('option', { name: /Ana/ }))
-    expect(aoMudar).toHaveBeenCalledWith('p1')
+    expect(aoMudar).toHaveBeenCalledWith('p1', 'Ana')
   })
 
   it('sem comSemConsultor não oferece "Sem consultor"', async () => {

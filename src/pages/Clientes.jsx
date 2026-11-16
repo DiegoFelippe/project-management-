@@ -70,7 +70,7 @@ export default function Clientes() {
   const [busca, setBusca] = useState('')
   const buscaAtrasada = useAtraso(busca.trim(), 300)
   const [consultoriaId, setConsultoriaId] = useState('')
-  const [consultor, setConsultor] = useState('') // '' = todos, 'sem' ou o id
+  const [consultor, setConsultor] = useState({ valor: '', nome: null }) // '' = todos, 'sem' ou o id
   const [pagina, setPagina] = useState(1)
   const [resultado, setResultado] = useState(null)
   const [erro, setErro] = useState(null)
@@ -83,7 +83,7 @@ export default function Clientes() {
   const mostraFiltroConsultor = perfil.papel !== 'pessoa' && !['distribuir', 'aguardando', 'meus', 'checkins'].includes(aba)
   // Em atendimento todo cliente tem consultor: lá não existe "Sem consultor".
   const semConsultorVale = aba !== 'atendimento'
-  const consultorFiltrado = mostraFiltroConsultor && (semConsultorVale || consultor !== 'sem') ? consultor : ''
+  const consultorFiltrado = mostraFiltroConsultor && (semConsultorVale || consultor.valor !== 'sem') ? consultor.valor : ''
   const recarregar = () => setVersao((v) => v + 1)
   const { abrir, janelas } = useAcoesDoCliente({ aoMudar: recarregar })
 
@@ -143,11 +143,11 @@ export default function Clientes() {
           <CampoBusca rotulo="Buscar clientes" placeholder="Buscar por nome, cidade ou CNPJ" valor={busca} aoMudar={setBusca} />
         )}
         {central && (
-          <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setConsultor('') }} />
+          <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setConsultor({ valor: '', nome: null }) }} />
         )}
         {mostraFiltroConsultor && (
-          <FiltroConsultor valor={consultorFiltrado} comSemConsultor={semConsultorVale}
-            consultoriaId={central ? (consultoriaId || null) : perfil.consultoria_id} aoMudar={setConsultor} />
+          <FiltroConsultor valor={consultorFiltrado} nome={consultor.nome} comSemConsultor={semConsultorVale}
+            consultoriaId={central ? (consultoriaId || null) : perfil.consultoria_id} aoMudar={(valor, nome) => setConsultor({ valor, nome })} />
         )}
         {central && (
           <AcaoPrincipal>
