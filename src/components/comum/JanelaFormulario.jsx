@@ -8,15 +8,19 @@ const LARGURAS = { md: 'sm:max-w-lg', lg: 'sm:max-w-2xl', xl: 'sm:max-w-4xl' }
 // Padrão Hub: todo formulário é uma janela. Cabeçalho (ícone, título, descrição, fechar), corpo rolável e
 // rodapé à direita. Esc e o X fecham; clique fora NÃO fecha (para não perder o que foi digitado).
 // No celular a janela encosta embaixo (bottom sheet).
+// Convenção de envio: enquanto `enviando`, Esc e X não fecham, e o botão principal que quem chama põe no
+// `rodape` mostra "Salvando…" (e fica desabilitado). O componente só mostra o spinner e marca aria-busy.
 export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, icone: Icone, largura = 'md', rodape, enviando = false, children }) {
   return (
-    <DialogPrimitive.Root open={aberto} onOpenChange={(abrir) => !abrir && aoFechar()}>
+    <DialogPrimitive.Root open={aberto} onOpenChange={(abrir) => !abrir && !enviando && aoFechar()}>
       <DialogPortal>
         <DialogOverlay />
         <DialogPrimitive.Content
           data-slot="janela-formulario"
           aria-busy={enviando || undefined}
           onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => enviando && e.preventDefault()}
+          {...(descricao ? {} : { 'aria-describedby': undefined })}
           className={cn(
             'bg-card fixed z-50 flex w-full flex-col overflow-hidden border shadow-[var(--shadow-modal)] duration-200',
             'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -35,7 +39,7 @@ export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, 
               <DialogTitle className="text-[15px] leading-tight font-bold tracking-normal [font-stretch:100%]">{titulo}</DialogTitle>
               {descricao && <DialogDescription className="mt-0.5 text-[12.5px]">{descricao}</DialogDescription>}
             </div>
-            <DialogPrimitive.Close className="botao-animado text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/50 grid size-8 shrink-0 place-items-center rounded-lg transition-[color,background-color,translate,scale] duration-150 outline-none hover:-translate-y-px focus-visible:ring-[3px] active:scale-[0.97] [&_svg]:size-4">
+            <DialogPrimitive.Close disabled={enviando} className="botao-animado text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/50 grid size-8 shrink-0 place-items-center rounded-lg transition-[color,background-color,translate,scale] duration-150 outline-none hover:-translate-y-px focus-visible:ring-[3px] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4">
               <XIcon />
               <span className="sr-only">Fechar</span>
             </DialogPrimitive.Close>

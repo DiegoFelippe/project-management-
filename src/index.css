@@ -324,3 +324,8 @@
 .botao-animado:hover:not(:disabled) > svg,
 .botao-animado:focus-visible > svg { animation: icone-botao 0.45s ease-out; }
 
+
+/* Botão com Plus (criar): em vez do pulinho, o Plus gira 90° no hover (padrão Hub). */
+.botao-animado > svg.lucide-plus { transition: transform 0.2s ease-out; }
+.botao-animado:hover:not(:disabled) > svg.lucide-plus,
+.botao-animado:focus-visible > svg.lucide-plus { animation: none; transform: rotate(90deg); }

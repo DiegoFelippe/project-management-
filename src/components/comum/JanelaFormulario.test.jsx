@@ -50,4 +50,24 @@ describe('JanelaFormulario', () => {
     montar({ aberto: false })
     expect(screen.queryByRole('dialog')).toBeNull()
   })
+
+  it('sem descrição não gera aviso do Radix', () => {
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
+    montar({ descricao: undefined })
+    expect(screen.getByRole('dialog', { name: 'Novo time' })).not.toHaveAttribute('aria-describedby')
+    expect(aviso).not.toHaveBeenCalled()
+    expect(erro).not.toHaveBeenCalled()
+    aviso.mockRestore()
+    erro.mockRestore()
+  })
+
+  it('enquanto envia, Esc e X não fecham e o spinner aparece', async () => {
+    const { aoFechar } = montar({ enviando: true })
+    await userEvent.keyboard('{Escape}')
+    await userEvent.click(screen.getByRole('button', { name: 'Fechar' }))
+    expect(aoFechar).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true')
+    expect(document.querySelector('[data-slot="janela-rodape"] .animate-spin')).not.toBeNull()
+  })
 })
