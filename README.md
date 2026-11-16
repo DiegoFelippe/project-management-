@@ -59,7 +59,7 @@ npm run dono:criar -- seu@email.com "Seu Nome"   # convite do dono (chega no Mai
 npm run exemplo:local                            # consultoria de exemplo, só local
 ```
 
-Logins de exemplo (só no Docker local): `admin@exemplo.test`, `gestor@exemplo.test`, `ana@exemplo.test`
+Logins de exemplo (só no Docker local): `admin@exemplo.test`, `gestor@exemplo.test`, `ana@exemplo.test`,
 `bruno@exemplo.test` e `central@exemplo.test` (a central, fora das consultorias), todos com a senha `exemplo-123`.
 
 Abra http://localhost:5173. Embaixo do contador aparece "Banco: conectado…" quando o app fala com o Supabase.
