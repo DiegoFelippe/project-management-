@@ -16,14 +16,12 @@ function resultadoDaEscrita({ data, error }) {
 }
 
 // O check-in que eu deixei aberto (no máximo um), com o nome do cliente; ou null.
-export async function meuCheckinAberto() {
-  const { data: sessao } = await supabase.auth.getUser()
-  const eu = sessao?.user?.id
-  if (!eu) return null
+export async function meuCheckinAberto(perfilId) {
+  if (!perfilId) return null
   const { data, error } = await supabase
     .from('checkins')
     .select('id, cliente_id, inicio, cliente:cliente_do_checkin(nome)')
-    .eq('consultor_id', eu)
+    .eq('consultor_id', perfilId)
     .is('fim', null)
     .maybeSingle()
   if (error) throw error

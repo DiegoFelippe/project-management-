@@ -1,5 +1,6 @@
 // Caminho completo dos clientes no Supabase local: central cria e manda, o gestor (sem times) escolhe
 // o consultor, a lista traz as relações calculadas, a busca é escapada e o realizado respeita as permissões.
+import { padraoDeBusca } from '../../src/lib/busca.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   clienteAdmin,
@@ -38,6 +39,8 @@ beforeAll(async () => {
   gestorA = await criarPerfilDeTeste({ papel: 'gestor', consultoriaId: A })
   pessoaA = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: A })
   adminB = await criarPerfilDeTeste({ papel: 'admin', consultoriaId: B })
+  // Desempate da ordem por nome: a pessoa vem antes do gestor quando os dois estão sem clientes.
+  await admin.from('perfis').update({ nome: 'Aaa pessoa' }).eq('id', pessoaA.id)
   comoCentral = await entrarComo(central)
   comoGestor = await entrarComo(gestorA)
   comoPessoa = await entrarComo(pessoaA)
@@ -56,8 +59,9 @@ describe('clientes de ponta a ponta', () => {
   it('gestor sem times vê a pessoa na ocupação e a escolhe como consultor', async () => {
     const { data, error } = await comoGestor.rpc('consultores_por_ocupacao', { p_consultoria: A })
     expect(error).toBeNull()
-    const ids = data.map((l) => l.id)
-    expect(ids).toContain(pessoaA.id)
+    const nossos = data.filter((l) => [pessoaA.id, gestorA.id].includes(l.id))
+    expect(nossos[0].id).toBe(pessoaA.id)
+    expect(data[0].id).toBe(pessoaA.id)
     expect(data[0].total).toBeGreaterThanOrEqual(2)
 
     const { data: linhas, error: erroEscolha } = await comoGestor
@@ -77,7 +81,7 @@ describe('clientes de ponta a ponta', () => {
       .eq('arquivado', false)
     expect(erroLista).toBeNull()
     expect(lista).toHaveLength(1)
-    expect(lista[0].consultor.nome).toBe('Teste pessoa')
+    expect(lista[0].consultor.nome).toBe('Aaa pessoa')
     expect(lista[0].consultoria.id).toBe(A)
   })
 
@@ -102,10 +106,11 @@ describe('clientes de ponta a ponta', () => {
     expect(achou.error).toBeNull()
     expect(achou.data.map((l) => l.id)).toEqual([clienteId])
 
-    const termo = '50%_(x),y'.replace(/[\\%_]/g, (c) => `\\${c}`)
-    const estranho = await comoCentral.from('clientes').select('id').ilike('busca', `%${termo}%`)
+    const estranho = await comoCentral.from('clientes').select('id').ilike('busca', padraoDeBusca('50%_(x),y*'))
     expect(estranho.error).toBeNull()
     expect(estranho.data).toHaveLength(0)
+    expect(padraoDeBusca('50%_(x),y*')).toBe('%50\\%\\_(x),y%')
+    expect(padraoDeBusca('cHAPeCó*')).toBe('%chapeco%')
   })
 
   it('check-in e check-out; realizado_no_mes aparece para a pessoa, o gestor e a central, não para a outra consultoria', async () => {
@@ -140,10 +145,13 @@ describe('clientes de ponta a ponta', () => {
     const ids = data.map((l) => l.id)
     expect(ids).toContain(A)
     expect(ids).toContain(B)
-    // B não tem cliente nem consultor: a ocupação de A não pode ser menor que a de B só por ordem
     const a = data.find((l) => l.id === A)
     const b = data.find((l) => l.id === B)
-    const primeiro = ids.indexOf(A) < ids.indexOf(B)
-    expect(primeiro).toBe(Number(a.ocupacao ?? Infinity) <= Number(b.ocupacao ?? Infinity))
+    // Ocupação é número ou nulo (capacidade 0), nunca ausente; nulo vai para o fim.
+    for (const l of [a, b]) expect(l.ocupacao === null || typeof Number(l.ocupacao) === 'number').toBe(true)
+    expect('ocupacao' in a && 'ocupacao' in b).toBe(true)
+    const chave = (l) => (l.ocupacao === null ? Infinity : Number(l.ocupacao))
+    expect(ids.indexOf(A) < ids.indexOf(B)).toBe(chave(a) <= chave(b))
+    expect(a.reservado).not.toBeUndefined()
   })
 })

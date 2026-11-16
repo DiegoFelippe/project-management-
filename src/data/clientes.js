@@ -2,6 +2,7 @@
 import { traduzirErroBanco } from '@/lib/erros'
 import { normalizarCnpj } from '@/lib/cnpj'
 import { supabase } from '@/lib/supabase'
+import { padraoDeBusca } from '@/lib/busca'
 import { buscarPagina } from './paginar'
 
 const CAMPOS_DA_LISTA =
@@ -18,17 +19,6 @@ function resultadoDaEscrita({ data, error }) {
   if (error) return { erro: traduzirErroBanco(error, { sobre: 'cliente' }) }
   if (!data?.length) return { erro: erroSemPermissao() }
   return { erro: null }
-}
-
-// Termo da busca: sem acento, minúsculo, com \, % e _ escapados (procuram o próprio caractere).
-export function padraoDeBusca(busca) {
-  const termo = String(busca ?? '')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .trim()
-  if (!termo) return null
-  return `%${termo.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
 }
 
 const texto = (valor) => {
@@ -60,8 +50,9 @@ export async function listarClientes({ aba, consultoriaId, consultorId, busca, p
   else if (aba === 'aguardando') consulta = consulta.not('consultoria_id', 'is', null).is('consultor_id', null)
   else if (aba === 'atendimento') consulta = consulta.not('consultor_id', 'is', null).eq('arquivado', false)
   else if (aba === 'meus') {
-    const { data } = await supabase.auth.getUser()
-    consulta = consulta.eq('consultor_id', data?.user?.id ?? '').eq('arquivado', false)
+    // O id de quem olha vem de quem chama (perfil.id); sem ele, não há o que listar.
+    if (!consultorId) return { itens: [], total: 0 }
+    consulta = consulta.eq('arquivado', false)
   }
   if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
   if (consultorId === 'sem') consulta = consulta.is('consultor_id', null)
