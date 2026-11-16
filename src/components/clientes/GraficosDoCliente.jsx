@@ -22,7 +22,7 @@ const TEXTO_SUAVE = { fill: 'var(--muted-foreground)' }
 
 function Cartao({ titulo, subtitulo, children }) {
   return (
-    <section aria-label={titulo} className="rounded-xl border bg-card p-4 shadow-xs">
+    <section aria-label={titulo} className="card p-4">
       <h2 className="text-sm font-semibold text-muted-foreground">{titulo}</h2>
       {subtitulo && <p className="mb-2 text-xs text-muted-foreground">{subtitulo}</p>}
       <div className={subtitulo ? '' : 'mt-3'}>{children}</div>

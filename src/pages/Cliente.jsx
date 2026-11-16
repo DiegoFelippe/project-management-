@@ -47,7 +47,7 @@ function Campo({ rotulo, children }) {
 
 function Bloco({ titulo, children }) {
   return (
-    <section aria-label={titulo} className="rounded-xl border bg-card p-4 shadow-xs">
+    <section aria-label={titulo} className="card p-4">
       <h2 className="mb-3 text-sm font-semibold text-muted-foreground">{titulo}</h2>
       <dl className="grid gap-3">{children}</dl>
     </section>
@@ -115,7 +115,7 @@ export default function Cliente() {
       rotulo: 'Geral',
       conteudo: (
       <>
-        <section aria-label="Resumo" className="mb-4 flex flex-wrap gap-x-8 gap-y-2 rounded-xl border bg-card p-4 shadow-xs">
+        <section aria-label="Resumo" className="mb-4 flex flex-wrap gap-x-8 gap-y-2 card p-4">
           <dl className="contents">
             <Campo rotulo="Situação">{situacaoDe(cliente)}</Campo>
             <Campo rotulo="Consultoria">{cliente.consultoria?.nome}</Campo>

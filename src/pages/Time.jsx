@@ -155,7 +155,7 @@ export default function Time() {
       {time.descricao && <p className="-mt-3 mb-5 text-sm text-muted-foreground">{time.descricao}</p>}
 
       {gerencio && (
-        <div className="mb-5 flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3 shadow-xs">
+        <div className="mb-5 card flex flex-wrap items-end gap-2 p-3">
           <div className="grid min-w-56 flex-1 gap-1.5">
             <Label htmlFor="colocar-pessoa">Colocar pessoa</Label>
             <Seletor id="colocar-pessoa" valor={escolhida} aoMudar={setEscolhida} buscar={buscarDisponiveis} placeholder="Escolha…" />

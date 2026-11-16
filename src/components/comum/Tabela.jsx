@@ -31,7 +31,7 @@ export function Paginacao({ pagina, total, porPagina = POR_PAGINA, aoMudar }) {
 
 export function Tabela({ rotulo, colunas, larguraMinima = 720, paginacao, children }) {
   return (
-    <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
+    <div className="card overflow-hidden">
       <div className="overflow-x-auto">
         <table aria-label={rotulo} className="w-full text-left text-sm" style={{ minWidth: larguraMinima }}>
           <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
