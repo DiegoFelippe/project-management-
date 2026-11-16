@@ -2,7 +2,7 @@
 -- Cada passo fica no histórico (cliente_eventos). Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(49);
+select plan(53);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -54,9 +54,11 @@ begin
 end $$;
 
 -- Cliente gravado direto (sem usuário logado), já na consultoria e com o consultor, se vierem.
+-- testes.como deixa o usuário nas configurações até o fim da transação (reset role não limpa): limpa aqui.
 create function testes.cliente(p_nome text, p_consultoria text, p_consultor text) returns uuid language plpgsql as $$
 declare v uuid;
 begin
+  perform set_config('request.jwt.claims', '', true);
   insert into public.clientes (nome, horas_mes, consultoria_id, consultor_id)
   values ('Cliente ' || p_nome, 10, testes.id(p_consultoria), testes.id(p_consultor)) returning id into v;
   insert into testes.fx values (p_nome, v);
@@ -125,6 +127,15 @@ select is(private.cnpj_valido('1122233300018'), false, 'CNPJ com 13 caracteres')
 select testes.como('central');
 select lives_ok($$insert into public.clientes (id, nome, horas_mes) values (testes.id('cli_mov'), 'Cliente Móvel', 20)$$,
   'central cadastra cliente sem consultoria');
+-- A central escolhe só a consultoria; o consultor é sempre escolhido pela consultoria.
+select throws_ok($$insert into public.clientes (nome, horas_mes, consultoria_id, consultor_id)
+    values ('Cliente com consultor', 10, testes.id('A'), testes.id('pessoa_a2'))$$,
+  'P0001', 'consultoria_escolhe_consultor', 'central não cadastra cliente já com consultor');
+reset role;
+select testes.como('dono');
+select throws_ok($$insert into public.clientes (nome, horas_mes, consultoria_id, consultor_id)
+    values ('Cliente com consultor', 10, testes.id('A'), testes.id('pessoa_a2'))$$,
+  'P0001', 'consultoria_escolhe_consultor', 'dono também não cadastra cliente já com consultor');
 reset role;
 
 select testes.como('admin_a');
@@ -256,10 +267,15 @@ select is((select count(*) from forjada f, public.consultor(f.c)), 0::bigint,
   'linha forjada (cliente de B com dados de A) não revela o consultor');
 reset role;
 
--- Trocar e tirar o consultor
+-- Trocar e tirar o consultor: a consultoria troca; a central não escolhe, mas pode tirar.
 select testes.como('admin_b');
 update public.clientes set consultor_id = testes.id('admin_b') where id = testes.id('cli_b');
-update public.clientes set consultor_id = null where id = testes.id('cli_b');
+reset role;
+select testes.como('central');
+select throws_ok($$update public.clientes set consultor_id = testes.id('pessoa_b') where id = testes.id('cli_b')$$,
+  'P0001', 'consultoria_escolhe_consultor', 'central não escolhe o consultor de um cliente');
+select lives_ok($$update public.clientes set consultor_id = null where id = testes.id('cli_b')$$,
+  'central tira o consultor (o cliente volta a aguardar a consultoria)');
 reset role;
 select bag_eq($$select tipo from public.cliente_eventos where cliente_id = testes.id('cli_b')$$,
   $$values ('cadastrado'), ('enviado'), ('consultor_escolhido'), ('consultor_trocado'), ('consultor_removido')$$,
