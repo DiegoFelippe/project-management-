@@ -9,6 +9,7 @@ import ArquivosDoCliente from '@/components/clientes/ArquivosDoCliente'
 import { AcoesDaLinha } from '@/components/clientes/AcoesDoCliente'
 import { useAcoesDoCliente } from '@/components/clientes/useAcoesDoCliente'
 import CheckinsDoCliente from '@/components/clientes/CheckinsDoCliente'
+import GraficosDoCliente from '@/components/clientes/GraficosDoCliente'
 import HistoricoDoCliente from '@/components/clientes/HistoricoDoCliente'
 import { Badge } from '@/components/ui/badge'
 import { buscarCliente } from '@/data/clientes'
@@ -147,6 +148,7 @@ export default function Cliente() {
             </Campo>
           </Bloco>
         </div>
+        <GraficosDoCliente cliente={cliente} />
       </>
       ),
     },

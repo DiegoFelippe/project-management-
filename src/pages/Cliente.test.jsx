@@ -4,12 +4,13 @@ import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apagarCheckin, editarCheckin, listarCheckins, meuCheckinAberto } from '@/data/checkins'
 import { limparPastaDoCliente, listarArquivos } from '@/data/arquivos'
-import { apagarCliente, buscarCliente, listarEventos } from '@/data/clientes'
+import { apagarCliente, buscarCliente, checkinsPorSemana, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
 import { renderizarTela } from '@/test/renderizar'
 import Cliente from './Cliente'
 
 vi.mock('@/data/clientes', () => ({
   buscarCliente: vi.fn(), listarEventos: vi.fn(),
+  horasPorMes: vi.fn(), horasPorConsultor: vi.fn(), checkinsPorSemana: vi.fn(),
   criarCliente: vi.fn(), editarCliente: vi.fn(), arquivarCliente: vi.fn(), reativarCliente: vi.fn(), apagarCliente: vi.fn(),
   mandarParaConsultoria: vi.fn(), escolherConsultor: vi.fn(), ajustarPrevisao: vi.fn(),
 }))
@@ -56,6 +57,9 @@ beforeEach(() => {
   vi.mocked(buscarCliente).mockResolvedValue(CLIENTE)
   vi.mocked(listarCheckins).mockResolvedValue({ itens: CHECKINS, total: 2 })
   vi.mocked(listarEventos).mockResolvedValue({ itens: EVENTOS, total: 2 })
+  vi.mocked(horasPorMes).mockResolvedValue([])
+  vi.mocked(horasPorConsultor).mockResolvedValue([])
+  vi.mocked(checkinsPorSemana).mockResolvedValue([])
   vi.mocked(meuCheckinAberto).mockResolvedValue(null)
   vi.mocked(listarArquivos).mockResolvedValue({ itens: [], total: 0 })
   vi.mocked(editarCheckin).mockResolvedValue({ erro: null })

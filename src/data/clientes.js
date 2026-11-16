@@ -126,3 +126,29 @@ export async function listarEventos(clienteId, { pagina = 1 } = {}) {
   if (error) throw error
   return { itens: data, total: data.length > 0 ? Number(data[0].total) : 0 }
 }
+
+// Gráficos da aba Geral. As funções do banco rodam com as permissões de quem pergunta: cada um soma só os
+// check-ins que enxerga. Os números vêm do PostgREST como número (numeric) ou texto; viram Number aqui.
+async function chamar(funcao, argumentos) {
+  const { data, error } = await supabase.rpc(funcao, argumentos)
+  if (error) throw error
+  return data
+}
+
+// Últimos 6 meses, do mais antigo ao atual: [{ mes: '2026-06-01', realizado }].
+export async function horasPorMes(clienteId) {
+  const linhas = await chamar('horas_do_cliente_por_mes', { p_cliente: clienteId, p_meses: 6 })
+  return linhas.map((l) => ({ mes: l.mes, realizado: Number(l.realizado) }))
+}
+
+// Horas do mês por consultor (mais horas primeiro): [{ consultorId, nome (null se não visível), horas }].
+export async function horasPorConsultor(clienteId, mes) {
+  const linhas = await chamar('horas_do_cliente_por_consultor', { p_cliente: clienteId, p_mes: mes })
+  return linhas.map((l) => ({ consultorId: l.consultor_id, nome: l.nome, horas: Number(l.horas) }))
+}
+
+// Semanas (segunda a domingo) que tocam o mês: [{ semana: '2026-11-02', quantidade, horas }].
+export async function checkinsPorSemana(clienteId, mes) {
+  const linhas = await chamar('checkins_do_cliente_por_semana', { p_cliente: clienteId, p_mes: mes })
+  return linhas.map((l) => ({ semana: l.semana, quantidade: Number(l.quantidade), horas: Number(l.horas) }))
+}
