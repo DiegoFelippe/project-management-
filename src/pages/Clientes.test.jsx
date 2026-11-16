@@ -7,7 +7,7 @@ import {
   mandarParaConsultoria, reativarCliente,
 } from '@/data/clientes'
 import { fazerCheckin, lancarHoras, meuCheckinAberto } from '@/data/checkins'
-import { escolherData, escolherHora } from '@/test/campos'
+import { escolherData, escolherHora, escolherNoSeletor } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
 import Clientes from './Clientes'
 
@@ -21,7 +21,7 @@ vi.mock('@/data/checkins', () => ({
   listarCheckins: vi.fn(), editarCheckin: vi.fn(), apagarCheckin: vi.fn(),
 }))
 vi.mock('@/data/capacidade', () => ({ consultoriasPorOcupacao: vi.fn(), consultoresPorOcupacao: vi.fn() }))
-vi.mock('@/data/consultorias', () => ({ listarNomesDeConsultorias: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/data/consultorias', () => ({ buscarConsultorias: vi.fn().mockResolvedValue({ itens: [], total: 0 }) }))
 
 const base = {
   razao_social: null, cidade: 'Natal', uf: 'RN', enviado_em: null, consultor_desde: null, arquivado: false,
@@ -267,7 +267,7 @@ describe('Clientes: distribuir e escolher consultor', () => {
     renderizarTela(<Clientes />, { perfil: central })
     await userEvent.click(await screen.findByRole('button', { name: 'Nas consultorias' }))
     await userEvent.click(await screen.findByRole('button', { name: /Próxima/ }))
-    await userEvent.selectOptions(screen.getByLabelText('Consultor'), 'sem')
+    await escolherNoSeletor(userEvent, 'Consultor', 'Sem consultor')
     expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ consultorId: 'sem', pagina: 1 }))
   })
 
@@ -275,24 +275,27 @@ describe('Clientes: distribuir e escolher consultor', () => {
     vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA, total: 2 })
     renderizarTela(<Clientes />, { perfil: gestor })
     await userEvent.click(await screen.findByRole('button', { name: 'Em atendimento' }))
-    const filtro = await screen.findByLabelText('Consultor')
-    expect(within(filtro).queryByRole('option', { name: 'Sem consultor' })).not.toBeInTheDocument()
-    expect(within(filtro).getByRole('option', { name: 'Todos' })).toBeInTheDocument()
+    await userEvent.click(await screen.findByLabelText('Consultor'))
+    expect(await screen.findByRole('option', { name: /Beto/ })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Todos' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Sem consultor' })).not.toBeInTheDocument()
   })
 
   it('filtro Consultor: Nas consultorias oferece Sem consultor', async () => {
     renderizarTela(<Clientes />, { perfil: central })
     await userEvent.click(await screen.findByRole('button', { name: 'Nas consultorias' }))
-    expect(within(await screen.findByLabelText('Consultor')).getByRole('option', { name: 'Sem consultor' })).toBeInTheDocument()
+    await userEvent.click(await screen.findByLabelText('Consultor'))
+    expect(await screen.findByRole('option', { name: 'Sem consultor' })).toBeInTheDocument()
   })
 
   it('filtro Consultor: escolher uma pessoa na busca filtra por ela (consultoria do gestor)', async () => {
     vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA, total: 2 })
     renderizarTela(<Clientes />, { perfil: gestor })
     await userEvent.click(await screen.findByRole('button', { name: 'Em atendimento' }))
-    await userEvent.selectOptions(await screen.findByLabelText('Consultor'), 'escolher')
+    await userEvent.click(await screen.findByLabelText('Consultor'))
+    await screen.findByRole('option', { name: /Beto/ })
     expect(consultoresPorOcupacao).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1' }))
-    await userEvent.click(await screen.findByRole('radio', { name: /Beto/ }))
+    await userEvent.click(screen.getByRole('option', { name: /Beto/ }))
     expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ consultorId: 'p2', pagina: 1 }))
   })
 })

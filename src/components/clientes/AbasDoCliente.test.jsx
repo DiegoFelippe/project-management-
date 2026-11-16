@@ -54,4 +54,17 @@ describe('AbasDoCliente', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Geral' }))
     expect(screen.getByLabelText('endereço')).not.toHaveTextContent('aba=')
   })
+
+  it('setas movem a seleção e o foco, com tabindex móvel', async () => {
+    tela()
+    screen.getByRole('tab', { name: 'Geral' }).focus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByRole('tab', { name: 'Check-ins' })).toHaveFocus()
+    expect(screen.getByRole('tab', { name: 'Check-ins' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Check-ins' })).toHaveAttribute('tabindex', '0')
+    expect(screen.getByRole('tab', { name: 'Geral' })).toHaveAttribute('tabindex', '-1')
+    expect(screen.getByLabelText('endereço')).toHaveTextContent('?aba=checkins')
+    await userEvent.keyboard('{ArrowLeft}{ArrowLeft}')
+    expect(screen.getByRole('tab', { name: 'Arquivos' })).toHaveFocus()
+  })
 })

@@ -7,6 +7,7 @@ import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
@@ -131,7 +132,11 @@ export default function Integracoes() {
     <>
       <Cabecalho titulo="Integrações"
         descricao="Conexões que o sistema usa. Cada consultoria conecta as suas, e todo o sistema usa a mesma conexão." />
-      {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setIntegracoes(null) }} />}
+      {ehDono && (
+        <BarraDeFiltros>
+          <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setIntegracoes(null) }} />
+        </BarraDeFiltros>
+      )}
       {aviso && <div className="mb-4"><Aviso>{aviso}</Aviso></div>}
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {ehDono && !consultoriaId && <ListaVazia>Escolha uma consultoria para ver as integrações dela.</ListaVazia>}

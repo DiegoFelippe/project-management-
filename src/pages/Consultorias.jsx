@@ -1,6 +1,8 @@
 import { Archive, ArchiveRestore, Building2, Pencil, Plus, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
+import BarraDeFiltros, { AcaoPrincipal } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
@@ -16,6 +18,7 @@ import { tirarLogo, trocarLogo } from '@/data/imagens'
 import { urlPublica } from '@/lib/imagem'
 import { criarAcesso } from '@/data/usuarios'
 
+const ABAS = [{ valor: 'ativas', rotulo: 'Ativas' }, { valor: 'arquivadas', rotulo: 'Arquivadas' }]
 const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
 
 export default function Consultorias() {
@@ -107,19 +110,15 @@ export default function Consultorias() {
       <Cabecalho titulo="Consultorias"
         descricao={resultado
           ? (filtro === 'ativas' ? plural(total, 'consultoria ativa', 'consultorias ativas') : plural(total, 'consultoria arquivada', 'consultorias arquivadas'))
-          : null}>
-        <Button onClick={() => setNova(true)}>
-          <Plus /> Nova consultoria
-        </Button>
-      </Cabecalho>
-      <div role="group" aria-label="Mostrar" className="mb-4 inline-flex rounded-lg bg-muted p-1 text-sm font-semibold">
-        {[['ativas', 'Ativas'], ['arquivadas', 'Arquivadas']].map(([valor, rotulo]) => (
-          <button key={valor} type="button" aria-pressed={filtro === valor} onClick={() => { setFiltro(valor); setPagina(1) }}
-            className={`botao-animado rounded-md px-3 py-1 transition-[background-color,color,translate,scale] hover:-translate-y-px active:scale-[0.97] ${filtro === valor ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground'}`}>
-            {rotulo}
-          </button>
-        ))}
-      </div>
+          : null} />
+      <BarraDeFiltros>
+        <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1) }} />
+        <AcaoPrincipal>
+          <Button onClick={() => setNova(true)}>
+            <Plus /> Nova consultoria
+          </Button>
+        </AcaoPrincipal>
+      </BarraDeFiltros>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as consultorias…" className="py-12" />}
       {resultado && lista.length === 0 && (

@@ -103,6 +103,14 @@ describe('Seletor', () => {
     expect(screen.queryByText(/refine a busca/i)).toBeNull()
   })
 
+  it('com buscar que falha: avisa o erro em vez de "Nada encontrado"', async () => {
+    const buscar = async () => { throw new Error('rede') }
+    render(<Seletor id="s" valor="" aoMudar={() => {}} opcoes={[]} buscar={buscar} />)
+    await userEvent.click(screen.getByRole('button'))
+    expect(await screen.findByText('Não foi possível carregar as opções.')).toBeInTheDocument()
+    expect(screen.queryByText('Nada encontrado')).toBeNull()
+  })
+
   it('dentro de uma janela: clique funciona e Esc fecha só a lista', async () => {
     const aoFechar = vi.fn()
     const aoMudar = vi.fn()

@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import Avatar from '@/components/comum/Avatar'
+import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
@@ -119,7 +120,11 @@ export default function Times() {
           </Button>
         )}
       </Cabecalho>
-      {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />}
+      {ehDono && (
+        <BarraDeFiltros>
+          <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />
+        </BarraDeFiltros>
+      )}
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!erro && times === null && <GraficoCarregando texto="Carregando os times…" className="py-12" />}
       {times?.length === 0 && (

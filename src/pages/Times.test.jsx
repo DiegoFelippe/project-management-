@@ -9,7 +9,7 @@ import Times from './Times'
 
 vi.mock('@/data/times', () => ({ listarTimes: vi.fn(), criarTime: vi.fn(), editarTime: vi.fn(), apagarTime: vi.fn() }))
 vi.mock('@/data/pessoas', () => ({ buscarPessoas: vi.fn() }))
-vi.mock('@/data/consultorias', () => ({ listarNomesDeConsultorias: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/data/consultorias', () => ({ buscarConsultorias: vi.fn().mockResolvedValue({ itens: [], total: 0 }) }))
 
 const gil = { id: 'g1', nome: 'Gil Gestor' }
 const TIMES = [

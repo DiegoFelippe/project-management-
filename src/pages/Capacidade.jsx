@@ -1,6 +1,8 @@
-import { CalendarOff, ChevronLeft, ChevronRight, Pencil, Search } from 'lucide-react'
+import { CalendarOff, ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/auth/useAuth'
+import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
+import BarraDeFiltros, { CampoBusca } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
@@ -8,7 +10,6 @@ import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/com
 import EditarCarga from '@/components/capacidade/EditarCarga'
 import JanelaAusencias from '@/components/capacidade/JanelaAusencias'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { consultoriasPorOcupacao, consultoresPorOcupacao, definirCarga } from '@/data/capacidade'
 import { POR_PAGINA } from '@/data/paginar'
 import { formatarHoras, formatarOcupacao } from '@/lib/horas'
@@ -16,7 +17,7 @@ import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
 
-const ABAS = [['consultores', 'Consultores'], ['consultorias', 'Consultorias']]
+const ABAS = [{ valor: 'consultores', rotulo: 'Consultores' }, { valor: 'consultorias', rotulo: 'Consultorias' }]
 
 export default function Capacidade() {
   const { perfil } = useAuth()
@@ -81,34 +82,17 @@ export default function Capacidade() {
   return (
     <>
       <Cabecalho titulo="Capacidade" descricao="Horas disponíveis, reservadas e realizadas de cada consultor no mês." />
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        {central && (
-          <div role="group" aria-label="Mostrar" className="inline-flex rounded-lg bg-muted p-1 text-sm font-semibold">
-            {ABAS.map(([valor, rotulo]) => (
-              <button key={valor} type="button" aria-pressed={aba === valor} onClick={() => setAba(valor)}
-                className={`botao-animado rounded-md px-3 py-1 transition-[background-color,color,translate,scale] hover:-translate-y-px active:scale-[0.97] ${aba === valor ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground'}`}>
-                {rotulo}
-              </button>
-            ))}
-          </div>
-        )}
+      <BarraDeFiltros>
+        {central && <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={aba} aoMudar={setAba} />}
         <div role="group" aria-label="Mês" className="inline-flex items-center gap-1 rounded-lg border bg-card p-1">
           <Button variant="ghost" size="sm" onClick={() => setMes(deslocarMes(mes, -1))}><ChevronLeft /> Anterior</Button>
           <span aria-live="polite" className="min-w-36 px-2 text-center text-sm font-semibold tabular-nums">{rotuloDoMes(mes)}</span>
           <Button variant="ghost" size="sm" onClick={() => setMes(deslocarMes(mes, 1))}>Próximo <ChevronRight /></Button>
         </div>
-        <div className="relative w-full max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input type="search" aria-label={emConsultores ? 'Buscar consultores' : 'Buscar consultorias'}
-            placeholder={emConsultores ? 'Buscar por nome' : 'Buscar consultoria'} className="h-10 pl-9"
-            value={busca} onChange={(e) => setBusca(e.target.value)} />
-        </div>
-        {central && emConsultores && (
-          <div className="[&>div]:mb-0">
-            <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />
-          </div>
-        )}
-      </div>
+        <CampoBusca rotulo={emConsultores ? 'Buscar consultores' : 'Buscar consultorias'}
+          placeholder={emConsultores ? 'Buscar por nome' : 'Buscar consultoria'} valor={busca} aoMudar={setBusca} />
+        {central && emConsultores && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
+      </BarraDeFiltros>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!erro && itens === null && <GraficoCarregando texto="Carregando a capacidade…" className="py-12" />}
       {itens?.length === 0 && <ListaVazia>{buscaAtrasada ? 'Nenhum resultado encontrado.' : emConsultores ? 'Nenhum consultor ainda.' : 'Nenhuma consultoria ainda.'}</ListaVazia>}

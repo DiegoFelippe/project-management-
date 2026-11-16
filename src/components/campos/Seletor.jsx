@@ -34,7 +34,7 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
     const numero = ++pedido.current
     buscar(termoAtrasado.trim())
       .then((r) => { if (numero === pedido.current) setRemoto(r) })
-      .catch(() => { if (numero === pedido.current) setRemoto({ itens: [], total: 0 }) })
+      .catch(() => { if (numero === pedido.current) setRemoto({ itens: [], total: 0, erro: true }) })
   }, [buscar, aberto, termoAtrasado])
 
   const todos = useMemo(() => (rotuloTodos != null ? { valor: '', rotulo: rotuloTodos } : null), [rotuloTodos])
@@ -116,8 +116,9 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
             })}
           </div>
           {buscar && !remoto && <p className="text-muted-foreground py-3 text-center text-[12px]">Buscando…</p>}
-          {(buscar ? remoto : true) && mostradas.length === (todos && !termo.trim() ? 1 : 0) && <p className="text-muted-foreground py-3 text-center text-[12px]">Nada encontrado</p>}
-          {buscar && remoto && (
+          {remoto?.erro && <p role="alert" className="text-muted-foreground py-3 text-center text-[12px]">Não foi possível carregar as opções.</p>}
+          {!remoto?.erro && (buscar ? remoto : true) && mostradas.length === (todos && !termo.trim() ? 1 : 0) && <p className="text-muted-foreground py-3 text-center text-[12px]">Nada encontrado</p>}
+          {buscar && remoto && !remoto.erro && (
             <p className="text-muted-foreground mt-1 border-t px-2.5 pt-1.5 text-[10.5px]">
               {total > remoto.itens.length ? `${remoto.itens.length} de ${total.toLocaleString('pt-BR')}. Refine a busca.` : `${total.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')}`}
             </p>

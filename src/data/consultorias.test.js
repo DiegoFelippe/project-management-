@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { buscarConsultoriasAtivas, listarNomesDeConsultorias } from './consultorias'
+import { buscarConsultorias, buscarConsultoriasAtivas } from './consultorias'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn() } }))
 
@@ -11,19 +11,26 @@ beforeEach(() => {
   vi.mocked(supabase.from).mockImplementation(banco.from)
 })
 
-describe('listarNomesDeConsultorias', () => {
-  it('para o filtro das listas: todas, inclusive as arquivadas, por nome', async () => {
-    banco.resposta = { data: [{ id: 'k1', nome: 'Acme' }], error: null }
-    expect(await listarNomesDeConsultorias()).toEqual([{ id: 'k1', nome: 'Acme' }])
+describe('buscarConsultorias', () => {
+  it('para o filtro das listas: todas, inclusive as arquivadas, pelo nome, com limite e total', async () => {
+    banco.resposta = { data: [{ id: 'k1', nome: 'Acme' }], error: null, count: 130 }
+    expect(await buscarConsultorias('ac_me%')).toEqual({ itens: [{ id: 'k1', nome: 'Acme' }], total: 130 })
     expect(banco.chamou('from', 'consultorias')).toBe(true)
-    expect(banco.chamou('select', 'id, nome')).toBe(true)
+    expect(banco.chamou('select', 'id, nome', { count: 'exact' })).toBe(true)
     expect(banco.chamou('is', 'arquivada_em', null)).toBe(false)
+    expect(banco.chamou('ilike', 'nome', '%ac\\_me\\%%')).toBe(true)
     expect(banco.chamou('order', 'nome')).toBe(true)
+    expect(banco.chamou('limit', 20)).toBe(true)
+  })
+
+  it('sem termo não filtra por nome', async () => {
+    await buscarConsultorias('')
+    expect(banco.chamadas.some((c) => c[0] === 'ilike')).toBe(false)
   })
 
   it('erro do banco sobe', async () => {
     banco.resposta = { data: null, error: { message: 'falhou' } }
-    await expect(listarNomesDeConsultorias()).rejects.toEqual({ message: 'falhou' })
+    await expect(buscarConsultorias()).rejects.toEqual({ message: 'falhou' })
   })
 })
 

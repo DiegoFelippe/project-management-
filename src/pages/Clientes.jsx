@@ -1,8 +1,10 @@
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { GraficoCarregando } from '@/components/comum/Carregando'
+import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
+import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
@@ -12,7 +14,6 @@ import FiltroConsultor from '@/components/clientes/FiltroConsultor'
 import MeusCheckins from '@/components/clientes/MeusCheckins'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { listarClientes } from '@/data/clientes'
 import { meuCheckinAberto } from '@/data/checkins'
 import { formatarCnpj } from '@/lib/cnpj'
@@ -22,9 +23,14 @@ import { useAtraso } from '@/lib/useAtraso'
 
 // Abas por papel. Quem atende (pessoa, gestor e admin) também tem Meus clientes e Meus check-ins;
 // a central e o dono nunca fazem check-in.
-const ABAS_DA_CENTRAL = [['distribuir', 'A distribuir'], ['nas_consultorias', 'Nas consultorias'], ['arquivados', 'Arquivados']]
-const ABAS_DO_CONSULTOR = [['meus', 'Meus clientes'], ['checkins', 'Meus check-ins']]
-const ABAS_DA_CONSULTORIA = [['aguardando', 'Aguardando consultor'], ['atendimento', 'Em atendimento'], ...ABAS_DO_CONSULTOR]
+const ABAS_DA_CENTRAL = [
+  { valor: 'distribuir', rotulo: 'A distribuir' }, { valor: 'nas_consultorias', rotulo: 'Nas consultorias' },
+  { valor: 'arquivados', rotulo: 'Arquivados' },
+]
+const ABAS_DO_CONSULTOR = [{ valor: 'meus', rotulo: 'Meus clientes' }, { valor: 'checkins', rotulo: 'Meus check-ins' }]
+const ABAS_DA_CONSULTORIA = [
+  { valor: 'aguardando', rotulo: 'Aguardando consultor' }, { valor: 'atendimento', rotulo: 'Em atendimento' }, ...ABAS_DO_CONSULTOR,
+]
 const ABAS_DA_PESSOA = ABAS_DO_CONSULTOR
 
 const HORA = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' })
@@ -60,11 +66,11 @@ export default function Clientes() {
   const central = veTudo(perfil)
   const gestao = !central && perfil.papel !== 'pessoa'
   const abas = abasDoPapel(perfil)
-  const [aba, setAba] = useState(abas[0][0])
+  const [aba, setAba] = useState(abas[0].valor)
   const [busca, setBusca] = useState('')
   const buscaAtrasada = useAtraso(busca.trim(), 300)
   const [consultoriaId, setConsultoriaId] = useState('')
-  const [consultor, setConsultor] = useState({ valor: '', nome: null }) // '' = todos, 'sem' ou o id
+  const [consultor, setConsultor] = useState('') // '' = todos, 'sem' ou o id
   const [pagina, setPagina] = useState(1)
   const [resultado, setResultado] = useState(null)
   const [erro, setErro] = useState(null)
@@ -77,7 +83,7 @@ export default function Clientes() {
   const mostraFiltroConsultor = perfil.papel !== 'pessoa' && !['distribuir', 'aguardando', 'meus', 'checkins'].includes(aba)
   // Em atendimento todo cliente tem consultor: lá não existe "Sem consultor".
   const semConsultorVale = aba !== 'atendimento'
-  const consultorFiltrado = mostraFiltroConsultor && (semConsultorVale || consultor.valor !== 'sem') ? consultor.valor : ''
+  const consultorFiltrado = mostraFiltroConsultor && (semConsultorVale || consultor !== 'sem') ? consultor : ''
   const recarregar = () => setVersao((v) => v + 1)
   const { abrir, janelas } = useAcoesDoCliente({ aoMudar: recarregar })
 
@@ -130,40 +136,27 @@ export default function Clientes() {
   return (
     <>
       <Cabecalho titulo="Clientes"
-        descricao={resultado && !emCheckins ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'cliente' : 'clientes'}` : null}>
-        {central && (
-          <Button onClick={() => abrir('formulario')}>
-            <Plus /> Novo cliente
-          </Button>
+        descricao={resultado && !emCheckins ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'cliente' : 'clientes'}` : null} />
+      <BarraDeFiltros>
+        {abas.length > 1 && <AbasSegmentadas rotulo="Mostrar" abas={abas} valor={aba} aoMudar={setAba} />}
+        {!emCheckins && (
+          <CampoBusca rotulo="Buscar clientes" placeholder="Buscar por nome, cidade ou CNPJ" valor={busca} aoMudar={setBusca} />
         )}
-      </Cabecalho>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        {abas.length > 1 && (
-          <div role="group" aria-label="Mostrar" className="inline-flex rounded-lg bg-muted p-1 text-sm font-semibold">
-            {abas.map(([valor, rotulo]) => (
-              <button key={valor} type="button" aria-pressed={aba === valor} onClick={() => setAba(valor)}
-                className={`botao-animado rounded-md px-3 py-1 transition-[background-color,color,translate,scale] hover:-translate-y-px active:scale-[0.97] ${aba === valor ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground'}`}>
-                {rotulo}
-              </button>
-            ))}
-          </div>
-        )}
-        {!emCheckins && <div className="relative w-full max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input type="search" aria-label="Buscar clientes" placeholder="Buscar por nome, cidade ou CNPJ" className="h-10 pl-9"
-            value={busca} onChange={(e) => setBusca(e.target.value)} />
-        </div>}
         {central && (
-          <div className="[&>div]:mb-0">
-            <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setConsultor({ valor: '', nome: null }) }} />
-          </div>
+          <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setConsultor('') }} />
         )}
         {mostraFiltroConsultor && (
-          <FiltroConsultor valor={consultorFiltrado} nome={consultor.nome} comSemConsultor={semConsultorVale}
-            consultoriaId={central ? (consultoriaId || null) : perfil.consultoria_id}
-            aoMudar={(valor, nome) => setConsultor({ valor, nome })} />
+          <FiltroConsultor valor={consultorFiltrado} comSemConsultor={semConsultorVale}
+            consultoriaId={central ? (consultoriaId || null) : perfil.consultoria_id} aoMudar={setConsultor} />
         )}
-      </div>
+        {central && (
+          <AcaoPrincipal>
+            <Button onClick={() => abrir('formulario')}>
+              <Plus /> Novo cliente
+            </Button>
+          </AcaoPrincipal>
+        )}
+      </BarraDeFiltros>
       {aba === 'meus' && aberto && clientes?.some((c) => c.id !== aberto.cliente_id) && (
         <p id={idDoAviso} className="mb-3 text-sm text-muted-foreground">
           Você está com check-in aberto em {aberto.cliente?.nome ?? 'outro cliente'} desde {HORA.format(new Date(aberto.inicio))}.

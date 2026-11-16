@@ -2,7 +2,9 @@ import { Pencil, Plus, Send, UserCheck, UserX, Landmark } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
+import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import Avatar from '@/components/comum/Avatar'
+import BarraDeFiltros, { AcaoPrincipal } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
@@ -21,6 +23,7 @@ import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@
 import { veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
 
+const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'desativados', rotulo: 'Desativados' }]
 const COR_DA_SITUACAO = {
   'Convite pendente': 'notice',
   'Senha provisória': 'secondary',
@@ -175,24 +178,18 @@ export default function Usuarios() {
   return (
     <>
       <Cabecalho titulo="Usuários"
-        descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'pessoa' : 'pessoas'}` : null}>
-        {(!ehDono || ehAdminGeral) && (
-          <Button onClick={() => setNovo(true)}>
-            <Plus /> Novo acesso
-          </Button>
-        )}
-      </Cabecalho>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+        descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'pessoa' : 'pessoas'}` : null} />
+      <BarraDeFiltros>
+        <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1) }} />
         {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />}
-        <div role="group" aria-label="Mostrar" className="mb-4 inline-flex rounded-lg bg-muted p-1 text-sm font-semibold">
-          {[['ativos', 'Ativos'], ['desativados', 'Desativados']].map(([valor, rotulo]) => (
-            <button key={valor} type="button" aria-pressed={filtro === valor} onClick={() => { setFiltro(valor); setPagina(1) }}
-              className={`botao-animado rounded-md px-3 py-1 transition-[background-color,color,translate,scale] hover:-translate-y-px active:scale-[0.97] ${filtro === valor ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground'}`}>
-              {rotulo}
-            </button>
-          ))}
-        </div>
-      </div>
+        {(!ehDono || ehAdminGeral) && (
+          <AcaoPrincipal>
+            <Button onClick={() => setNovo(true)}>
+              <Plus /> Novo acesso
+            </Button>
+          </AcaoPrincipal>
+        )}
+      </BarraDeFiltros>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as pessoas…" className="py-12" />}
       {resultado && lista.length === 0 && (

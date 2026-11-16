@@ -8,6 +8,7 @@ import {
   salvarIntegracao,
   testarIntegracao,
 } from '@/data/integracoes'
+import { escolherNoSeletor } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
 import Integracoes from './Integracoes'
 
@@ -15,7 +16,7 @@ vi.mock('@/data/integracoes', () => ({
   listarIntegracoes: vi.fn(), salvarIntegracao: vi.fn(), testarIntegracao: vi.fn(),
   desconectarIntegracao: vi.fn(), iniciarGoogle: vi.fn(),
 }))
-vi.mock('@/data/consultorias', () => ({ listarNomesDeConsultorias: vi.fn().mockResolvedValue([{ id: 'c1', nome: 'Acme' }]) }))
+vi.mock('@/data/consultorias', () => ({ buscarConsultorias: vi.fn().mockResolvedValue({ itens: [{ id: 'c1', nome: 'Acme' }], total: 1 }) }))
 
 const admin = { id: 'a1', papel: 'admin', consultoria_id: 'c1' }
 const SMTP = {
@@ -86,7 +87,7 @@ describe('Integrações', () => {
   it('o dono escolhe a consultoria e só olha', async () => {
     renderizarTela(<Integracoes />, { perfil: { id: 'd1', papel: 'dono', consultoria_id: null } })
     expect(await screen.findByText(/Escolha uma consultoria/)).toBeInTheDocument()
-    await userEvent.selectOptions(screen.getByLabelText('Consultoria'), 'c1')
+    await escolherNoSeletor(userEvent, 'Consultoria', 'Acme')
     await screen.findByRole('table', { name: 'Integrações' })
     expect(listarIntegracoes).toHaveBeenCalledWith({ consultoriaId: 'c1' })
     expect(screen.queryByRole('button', { name: /Editar|Conectar|Testar|Desconectar/ })).not.toBeInTheDocument()

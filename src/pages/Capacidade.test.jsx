@@ -9,7 +9,7 @@ vi.mock('@/data/capacidade', () => ({
   consultoriasPorOcupacao: vi.fn(), consultoresPorOcupacao: vi.fn(), definirCarga: vi.fn(),
   listarAusencias: vi.fn(), criarAusencia: vi.fn(), editarAusencia: vi.fn(), apagarAusencia: vi.fn(),
 }))
-vi.mock('@/data/consultorias', () => ({ listarNomesDeConsultorias: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/data/consultorias', () => ({ buscarConsultorias: vi.fn().mockResolvedValue({ itens: [], total: 0 }) }))
 
 const ANA = {
   id: 'p1', nome: 'Ana', email: 'ana@x.test', consultoria_id: 's1', consultoria_nome: 'STI', carga_semanal: 40,

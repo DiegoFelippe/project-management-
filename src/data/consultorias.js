@@ -3,23 +3,23 @@ import { chamarFuncao, supabase } from '@/lib/supabase'
 import { padraoParcial } from '@/lib/busca'
 import { buscarPagina } from './paginar'
 
-// Para o filtro de quem vê tudo nas listas: todas as consultorias, inclusive as arquivadas, por nome.
-export async function listarNomesDeConsultorias() {
-  const { data, error } = await supabase.from('consultorias').select('id, nome').order('nome')
-  if (error) throw error
-  return data
-}
-
-// Seletor de consultoria com busca no banco (acesso novo de administrador): só as ativas, pelo nome (ilike), no
-// máximo `limite` por vez. Devolve { itens: [{ id, nome }], total } (total = quantas combinam, para "N de TOTAL").
-export async function buscarConsultoriasAtivas(termo = '', limite = 20) {
-  let consulta = supabase.from('consultorias').select('id, nome', { count: 'exact' }).is('arquivada_em', null).order('nome').limit(limite)
+// Consultorias por nome (ilike), no máximo `limite` por vez, numa consulta só. Devolve { itens: [{ id, nome }], total }
+// (total = quantas combinam, para o "N de TOTAL" do Seletor). `soAtivas` tira as arquivadas.
+async function buscarPorNome(termo, limite, soAtivas) {
+  let consulta = supabase.from('consultorias').select('id, nome', { count: 'exact' }).order('nome').limit(limite)
+  if (soAtivas) consulta = consulta.is('arquivada_em', null)
   const padrao = padraoParcial(termo)
   if (padrao) consulta = consulta.ilike('nome', padrao)
   const { data, error, count } = await consulta
   if (error) throw error
   return { itens: data, total: count ?? 0 }
 }
+
+// Filtro das listas de quem vê tudo: todas as consultorias, inclusive as arquivadas, buscadas no banco pelo nome.
+export const buscarConsultorias = (termo = '', limite = 20) => buscarPorNome(termo, limite, false)
+
+// Seletor de consultoria com busca no banco (acesso novo de administrador): só as ativas.
+export const buscarConsultoriasAtivas = (termo = '', limite = 20) => buscarPorNome(termo, limite, true)
 
 // Tela Consultorias (só o dono enxerga todas): uma página, ativas ou arquivadas. Pessoas e times
 // vêm contados no banco; da administração, só quem é admin.

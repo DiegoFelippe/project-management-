@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { useSearchParams } from 'react-router'
-import { cn } from '@/lib/utils'
+import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 
 // Abas da página do cliente. `abas` é a lista, na ordem em que aparecem: { id, rotulo, conteudo }. A escolhida
 // vive em ?aba= (a primeira é a padrão; valor desconhecido volta para ela). Só o painel aberto monta o conteúdo.
@@ -19,32 +19,11 @@ export default function AbasDoCliente({ abas }) {
     }, { replace: true })
   }
 
-  function aoTeclar(e, indice) {
-    const passo = { ArrowRight: 1, ArrowLeft: -1 }[e.key]
-    if (!passo) return
-    e.preventDefault()
-    const proxima = abas[(indice + passo + abas.length) % abas.length]
-    escolher(proxima.id)
-    document.getElementById(`${base}-aba-${proxima.id}`)?.focus()
-  }
-
   return (
     <div className="grid gap-4">
-      <div role="tablist" aria-label="Seções do cliente" className="flex gap-1 overflow-x-auto border-b">
-        {abas.map((aba, i) => {
-          const selecionada = aba.id === atual.id
-          return (
-            <button key={aba.id} type="button" role="tab" id={`${base}-aba-${aba.id}`}
-              aria-selected={selecionada} aria-controls={`${base}-painel-${aba.id}`} tabIndex={selecionada ? 0 : -1}
-              onClick={() => escolher(aba.id)} onKeyDown={(e) => aoTeclar(e, i)}
-              className={cn(
-                'botao-animado -mb-px whitespace-nowrap rounded-t-md border-b-2 px-4 py-2 text-sm font-medium transition-all hover:-translate-y-px active:scale-[0.97]',
-                selecionada ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
-              )}>
-              {aba.rotulo}
-            </button>
-          )
-        })}
+      <div>
+        <AbasSegmentadas comoAbas idBase={base} rotulo="Seções do cliente" valor={atual.id} aoMudar={escolher}
+          abas={abas.map((a) => ({ valor: a.id, rotulo: a.rotulo }))} />
       </div>
       {abas.map((aba) => (
         <div key={aba.id} role="tabpanel" id={`${base}-painel-${aba.id}`} aria-labelledby={`${base}-aba-${aba.id}`}
