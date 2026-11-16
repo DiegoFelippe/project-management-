@@ -15,8 +15,9 @@ const HORA = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' })
 const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
 
 // Tabela dos check-ins do consultor (os dele, de qualquer cliente, inclusive de quem já saiu da carteira).
+// Editar e Apagar só nos da consultoria atual (consultoriaId): os de uma consultoria antiga ficam só para ver.
 // aoMudar() avisa a tela depois de editar ou apagar, para ela recarregar o check-in aberto.
-export default function MeusCheckins({ consultorId, aoMudar }) {
+export default function MeusCheckins({ consultorId, consultoriaId, aoMudar }) {
   const [pagina, setPagina] = useState(1)
   const [resultado, setResultado] = useState(null)
   const [erro, setErro] = useState(null)
@@ -76,6 +77,7 @@ export default function MeusCheckins({ consultorId, aoMudar }) {
           {itens.map((c) => {
             const inicio = new Date(c.inicio)
             const fim = c.fim ? new Date(c.fim) : null
+            const mexe = c.consultoria_id === consultoriaId
             return (
               <Linha key={c.id}>
                 <Celula className="font-semibold">{c.cliente?.nome ?? '—'}</Celula>
@@ -88,8 +90,8 @@ export default function MeusCheckins({ consultorId, aoMudar }) {
                 </Celula>
                 <Celula className="max-w-md truncate text-muted-foreground">{c.descricao || '—'}</Celula>
                 <CelulaAcoes>
-                  {fim && <Button variant="ghost" size="sm" onClick={() => setEditando(c)}><Pencil /> Editar</Button>}
-                  <Button variant="ghost" size="sm" onClick={() => setApagando(c)} className={BOTAO_PERIGO}><Trash2 /> Apagar</Button>
+                  {mexe && fim && <Button variant="ghost" size="sm" onClick={() => setEditando(c)}><Pencil /> Editar</Button>}
+                  {mexe && <Button variant="ghost" size="sm" onClick={() => setApagando(c)} className={BOTAO_PERIGO}><Trash2 /> Apagar</Button>}
                 </CelulaAcoes>
               </Linha>
             )

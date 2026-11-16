@@ -26,7 +26,7 @@ beforeEach(() => {
 
 describe('MeusCheckins', () => {
   it('lista os meus check-ins com cliente, horas e descrição', async () => {
-    render(<MeusCheckins consultorId="p9" aoMudar={vi.fn()} />)
+    render(<MeusCheckins consultorId="p9" consultoriaId="s1" aoMudar={vi.fn()} />)
     const tabela = await screen.findByRole('table', { name: 'Meus check-ins' })
     expect(listarCheckins).toHaveBeenCalledWith({ consultorId: 'p9', pagina: 1 })
     for (const coluna of ['Cliente', 'Data', 'Horário', 'Horas', 'O que foi feito']) {
@@ -42,7 +42,7 @@ describe('MeusCheckins', () => {
 
   it('Editar abre a janela preenchida e Salvar chama editarCheckin e avisa', async () => {
     const aoMudar = vi.fn()
-    render(<MeusCheckins consultorId="p9" aoMudar={aoMudar} />)
+    render(<MeusCheckins consultorId="p9" consultoriaId="s1" aoMudar={aoMudar} />)
     await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Editar' }))
     const janela = screen.getByRole('dialog', { name: 'Editar check-in em Provedor Alfa' })
     expect(within(janela).getByLabelText('Data')).toHaveValue('2026-11-10')
@@ -55,7 +55,7 @@ describe('MeusCheckins', () => {
 
   it('Apagar pede confirmação, apaga e recarrega', async () => {
     const aoMudar = vi.fn()
-    render(<MeusCheckins consultorId="p9" aoMudar={aoMudar} />)
+    render(<MeusCheckins consultorId="p9" consultoriaId="s1" aoMudar={aoMudar} />)
     await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Apagar' }))
     expect(apagarCheckin).not.toHaveBeenCalled()
     await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar check-in' }))
@@ -66,7 +66,7 @@ describe('MeusCheckins', () => {
 
   it('Apagar com erro mantém a confirmação aberta com o motivo', async () => {
     vi.mocked(apagarCheckin).mockResolvedValue({ erro: 'Sem permissão.' })
-    render(<MeusCheckins consultorId="p9" aoMudar={vi.fn()} />)
+    render(<MeusCheckins consultorId="p9" consultoriaId="s1" aoMudar={vi.fn()} />)
     await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Apagar' }))
     await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar check-in' }))
     expect(await screen.findByText('Sem permissão.')).toBeInTheDocument()
@@ -74,14 +74,24 @@ describe('MeusCheckins', () => {
 
   it('paginação: Próxima pede a página 2 ao banco', async () => {
     vi.mocked(listarCheckins).mockResolvedValue({ itens: ITENS, total: 16 })
-    render(<MeusCheckins consultorId="p9" aoMudar={vi.fn()} />)
+    render(<MeusCheckins consultorId="p9" consultoriaId="s1" aoMudar={vi.fn()} />)
     await userEvent.click(await screen.findByRole('button', { name: /Próxima/ }))
     expect(listarCheckins).toHaveBeenLastCalledWith({ consultorId: 'p9', pagina: 2 })
   })
 
+  it('check-in de uma consultoria em que não estou mais: só vejo, sem Editar nem Apagar', async () => {
+    vi.mocked(listarCheckins).mockResolvedValue({
+      itens: [{ ...ITENS[0], id: 'c3', consultoria_id: 's0', cliente: { id: 'k3', nome: 'Da Antiga' } }], total: 1,
+    })
+    render(<MeusCheckins consultorId="p9" consultoriaId="s1" aoMudar={vi.fn()} />)
+    const linha = await screen.findByRole('row', { name: /Da Antiga/ })
+    expect(within(linha).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
+    expect(within(linha).queryByRole('button', { name: 'Apagar' })).not.toBeInTheDocument()
+  })
+
   it('sem check-ins mostra a lista vazia', async () => {
     vi.mocked(listarCheckins).mockResolvedValue({ itens: [], total: 0 })
-    render(<MeusCheckins consultorId="p9" aoMudar={vi.fn()} />)
+    render(<MeusCheckins consultorId="p9" consultoriaId="s1" aoMudar={vi.fn()} />)
     expect(await screen.findByText('Você ainda não registrou nenhum check-in.')).toBeInTheDocument()
   })
 })

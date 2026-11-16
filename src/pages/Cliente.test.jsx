@@ -141,6 +141,14 @@ describe('Cliente (página)', () => {
     expect(within(de_outro).queryByRole('button', { name: 'Apagar' })).not.toBeInTheDocument()
   })
 
+  it('o consultor que mudou de consultoria não edita nem apaga os check-ins da antiga', async () => {
+    tela({ id: 'p1', papel: 'pessoa', consultoria_id: 's2' })
+    const tabela = await screen.findByRole('table', { name: 'Check-ins' })
+    const dele = within(tabela).getByRole('row', { name: /Reunião/ })
+    expect(within(dele).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
+    expect(within(dele).queryByRole('button', { name: 'Apagar' })).not.toBeInTheDocument()
+  })
+
   it('Editar check-in abre preenchido e salva com editarCheckin', async () => {
     tela(adminDaSti)
     const dele = within(await screen.findByRole('table', { name: 'Check-ins' })).getByRole('row', { name: /Reunião/ })

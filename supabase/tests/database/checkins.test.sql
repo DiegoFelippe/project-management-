@@ -3,7 +3,7 @@
 -- arquivado, consultor desativado ou fora da consultoria, consultoria arquivada). Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(74);
+select plan(77);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -361,6 +361,15 @@ select ok((select consultor_id is null from public.clientes where id = testes.id
 update public.perfis set consultoria_id = testes.id('B') where id = testes.id('pessoa_a3');
 select is((select count(*) from public.time_membros where pessoa_id = testes.id('pessoa_a3')), 0::bigint,
   'quem muda de consultoria sai dos times da antiga');
+
+select testes.como('pessoa_a3');
+select is((select count(*) from public.checkins where id = testes.id('k_troca')), 1::bigint,
+  'quem saiu da consultoria continua vendo os check-ins antigos');
+with u as (update public.checkins set descricao = 'Mudado depois de sair' where id = testes.id('k_troca') returning 1)
+select is(count(*), 0::bigint, 'mas não corrige check-in da consultoria antiga') from u;
+with d as (delete from public.checkins where id = testes.id('k_troca') returning 1)
+select is(count(*), 0::bigint, 'nem apaga') from d;
+reset role;
 
 select testes.como('gestor_a2');
 update public.clientes set consultor_id = testes.id('pessoa_a4') where id = testes.id('c_esq');

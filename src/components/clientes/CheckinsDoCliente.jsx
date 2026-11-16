@@ -14,10 +14,11 @@ const DATA = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' })
 const HORA = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' })
 const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
 
-// Edita e apaga: o próprio consultor, ou admin/gestor da consultoria do check-in. A central só vê.
+// Edita e apaga: o próprio consultor ou admin/gestor, sempre na consultoria do check-in (quem saiu dela só
+// vê). A central só vê.
 function podeMexer(perfil, checkin) {
-  if (perfil.id === checkin.consultor_id) return true
-  return ['admin', 'gestor'].includes(perfil.papel) && perfil.consultoria_id === checkin.consultoria_id
+  if (perfil.consultoria_id !== checkin.consultoria_id) return false
+  return perfil.id === checkin.consultor_id || ['admin', 'gestor'].includes(perfil.papel)
 }
 
 // Tabela Check-ins do cliente (de todos os consultores), paginada no banco.

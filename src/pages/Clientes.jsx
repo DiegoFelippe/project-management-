@@ -168,7 +168,7 @@ export default function Clientes() {
           {' '}Faça o check-out para começar outro.
         </p>
       )}
-      {emCheckins && <MeusCheckins consultorId={perfil.id} aoMudar={recarregar} />}
+      {emCheckins && <MeusCheckins consultorId={perfil.id} consultoriaId={perfil.consultoria_id} aoMudar={recarregar} />}
       {!emCheckins && erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       {!emCheckins && !erro && clientes === null && <GraficoCarregando texto="Carregando os clientes…" className="py-12" />}
       {!emCheckins && clientes?.length === 0 && <ListaVazia>{buscaAtrasada ? 'Nenhum cliente encontrado.' : VAZIO[aba]}</ListaVazia>}
