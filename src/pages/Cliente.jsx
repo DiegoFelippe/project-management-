@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import Cabecalho from '@/components/comum/Cabecalho'
+import AgendaDoCliente from '@/components/clientes/AgendaDoCliente'
 import AbasDoCliente from '@/components/clientes/AbasDoCliente'
 import ArquivosDoCliente from '@/components/clientes/ArquivosDoCliente'
 import { AcoesDaLinha } from '@/components/clientes/AcoesDoCliente'
@@ -148,10 +149,11 @@ export default function Cliente() {
             </Campo>
           </Bloco>
         </div>
-        <GraficosDoCliente cliente={cliente} />
+        <GraficosDoCliente cliente={cliente} versao={versao} />
       </>
       ),
     },
+    { id: 'agenda', rotulo: 'Agenda', conteudo: <AgendaDoCliente clienteId={cliente.id} versao={versao} /> },
     { id: 'checkins', rotulo: 'Check-ins', conteudo: <CheckinsDoCliente cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar} /> },
     { id: 'arquivos', rotulo: 'Arquivos', conteudo: <ArquivosDoCliente cliente={cliente} perfil={perfil} /> },
     { id: 'historico', rotulo: 'Histórico', conteudo: <HistoricoDoCliente clienteId={cliente.id} versao={versao} /> },

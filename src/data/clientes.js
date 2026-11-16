@@ -3,6 +3,7 @@ import { traduzirErroBanco } from '@/lib/erros'
 import { normalizarCnpj } from '@/lib/cnpj'
 import { supabase } from '@/lib/supabase'
 import { padraoDeBusca } from '@/lib/busca'
+import { deslocarMes } from '@/lib/mes'
 import { buscarPagina, POR_PAGINA } from './paginar'
 
 const CAMPOS_DA_LISTA =
@@ -125,6 +126,32 @@ export async function listarEventos(clienteId, { pagina = 1 } = {}) {
   })
   if (error) throw error
   return { itens: data, total: data.length > 0 ? Number(data[0].total) : 0 }
+}
+
+// Eventos do cliente no mês (fuso de São Paulo), do mais novo ao mais antigo: páginas de 50 até acabar, no máximo
+// 4. Devolve { itens, total } (total é o do mês; se passar de 200, a agenda avisa "e mais N eventos").
+const EVENTOS_POR_PAGINA = 50
+const PAGINAS_DE_EVENTOS = 4
+
+export async function eventosDoMes(clienteId, mes) {
+  const de = `${mes}T00:00:00-03:00`
+  const ate = `${deslocarMes(mes, 1)}T00:00:00-03:00`
+  const itens = []
+  let total = 0
+  for (let pagina = 0; pagina < PAGINAS_DE_EVENTOS; pagina++) {
+    const { data, error } = await supabase.rpc('historico_do_cliente', {
+      p_cliente: clienteId,
+      p_limite: EVENTOS_POR_PAGINA,
+      p_deslocamento: pagina * EVENTOS_POR_PAGINA,
+      p_de: de,
+      p_ate: ate,
+    })
+    if (error) throw error
+    if (data.length > 0) total = Number(data[0].total)
+    itens.push(...data)
+    if (data.length < EVENTOS_POR_PAGINA) break
+  }
+  return { itens, total }
 }
 
 // Gráficos da aba Geral. As funções do banco rodam com as permissões de quem pergunta: cada um soma só os

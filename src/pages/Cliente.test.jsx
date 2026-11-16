@@ -2,21 +2,21 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { apagarCheckin, editarCheckin, listarCheckins, meuCheckinAberto } from '@/data/checkins'
+import { apagarCheckin, checkinsDoMes, editarCheckin, listarCheckins, meuCheckinAberto } from '@/data/checkins'
 import { limparPastaDoCliente, listarArquivos } from '@/data/arquivos'
-import { apagarCliente, buscarCliente, checkinsPorSemana, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
+import { apagarCliente, buscarCliente, checkinsPorSemana, eventosDoMes, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
 import { renderizarTela } from '@/test/renderizar'
 import Cliente from './Cliente'
 
 vi.mock('@/data/clientes', () => ({
-  buscarCliente: vi.fn(), listarEventos: vi.fn(),
+  buscarCliente: vi.fn(), listarEventos: vi.fn(), eventosDoMes: vi.fn(),
   horasPorMes: vi.fn(), horasPorConsultor: vi.fn(), checkinsPorSemana: vi.fn(),
   criarCliente: vi.fn(), editarCliente: vi.fn(), arquivarCliente: vi.fn(), reativarCliente: vi.fn(), apagarCliente: vi.fn(),
   mandarParaConsultoria: vi.fn(), escolherConsultor: vi.fn(), ajustarPrevisao: vi.fn(),
 }))
 vi.mock('@/data/checkins', () => ({
   meuCheckinAberto: vi.fn(), fazerCheckin: vi.fn(), fazerCheckout: vi.fn(), lancarHoras: vi.fn(),
-  listarCheckins: vi.fn(), editarCheckin: vi.fn(), apagarCheckin: vi.fn(),
+  listarCheckins: vi.fn(), editarCheckin: vi.fn(), apagarCheckin: vi.fn(), checkinsDoMes: vi.fn(),
 }))
 vi.mock('@/data/arquivos', () => ({
   listarArquivos: vi.fn(), enviarArquivo: vi.fn(), linkParaBaixar: vi.fn(), apagarArquivo: vi.fn(), limparPastaDoCliente: vi.fn(),
@@ -57,6 +57,8 @@ beforeEach(() => {
   vi.mocked(buscarCliente).mockResolvedValue(CLIENTE)
   vi.mocked(listarCheckins).mockResolvedValue({ itens: CHECKINS, total: 2 })
   vi.mocked(listarEventos).mockResolvedValue({ itens: EVENTOS, total: 2 })
+  vi.mocked(checkinsDoMes).mockResolvedValue([])
+  vi.mocked(eventosDoMes).mockResolvedValue({ itens: [], total: 0 })
   vi.mocked(horasPorMes).mockResolvedValue([])
   vi.mocked(horasPorConsultor).mockResolvedValue([])
   vi.mocked(checkinsPorSemana).mockResolvedValue([])
@@ -98,6 +100,13 @@ describe('Cliente (página)', () => {
     vi.mocked(buscarCliente).mockResolvedValue(null)
     tela()
     expect(await screen.findByText('Cliente não encontrado.')).toBeInTheDocument()
+  })
+
+  it('a aba Agenda fica entre Geral e Check-ins e mostra a grade do mês', async () => {
+    tela(central, '/clientes/k1?aba=agenda')
+    await screen.findByRole('grid')
+    expect(screen.getAllByRole('tab').map((a) => a.textContent)).toEqual(['Geral', 'Agenda', 'Check-ins', 'Arquivos', 'Histórico'])
+    expect(checkinsDoMes).toHaveBeenCalledWith('k1', expect.stringMatching(/^\d{4}-\d{2}-01$/))
   })
 
   it('o histórico mostra o que aconteceu, com quem fez', async () => {
@@ -223,7 +232,7 @@ describe('Cliente (página)', () => {
   it('mostra as abas na ordem e abre Geral com os dados e as ações', async () => {
     tela()
     await screen.findByRole('heading', { name: 'Provedor Alfa' })
-    expect(screen.getAllByRole('tab').map((a) => a.textContent)).toEqual(['Geral', 'Check-ins', 'Arquivos', 'Histórico'])
+    expect(screen.getAllByRole('tab').map((a) => a.textContent)).toEqual(['Geral', 'Agenda', 'Check-ins', 'Arquivos', 'Histórico'])
     expect(screen.getByRole('tab', { name: 'Geral' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByRole('table', { name: 'Check-ins' })).not.toBeInTheDocument()
     expect(screen.getByText('Alfa Telecom Ltda')).toBeInTheDocument()

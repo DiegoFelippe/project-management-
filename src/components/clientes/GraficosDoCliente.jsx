@@ -112,12 +112,13 @@ function useCarregado(chave, carregar, mensagemDeErro) {
   return estado.chave === chave ? estado : { dados: null, erro: null }
 }
 
-export default function GraficosDoCliente({ cliente }) {
+// versao muda quando a página mudou algo (ex.: check-out na aba Geral) e os gráficos recarregam.
+export default function GraficosDoCliente({ cliente, versao = 0 }) {
   const [mes, setMes] = useState(mesAtual)
   const atual = mesAtual()
-  const porMes = useCarregado(`mes:${cliente.id}`, () => horasPorMes(cliente.id), 'Não foi possível carregar o gráfico de horas por mês.')
-  const porConsultor = useCarregado(`consultor:${cliente.id}:${mes}`, () => horasPorConsultor(cliente.id, mes), 'Não foi possível carregar o gráfico de horas por consultor.')
-  const porSemana = useCarregado(`semana:${cliente.id}:${mes}`, () => checkinsPorSemana(cliente.id, mes), 'Não foi possível carregar o gráfico de check-ins por semana.')
+  const porMes = useCarregado(`mes:${cliente.id}:${versao}`, () => horasPorMes(cliente.id), 'Não foi possível carregar o gráfico de horas por mês.')
+  const porConsultor = useCarregado(`consultor:${cliente.id}:${mes}:${versao}`, () => horasPorConsultor(cliente.id, mes), 'Não foi possível carregar o gráfico de horas por consultor.')
+  const porSemana = useCarregado(`semana:${cliente.id}:${mes}:${versao}`, () => checkinsPorSemana(cliente.id, mes), 'Não foi possível carregar o gráfico de check-ins por semana.')
 
   const semHoras = porMes.dados?.every((m) => m.realizado === 0)
   const semSemanas = porSemana.dados?.every((s) => s.quantidade === 0)

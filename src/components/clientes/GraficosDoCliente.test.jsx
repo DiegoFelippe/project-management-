@@ -85,6 +85,15 @@ describe('GraficosDoCliente', () => {
     expect(horasPorMes).toHaveBeenCalledTimes(1)
   })
 
+  it('recarrega os três gráficos quando a versão da página muda', async () => {
+    const { rerender } = render(<GraficosDoCliente cliente={CLIENTE} versao={0} />)
+    await screen.findByRole('img', { name: /Horas por mês/ })
+    rerender(<GraficosDoCliente cliente={CLIENTE} versao={1} />)
+    await waitFor(() => expect(horasPorMes).toHaveBeenCalledTimes(2))
+    expect(horasPorConsultor).toHaveBeenCalledTimes(2)
+    expect(checkinsPorSemana).toHaveBeenCalledTimes(2)
+  })
+
   it('erro ao carregar avisa', async () => {
     vi.mocked(horasPorMes).mockRejectedValue(new Error('x'))
     render(<GraficosDoCliente cliente={CLIENTE} />)

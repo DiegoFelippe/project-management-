@@ -30,6 +30,11 @@ describe('AbasDoCliente', () => {
     expect(screen.getByRole('tab', { name: 'Geral' })).toHaveAttribute('aria-controls', screen.getByRole('tabpanel').id)
   })
 
+  it('o painel aberto entra na ordem do Tab', () => {
+    tela()
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('tabindex', '0')
+  })
+
   it('?aba=arquivos abre Arquivos', () => {
     tela('/c/1?aba=arquivos')
     expect(screen.getByRole('tab', { name: 'Arquivos' })).toHaveAttribute('aria-selected', 'true')

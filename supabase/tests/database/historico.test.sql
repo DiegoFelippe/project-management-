@@ -1,7 +1,7 @@
 -- Histórico do cliente com nomes: cada consultoria só vê os próprios nomes. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(11);
+select plan(16);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -120,6 +120,23 @@ select is((select de_consultor from public.historico_do_cliente(testes.id('cli')
   null, 'a consultoria nova não vê o consultor anterior');
 select is((select autor from public.historico_do_cliente(testes.id('cli')) where tipo = 'movido'),
   'Central', 'o autor da central aparece como Central');
+reset role;
+
+-- Período opcional (p_de inclusivo, p_ate exclusivo); os três eventos antigos têm 1 hora, o "movido" é de agora.
+select testes.como('central');
+select is((select count(*) from public.historico_do_cliente(testes.id('cli'), 15, 0, now() - interval '30 minutes', null)),
+  1::bigint, 'p_de corta os eventos anteriores');
+select is((select count(*) from public.historico_do_cliente(testes.id('cli'), 15, 0, null, now() - interval '30 minutes')),
+  3::bigint, 'p_ate corta os eventos a partir dele');
+select is((select total from public.historico_do_cliente(testes.id('cli'), 1, 0, null, now() - interval '30 minutes')),
+  3::bigint, 'o total respeita o período');
+select is((select count(*) from public.historico_do_cliente(testes.id('cli'), 15, 0, now() + interval '1 day', now() + interval '2 days')),
+  0::bigint, 'período sem eventos devolve 0 linhas');
+reset role;
+select testes.como('gestor_b');
+select is((select de_consultoria is null and para_consultoria = 'Consultoria B'
+  from public.historico_do_cliente(testes.id('cli'), 15, 0, now() - interval '30 minutes', null) where tipo = 'movido'),
+  true, 'com período, os nomes continuam mascarados');
 reset role;
 
 -- Quem não vê o cliente não recebe linhas
