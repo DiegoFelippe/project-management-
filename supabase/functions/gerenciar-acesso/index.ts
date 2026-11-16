@@ -1,4 +1,4 @@
-// POST /functions/v1/gerenciar-acesso — { acao: 'editar' | 'desativar' | 'reativar' | 'mover_para_central', pessoa_id, nome?, papel? }
+// POST /functions/v1/gerenciar-acesso — { acao: 'editar' | 'desativar' | 'reativar' | 'mover_para_central', pessoa_id, nome?, papel?, telefone?, cidade?, uf?, cargo?, data_entrada? }
 // Dono cuida dos administradores e da central; a central, dos administradores; só o dono move alguém para a central; administrador, de gestores e pessoas da consultoria dele;
 // gestor só muda o nome e a ficha (telefone, cidade, uf, cargo, data_entrada) das pessoas que vê. Em si mesmo ("Meu perfil"), cada um muda só o próprio nome:
 // não troca o próprio papel nem se desativa. E-mail não muda.
@@ -6,6 +6,8 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
 import { clienteAdmin, type Perfil, quemChama } from '../_shared/clientes.ts'
 import { Falha, lerJson, responder, servir } from '../_shared/http.ts'
 import { validarFicha, validarNome, validarUuid } from '../_shared/validar.ts'
+
+const CAMPOS_DA_FICHA = ['telefone', 'cidade', 'uf', 'cargo', 'data_entrada']
 
 type Poder = 'tudo' | 'nome' | null
 
@@ -71,8 +73,12 @@ servir(async (req) => {
   if (acao === 'editar') {
     const mudancas: Record<string, string | null> = {}
     if (corpo.nome !== undefined) mudancas.nome = validarNome(corpo.nome)
-    if (!euMesmo) Object.assign(mudancas, validarFicha(corpo))
-    else if (Object.keys(validarFicha(corpo)).length) throw new Falha(403, 'sem_permissao')
+    if (euMesmo) {
+      // Em si mesmo só o nome; o contato vai por atualizar_meu_contato. Confere antes de validar.
+      if (CAMPOS_DA_FICHA.some((c) => corpo[c] !== undefined)) throw new Falha(403, 'sem_permissao')
+    } else {
+      Object.assign(mudancas, validarFicha(corpo))
+    }
     if (corpo.papel !== undefined) {
       if (poder !== 'tudo' || quem.papel !== 'admin') throw new Falha(403, 'sem_permissao')
       if (corpo.papel !== 'pessoa' && corpo.papel !== 'gestor') throw new Falha(400, 'dados_invalidos', { campo: 'papel' })

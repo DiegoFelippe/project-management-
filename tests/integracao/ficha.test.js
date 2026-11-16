@@ -90,6 +90,7 @@ describe('ficha do consultor', () => {
   it('pessoa não edita outra; em si mesma só o nome', async () => {
     expect((await acesso(comoPessoa, { acao: 'editar', pessoa_id: pessoa2.id, cargo: 'Não' })).status).toBe(403)
     expect((await acesso(comoPessoa, { acao: 'editar', pessoa_id: pessoa.id, cargo: 'Chefe' })).status).toBe(403)
+    expect((await acesso(comoPessoa, { acao: 'editar', pessoa_id: pessoa.id, uf: 'XX' })).status).toBe(403)
     expect((await acesso(comoPessoa, { acao: 'editar', pessoa_id: pessoa.id, nome: 'Meu Nome Novo' })).status).toBe(200)
   })
 

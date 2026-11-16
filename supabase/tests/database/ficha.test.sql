@@ -1,7 +1,7 @@
 -- Ficha do consultor: campos novos do perfil e atualizar_meu_contato. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(18);
+select plan(23);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -50,6 +50,10 @@ end $$;
 select testes.consultoria('A');
 select testes.perfil('pessoa_a', 'pessoa', 'A');
 select testes.perfil('pessoa_b', 'pessoa', 'A');
+select testes.perfil('pessoa_prov', 'pessoa', 'A');
+select testes.perfil('pessoa_off', 'pessoa', 'A');
+update public.perfis set precisa_trocar_senha = true where id = testes.id('pessoa_prov');
+update public.perfis set ativo = false where id = testes.id('pessoa_off');
 
 select has_column('public', 'perfis', 'telefone', 'perfis tem telefone');
 select has_column('public', 'perfis', 'cidade', 'perfis tem cidade');
@@ -81,6 +85,19 @@ select is((select uf from public.perfis where id = testes.id('pessoa_a')), 'RJ',
 select testes.como('pessoa_a');
 select throws_ok(format('update public.perfis set cargo = %L where id = %L', 'Chefe', testes.id('pessoa_a')), '42501', null, 'direto no banco, cargo não muda');
 reset role;
+
+-- Só quem está liberado, e só o próprio perfil
+select testes.como('pessoa_off');
+select throws_ok($$select public.atualizar_meu_contato('1', 'X', 'SP')$$, 'P0001', 'sem_permissao', 'desativada não grava o contato');
+reset role;
+select testes.como('pessoa_prov');
+select throws_ok($$select public.atualizar_meu_contato('1', 'X', 'SP')$$, 'P0001', 'sem_permissao', 'senha provisória não grava o contato');
+reset role;
+select testes.como('pessoa_a');
+select lives_ok($$select public.atualizar_meu_contato('777', 'Só A', 'SP')$$, 'pessoa_a grava o dela');
+reset role;
+select is((select cidade from public.perfis where id = testes.id('pessoa_b')), null, 'pessoa_a não muda o contato de pessoa_b');
+select is(has_function_privilege('anon', 'public.atualizar_meu_contato(text,text,text)', 'execute'), false, 'anon não executa a função');
 
 select * from finish();
 rollback;
