@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatarHoras, formatarOcupacao, horasEntre } from './horas'
+import { formatarHoras, formatarOcupacao, horasEntre, formatarDuracao } from './horas'
 
 describe('horas', () => {
   it('formata horas', () => {
@@ -17,5 +17,13 @@ describe('horas', () => {
 
   it('calcula as horas entre duas datas', () => {
     expect(horasEntre(new Date('2026-11-16T10:00:00Z'), new Date('2026-11-16T12:30:00Z'))).toBe(2.5)
+  })
+})
+
+describe('formatarDuracao', () => {
+  it('mostra minutos abaixo de uma hora e "h mm" a partir dela', () => {
+    expect(formatarDuracao(5 * 60_000)).toBe('5 min')
+    expect(formatarDuracao(65 * 60_000)).toBe('1 h 05')
+    expect(formatarDuracao(-1000)).toBe('0 min')
   })
 })

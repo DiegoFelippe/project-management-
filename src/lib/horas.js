@@ -13,3 +13,10 @@ export function formatarOcupacao(n) {
 export function horasEntre(inicio, fim) {
   return (fim.getTime() - inicio.getTime()) / 3_600_000
 }
+
+// Tempo decorrido em "1 h 05"; abaixo de uma hora, "5 min".
+export function formatarDuracao(milissegundos) {
+  const minutos = Math.max(0, Math.floor(milissegundos / 60_000))
+  if (minutos < 60) return `${minutos} min`
+  return `${Math.floor(minutos / 60)} h ${String(minutos % 60).padStart(2, '0')}`
+}

@@ -6,6 +6,7 @@ import {
   ajustarPrevisao, apagarCliente, arquivarCliente, criarCliente, editarCliente, escolherConsultor, listarClientes,
   mandarParaConsultoria, reativarCliente,
 } from '@/data/clientes'
+import { fazerCheckin, lancarHoras, meuCheckinAberto } from '@/data/checkins'
 import { renderizarTela } from '@/test/renderizar'
 import Clientes from './Clientes'
 
@@ -13,6 +14,10 @@ vi.mock('@/data/clientes', () => ({
   listarClientes: vi.fn(), criarCliente: vi.fn(), editarCliente: vi.fn(),
   arquivarCliente: vi.fn(), reativarCliente: vi.fn(), apagarCliente: vi.fn(),
   mandarParaConsultoria: vi.fn(), escolherConsultor: vi.fn(), ajustarPrevisao: vi.fn(),
+}))
+vi.mock('@/data/checkins', () => ({
+  meuCheckinAberto: vi.fn(), fazerCheckin: vi.fn(), fazerCheckout: vi.fn(), lancarHoras: vi.fn(),
+  listarCheckins: vi.fn(), editarCheckin: vi.fn(), apagarCheckin: vi.fn(),
 }))
 vi.mock('@/data/capacidade', () => ({ consultoriasPorOcupacao: vi.fn(), consultoresPorOcupacao: vi.fn() }))
 vi.mock('@/data/consultorias', () => ({ listarNomesDeConsultorias: vi.fn().mockResolvedValue([]) }))
@@ -39,6 +44,9 @@ beforeEach(() => {
     { id: 'p1', nome: 'Ana', capacidade: 100, reservado: 40, ocupacao: 0.4 },
     { id: 'p2', nome: 'Beto', capacidade: 100, reservado: 60, ocupacao: 0.6 },
   ], total: 2 })
+  vi.mocked(meuCheckinAberto).mockResolvedValue(null)
+  vi.mocked(fazerCheckin).mockResolvedValue({ erro: null })
+  vi.mocked(lancarHoras).mockResolvedValue({ erro: null })
   for (const f of [criarCliente, editarCliente, arquivarCliente, reativarCliente, apagarCliente, mandarParaConsultoria, escolherConsultor, ajustarPrevisao]) {
     vi.mocked(f).mockResolvedValue({ erro: null })
   }
@@ -263,5 +271,102 @@ describe('Clientes: distribuir e escolher consultor', () => {
     expect(consultoresPorOcupacao).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1' }))
     await userEvent.click(await screen.findByRole('radio', { name: /Beto/ }))
     expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ consultorId: 'p2', pagina: 1 }))
+  })
+})
+
+describe('Clientes: check-in do consultor', () => {
+  const pessoa = { id: 'p9', papel: 'pessoa', consultoria_id: 's1' }
+  const MEUS = CLIENTES.map((c) => ({ ...c, consultoria_id: 's1', consultor_id: 'p9', consultor: { id: 'p9', nome: 'Eu', ativo: true } }))
+
+  beforeEach(() => vi.mocked(listarClientes).mockResolvedValue({ itens: MEUS, total: 2 }))
+
+  it('a pessoa vê Meus clientes e Meus check-ins, com previsão e realizado', async () => {
+    renderizarTela(<Clientes />, { perfil: pessoa })
+    const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    expect(screen.getByRole('button', { name: 'Meus clientes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Meus check-ins' })).toBeInTheDocument()
+    expect(within(alfa).getByText('41 h de 40 h')).toBeInTheDocument()
+    expect(within(linha('Provedor Beta')).getByText('0 h de 20 h')).toBeInTheDocument()
+    expect(meuCheckinAberto).toHaveBeenCalledWith('p9')
+  })
+
+  it('Fazer check-in chama fazerCheckin e recarrega a lista e o check-in aberto', async () => {
+    renderizarTela(<Clientes />, { perfil: pessoa })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Fazer check-in' }))
+    expect(fazerCheckin).toHaveBeenCalledWith('k1')
+    await vi.waitFor(() => expect(meuCheckinAberto).toHaveBeenCalledTimes(2))
+    expect(listarClientes).toHaveBeenCalledTimes(2)
+  })
+
+  it('com check-in aberto, a linha dele vira check-out e as outras ficam desabilitadas', async () => {
+    vi.mocked(meuCheckinAberto).mockResolvedValue({
+      id: 'a1', cliente_id: 'k1', inicio: new Date(Date.now() - 3_900_000).toISOString(), cliente: { nome: 'Provedor Alfa' },
+    })
+    renderizarTela(<Clientes />, { perfil: pessoa })
+    const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    expect(await within(alfa).findByRole('button', { name: /Fazer check-out · 1 h 05/ })).toBeInTheDocument()
+    expect(within(linha('Provedor Beta')).getByRole('button', { name: 'Fazer check-in' })).toBeDisabled()
+  })
+
+  it('Lançar horas abre a janela e chama lancarHoras com o cliente', async () => {
+    renderizarTela(<Clientes />, { perfil: pessoa })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Lançar horas' }))
+    const janela = screen.getByRole('dialog', { name: 'Lançar horas em Provedor Alfa' })
+    fireEvent.change(within(janela).getByLabelText('Data'), { target: { value: '2026-11-10' } })
+    fireEvent.change(within(janela).getByLabelText('Início'), { target: { value: '10:00' } })
+    fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '09:00' } })
+    await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Lançar horas' }))
+    expect(within(janela).getByText('O fim precisa ser depois do início.')).toBeInTheDocument()
+    fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '11:00' } })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Lançar horas' }))
+    expect(lancarHoras).toHaveBeenCalledWith({
+      clienteId: 'k1', inicio: new Date('2026-11-10T10:00').toISOString(), fim: new Date('2026-11-10T11:00').toISOString(),
+      descricao: 'Reunião',
+    })
+  })
+
+  it('erro de sobreposição do banco aparece na janela', async () => {
+    vi.mocked(lancarHoras).mockResolvedValue({ erro: 'Esse horário se sobrepõe a outro check-in seu.' })
+    renderizarTela(<Clientes />, { perfil: pessoa })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Lançar horas' }))
+    const janela = screen.getByRole('dialog')
+    fireEvent.change(within(janela).getByLabelText('Data'), { target: { value: '2026-11-10' } })
+    fireEvent.change(within(janela).getByLabelText('Início'), { target: { value: '09:00' } })
+    fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '11:00' } })
+    await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'x')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Lançar horas' }))
+    expect(await within(janela).findByText('Esse horário se sobrepõe a outro check-in seu.')).toBeInTheDocument()
+  })
+
+  it('admin e gestor ganham Meus clientes (com o id deles) e Meus check-ins', async () => {
+    for (const papel of ['admin', 'gestor']) {
+      const { unmount } = renderizarTela(<Clientes />, { perfil: { id: 'g1', papel, consultoria_id: 's1' } })
+      await userEvent.click(await screen.findByRole('button', { name: 'Meus clientes' }))
+      expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'meus', consultorId: 'g1' }))
+      expect(await screen.findAllByRole('button', { name: 'Fazer check-in' })).toHaveLength(2)
+      expect(screen.getByRole('button', { name: 'Meus check-ins' })).toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it('a central não faz check-in: sem Meus clientes, Meus check-ins nem busca de check-in aberto', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    await screen.findByRole('table', { name: 'Clientes' })
+    expect(screen.queryByRole('button', { name: 'Meus clientes' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Meus check-ins' })).not.toBeInTheDocument()
+    expect(meuCheckinAberto).not.toHaveBeenCalled()
+  })
+
+  it('a aba Meus check-ins lista os check-ins do consultor sem recarregar clientes', async () => {
+    const { listarCheckins } = await import('@/data/checkins')
+    vi.mocked(listarCheckins).mockResolvedValue({ itens: [], total: 0 })
+    renderizarTela(<Clientes />, { perfil: pessoa })
+    await screen.findByRole('table', { name: 'Clientes' })
+    const chamadas = vi.mocked(listarClientes).mock.calls.length
+    await userEvent.click(screen.getByRole('button', { name: 'Meus check-ins' }))
+    expect(await screen.findByText('Você ainda não registrou nenhum check-in.')).toBeInTheDocument()
+    expect(listarCheckins).toHaveBeenCalledWith({ consultorId: 'p9', pagina: 1 })
+    expect(listarClientes).toHaveBeenCalledTimes(chamadas)
   })
 })

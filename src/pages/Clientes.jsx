@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, ArrowRightLeft, Clock, Pencil, Plus, Search, Send, Trash2, UserCheck } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowRightLeft, Clock, History, Pencil, Plus, Search, Send, Trash2, UserCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
@@ -8,10 +8,13 @@ import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import FiltroConsultor from '@/components/clientes/FiltroConsultor'
+import BotaoCheckin from '@/components/clientes/BotaoCheckin'
 import FormularioCliente from '@/components/clientes/FormularioCliente'
+import JanelaCheckin from '@/components/clientes/JanelaCheckin'
 import JanelaConsultor from '@/components/clientes/JanelaConsultor'
 import JanelaMandar from '@/components/clientes/JanelaMandar'
 import JanelaPrevisao from '@/components/clientes/JanelaPrevisao'
+import MeusCheckins from '@/components/clientes/MeusCheckins'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,15 +22,18 @@ import {
   ajustarPrevisao, apagarCliente, arquivarCliente, criarCliente, editarCliente, escolherConsultor, listarClientes,
   mandarParaConsultoria, reativarCliente,
 } from '@/data/clientes'
+import { lancarHoras, meuCheckinAberto } from '@/data/checkins'
 import { formatarCnpj } from '@/lib/cnpj'
 import { formatarHoras } from '@/lib/horas'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
 
-// Abas por papel. A pessoa ganha o check-in na tarefa seguinte.
+// Abas por papel. Quem atende (pessoa, gestor e admin) também tem Meus clientes e Meus check-ins;
+// a central e o dono nunca fazem check-in.
 const ABAS_DA_CENTRAL = [['distribuir', 'A distribuir'], ['nas_consultorias', 'Nas consultorias'], ['arquivados', 'Arquivados']]
-const ABAS_DA_CONSULTORIA = [['aguardando', 'Aguardando consultor'], ['atendimento', 'Em atendimento']]
-const ABAS_DA_PESSOA = [['meus', 'Meus clientes']]
+const ABAS_DO_CONSULTOR = [['meus', 'Meus clientes'], ['checkins', 'Meus check-ins']]
+const ABAS_DA_CONSULTORIA = [['aguardando', 'Aguardando consultor'], ['atendimento', 'Em atendimento'], ...ABAS_DO_CONSULTOR]
+const ABAS_DA_PESSOA = ABAS_DO_CONSULTOR
 
 function abasDoPapel(perfil) {
   if (veTudo(perfil)) return ABAS_DA_CENTRAL
@@ -44,10 +50,12 @@ const VAZIO = {
   meus: 'Você ainda não tem clientes.',
 }
 
-function Previsao({ cliente }) {
+function Previsao({ cliente, comRealizado }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="tabular-nums">{formatarHoras(cliente.horas_mes)}</span>
+      <span className="tabular-nums">
+        {comRealizado ? `${formatarHoras(cliente.realizado_no_mes)} de ${formatarHoras(cliente.horas_mes)}` : formatarHoras(cliente.horas_mes)}
+      </span>
       {cliente.realizado_no_mes > cliente.horas_mes && <Badge variant="notice">Passou da previsão</Badge>}
     </div>
   )
@@ -56,8 +64,8 @@ function Previsao({ cliente }) {
 const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
 
 // Ações da linha por papel: a central (e o dono) distribui e cuida do cadastro; admin e gestor escolhem o
-// consultor e ajustam a previsão; a pessoa não tem ações aqui.
-function AcoesDaLinha({ cliente, aba, central, gestao, abrir }) {
+// consultor e ajustam a previsão; em Meus clientes, quem atende faz check-in/check-out e lança horas.
+function AcoesDaLinha({ cliente, aba, central, gestao, aberto, abrir, aoMudar }) {
   if (central) {
     return (
       <>
@@ -74,6 +82,14 @@ function AcoesDaLinha({ cliente, aba, central, gestao, abrir }) {
           <Button variant="ghost" size="sm" onClick={() => abrir('arquivar', cliente)}><Archive /> Arquivar</Button>
         )}
         <Button variant="ghost" size="sm" onClick={() => abrir('apagar', cliente)} className={BOTAO_PERIGO}><Trash2 /> Apagar</Button>
+      </>
+    )
+  }
+  if (aba === 'meus') {
+    return (
+      <>
+        <BotaoCheckin key={aberto?.id ?? 'livre'} cliente={cliente} aberto={aberto} aoMudar={aoMudar} />
+        <Button variant="ghost" size="sm" onClick={() => abrir('lancar', cliente)}><History /> Lançar horas</Button>
       </>
     )
   }
@@ -113,13 +129,18 @@ export default function Clientes() {
   const [mandando, setMandando] = useState(null)
   const [escolhendo, setEscolhendo] = useState(null)
   const [ajustando, setAjustando] = useState(null)
-  // O filtro de consultor só faz sentido onde já há consultor.
-  const mostraFiltroConsultor = perfil.papel !== 'pessoa' && aba !== 'distribuir' && aba !== 'aguardando'
+  const [lancando, setLancando] = useState(null)
+  const [aberto, setAberto] = useState(null) // meu check-in aberto
+  const consultorQueAtende = !central
+  const emCheckins = aba === 'checkins'
+  // O filtro de consultor só faz sentido onde já há consultor (e não nas listas só minhas).
+  const mostraFiltroConsultor = perfil.papel !== 'pessoa' && !['distribuir', 'aguardando', 'meus', 'checkins'].includes(aba)
   const consultorFiltrado = mostraFiltroConsultor ? consultor.valor : ''
   const recarregar = () => setVersao((v) => v + 1)
 
   // Uma página por vez, filtrada e paginada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
+    if (emCheckins) return undefined
     let ativo = true
     listarClientes({
       aba,
@@ -138,7 +159,19 @@ export default function Clientes() {
     return () => {
       ativo = false
     }
-  }, [aba, buscaAtrasada, consultoriaId, consultorFiltrado, pagina, versao, perfil.id])
+  }, [aba, emCheckins, buscaAtrasada, consultoriaId, consultorFiltrado, pagina, versao, perfil.id])
+
+  // O check-in que ficou aberto (no máximo um); recarregado depois de cada check-in, check-out ou lançamento.
+  useEffect(() => {
+    if (!consultorQueAtende) return undefined
+    let ativo = true
+    meuCheckinAberto(perfil.id)
+      .then((r) => ativo && setAberto(r))
+      .catch(() => {})
+    return () => {
+      ativo = false
+    }
+  }, [consultorQueAtende, perfil.id, versao])
 
   // Qualquer mudança de filtro volta para a página 1.
   const filtros = `${aba}|${buscaAtrasada}|${consultoriaId}|${consultorFiltrado}`
@@ -183,6 +216,16 @@ export default function Clientes() {
     else if (acao === 'mandar') setMandando(cliente)
     else if (acao === 'consultor') setEscolhendo(cliente)
     else if (acao === 'previsao') setAjustando(cliente)
+    else if (acao === 'lancar') setLancando(cliente)
+  }
+
+  async function lancar(cliente, dados) {
+    const resposta = await lancarHoras({ clienteId: cliente.id, ...dados })
+    if (!resposta.erro) {
+      toast.success(`Horas lançadas em ${cliente.nome}.`)
+      recarregar()
+    }
+    return resposta
   }
 
   async function mandar(cliente, consultoriaId, consultoria) {
@@ -218,7 +261,7 @@ export default function Clientes() {
   return (
     <>
       <Cabecalho titulo="Clientes"
-        descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'cliente' : 'clientes'}` : null}>
+        descricao={resultado && !emCheckins ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'cliente' : 'clientes'}` : null}>
         {central && (
           <Button onClick={() => setFormulario({})}>
             <Plus /> Novo cliente
@@ -236,11 +279,11 @@ export default function Clientes() {
             ))}
           </div>
         )}
-        <div className="relative w-full max-w-xs">
+        {!emCheckins && <div className="relative w-full max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input type="search" aria-label="Buscar clientes" placeholder="Buscar por nome, cidade ou CNPJ" className="h-10 pl-9"
             value={busca} onChange={(e) => setBusca(e.target.value)} />
-        </div>
+        </div>}
         {central && (
           <div className="[&>div]:mb-0">
             <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setConsultor({ valor: '', nome: null }) }} />
@@ -252,10 +295,11 @@ export default function Clientes() {
             aoMudar={(valor, nome) => setConsultor({ valor, nome })} />
         )}
       </div>
-      {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
-      {!erro && clientes === null && <GraficoCarregando texto="Carregando os clientes…" className="py-12" />}
-      {clientes?.length === 0 && <ListaVazia>{buscaAtrasada ? 'Nenhum cliente encontrado.' : VAZIO[aba]}</ListaVazia>}
-      {clientes?.length > 0 && (
+      {emCheckins && <MeusCheckins consultorId={perfil.id} aoMudar={recarregar} />}
+      {!emCheckins && erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+      {!emCheckins && !erro && clientes === null && <GraficoCarregando texto="Carregando os clientes…" className="py-12" />}
+      {!emCheckins && clientes?.length === 0 && <ListaVazia>{buscaAtrasada ? 'Nenhum cliente encontrado.' : VAZIO[aba]}</ListaVazia>}
+      {!emCheckins && clientes?.length > 0 && (
         <Tabela rotulo="Clientes" colunas={['Cliente', 'CNPJ', 'Cidade', 'Previsão', 'Consultoria', 'Consultor']}
           paginacao={{ pagina, total, aoMudar: setPagina }}>
           {clientes.map((c) => (
@@ -269,7 +313,7 @@ export default function Clientes() {
               </Celula>
               <Celula className="tabular-nums text-muted-foreground">{c.cnpj ? formatarCnpj(c.cnpj) : '—'}</Celula>
               <Celula className="text-muted-foreground">{c.cidade ? `${c.cidade}${c.uf ? `/${c.uf}` : ''}` : '—'}</Celula>
-              <Celula><Previsao cliente={c} /></Celula>
+              <Celula><Previsao cliente={c} comRealizado={aba === 'meus'} /></Celula>
               <Celula className="text-muted-foreground">{c.consultoria?.nome ?? '—'}</Celula>
               <Celula className="text-muted-foreground">
                 {c.consultor ? (
@@ -279,7 +323,7 @@ export default function Clientes() {
                   </>
                 ) : '—'}
               </Celula>
-              <CelulaAcoes><AcoesDaLinha cliente={c} aba={aba} central={central} gestao={gestao} abrir={abrir} /></CelulaAcoes>
+              <CelulaAcoes><AcoesDaLinha cliente={c} aba={aba} central={central} gestao={gestao} aberto={aberto} abrir={abrir} aoMudar={recarregar} /></CelulaAcoes>
             </Linha>
           ))}
         </Tabela>
@@ -299,6 +343,10 @@ export default function Clientes() {
       {ajustando && (
         <JanelaPrevisao key={ajustando.id} aberto cliente={ajustando} aoFechar={() => setAjustando(null)}
           aoSalvar={(horas) => ajustar(ajustando, horas)} />
+      )}
+      {lancando && (
+        <JanelaCheckin key={lancando.id} aberto modo="lancar" nomeDoCliente={lancando.nome} aoFechar={() => setLancando(null)}
+          aoSalvar={(dados) => lancar(lancando, dados)} />
       )}
       {arquivando && (
         <ConfirmarAcao aberto aoFechar={() => setArquivando(null)} titulo={`Arquivar o cliente ${arquivando.nome}?`}
