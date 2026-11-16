@@ -342,3 +342,30 @@ Painéis estratégicos da central: leem `cliente_eventos`, `checkins` e a capaci
 - **Administrador e gestor também têm "Meus clientes" e "Meus check-ins"**, porque qualquer usuário ativo da
   consultoria pode ser consultor.
 - **Filtro de consultor** na lista de clientes da consultoria (todos, sem consultor ou um específico).
+
+## Página do cliente em abas (pedido do Diego, 16/11)
+
+Decisão do Diego: as informações de **cada cliente** ficam em abas dentro da página do cliente
+(`/clientes/:id`), nesta ordem: **Geral · Agenda · Check-ins · Arquivos · Histórico**. A lista de Clientes não
+muda. "Pode" (16/11) para o resumo abaixo.
+
+- **Geral:** os dados do cliente e as ações de hoje (Editar, Mandar/Mover, Trocar consultor, Ajustar
+  previsão, Check-in, Lançar horas, Arquivar, Apagar, conforme o papel) e três gráficos **deste cliente**:
+  1. horas realizadas × previsão nos últimos 6 meses (barras do realizado e linha da previsão de hoje);
+  2. horas por consultor no mês escolhido;
+  3. check-ins por semana no mês escolhido.
+  Os números vêm do banco e respeitam as regras: cada consultoria vê só as horas da própria equipe; a central
+  vê todas.
+- **Agenda:** calendário do mês (Anterior/Próximo) com, em cada dia, os check-ins (quem, quanto tempo, o que
+  foi feito) e os passos do histórico (mandado, consultor escolhido, previsão ajustada…). Clicar no dia mostra
+  os detalhes. Reuniões do Google Agenda ficam para a etapa 3.
+- **Check-ins** e **Histórico:** as tabelas que já existem, cada uma na sua aba.
+- **Arquivos:** os arquivos enviados ao cliente, **guardados no próprio sistema** (Storage do Supabase, bucket
+  privado, pasta do cliente). Subir arrastando ou escolhendo o arquivo (até 25 MB), lista paginada com nome,
+  tamanho, quem enviou e quando, **Baixar** (link temporário) e **Apagar** com confirmação.
+  - Quem sobe: a central/dono e, na consultoria que atende o cliente, admin, gestor e o consultor do cliente.
+  - Quem vê: como os check-ins — cada arquivo guarda a consultoria do momento do envio; a consultoria vê os
+    arquivos enviados por ela e os enviados pela central; a central vê todos. Uma consultoria nunca vê
+    arquivos de outra.
+  - Quem apaga: quem enviou, admin/gestor da consultoria do arquivo e a central.
+- A aba aberta fica no endereço (`?aba=agenda`), para voltar à mesma aba ao recarregar.

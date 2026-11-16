@@ -661,3 +661,132 @@ grava pelo supabase-js com a chave publicável; listas paginam no banco com `bus
   `Teste …` e arquivá-los no fim — **perguntar antes de apagar**); como `ana@exemplo.test`, check-in e
   check-out; Capacidade como gestor. Capturas de cada passo.
 - [ ] **Passo 3:** commit `Documentação de clientes e central`. **Perguntar ao Diego antes de push e PR.**
+
+---
+
+## Entrega 3 — Página do cliente em abas (pedido de 16/11)
+
+Design: seção "Página do cliente em abas" do design. Mesmas Restrições globais.
+
+### Task 16: Arquivos do cliente no banco e no Storage
+
+**Arquivos:**
+- Criar: `supabase/migrations/<data>_arquivos_do_cliente.sql`, `supabase/tests/database/arquivos.test.sql`,
+  `src/data/arquivos.js`, `tests/integracao/arquivos.test.js`
+- Modificar: `tests/integracao/ambiente.js` (limpeza apaga arquivos e objetos do Storage criados pelo teste)
+
+**Interfaces:**
+- Consome: `private.sou_central()`, `private.gerencio_consultoria(uuid)`, `private.vejo_cliente(uuid, uuid)`,
+  `public.clientes` (Tasks 1 e 4).
+- Produz:
+  - Bucket `arquivos` (privado, `file_size_limit` 26214400, qualquer tipo).
+  - Tabela `public.cliente_arquivos`: `id uuid pk`, `cliente_id references clientes on delete cascade`,
+    `consultoria_id uuid null references consultorias on delete restrict` (a do cliente no envio; nula quando
+    quem envia é a central), `caminho text unique not null` (`<cliente_id>/<uuid>-<nome>`), `nome text` (1–200),
+    `tamanho bigint` (1–26214400), `tipo text`, `enviado_por uuid default auth.uid() references perfis on delete
+    set null`, `enviado_em timestamptz default now()`. Índice `(cliente_id, enviado_em desc)`.
+  - `private.posso_enviar_arquivo(p_cliente uuid) returns boolean`: `sou_central()`, ou (cliente ativo da minha
+    consultoria e eu sou admin/gestor dela ou o consultor do cliente).
+  - `private.vejo_arquivo(p_consultoria uuid, p_cliente uuid) returns boolean`: `sou_central()`, ou eu vejo o
+    cliente e (`p_consultoria` é a minha ou é nula).
+  - `private.posso_apagar_arquivo(p_id uuid) returns boolean`: `sou_central()`, quem enviou, ou admin/gestor da
+    consultoria do arquivo.
+  - Gatilho `before insert`: `consultoria_id` = a do cliente se quem envia não é da central (nula para central);
+    `enviado_por = auth.uid()`; o caminho começa com o `cliente_id`.
+  - RLS em `cliente_arquivos`: select `vejo_arquivo(...)`; insert `posso_enviar_arquivo(cliente_id)`; delete
+    `posso_apagar_arquivo(id)`; sem update. Grants só para `authenticated`.
+  - Políticas em `storage.objects` para `bucket_id = 'arquivos'`: insert se `posso_enviar_arquivo(<1ª pasta do
+    caminho>)`; select e delete se existe linha em `cliente_arquivos` com esse `caminho` que a pessoa pode ver /
+    apagar (funções `private` security definer, como `posso_mudar_foto`).
+  - `src/data/arquivos.js`: `listarArquivos(clienteId, { pagina })` → `{ itens, total }` (campos `id, nome,
+    tamanho, tipo, enviado_em, enviado_por, autor:perfis(nome)` — o nome do autor pode vir nulo para quem não o
+    enxerga: mostrar "Central" quando `consultoria_id` é nula), `enviarArquivo(clienteId, arquivo: File)` →
+    `{ erro }` (sobe ao Storage e grava a linha; se a linha falhar, apaga o objeto), `linkParaBaixar(arquivo)`
+    → `{ url } | { erro }` (`createSignedUrl` de 60 s), `apagarArquivo(arquivo)` → `{ erro }` (apaga a linha e
+    o objeto).
+
+- [ ] **Passo 1: Testes.** pgTAP: a central envia (linha com `consultoria_id` nula); o consultor do cliente envia
+  (linha com a consultoria dele); outra consultoria não vê nem apaga; a consultoria nova (depois de mover) vê os
+  da central e não os da antiga; pessoa que não é o consultor não envia; quem enviou apaga; gestor apaga os da
+  consultoria. Integração: upload real de um arquivo pequeno, download pelo link assinado, outra consultoria
+  recebe erro ao baixar, apagar remove linha e objeto, arquivo de 26 MB recusado.
+- [ ] **Passo 2:** FALHA. **Passo 3:** cópia do banco e migração (`npx supabase migration new arquivos_do_cliente
+  < /dev/null`, `npx supabase migration up`). **Passo 4:** `npm run test:db` e `npm run test:integracao` →
+  PASSA. **Passo 5:** commit `Arquivos do cliente no banco e no Storage`.
+
+### Task 17: Abas na página do cliente e aba Arquivos
+
+**Arquivos:**
+- Modificar: `src/pages/Cliente.jsx` (+ teste)
+- Criar: `src/components/clientes/AbasDoCliente.jsx`, `src/components/clientes/ArquivosDoCliente.jsx` (+ testes)
+
+**Interfaces:**
+- Consome: `src/data/arquivos.js` (Task 16); `CheckinsDoCliente`, `HistoricoDoCliente`, ações do cliente
+  (Task 13).
+- Produz: abas **Geral · Agenda · Check-ins · Arquivos · Histórico** (botões `botao-animado`, `role="tablist"`/
+  `tab`/`tabpanel`), aba escolhida em `?aba=` (`geral` padrão; valor desconhecido volta para `geral`); a aba
+  Geral mostra os dados e as ações de hoje e reserva o espaço dos gráficos (Task 18); a Task 17 cria as abas
+  Geral, Check-ins, Arquivos e Histórico, e a aba Agenda entra na Task 19, já na ordem final. Aba Arquivos: área de soltar arquivo + botão "Escolher
+  arquivo", aviso de limite ("até 25 MB"), progresso enquanto envia, tabela paginada (Nome, Tamanho, Enviado
+  por, Quando, ações Baixar/Apagar), `ConfirmarAcao` no apagar.
+
+- [ ] **Passo 1: Testes**: as abas aparecem na ordem e `?aba=arquivos` abre Arquivos; trocar de aba muda o
+  endereço; arquivo de 26 MB mostra "O arquivo passa de 25 MB." sem enviar; soltar um arquivo chama
+  `enviarArquivo(<id>, <File>)` e recarrega a lista; Baixar chama `linkParaBaixar`; Apagar confirma e chama
+  `apagarArquivo`; quem não pode enviar não vê a área de soltar.
+- [ ] **Passo 2:** FALHA. **Passo 3:** implementar. **Passo 4:** `npm test`, `npm run lint` → PASSA.
+  **Passo 5:** commit `Página do cliente em abas e aba Arquivos`.
+
+### Task 18: Gráficos da aba Geral
+
+**Arquivos:**
+- Criar: `supabase/migrations/<data>_graficos_do_cliente.sql`, `supabase/tests/database/graficos.test.sql`,
+  `src/components/clientes/GraficosDoCliente.jsx` (+ teste), funções em `src/data/clientes.js`
+
+**Interfaces:**
+- Consome: `checkins`, `clientes` (Tasks 4 e 6).
+- Produz (funções `security invoker`, então cada um soma só os check-ins que enxerga; mês em São Paulo):
+  - `public.horas_do_cliente_por_mes(p_cliente uuid, p_meses int default 6)` → `table (mes date, realizado
+    numeric)` (os últimos `p_meses` meses, inclusive o atual, com 0 nos meses sem check-in).
+  - `public.horas_do_cliente_por_consultor(p_cliente uuid, p_mes date default null)` → `table (consultor_id uuid,
+    nome text, horas numeric)` (nome via `private.nome_do_perfil_visivel`).
+  - `public.checkins_do_cliente_por_semana(p_cliente uuid, p_mes date default null)` → `table (semana date,
+    quantidade int, horas numeric)` (semanas que tocam o mês, começando na segunda).
+  - `src/data/clientes.js`: `horasPorMes(clienteId)`, `horasPorConsultor(clienteId, mes)`,
+    `checkinsPorSemana(clienteId, mes)`.
+  - `<GraficosDoCliente cliente />`: três gráficos em SVG próprio (sem biblioteca nova; estilo de
+    `src/components/inicio/GraficoInicio.jsx`: cores do tema, sem animação contínua), cada um com título,
+    números visíveis e texto alternativo (`role="img"` + `aria-label` com os valores); mês escolhido com
+    Anterior/Próximo para os gráficos 2 e 3; estado vazio "Sem check-ins neste mês.".
+
+- [ ] **Passo 1: Testes**: pgTAP com números conferidos à mão (meses sem check-in = 0; isolamento: a consultoria
+  B não soma horas da A); Vitest: os três gráficos com os valores no `aria-label`, linha da previsão, estado
+  vazio, troca de mês chama as funções com o mês novo.
+- [ ] **Passo 2:** FALHA. **Passo 3:** migração e componente. **Passo 4:** `npm run test:db`, `npm test`,
+  `npm run lint` → PASSA. **Passo 5:** commit `Gráficos do cliente na aba Geral`.
+
+### Task 19: Agenda do cliente
+
+**Arquivos:**
+- Criar: `src/components/clientes/AgendaDoCliente.jsx` (+ teste)
+- Modificar: `src/data/checkins.js` (`checkinsDoMes(clienteId, mes)`), `src/data/clientes.js`
+  (`eventosDoMes(clienteId, mes)`), a função `public.historico_do_cliente` ganha `p_de timestamptz default null,
+  p_ate timestamptz default null` (migração nova, mesma regra de nomes visíveis), `src/components/clientes/
+  AbasDoCliente.jsx` (aba Agenda na ordem final)
+
+**Interfaces:**
+- Consome: `checkins` (RLS), `historico_do_cliente` (Task 13).
+- Produz: `checkinsDoMes` = check-ins do cliente com início no mês (sem paginação, limitado ao mês, ordem
+  `inicio`); `eventosDoMes` = histórico do mês pela função com `p_de`/`p_ate` e `p_limite` 50 por página até
+  acabar (no máximo 4 páginas; mais que isso mostra "e mais N"); `<AgendaDoCliente clienteId />`: grade do mês
+  (seg–dom), Anterior/Próximo, hoje destacado, em cada dia até 3 marcas (check-ins com horas, eventos com o
+  texto curto) e "+N"; clicar no dia abre o detalhe do dia (lista com horário, quem, horas, o que foi feito,
+  e os eventos); teclado: setas movem o dia, Enter abre.
+
+- [ ] **Passo 1: Testes**: novembro/2026 começa no domingo (primeira linha com 6 dias vazios); check-in do dia 16
+  aparece no 16 com "Ana Lima · 1 h"; evento "Mandado para Consultoria Exemplo" aparece no dia; clicar no dia
+  abre o detalhe; Próximo pede dezembro; a aba Agenda fica entre Geral e Check-ins.
+- [ ] **Passo 2:** FALHA. **Passo 3:** implementar (migração com `npx supabase migration new
+  historico_por_periodo < /dev/null`). **Passo 4:** `npm run test:db`, `npm test`, `npm run lint`, `npm run
+  build` → PASSA. **Passo 5:** commit `Agenda do cliente`. **Conferência no navegador pelo controlador** (abas,
+  arquivo real, gráficos e agenda com os dados de teste).
