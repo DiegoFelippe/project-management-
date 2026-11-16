@@ -37,7 +37,17 @@ describe('MeusCheckins', () => {
     expect(within(alfa).getByText('Reunião')).toBeInTheDocument()
     const antigo = screen.getByRole('row', { name: /Antigo Cliente/ })
     expect(within(antigo).getByText('Em aberto')).toBeInTheDocument()
-    expect(within(antigo).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
+    expect(within(antigo).getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+  })
+
+  it('Editar no check-in aberto abre a janela com o fim para fechá-lo', async () => {
+    render(<MeusCheckins consultorId="p9" consultoriaId="s1" aoMudar={vi.fn()} />)
+    await userEvent.click(within(await screen.findByRole('row', { name: /Antigo Cliente/ })).getByRole('button', { name: 'Editar' }))
+    const janela = screen.getByRole('dialog', { name: 'Editar check-in em Antigo Cliente' })
+    expect(within(janela).getByLabelText('Fim')).not.toHaveValue('')
+    await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Suporte')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
+    expect(editarCheckin).toHaveBeenCalledWith('c2', { fim: expect.any(String), descricao: 'Suporte' })
   })
 
   it('Editar abre a janela preenchida e Salvar chama editarCheckin e avisa', async () => {
@@ -48,7 +58,7 @@ describe('MeusCheckins', () => {
     expect(within(janela).getByLabelText('Data')).toHaveValue('2026-11-10')
     expect(within(janela).getByLabelText('O que foi feito')).toHaveValue('Reunião')
     await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
-    expect(editarCheckin).toHaveBeenCalledWith('c1', { inicio: ITENS[0].inicio, fim: ITENS[0].fim, descricao: 'Reunião' })
+    expect(editarCheckin).toHaveBeenCalledWith('c1', { descricao: 'Reunião' })
     expect(aoMudar).toHaveBeenCalled()
     expect(listarCheckins).toHaveBeenCalledTimes(2)
   })

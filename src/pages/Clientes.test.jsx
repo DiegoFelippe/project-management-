@@ -351,7 +351,7 @@ describe('Clientes: check-in do consultor', () => {
     fireEvent.change(within(janela).getByLabelText('Data'), { target: { value: '2026-11-10' } })
     fireEvent.change(within(janela).getByLabelText('Início'), { target: { value: '09:00' } })
     fireEvent.change(within(janela).getByLabelText('Fim'), { target: { value: '11:00' } })
-    await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'x')
+    await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
     await userEvent.click(within(janela).getByRole('button', { name: 'Lançar horas' }))
     expect(await within(janela).findByText('Esse horário se sobrepõe a outro check-in seu.')).toBeInTheDocument()
   })

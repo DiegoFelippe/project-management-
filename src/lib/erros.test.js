@@ -91,6 +91,9 @@ describe('traduzirErroBanco com contexto', () => {
       'Este cliente tem horas registradas. Arquive em vez de apagar.',
     )
     expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')
+    expect(traduzirErroBanco({ code: '23514' }, { sobre: 'checkin' })).toBe(
+      'Um check-in não pode passar de 24 h. Ajuste o horário de fim.',
+    )
     expect(traduzirErroBanco({ code: '23P01' }, { sobre: 'checkin' })).toBe(
       'Esse horário se sobrepõe a outro check-in seu.',
     )

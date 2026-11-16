@@ -156,8 +156,22 @@ describe('Cliente (página)', () => {
     const janela = screen.getByRole('dialog', { name: 'Editar check-in em Provedor Alfa' })
     expect(within(janela).getByLabelText('O que foi feito')).toHaveValue('Reunião')
     await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
-    expect(editarCheckin).toHaveBeenCalledWith('c1', { inicio: CHECKINS[0].inicio, fim: CHECKINS[0].fim, descricao: 'Reunião' })
+    expect(editarCheckin).toHaveBeenCalledWith('c1', { descricao: 'Reunião' })
     expect(buscarCliente).toHaveBeenCalledTimes(2)
+  })
+
+  it('o check-in aberto também tem Editar (para fechá-lo com um fim)', async () => {
+    vi.mocked(listarCheckins).mockResolvedValue({
+      itens: [{ ...CHECKINS[1], id: 'c3', fim: null, descricao: null, inicio: new Date(Date.now() - 3_600_000).toISOString() }],
+      total: 1,
+    })
+    tela(adminDaSti)
+    const linha = within(await screen.findByRole('table', { name: 'Check-ins' })).getByRole('row', { name: /Em aberto/ })
+    await userEvent.click(within(linha).getByRole('button', { name: 'Editar' }))
+    const janela = screen.getByRole('dialog', { name: 'Editar check-in em Provedor Alfa' })
+    await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Fechado pelo administrador')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
+    expect(editarCheckin).toHaveBeenCalledWith('c3', { fim: expect.any(String), descricao: 'Fechado pelo administrador' })
   })
 
   it('Apagar check-in pede confirmação antes', async () => {

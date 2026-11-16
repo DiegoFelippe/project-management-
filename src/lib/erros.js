@@ -43,6 +43,9 @@ export function traduzirErroFuncao(codigo) {
   return ERROS_FUNCAO[codigo] ?? PADRAO
 }
 
+// O banco recusa (23514) check-in de mais de 24 h; a tela confere o mesmo antes de enviar.
+export const CHECKIN_DE_MAIS_DE_24H = 'Um check-in não pode passar de 24 h. Ajuste o horário de fim.'
+
 // Mensagens levantadas pelo banco (raise exception '<texto>').
 const ERROS_MENSAGEM_BANCO = {
   so_central_muda: 'Só a central muda os dados do cliente.',
@@ -66,7 +69,7 @@ export function traduzirErroBanco(erro, { sobre = 'time' } = {}) {
   if (erro?.code === '23503' && sobre === 'cliente') {
     return 'Este cliente tem horas registradas. Arquive em vez de apagar.'
   }
-  if (erro?.code === '23514') return 'Confira os campos destacados.'
+  if (erro?.code === '23514') return sobre === 'checkin' ? CHECKIN_DE_MAIS_DE_24H : 'Confira os campos destacados.'
   if (erro?.code === '23P01') return 'Esse horário se sobrepõe a outro check-in seu.'
   if (erro?.code === '42501') return ERROS_FUNCAO.sem_permissao
   return PADRAO

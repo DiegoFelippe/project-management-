@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CHECKIN_DE_MAIS_DE_24H } from '@/lib/erros'
 import { horasEntre } from '@/lib/horas'
 
 const MAXIMO_DE_HORAS = 24
@@ -12,44 +13,67 @@ const dois = (n) => String(n).padStart(2, '0')
 const dataLocal = (d) => `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`
 const horaLocal = (d) => `${dois(d.getHours())}:${dois(d.getMinutes())}`
 
+// Fim para fechar um check-in aberto: agora ou, se o check-out ficou esquecido, início + 24 h (o máximo).
+const fimSugerido = (inicio) => new Date(Math.min(Date.now(), inicio.getTime() + MAXIMO_DE_HORAS * 3_600_000))
+
+// Valores dos campos ao abrir. Check-in aberto (check-out ou Editar) já vem com o fim sugerido.
+function camposIniciais(checkin) {
+  const inicio = checkin?.inicio ? new Date(checkin.inicio) : null
+  const fim = checkin?.fim ? new Date(checkin.fim) : inicio ? fimSugerido(inicio) : null
+  return {
+    data: inicio ? dataLocal(inicio) : '',
+    inicio: inicio ? horaLocal(inicio) : '',
+    dataFim: fim ? dataLocal(fim) : '',
+    fim: fim ? horaLocal(fim) : '',
+  }
+}
+
 const TEXTOS = {
-  checkout: { titulo: 'Fazer check-out em', botao: 'Fazer check-out', descricao: 'Conte o que foi feito neste atendimento.' },
+  checkout: { titulo: 'Fazer check-out em', botao: 'Fazer check-out', descricao: 'Confira o fim e conte o que foi feito neste atendimento.' },
   lancar: { titulo: 'Lançar horas em', botao: 'Lançar horas', descricao: 'Registre um atendimento que já aconteceu.' },
   editar: { titulo: 'Editar check-in em', botao: 'Salvar', descricao: 'Corrija o horário ou o que foi feito.' },
 }
 
-// Janela do check-in. modo: "checkout" (só o que foi feito), "lancar" (período passado) ou "editar".
-// aoSalvar recebe { descricao } no check-out e { inicio, fim, descricao } (ISO) nos outros; devolve { erro }.
+// Janela do check-in. modo: "checkout" (fim e o que foi feito), "lancar" (período passado) ou "editar"
+// (inclusive o check-in aberto, que fecha com o fim informado).
+// aoSalvar recebe { descricao } e, em ISO, só os horários que valem gravar: no check-out e no check-in
+// aberto o fim; nos outros, o início e o fim que a pessoa mudou (sem mexer, ficam os guardados, com os
+// segundos). Devolve { erro }.
 export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, aoFechar, aoSalvar }) {
-  const inicioAtual = checkin?.inicio ? new Date(checkin.inicio) : null
-  const fimAtual = checkin?.fim ? new Date(checkin.fim) : null
-  const [data, setData] = useState(inicioAtual ? dataLocal(inicioAtual) : '')
-  // Check-in que atravessa a meia-noite: o fim tem a própria data, mostrada só nesse caso.
-  const viraODia = Boolean(inicioAtual && fimAtual && dataLocal(inicioAtual) !== dataLocal(fimAtual))
-  const [dataFim, setDataFim] = useState(fimAtual ? dataLocal(fimAtual) : '')
-  const [inicio, setInicio] = useState(inicioAtual ? horaLocal(inicioAtual) : '')
-  const [fim, setFim] = useState(fimAtual ? horaLocal(fimAtual) : '')
+  const [iniciais] = useState(() => camposIniciais(checkin))
+  const [data, setData] = useState(iniciais.data)
+  const [inicio, setInicio] = useState(iniciais.inicio)
+  const [dataFim, setDataFim] = useState(iniciais.dataFim)
+  const [fim, setFim] = useState(iniciais.fim)
   const [descricao, setDescricao] = useState(checkin?.descricao ?? '')
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
+  const checkout = modo === 'checkout'
+  const fechando = Boolean(checkin?.inicio && !checkin?.fim)
+  // Data do fim: sempre no check-out; nos outros, quando o check-in atravessa a meia-noite.
+  const comDataDoFim = checkout || iniciais.dataFim !== iniciais.data
   const textos = TEXTOS[modo]
-  const comHorario = modo !== 'checkout'
 
   async function salvar(evento) {
     evento.preventDefault()
-    const dados = { descricao: descricao.trim() }
-    if (comHorario) {
-      if (!data || !inicio || !fim || (viraODia && !dataFim)) return setErro('Informe a data, o início e o fim.')
-      const de = new Date(`${data}T${inicio}`)
-      const ate = new Date(`${viraODia ? dataFim : data}T${fim}`)
-      if (Number.isNaN(de.getTime()) || Number.isNaN(ate.getTime())) return setErro('Informe a data, o início e o fim.')
-      if (ate <= de) return setErro('O fim precisa ser depois do início.')
-      if (ate > new Date()) return setErro('O horário não pode estar no futuro.')
-      if (horasEntre(de, ate) > MAXIMO_DE_HORAS) return setErro(`Um check-in tem no máximo ${MAXIMO_DE_HORAS} horas.`)
-      dados.inicio = de.toISOString()
-      dados.fim = ate.toISOString()
+    const diaDoFim = comDataDoFim ? dataFim : data
+    if (!fim || !diaDoFim || (!checkout && (!data || !inicio))) {
+      return setErro(checkout ? 'Informe a data e a hora do fim.' : 'Informe a data, o início e o fim.')
     }
-    if (!dados.descricao) return setErro('Conte o que foi feito.')
+    const mudouInicio = data !== iniciais.data || inicio !== iniciais.inicio
+    const mudouFim = diaDoFim !== iniciais.dataFim || fim !== iniciais.fim
+    const de = mudouInicio ? new Date(`${data}T${inicio}`) : new Date(checkin.inicio)
+    const ate = mudouFim ? new Date(`${diaDoFim}T${fim}`) : checkin?.fim ? new Date(checkin.fim) : fimSugerido(de)
+    if (Number.isNaN(de.getTime()) || Number.isNaN(ate.getTime())) return setErro('Informe a data, o início e o fim.')
+    if (ate <= de) return setErro('O fim precisa ser depois do início.')
+    if (ate > new Date()) return setErro('O horário não pode estar no futuro.')
+    if (horasEntre(de, ate) > MAXIMO_DE_HORAS) return setErro(CHECKIN_DE_MAIS_DE_24H)
+    // O banco pede pelo menos 2 caracteres no que foi feito de um check-in fechado.
+    if (descricao.trim().length < 2) return setErro('Conte o que foi feito.')
+
+    const dados = { descricao: descricao.trim() }
+    if (mudouInicio) dados.inicio = de.toISOString()
+    if (mudouFim || fechando) dados.fim = ate.toISOString()
     setErro(null)
     setEnviando(true)
     const resposta = await aoSalvar(dados)
@@ -58,15 +82,35 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
     aoFechar()
   }
 
+  const campoDataDoFim = (
+    <div className="grid gap-2">
+      <Label htmlFor="checkin-data-fim">Data do fim</Label>
+      <Input id="checkin-data-fim" type="date" className="h-10" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+    </div>
+  )
+  const campoFim = (
+    <div className="grid gap-2">
+      <Label htmlFor="checkin-fim">Fim</Label>
+      <Input id="checkin-fim" type="time" className="h-10" value={fim} onChange={(e) => setFim(e.target.value)} />
+    </div>
+  )
+
   return (
     <Dialog open={aberto} onOpenChange={(abrir) => !abrir && aoFechar()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{textos.titulo} {nomeDoCliente}</DialogTitle>
-          <DialogDescription>{textos.descricao}</DialogDescription>
+          <DialogDescription>
+            {modo === 'editar' && fechando ? 'Informe o fim e o que foi feito para fechar o check-in.' : textos.descricao}
+          </DialogDescription>
         </DialogHeader>
         <form noValidate onSubmit={salvar} className="grid gap-4">
-          {comHorario && (
+          {checkout ? (
+            <div className="grid grid-cols-2 gap-3">
+              {campoDataDoFim}
+              {campoFim}
+            </div>
+          ) : (
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-3 grid gap-2 sm:col-span-1">
                 <Label htmlFor="checkin-data">Data</Label>
@@ -76,16 +120,8 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
                 <Label htmlFor="checkin-inicio">Início</Label>
                 <Input id="checkin-inicio" type="time" className="h-10" value={inicio} onChange={(e) => setInicio(e.target.value)} />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="checkin-fim">Fim</Label>
-                <Input id="checkin-fim" type="time" className="h-10" value={fim} onChange={(e) => setFim(e.target.value)} />
-              </div>
-              {viraODia && (
-                <div className="col-span-3 grid gap-2">
-                  <Label htmlFor="checkin-data-fim">Data do fim</Label>
-                  <Input id="checkin-data-fim" type="date" className="h-10" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
-                </div>
-              )}
+              {campoFim}
+              {comDataDoFim && <div className="col-span-3">{campoDataDoFim}</div>}
             </div>
           )}
           <div className="grid gap-2">

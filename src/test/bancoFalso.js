@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'node:util'
+
 // supabase-js falso para os testes dos módulos de dados (src/data). Cada from() devolve um construtor de
 // consulta que registra as chamadas ([método, ...argumentos]) e responde com `banco.resposta` no range()
 // ou no await (ex.: contagem com head: true).
@@ -22,9 +24,9 @@ export function criarBancoFalso() {
       })
       return consulta
     },
-    // A consulta recebeu exatamente esta chamada?
+    // A consulta recebeu exatamente esta chamada (objetos comparados sem olhar a ordem das chaves)?
     chamou(...chamada) {
-      return banco.chamadas.some((c) => JSON.stringify(c) === JSON.stringify(chamada))
+      return banco.chamadas.some((c) => isDeepStrictEqual(c, chamada))
     },
   }
   return banco

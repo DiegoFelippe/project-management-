@@ -88,7 +88,7 @@ export default function CheckinsDoCliente({ cliente, perfil, versao, aoMudar }) 
                 </Celula>
                 <Celula className="max-w-md truncate text-muted-foreground">{c.descricao || '—'}</Celula>
                 <CelulaAcoes>
-                  {mexe && fim && <Button variant="ghost" size="sm" onClick={() => setEditando(c)}><Pencil /> Editar</Button>}
+                  {mexe && <Button variant="ghost" size="sm" onClick={() => setEditando(c)}><Pencil /> Editar</Button>}
                   {mexe && <Button variant="ghost" size="sm" onClick={() => setApagando(c)} className={BOTAO_PERIGO}><Trash2 /> Apagar</Button>}
                 </CelulaAcoes>
               </Linha>

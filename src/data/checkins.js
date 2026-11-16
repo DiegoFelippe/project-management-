@@ -35,9 +35,10 @@ export async function fazerCheckin(clienteId) {
   return { erro: error ? traduzir(error) : null }
 }
 
-export async function fazerCheckout(id, descricao) {
+// Fecha o check-in aberto com o fim escolhido na janela (ISO) e o que foi feito.
+export async function fazerCheckout(id, { fim, descricao }) {
   return resultadoDaEscrita(
-    await supabase.from('checkins').update({ fim: new Date().toISOString(), descricao: descricao?.trim() }).eq('id', id).select('id'),
+    await supabase.from('checkins').update({ fim, descricao: descricao?.trim() }).eq('id', id).select('id'),
   )
 }
 
@@ -49,10 +50,12 @@ export async function lancarHoras({ clienteId, inicio, fim, descricao }) {
   return { erro: error ? traduzir(error) : null }
 }
 
+// Só manda início e fim quando vieram (a janela manda só o que a pessoa mudou, para não cortar os segundos).
 export async function editarCheckin(id, { inicio, fim, descricao }) {
-  return resultadoDaEscrita(
-    await supabase.from('checkins').update({ inicio, fim, descricao: descricao?.trim() }).eq('id', id).select('id'),
-  )
+  const colunas = { descricao: descricao?.trim() }
+  if (inicio !== undefined) colunas.inicio = inicio
+  if (fim !== undefined) colunas.fim = fim
+  return resultadoDaEscrita(await supabase.from('checkins').update(colunas).eq('id', id).select('id'))
 }
 
 export async function apagarCheckin(id) {

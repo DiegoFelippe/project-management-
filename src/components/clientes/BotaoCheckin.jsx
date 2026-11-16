@@ -32,8 +32,8 @@ export default function BotaoCheckin({ cliente, aberto, aoMudar, idDoAviso }) {
     aoMudar()
   }
 
-  async function sair({ descricao }) {
-    const resposta = await fazerCheckout(aberto.id, descricao)
+  async function sair(dados) {
+    const resposta = await fazerCheckout(aberto.id, dados)
     if (!resposta.erro) {
       toast.success(`Check-out feito em ${cliente.nome}.`)
       aoMudar()
@@ -47,7 +47,8 @@ export default function BotaoCheckin({ cliente, aberto, aoMudar, idDoAviso }) {
       <>
         <Button variant="ghost" size="sm" onClick={() => setSaindo(true)}><LogOut /> Fazer check-out · {tempo}</Button>
         {saindo && (
-          <JanelaCheckin aberto modo="checkout" nomeDoCliente={cliente.nome} aoFechar={() => setSaindo(false)} aoSalvar={sair} />
+          <JanelaCheckin aberto modo="checkout" nomeDoCliente={cliente.nome} checkin={aberto}
+            aoFechar={() => setSaindo(false)} aoSalvar={sair} />
         )}
       </>
     )
