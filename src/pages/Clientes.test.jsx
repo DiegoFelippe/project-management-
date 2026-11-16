@@ -270,6 +270,21 @@ describe('Clientes: distribuir e escolher consultor', () => {
     expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ consultorId: 'sem', pagina: 1 }))
   })
 
+  it('filtro Consultor: Em atendimento não oferece Sem consultor (sempre daria lista vazia)', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA, total: 2 })
+    renderizarTela(<Clientes />, { perfil: gestor })
+    await userEvent.click(await screen.findByRole('button', { name: 'Em atendimento' }))
+    const filtro = await screen.findByLabelText('Consultor')
+    expect(within(filtro).queryByRole('option', { name: 'Sem consultor' })).not.toBeInTheDocument()
+    expect(within(filtro).getByRole('option', { name: 'Todos' })).toBeInTheDocument()
+  })
+
+  it('filtro Consultor: Nas consultorias oferece Sem consultor', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    await userEvent.click(await screen.findByRole('button', { name: 'Nas consultorias' }))
+    expect(within(await screen.findByLabelText('Consultor')).getByRole('option', { name: 'Sem consultor' })).toBeInTheDocument()
+  })
+
   it('filtro Consultor: escolher uma pessoa na busca filtra por ela (consultoria do gestor)', async () => {
     vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA, total: 2 })
     renderizarTela(<Clientes />, { perfil: gestor })
@@ -317,6 +332,17 @@ describe('Clientes: check-in do consultor', () => {
     const aviso = /Você está com check-in aberto em Provedor Alfa desde \d{2}:\d{2}\. Faça o check-out para começar outro\./
     expect(screen.getAllByText(aviso)).toHaveLength(1)
     expect(beta).toHaveAccessibleDescription(screen.getByText(aviso).textContent)
+  })
+
+  it('com o check-in aberto no único cliente da lista não há botão desabilitado a explicar: sem aviso', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: [MEUS[0]], total: 1 })
+    vi.mocked(meuCheckinAberto).mockResolvedValue({
+      id: 'a1', cliente_id: 'k1', inicio: new Date(Date.now() - 600_000).toISOString(), cliente: { nome: 'Provedor Alfa' },
+    })
+    renderizarTela(<Clientes />, { perfil: pessoa })
+    const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    expect(await within(alfa).findByRole('button', { name: /Fazer check-out/ })).toBeInTheDocument()
+    expect(screen.queryByText(/Você está com check-in aberto/)).not.toBeInTheDocument()
   })
 
   it('sem check-in aberto não mostra o aviso', async () => {

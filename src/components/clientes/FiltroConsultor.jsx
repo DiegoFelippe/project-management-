@@ -33,7 +33,8 @@ function Busca({ consultoriaId, valor, aoEscolher }) {
 
 // Filtro "Consultor" da lista: Todos, Sem consultor ou uma pessoa buscada (ordenada por ocupação).
 // valor: '' | 'sem' | id. aoMudar(valor, nome). consultoriaId: null = de todas as consultorias.
-export default function FiltroConsultor({ valor, nome, consultoriaId, aoMudar }) {
+// comSemConsultor: false onde todo cliente tem consultor (Em atendimento), para não oferecer uma lista vazia.
+export default function FiltroConsultor({ valor, nome, consultoriaId, comSemConsultor = true, aoMudar }) {
   const [buscando, setBuscando] = useState(false)
   const pessoa = valor && valor !== 'sem'
 
@@ -48,7 +49,7 @@ export default function FiltroConsultor({ valor, nome, consultoriaId, aoMudar })
       <Label htmlFor="filtro-consultor" className="shrink-0 text-muted-foreground">Consultor</Label>
       <SelectNativo id="filtro-consultor" className="min-w-44" value={valor} onChange={mudou}>
         <option value="">Todos</option>
-        <option value="sem">Sem consultor</option>
+        {comSemConsultor && <option value="sem">Sem consultor</option>}
         {pessoa && <option value={valor}>{nome ?? 'Consultor escolhido'}</option>}
         <option value="escolher">Escolher uma pessoa…</option>
       </SelectNativo>

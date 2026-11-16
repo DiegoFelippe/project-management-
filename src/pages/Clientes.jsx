@@ -75,7 +75,9 @@ export default function Clientes() {
   const emCheckins = aba === 'checkins'
   // O filtro de consultor só faz sentido onde já há consultor (e não nas listas só minhas).
   const mostraFiltroConsultor = perfil.papel !== 'pessoa' && !['distribuir', 'aguardando', 'meus', 'checkins'].includes(aba)
-  const consultorFiltrado = mostraFiltroConsultor ? consultor.valor : ''
+  // Em atendimento todo cliente tem consultor: lá não existe "Sem consultor".
+  const semConsultorVale = aba !== 'atendimento'
+  const consultorFiltrado = mostraFiltroConsultor && (semConsultorVale || consultor.valor !== 'sem') ? consultor.valor : ''
   const recarregar = () => setVersao((v) => v + 1)
   const { abrir, janelas } = useAcoesDoCliente({ aoMudar: recarregar })
 
@@ -157,12 +159,12 @@ export default function Clientes() {
           </div>
         )}
         {mostraFiltroConsultor && (
-          <FiltroConsultor valor={consultor.valor} nome={consultor.nome}
+          <FiltroConsultor valor={consultorFiltrado} nome={consultor.nome} comSemConsultor={semConsultorVale}
             consultoriaId={central ? (consultoriaId || null) : perfil.consultoria_id}
             aoMudar={(valor, nome) => setConsultor({ valor, nome })} />
         )}
       </div>
-      {aba === 'meus' && aberto && (
+      {aba === 'meus' && aberto && clientes?.some((c) => c.id !== aberto.cliente_id) && (
         <p id={idDoAviso} className="mb-3 text-sm text-muted-foreground">
           Você está com check-in aberto em {aberto.cliente?.nome ?? 'outro cliente'} desde {HORA.format(new Date(aberto.inicio))}.
           {' '}Faça o check-out para começar outro.
