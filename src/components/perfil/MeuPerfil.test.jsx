@@ -72,13 +72,10 @@ describe('Meu perfil', () => {
     expect(gerenciarAcesso).not.toHaveBeenCalled()
   })
 
-  it('mostra as minhas ausências, só para leitura', async () => {
-    expect(await screen.findByText('Minhas ausências')).toBeInTheDocument()
-    expect(listarAusencias).toHaveBeenCalledWith('me', { pagina: 1 })
-    const tabela = await screen.findByRole('table', { name: 'Ausências' })
-    expect(within(tabela).getByText('20/12/2026')).toBeInTheDocument()
-    expect(within(tabela).getByText('Férias')).toBeInTheDocument()
-    expect(within(tabela).queryByRole('button')).toBeNull()
+  it('não mostra as ausências: elas ficam só na ficha, em Usuários (pedido do Diego, 16/11)', () => {
+    expect(screen.queryByText('Minhas ausências')).toBeNull()
+    expect(screen.queryByRole('table', { name: 'Ausências' })).toBeNull()
+    expect(listarAusencias).not.toHaveBeenCalled()
   })
 
   it('mostra telefone, cidade e UF para editar; cargo, entrada e carga só para ler', () => {

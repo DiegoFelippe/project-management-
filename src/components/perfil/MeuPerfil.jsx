@@ -5,7 +5,6 @@ import { UserRound } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
-import AusenciasDaPessoa from '@/components/capacidade/AusenciasDaPessoa'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import Seletor from '@/components/campos/Seletor'
 import CampoImagem from '@/components/comum/CampoImagem'
@@ -36,7 +35,7 @@ export default function MeuPerfil({ aberto, aoFechar }) {
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
 
-  const minhasAusencias = ['admin', 'gestor', 'pessoa'].includes(perfil.papel)
+  const naConsultoria = ['admin', 'gestor', 'pessoa'].includes(perfil.papel)
 
   const contatoMudou = telefone.trim() !== (perfil.telefone ?? '') || cidade.trim() !== (perfil.cidade ?? '') || uf !== (perfil.uf ?? '')
 
@@ -118,11 +117,11 @@ export default function MeuPerfil({ aberto, aoFechar }) {
           <p className="text-sm text-muted-foreground">
             {NOME_DO_PAPEL[perfil.papel]} · {perfil.consultoria?.nome ?? 'Plataforma'}
           </p>
-          {(perfil.cargo || perfil.data_entrada || minhasAusencias) && (
+          {(perfil.cargo || perfil.data_entrada || naConsultoria) && (
             <dl className="grid gap-3 text-sm sm:grid-cols-3">
               {perfil.cargo && <div><dt className="text-xs text-muted-foreground">Cargo</dt><dd>{perfil.cargo}</dd></div>}
               {perfil.data_entrada && <div><dt className="text-xs text-muted-foreground">Data de entrada</dt><dd>{formatarDia(perfil.data_entrada)}</dd></div>}
-              {minhasAusencias && perfil.carga_semanal != null && (
+              {naConsultoria && perfil.carga_semanal != null && (
                 <div><dt className="text-xs text-muted-foreground">Carga semanal</dt><dd>{formatarHoras(Number(perfil.carga_semanal))} por semana</dd></div>
               )}
             </dl>
@@ -160,12 +159,6 @@ export default function MeuPerfil({ aberto, aoFechar }) {
           </div>
           <p className="text-xs text-muted-foreground">Pelo menos 8 caracteres. Deixe em branco para manter a atual.</p>
         </SecaoFormulario>
-        {minhasAusencias && (
-          <SecaoFormulario titulo="Minhas ausências">
-            <AusenciasDaPessoa perfilId={perfil.id} />
-            <p className="text-xs text-muted-foreground">Quem registra ou muda as ausências é a administração da sua consultoria.</p>
-          </SecaoFormulario>
-        )}
         {erro && <Aviso>{erro}</Aviso>}
       </form>
     </JanelaFormulario>
