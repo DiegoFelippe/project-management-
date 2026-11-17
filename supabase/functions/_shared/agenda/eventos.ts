@@ -11,7 +11,12 @@
 // cliente e participantes da consultoria do evento, até 20 convidados de fora com e-mail válido e sem repetir, fim
 // depois do início, até 31 dias; o banco é quem decide, aqui elas só viram mensagem) → grava no Google do organizador
 // → grava no banco. Se o Google recusa, o que esta chamada já tinha feito no Google é desfeito e nada muda no banco;
-// se o banco recusa depois do Google, o Google é desfeito. Organizador sem Google: fica só no app, sem Meet, com aviso.
+// se o banco recusa depois do Google, o Google é desfeito.
+//
+// O Google do organizador só é usado quando ele está ativo (a credencial de quem saiu nunca é lida), conectou e a
+// conexão não está marcada com erro. Sem isso: evento novo (ou que ainda está só no app) fica só no app, sem Meet, com
+// o aviso do motivo; evento que já está no Google é recusado (mudar só no app deixaria o app e o Google diferentes
+// sem ninguém saber). Evento novo na agenda de quem está desativado é recusado.
 import { Falha } from '../http.ts'
 import { ErroDoGoogle, type EventoParaOGoogle, type GoogleDaPessoa } from './google.ts'
 import type { Banco } from './tokens.ts'
@@ -317,7 +322,47 @@ async function agendaDe(db: Banco, quem: Quem, consultorId: string): Promise<Pes
   if (!consultor?.consultoria_id) {
     throw recusa(400, 'consultor_invalido', 'Escolha o consultor: o evento fica na agenda de um consultor da consultoria.')
   }
+  if (!consultor.ativo) {
+    throw recusa(400, 'consultor_inativo', `O acesso de ${consultor.nome} está desativado: escolha outro consultor.`)
+  }
   return consultor
+}
+
+// ── O Google do organizador ──
+
+type SemGoogle = 'desativado' | 'sem_conexao' | 'reconectar'
+type GoogleDoOrganizador = { google: GoogleDaPessoa; motivo: null } | { google: null; motivo: SemGoogle }
+
+// O Google do organizador quando dá para usar: ele está ativo (de quem saiu, nem o token é lido), conectou e a conexão
+// não está marcada com erro ("Reconecte o Google"). Senão, o motivo.
+async function googleDoOrganizador(db: Banco, googleDe: GoogleDe, organizador: Pessoa): Promise<GoogleDoOrganizador> {
+  if (!organizador.ativo) return { google: null, motivo: 'desativado' }
+  const conexao = conferir(
+    await db.from('google_pessoas').select('erro').eq('perfil_id', organizador.id).maybeSingle(),
+  ) as { erro: string | null } | null
+  if (!conexao) return { google: null, motivo: 'sem_conexao' }
+  if (conexao.erro) return { google: null, motivo: 'reconectar' }
+  const google = await googleDe(organizador.id)
+  return google ? { google, motivo: null } : { google: null, motivo: 'sem_conexao' }
+}
+
+// "Fica só no app: …" (evento novo, ou que ainda não está no Google).
+function ficaSoNoApp(motivo: SemGoogle, nome: string): string {
+  if (motivo === 'desativado') return `Fica só no app: o acesso de ${nome} está desativado.`
+  if (motivo === 'reconectar') return `Fica só no app: o Google de ${nome} pede para reconectar.`
+  return `Fica só no app: ${nome} não conectou o Google.`
+}
+
+// Evento que já está no Google, sem o Google do organizador: não muda só no app.
+const SITUACAO_DO_GOOGLE: Record<SemGoogle, string> = {
+  desativado: 'foi desativado',
+  sem_conexao: 'não está conectado',
+  reconectar: 'pede para reconectar',
+}
+function semGoogleParaEditar(motivo: SemGoogle, nome: string): Falha {
+  return recusa(409, 'google_indisponivel',
+    `Este evento está no Google de ${nome}, que ${SITUACAO_DO_GOOGLE[motivo]}. ` +
+    `Para mudar, ${nome} reconecta ou a gestão apaga e cria de novo.`)
 }
 
 // Cliente novo no evento: um que quem cria vê (as regras de private.vejo_cliente) e que não está arquivado. Que ele é
@@ -442,7 +487,8 @@ export async function salvarEvento(db: Banco, googleDe: GoogleDe, quem: Quem, da
     emails: d.convidados === undefined ? antes.emails : listaDeEmails(d.convidados),
   }
 
-  const google = await googleDe(consultor.id)
+  const { google, motivo } = await googleDoOrganizador(db, googleDe, consultor)
+  if (motivo && atual?.google_evento_id) throw semGoogleParaEditar(motivo, consultor.nome)
   if (google && atual?.com_meet && !campos.com_meet) {
     throw recusa(409, 'meet_fixo',
       'O Meet desta reunião já foi criado no Google e não sai pelo app. Para tirar o Meet, apague o evento e crie de novo.')
@@ -463,11 +509,8 @@ export async function salvarEvento(db: Banco, googleDe: GoogleDe, quem: Quem, da
   // As regras do banco antes de qualquer coisa no Google.
   await gravarNoBanco(db, evento, lista, !atual, true)
 
-  if (!google) {
-    return {
-      evento: await gravarNoBanco(db, evento, lista, !atual, false),
-      aviso: `Fica só no app: ${consultor.nome} não conectou o Google.`,
-    }
+  if (motivo) {
+    return { evento: await gravarNoBanco(db, evento, lista, !atual, false), aviso: ficaSoNoApp(motivo, consultor.nome) }
   }
 
   const emails = await emailsDosParticipantes(db, [...new Set([...lista.perfis, ...antes.perfis])])
@@ -518,12 +561,9 @@ export async function apagarEvento(db: Banco, googleDe: GoogleDe, quem: Quem, id
     const soNoApp = (motivo: string) =>
       `Saiu só do app: ${motivo}. O evento pode continuar no Google Agenda de ${organizador.nome}.`
     const quebrada = `o Google de ${organizador.nome} não aceita mais a conexão`
-    const conexao = conferir(
-      await db.from('google_pessoas').select('erro').eq('perfil_id', organizador.id).maybeSingle(),
-    ) as { erro: string | null } | null
-    const google = organizador.ativo && conexao && !conexao.erro ? await googleDe(organizador.id) : null
-    if (!organizador.ativo) aviso = soNoApp(`o acesso de ${organizador.nome} está desativado`)
-    else if (conexao?.erro) aviso = soNoApp(quebrada)
+    const { google, motivo } = await googleDoOrganizador(db, googleDe, organizador)
+    if (motivo === 'desativado') aviso = soNoApp(`o acesso de ${organizador.nome} está desativado`)
+    else if (motivo === 'reconectar') aviso = soNoApp(quebrada)
     else if (!google) aviso = soNoApp(`${organizador.nome} não conectou o Google`)
     else {
       try {

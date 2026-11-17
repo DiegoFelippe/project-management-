@@ -81,8 +81,44 @@ function FiltroCliente({ valor, nome, consultoriaId, aoMudar }) {
   )
 }
 
+function BotaoDesconectar({ aoDesconectar, className }) {
+  return (
+    <button type="button" aria-label="Desconectar o Google" title="Desconectar o Google" onClick={aoDesconectar}
+      className={cn('botao-animado grid place-items-center rounded-md transition-[color,translate,scale] outline-none hover:-translate-y-px hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]', className)}>
+      <X className="size-3.5" aria-hidden="true" />
+    </button>
+  )
+}
+
+// O Google da pessoa: o selo "Google conectado ✕"; com a conexão quebrada, "Reconectar Google" e o ✕ para desconectar
+// (quem não quer mais o Google não fica preso ao erro); sem conexão, "Conectar Google".
+function GoogleDaPessoa({ google, conectando, aoConectar, aoDesconectar }) {
+  const desconectar = (classe) => <BotaoDesconectar aoDesconectar={aoDesconectar} className={classe} />
+  if (google?.conectado && !google.erro) {
+    return (
+      <span title={google.email ? `Conectado como ${google.email}` : undefined}
+        className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-positive/25 bg-positive-soft px-3 text-rotulo font-medium text-positive">
+        <LogoDoGoogle conectado />
+        Google conectado
+        {desconectar('ml-0.5 size-5')}
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Button type="button" variant="outline" onClick={aoConectar} disabled={conectando} title={google?.erro ?? undefined}
+        className={cn(google?.erro && 'border-notice/40 text-notice')}>
+        <LogoDoGoogle />
+        {conectando ? 'Conectando…' : google?.erro ? 'Reconectar Google' : 'Conectar Google'}
+      </Button>
+      {google?.conectado && desconectar('size-9 rounded-xl text-muted-foreground')}
+    </span>
+  )
+}
+
 // Barra do Calendário (padrão BarraDeFiltros, como a do Hub): Mostrar, consultoria (central e dono), consultor
-// (gestão e central), cliente e Limpar filtros; no fim, o Google da pessoa (Conectar ou o selo) e "Novo evento".
+// (gestão e central), cliente e Limpar filtros; no fim, o Google da pessoa (Conectar ou o selo; central e dono não têm:
+// nunca organizam eventos) e "Novo evento".
 export default function BarraDoCalendario({
   perfil, central, gestao, mostrar, aoMostrar, consultoria, aoConsultoria, consultor, aoConsultor, cliente, aoCliente, temFiltros, aoLimpar,
   google, conectando, aoConectar, aoDesconectar, aoNovo,
@@ -102,23 +138,7 @@ export default function BarraDoCalendario({
         aoMudar={(valor, nome) => aoCliente({ valor, nome })} />
       {temFiltros && <Button type="button" variant="link" size="sm" onClick={aoLimpar}>Limpar filtros</Button>}
       <AcaoPrincipal>
-        {google?.conectado && !google.erro ? (
-          <span title={google.email ? `Conectado como ${google.email}` : undefined}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-positive/25 bg-positive-soft px-3 text-rotulo font-medium text-positive">
-            <LogoDoGoogle conectado />
-            Google conectado
-            <button type="button" aria-label="Desconectar o Google" title="Desconectar o Google" onClick={aoDesconectar}
-              className="botao-animado ml-0.5 grid size-5 place-items-center rounded-md transition-[color,translate,scale] outline-none hover:-translate-y-px hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]">
-              <X className="size-3.5" aria-hidden="true" />
-            </button>
-          </span>
-        ) : (
-          <Button type="button" variant="outline" onClick={aoConectar} disabled={conectando} title={google?.erro ?? undefined}
-            className={cn(google?.erro && 'border-notice/40 text-notice')}>
-            <LogoDoGoogle />
-            {conectando ? 'Conectando…' : google?.erro ? 'Reconectar Google' : 'Conectar Google'}
-          </Button>
-        )}
+        {!central && <GoogleDaPessoa google={google} conectando={conectando} aoConectar={aoConectar} aoDesconectar={aoDesconectar} />}
         <Button type="button" onClick={aoNovo}><Plus /> Novo evento</Button>
       </AcaoPrincipal>
     </BarraDeFiltros>

@@ -578,11 +578,111 @@ describe('agenda: criar, editar, apagar e responder (núcleo da Edge Function, G
     expect(await linha(revogado.id)).toBeNull()
     const conexao = await admin.from('google_pessoas').select('erro').eq('perfil_id', p.caio.id).single()
     expect(conexao.data.erro).toMatch(/Reconecte o Google/)
-    // A gestora, criando na agenda dele, fica sabendo de quem é a conexão.
-    const daGestora = await recusa(salvar(p.gestora, evento({ consultor_id: p.caio.id })))
-    expect(daGestora.extra.erro).toBe(
-      `O Google de ${p.caio.nome} não aceita mais a conexão: ${p.caio.nome} precisa reconectar o Google.`,
-    )
+    // Com a conexão já marcada, o evento novo que a gestora cria na agenda dele fica só no app, sem pedir ao Google.
+    const antesDaGestora = google.pedidos.length
+    const daGestora = await salvar(p.gestora, evento({ consultor_id: p.caio.id }))
+    expect(daGestora.aviso).toBe(`Fica só no app: o Google de ${p.caio.nome} pede para reconectar.`)
+    expect(daGestora.evento).toMatchObject({ google_evento_id: null, com_meet: false })
+    expect(google.pedidos.length).toBe(antesDaGestora)
+  })
+
+  describe('organizador desativado ou com o Google quebrado (nunca salvar sem saída, nunca a credencial de quem saiu)', () => {
+    const naoMudou = async (e) => expect(await linha(e.id)).toMatchObject({ titulo: e.titulo, inicio: e.inicio, fim: e.fim })
+    // Um evento do consultor que ficou só no app (gravado antes de ele conectar o Google).
+    async function soNoAppDe(consultorId, titulo) {
+      const { data, error } = await admin.from('agenda_eventos').insert({
+        consultoria_id: C, consultor_id: consultorId, titulo, inicio: '2026-11-21T13:00:00Z', fim: '2026-11-21T14:00:00Z',
+      }).select('*').single()
+      if (error) throw error
+      return data
+    }
+    const recusaDoGoogle = (nome, situacao) =>
+      `Este evento está no Google de ${nome}, que ${situacao}. Para mudar, ${nome} reconecta ou a gestão apaga e cria de novo.`
+
+    it('desativado: evento novo recusado com mensagem clara; o do Google não muda; o só do app muda sem o Google dele', async () => {
+      const saiu = await pessoa('pessoa', C, { comGoogle: true })
+      const { evento: noGoogle } = await salvar(p.gestora, evento({ consultor_id: saiu.id, convidados: ['contato@cliente.test'] }))
+      expect(noGoogle.google_evento_id).toBeTruthy()
+      const soNoApp = await soNoAppDe(saiu.id, 'Só no app')
+      const desativar = await admin.from('perfis')
+        .update({ ativo: false, desativado_em: new Date().toISOString() }).eq('id', saiu.id)
+      if (desativar.error) throw desativar.error
+      const antes = google.pedidos.length
+
+      const novo = evento({ consultor_id: saiu.id })
+      const erroNovo = await recusa(salvar(p.gestora, novo))
+      expect(erroNovo).toMatchObject({ status: 400, codigo: 'consultor_inativo' })
+      expect(erroNovo.extra.erro).toBe(`O acesso de ${saiu.nome} está desativado: escolha outro consultor.`)
+      expect(await linha(novo.id)).toBeNull()
+
+      const erroEditar = await recusa(salvar(p.gestora, { id: noGoogle.id, titulo: 'Mudou' }))
+      expect(erroEditar).toMatchObject({ status: 409, codigo: 'google_indisponivel' })
+      expect(erroEditar.extra.erro).toBe(recusaDoGoogle(saiu.nome, 'foi desativado'))
+      await naoMudou(noGoogle)
+
+      const r = await salvar(p.gestora, { id: soNoApp.id, titulo: 'Só no app (mudou)' })
+      expect(r.aviso).toBe(`Fica só no app: o acesso de ${saiu.nome} está desativado.`)
+      expect(r.evento).toMatchObject({ titulo: 'Só no app (mudou)', google_evento_id: null })
+      // O token de quem saiu nem foi lido: nenhum pedido ao Google.
+      expect(google.pedidos.length).toBe(antes)
+      expect(google.evento(saiu.googleEmail, noGoogle.google_evento_id).summary).toBe('Kickoff com o cliente')
+    })
+
+    it('conexão marcada com erro: o novo fica só no app com o aviso; o que está no Google não muda pelo app', async () => {
+      const quebrou = await pessoa('pessoa', C, { comGoogle: true })
+      const { evento: noGoogle } = await salvar(p.gestora, evento({ consultor_id: quebrou.id }))
+      const soNoAppAntes = await soNoAppDe(quebrou.id, 'Interno')
+      const marcar = await admin.from('google_pessoas').update({ erro: 'O Google não aceita mais esta conexão. Reconecte o Google.' })
+        .eq('perfil_id', quebrou.id)
+      if (marcar.error) throw marcar.error
+      const antes = google.pedidos.length
+      const pedeReconectar = `Fica só no app: o Google de ${quebrou.nome} pede para reconectar.`
+
+      const r = await salvar(p.gestora, evento({ consultor_id: quebrou.id, com_meet: true, convidados: ['x@cliente.test'] }))
+      expect(r.aviso).toBe(pedeReconectar)
+      expect(r.evento).toMatchObject({ google_evento_id: null, com_meet: false, meet_link: null })
+
+      const erro = await recusa(salvar(p.gestora, { id: noGoogle.id, titulo: 'Mudou' }))
+      expect(erro).toMatchObject({ status: 409, codigo: 'google_indisponivel' })
+      expect(erro.extra.erro).toBe(recusaDoGoogle(quebrou.nome, 'pede para reconectar'))
+      await naoMudou(noGoogle)
+      // Até o próprio organizador recebe a recusa (ele reconecta e tenta de novo).
+      expect(await recusa(salvar(quebrou, { id: noGoogle.id, titulo: 'Mudou' }))).toMatchObject({ codigo: 'google_indisponivel' })
+
+      expect((await salvar(p.gestora, { id: soNoAppAntes.id, titulo: 'Interno (mudou)' })).aviso).toBe(pedeReconectar)
+      expect(google.pedidos.length).toBe(antes)
+    })
+
+    it('sem conexão: o que está no Google não muda pelo app; "não conectou o Google" só quando é verdade', async () => {
+      const desconectou = await pessoa('pessoa', C, { comGoogle: true })
+      const { evento: noGoogle } = await salvar(p.gestora, evento({ consultor_id: desconectou.id }))
+      await admin.from('google_pessoas').delete().eq('perfil_id', desconectou.id)
+      const antes = google.pedidos.length
+
+      const erro = await recusa(salvar(p.gestora, { id: noGoogle.id, titulo: 'Mudou' }))
+      expect(erro).toMatchObject({ status: 409, codigo: 'google_indisponivel' })
+      expect(erro.extra.erro).toBe(recusaDoGoogle(desconectou.nome, 'não está conectado'))
+      await naoMudou(noGoogle)
+
+      const r = await salvar(p.gestora, evento({ consultor_id: desconectou.id }))
+      expect(r.aviso).toBe(`Fica só no app: ${desconectou.nome} não conectou o Google.`)
+      expect(google.pedidos.length).toBe(antes)
+    })
+
+    it('Google revogado e ainda não marcado: a gestora fica sabendo de quem é a conexão, e ela fica marcada', async () => {
+      const revogou = await pessoa('pessoa', C, { comGoogle: true })
+      google.revogarConta(revogou.googleEmail)
+      const primeiro = evento({ consultor_id: revogou.id })
+      const erro = await recusa(salvar(p.gestora, primeiro))
+      expect(erro).toMatchObject({ status: 502, codigo: 'google_recusou', extra: { motivo: 'reconectar' } })
+      expect(erro.extra.erro).toBe(
+        `O Google de ${revogou.nome} não aceita mais a conexão: ${revogou.nome} precisa reconectar o Google.`,
+      )
+      expect(await linha(primeiro.id)).toBeNull()
+      // A mesma janela, de novo: agora a conexão está marcada, e o evento fica só no app, com o aviso.
+      const r = await salvar(p.gestora, primeiro)
+      expect(r.aviso).toBe(`Fica só no app: o Google de ${revogou.nome} pede para reconectar.`)
+    })
   })
 
   it('21 convidados de fora recusado', async () => {

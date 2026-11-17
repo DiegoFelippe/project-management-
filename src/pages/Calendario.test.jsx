@@ -328,4 +328,32 @@ describe('Calendário: Google da pessoa', () => {
     expect(desconectarGoogle).toHaveBeenCalled()
     expect(await screen.findByRole('button', { name: 'Conectar Google' })).toBeInTheDocument()
   })
+
+  it('conexão com erro: Reconectar Google e também dá para desconectar', async () => {
+    const user = userEvent.setup()
+    vi.mocked(meuGoogle).mockResolvedValue({
+      conectado: true, email: 'ana@ixcsoft.com.br', erro: 'O Google não aceita mais esta conexão. Reconecte o Google.',
+    })
+    vi.mocked(desconectarGoogle).mockResolvedValue({ erro: null, revogado: false })
+    tela(consultor)
+    expect(await screen.findByRole('button', { name: 'Reconectar Google' })).toBeInTheDocument()
+    expect(screen.queryByText('Google conectado')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Desconectar o Google' }))
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Desconectar' }))
+    expect(desconectarGoogle).toHaveBeenCalled()
+    expect(await screen.findByRole('button', { name: 'Conectar Google' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Desconectar o Google' })).not.toBeInTheDocument()
+  })
+
+  it('central e dono não conectam o Google na barra (nunca organizam eventos)', async () => {
+    for (const perfil of [central, { ...central, id: 'd0', papel: 'dono' }]) {
+      const { unmount } = tela(perfil)
+      expect(await screen.findByRole('button', { name: 'Novo evento' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Conectar Google|Reconectar Google/ })).not.toBeInTheDocument()
+      expect(screen.queryByText('Google conectado')).not.toBeInTheDocument()
+      unmount()
+    }
+    // Nem chega a ler o Google: a barra não tem o que mostrar.
+    expect(meuGoogle).not.toHaveBeenCalled()
+  })
 })

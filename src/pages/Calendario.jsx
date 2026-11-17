@@ -146,7 +146,9 @@ export default function Calendario() {
   const diaDoDetalhe = periodo.dias.includes(selecionado) ? selecionado
     : periodo.dias.includes(hoje) ? hoje : visao === 'mes' ? `${diaDaVisao.slice(0, 7)}-01` : periodo.de
 
+  // O meu Google (o selo da barra e o aviso da janela). Central e dono nunca organizam eventos: não leem.
   useEffect(() => {
+    if (central) return undefined
     let ativo = true
     meuGoogle()
       .then((g) => ativo && setGoogle(g))
@@ -154,7 +156,7 @@ export default function Calendario() {
     return () => {
       ativo = false
     }
-  }, [versaoDoGoogle])
+  }, [central, versaoDoGoogle])
 
   // Volta do "Conectar Google": conclui com o login da pessoa (uma vez só: o pedido é de uso único) e tira o
   // ?code=…&state=… do endereço na hora (history.replaceState, pelo roteador), antes de esperar a resposta.
