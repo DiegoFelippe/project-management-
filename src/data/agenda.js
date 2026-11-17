@@ -41,9 +41,10 @@ export async function buscarEvento(id) {
   return data
 }
 
-// { semana, mes, aguardando, pastas_no_mes } no recorte de quem chama; dia: 'AAAA-MM-DD'.
-export async function indicadoresDaAgenda(dia) {
-  const { data, error } = await supabase.rpc('indicadores_da_agenda', { p_dia: dia })
+// { semana, mes, aguardando, pastas_no_mes } no recorte de quem chama; dia: 'AAAA-MM-DD'. clienteId (a aba Agenda do
+// cliente): só as reuniões daquele cliente, ainda dentro do que a pessoa vê (o banco recorta).
+export async function indicadoresDaAgenda(dia, { clienteId } = {}) {
+  const { data, error } = await supabase.rpc('indicadores_da_agenda', { p_dia: dia, p_cliente: clienteId ?? null })
   if (error) throw error
   return data
 }

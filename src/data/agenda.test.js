@@ -114,7 +114,12 @@ describe('indicadoresDaAgenda e feriadosDoPeriodo', () => {
   it('chama as funções do banco com os parâmetros certos', async () => {
     vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: { semana: 1, mes: 2, aguardando: 0, pastas_no_mes: 0 }, error: null })
     expect(await indicadoresDaAgenda('2026-11-10')).toEqual({ semana: 1, mes: 2, aguardando: 0, pastas_no_mes: 0 })
-    expect(supabase.rpc).toHaveBeenCalledWith('indicadores_da_agenda', { p_dia: '2026-11-10' })
+    expect(supabase.rpc).toHaveBeenCalledWith('indicadores_da_agenda', { p_dia: '2026-11-10', p_cliente: null })
+
+    // A aba Agenda do cliente: os números só daquele cliente (o banco recorta).
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: { semana: 0, mes: 1, aguardando: 0, pastas_no_mes: 0 }, error: null })
+    expect(await indicadoresDaAgenda('2026-11-10', { clienteId: 'k1' })).toEqual({ semana: 0, mes: 1, aguardando: 0, pastas_no_mes: 0 })
+    expect(supabase.rpc).toHaveBeenLastCalledWith('indicadores_da_agenda', { p_dia: '2026-11-10', p_cliente: 'k1' })
 
     vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: ['2026-11-02', '2026-11-15'], error: null })
     expect(await feriadosDoPeriodo('2026-11-01', '2026-11-30')).toEqual(['2026-11-02', '2026-11-15'])

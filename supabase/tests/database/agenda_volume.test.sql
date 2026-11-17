@@ -1,12 +1,13 @@
--- Volume da agenda: 200 consultorias, 3.000 consultores e 100.000 eventos em dois anos de história (jan/2025 a
--- dez/2026), com 50.000 participantes, criados aqui e desfeitos no fim (rollback: nada fica no banco). A leitura de
--- uma semana (eventos_do_periodo, com participantes) e os indicadores precisam responder em até 150 ms para a
--- central, 100 ms para uma consultoria e 75 ms para um consultor (média de 5 execuções, com 50% de folga). Além do
--- tempo, o plano das consultas de cada papel não pode varrer a tabela de eventos inteira (Seq Scan): é o que
--- garante que o tempo não cresce com os anos de história. Roda com: npm run test:db
+-- Volume da agenda: 200 consultorias, 3.000 consultores, 2.000 clientes e 100.000 eventos em dois anos de história
+-- (jan/2025 a dez/2026), com 50.000 participantes, criados aqui e desfeitos no fim (rollback: nada fica no banco). A
+-- leitura de uma semana (eventos_do_periodo, com participantes) e os indicadores precisam responder em até 150 ms para
+-- a central, 100 ms para uma consultoria e 75 ms para um consultor (média de 5 execuções, com 50% de folga); a aba
+-- Agenda do cliente (o mês e os números só daquele cliente), em até 50 ms para cada papel. Além do tempo, o plano das
+-- consultas de cada papel não pode varrer a tabela de eventos inteira (Seq Scan): é o que garante que o tempo não
+-- cresce com os anos de história. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(11);
+select plan(17);
 
 create schema testes;
 grant usage on schema testes to authenticated;
@@ -56,6 +57,13 @@ begin
 end $$;
 grant execute on function testes.media_ms() to authenticated;
 
+-- A aba Agenda do cliente: o mês visível (novembro, na grade de domingo a sábado) e os 4 números, só do cliente.
+create function testes.aba_do_cliente() returns jsonb language sql stable as $$
+  select public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-06 00:00-03',
+    p_cliente => testes.id('k1')) || public.indicadores_da_agenda(date '2026-11-10', testes.id('k1'))
+$$;
+grant execute on function testes.aba_do_cliente() to authenticated;
+
 select set_config('request.jwt.claims', '', true);
 
 create temp table v_consultorias (n int primary key, id uuid not null default gen_random_uuid());
@@ -83,19 +91,30 @@ insert into testes.fx select 'adm1', id from v_pessoas where n = 1;
 insert into testes.fx select 'c1', id from v_consultorias where n = 1;
 insert into testes.fx select 'pessoa401', id from v_pessoas where n = 401;
 
+-- 2.000 clientes, 10 por consultoria (sem consultor escolhido: a agenda não depende disso). Cada consultor atende um
+-- cliente da consultoria dele, o k = ((n - 1) / 200) % 10; o k1 é o do pessoa401 (e do 2401).
+create temp table v_clientes (consultoria_n int, k int, id uuid not null default gen_random_uuid(),
+  primary key (consultoria_n, k));
+insert into v_clientes (consultoria_n, k) select c.n, k from v_consultorias c cross join generate_series(0, 9) k;
+insert into public.clientes (id, nome, horas_mes, consultoria_id)
+select k.id, 'Cliente volume ' || k.consultoria_n || '-' || k.k, 10, c.id
+from v_clientes k join v_consultorias c on c.n = k.consultoria_n;
+insert into testes.fx select 'k1', id from v_clientes where consultoria_n = 1 and k = 2;
+
 -- 100.000 eventos entre 1º/jan/2025 e 31/dez/2026 (a semana medida tem cerca de 1/104 deles), de 1 h, dos 3.000
--- consultores; metade com Meet, 5% aguardando, 2% com pasta.
+-- consultores; metade com Meet, 5% aguardando, 2% com pasta; cerca de um quarto (27.000) com o cliente do consultor.
 create temp table v_eventos (n int primary key, id uuid not null default gen_random_uuid());
 insert into v_eventos (n) select generate_series(1, 100000);
 
-insert into public.agenda_eventos (id, consultoria_id, consultor_id, titulo, inicio, fim, com_meet, reuniao, pasta_id)
-select v.id, c.id, p.id, 'Evento volume ' || v.n,
+insert into public.agenda_eventos (id, consultoria_id, consultor_id, cliente_id, titulo, inicio, fim, com_meet, reuniao, pasta_id)
+select v.id, c.id, p.id, k.id, 'Evento volume ' || v.n,
   timestamptz '2025-01-01 08:00-03' + ((v.n * 7919) % 730) * interval '1 day' + (v.n % 10) * interval '1 hour',
   timestamptz '2025-01-01 09:00-03' + ((v.n * 7919) % 730) * interval '1 day' + (v.n % 10) * interval '1 hour',
   v.n % 2 = 0, case when v.n % 20 = 0 then 'aguardando' else 'agendada' end, null
 from v_eventos v
 join v_pessoas p on p.n = (v.n - 1) % 3000 + 1
-join v_consultorias c on c.n = (p.n - 1) % 200 + 1;
+join v_consultorias c on c.n = (p.n - 1) % 200 + 1
+left join v_clientes k on ((v.n - 1) / 3000) % 4 = 0 and k.consultoria_n = c.n and k.k = ((p.n - 1) / 200) % 10;
 
 -- 50.000 participantes: o convidado de dentro é um consultor da mesma consultoria; mais 15.000 de fora (e-mail).
 insert into public.agenda_participantes (evento_id, perfil_id)
@@ -115,6 +134,8 @@ select diag('central, média medida: ' || testes.media_ms() || ' ms');
 select ok(testes.semana() > 500, 'a central lê a semana com centenas de eventos');
 select performs_within('select testes.semana(), public.indicadores_da_agenda(date ''2026-11-10'')', 112.5, 112.5, 5,
   'central (100.000 eventos): a semana e os indicadores em até 150 ms na média (+50%)');
+select performs_within('select testes.aba_do_cliente()', 25, 25, 5,
+  'central, aba Agenda do cliente: o mês e os números do cliente em até 50 ms na média');
 reset role;
 
 select testes.como('adm1');
@@ -125,6 +146,8 @@ select diag('administrador, média medida: ' || testes.media_ms() || ' ms');
 select ok(testes.semana() > 0, 'o administrador lê a semana da consultoria');
 select performs_within('select testes.semana(), public.indicadores_da_agenda(date ''2026-11-10'')', 75, 75, 5,
   'administrador (15 consultores): a semana e os indicadores em até 100 ms na média (+50%)');
+select performs_within('select testes.aba_do_cliente()', 25, 25, 5,
+  'administrador, aba Agenda do cliente: o mês e os números do cliente em até 50 ms na média');
 reset role;
 
 select testes.como('pessoa401');
@@ -133,6 +156,8 @@ select performs_within('select testes.participantes_da_semana()', 50, 50, 5,
 select diag('consultor, média medida: ' || testes.media_ms() || ' ms');
 select performs_within('select testes.semana(), public.indicadores_da_agenda(date ''2026-11-10'')', 56.25, 56.25, 5,
   'consultor (33 eventos, próprios e convidados): a semana e os indicadores em até 75 ms na média (+50%)');
+select performs_within('select testes.aba_do_cliente()', 25, 25, 5,
+  'consultor, aba Agenda do cliente: o mês e os números do cliente em até 50 ms na média');
 reset role;
 
 -- Planos: as consultas de cada papel (as mesmas ramas de eventos_do_periodo) não varrem a tabela inteira.
@@ -159,6 +184,23 @@ select ok(not testes.varre_eventos($$
     and e.inicio < timestamptz '2026-11-15 00:00-03' and e.fim > timestamptz '2026-11-08 00:00-03'
   order by e.inicio, e.id limit 1001 $$),
   'central: a semana usa o índice por início (sem Seq Scan em agenda_eventos)');
+-- A aba do cliente (p_cliente): o filtro do cliente em cada ramo também vai por índice.
+select ok(not testes.varre_eventos(format($$
+  select e.id from public.agenda_eventos e
+  where e.cliente_id = %L and e.inicio >= timestamptz '2026-11-01 00:00-03' - interval '31 days'
+    and e.inicio < timestamptz '2026-12-06 00:00-03' and e.fim > timestamptz '2026-11-01 00:00-03'
+  order by e.inicio, e.id limit 1001 $$, testes.id('k1'))),
+  'central, aba do cliente: o período do cliente usa índice (sem Seq Scan em agenda_eventos)');
+select ok(not testes.varre_eventos(format($$
+  select e.inicio, e.cliente_id, e.com_meet, e.pasta_id from public.agenda_eventos e
+  where e.consultoria_id = %L and e.cliente_id = %L
+    and e.inicio >= timestamptz '2026-11-01 00:00-03' and e.inicio < timestamptz '2026-12-01 00:00-03' $$,
+  testes.id('c1'), testes.id('k1'))),
+  'administrador/gestor, aba do cliente: os números do cliente usam índice (sem Seq Scan em agenda_eventos)');
+select ok(not testes.varre_eventos(format($$
+  select 1 from public.agenda_eventos e
+  where e.reuniao = 'aguardando' and e.cliente_id is not null and e.cliente_id = %L $$, testes.id('k1'))),
+  'aba do cliente: o "aguardando" do cliente usa índice (sem Seq Scan em agenda_eventos)');
 select ok(testes.varre_eventos($$ select e.id from public.agenda_eventos e where e.titulo = 'x' $$),
   'controle do teste: uma consulta sem índice é pega como Seq Scan');
 

@@ -197,6 +197,38 @@ describe('agenda: leituras contra o banco de verdade', () => {
     expect(await meuGoogle()).toEqual({ conectado: false, email: null, erro: null })
   })
 
+  it('indicadores do cliente (aba Agenda do cliente): só as reuniões dele, no recorte de cada papel', async () => {
+    // Outro cliente da A com uma reunião do mesmo consultor (12/11, aguardando a transcrição): conta sem o recorte,
+    // nunca no recorte do clienteA. O evento sai no fim, para não mudar as listas dos testes seguintes.
+    const outro = await admin
+      .from('clientes')
+      .insert({ nome: 'Outro cliente agenda integração', horas_mes: 10, consultoria_id: A, consultor_id: pessoaA.id })
+      .select('id')
+      .single()
+    if (outro.error) throw outro.error
+    registrarCliente(outro.data.id)
+    await novoEvento('doOutroCliente', A, pessoaA.id, '12', { cliente_id: outro.data.id, com_meet: true, reuniao: 'aguardando' })
+    try {
+      const doCliente = (clienteId = clienteA) => indicadoresDaAgenda('2026-11-10', { clienteId })
+      const soOProprio = { semana: 1, mes: 1, aguardando: 0, pastas_no_mes: 0 }
+      const soODoOutro = { semana: 1, mes: 1, aguardando: 1, pastas_no_mes: 0 }
+      const nada = { semana: 0, mes: 0, aguardando: 0, pastas_no_mes: 0 }
+      entrar('pessoa')
+      expect(await indicadoresDaAgenda('2026-11-10')).toEqual({ semana: 2, mes: 2, aguardando: 1, pastas_no_mes: 0 })
+      expect(await doCliente()).toEqual(soOProprio)
+      expect(await doCliente(outro.data.id)).toEqual(soODoOutro)
+      entrar('gestor')
+      expect(await doCliente()).toEqual(soOProprio)
+      entrar('central')
+      expect(await doCliente()).toEqual(soOProprio)
+      expect(await doCliente(outro.data.id)).toEqual(soODoOutro)
+      entrar('pessoaB')
+      expect(await doCliente()).toEqual(nada)
+    } finally {
+      await admin.from('agenda_eventos').delete().eq('id', ev.doOutroCliente)
+    }
+  })
+
   it('ausências: com nome, por consultor e por consultoria, mesmo para gestor sem time', async () => {
     const pedir = (extra, de = '2026-11-01', ate = '2026-11-30') => ausenciasDoPeriodo({ de, ate, ...extra })
     entrar('gestor')
