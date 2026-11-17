@@ -15,4 +15,9 @@ describe('MeusClientes', () => {
     ver({ passado: false, clientes: [] })
     expect(screen.getByText('Nenhum cliente seu neste mês.')).toBeInTheDocument()
   })
+  it('período: título e frase falam do período', () => {
+    ver({ passado: true, intervalo: true, clientes: [] })
+    expect(screen.getByRole('heading', { name: 'Meus clientes no período' })).toBeInTheDocument()
+    expect(screen.getByText('Nenhum cliente seu neste período.')).toBeInTheDocument()
+  })
 })

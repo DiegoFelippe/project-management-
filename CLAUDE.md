@@ -107,7 +107,8 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   Integrações), e a barra **sempre começa com o ícone e a palavra "Filtros"** (como no Calendário; o componente já
   traz, não repita na tela). Pedido do Diego (2026-11-17). Nada de prop para esconder o rótulo. Depois vêm abas,
   busca, filtros e o botão principal no fim. Tela sem filtro natural ainda ganha a barra com o recorte que faz
-  sentido (Início: o mês; Times: busca pelo nome; Integrações: Todas/Conectadas/Não conectadas). As abas são
+  sentido (Início: o período — Mês com a `NavegacaoDoMes`, Últimos 30/90 dias, Este ano ou Personalizado com De e
+  Até, no endereço; Times: busca pelo nome; Integrações: Todas/Conectadas/Não conectadas). As abas são
   `AbasSegmentadas`; `comoAbas` só nas abas de página, como as do cliente. Times: "Novo time" é o botão principal
   da barra (administrador e gestor), e o dono vê a consultoria no lugar dele. **Toda tela do menu: barra de filtros
   (ícone + "Filtros") → cartões de números → conteúdo.** Os cartões (pedido do Diego, 17/11) são o

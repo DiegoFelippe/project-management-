@@ -35,4 +35,8 @@ describe('RankingDeOcupacao', () => {
     ver({ recorte: 'consultoria', ranking: [] })
     expect(screen.getByText('Nenhum consultor com capacidade neste mês.')).toBeInTheDocument()
   })
+  it('período: utilização e a frase do vazio fala do período', () => {
+    ver({ recorte: 'tudo', passado: true, intervalo: true, ranking: [], mes: '2026-11-01' })
+    expect(screen.getByText('Nenhuma consultoria com capacidade neste período.')).toBeInTheDocument()
+  })
 })

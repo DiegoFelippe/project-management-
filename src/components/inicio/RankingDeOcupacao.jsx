@@ -2,11 +2,13 @@ import { Link } from 'react-router'
 import { formatarHoras, formatarOcupacao } from '@/lib/horas'
 
 // Do mais ocupado ao menos (a ordem vem do banco). Barra cheia = 100%; acima disso a barra segue cheia e fica vermelha.
-export default function RankingDeOcupacao({ recorte, passado, ranking, mes }) {
+// No período (`intervalo`), a ordem é pela utilização no período; os links vão ao mês do fim do período (`mes`).
+export default function RankingDeOcupacao({ recorte, passado, intervalo = false, ranking, mes }) {
   const porConsultoria = recorte === 'tudo'
   const titulo = porConsultoria ? 'Ocupação por consultoria' : 'Ocupação por consultor'
   const ocupacaoDoMes = `/consultorias?aba=ocupacao&mes=${mes}`
   const rotulo = passado ? 'utilização' : 'ocupação'
+  const neste = intervalo ? 'neste período' : 'neste mês'
   return (
     <section aria-label={titulo} className="card p-4">
       <div className="mb-3 flex items-baseline justify-between gap-2">
@@ -14,7 +16,7 @@ export default function RankingDeOcupacao({ recorte, passado, ranking, mes }) {
         <Link to={porConsultoria ? ocupacaoDoMes : `/usuarios?mes=${mes}`} className="text-rotulo font-medium text-primary hover:underline">{porConsultoria ? 'Ver todas' : 'Ver todos'}</Link>
       </div>
       {ranking.length === 0 ? (
-        <p className="py-4 text-corpo text-muted-foreground">{porConsultoria ? 'Nenhuma consultoria com capacidade neste mês.' : 'Nenhum consultor com capacidade neste mês.'}</p>
+        <p className="py-4 text-corpo text-muted-foreground">{porConsultoria ? `Nenhuma consultoria com capacidade ${neste}.` : `Nenhum consultor com capacidade ${neste}.`}</p>
       ) : (
         <ul className="grid gap-3">
           {ranking.map((r) => (

@@ -19,6 +19,13 @@ describe('HorasPorMes', () => {
     expect(screen.queryByText(/previsão atual/)).not.toBeInTheDocument()
     expect(container.querySelector('line[stroke-dasharray]')).toBeNull()
   })
+  it('período: os meses do período em destaque (no_periodo, do banco) e o subtítulo diz de quando a quando', () => {
+    const doPeriodo = meses.map((m, i) => ({ ...m, no_periodo: i >= 4 }))
+    const { container } = render(<HorasPorMes meses={doPeriodo} previsao={null} intervalo />)
+    expect([...container.querySelectorAll('rect')].map((r) => r.getAttribute('fill-opacity'))).toEqual(['0.6', '0.6', '0.6', '1', '1'])
+    expect(screen.getByText('Realizado de jun/26 a nov/26, mês a mês; em destaque, os meses do período')).toBeInTheDocument()
+    expect(container.querySelector('line[stroke-dasharray]')).toBeNull()
+  })
   it('textos em HTML com a classe de legenda (não <text> do SVG), então não encolhem no celular', () => {
     const { container } = render(<HorasPorMes meses={meses} previsao={120} />)
     expect(container.querySelectorAll('svg text')).toHaveLength(0)

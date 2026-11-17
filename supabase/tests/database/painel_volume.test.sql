@@ -1,10 +1,11 @@
 -- Volume do painel do Início: 200 consultorias, 3.000 consultores, 50.000 clientes e 200.000 check-ins fechados no mês atual mais 500.000 nos 5 meses anteriores (o gráfico lê 6 meses), criados
--- aqui e desfeitos no fim (rollback: nada fica no banco). painel_do_inicio precisa responder em até 500 ms
+-- aqui e desfeitos no fim (rollback: nada fica no banco). painel_do_inicio no Mês precisa responder em até 500 ms
 -- para a central (tudo), 150 ms para uma consultoria e 100 ms para um consultor (média de 5 execuções, com 50% de
--- folga). Roda com: npm run test:db
+-- folga). No período "Este ano" (12 meses até hoje, o pior caso: lê os 700.000 check-ins), 1000 ms para a central e
+-- 300 ms para a consultoria e para o consultor. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(7);
+select plan(11);
 
 create schema testes;
 grant usage on schema testes to authenticated;
@@ -24,6 +25,26 @@ begin
   return round(extract(epoch from clock_timestamp() - t0) * 1000 / 5, 1);
 end $$;
 grant execute on function testes.media_ms() to authenticated;
+
+-- "Este ano" no pior caso: 12 meses até hoje (o "Este ano" de dezembro), que cobre o volume inteiro (os check-ins são
+-- do mês atual e dos 5 anteriores). Fixo assim, a medida não muda com o mês em que o teste roda.
+create function testes.ano_de() returns date language sql stable as $$
+  select (date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '11 months')::date
+$$;
+create function testes.hoje() returns date language sql stable as $$
+  select (now() at time zone 'America/Sao_Paulo')::date
+$$;
+grant execute on function testes.ano_de(), testes.hoje() to authenticated;
+
+-- Média (ms) de 5 execuções do painel no "Este ano" acima, só para o relatório (diag).
+create function testes.media_ms_ano() returns numeric language plpgsql as $$
+declare t0 timestamptz; i int;
+begin
+  t0 := clock_timestamp();
+  for i in 1..5 loop perform public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje()); end loop;
+  return round(extract(epoch from clock_timestamp() - t0) * 1000 / 5, 1);
+end $$;
+grant execute on function testes.media_ms_ano() to authenticated;
 
 create function testes.como(p_nome text) returns void language plpgsql as $$
 begin
@@ -137,18 +158,33 @@ select ok((select bool_and((e ->> 'realizado')::numeric > 0) from jsonb_array_el
 -- folga de 0,75 x limite: o limite como média, com 50% de tolerância.
 select performs_within('select public.painel_do_inicio()', 375, 375, 5,
   'central (todas as consultorias, 3.000 consultores): painel_do_inicio() em até 500 ms na média (+50%)');
+-- "Este ano" (12 meses até hoje): utilização de 3.000 consultores sobre os 700.000 check-ins do volume.
+select diag('Este ano, média medida: ' || testes.media_ms_ano() || ' ms');
+select is((public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje()) -> 'indicadores' ->> 'realizado')::numeric,
+  (select round(sum(extract(epoch from k.fim - k.inicio)) / 3600, 1) from public.checkins k
+   join public.consultorias co on co.id = k.consultoria_id and co.arquivada_em is null
+   where k.fim is not null and k.inicio >= testes.ano_de()::timestamp at time zone 'America/Sao_Paulo'),
+  'Este ano: o realizado da central soma todos os check-ins do ano (meses inteiros pelo resumo, o mês atual direto)');
+select performs_within('select public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje())', 750, 750, 5,
+  'central, Este ano (3.000 consultores, 700.000 check-ins): painel_do_inicio(de, até) em até 1000 ms na média (+50%)');
 reset role;
 
 select testes.como('adm1');
 select diag('média medida: ' || testes.media_ms() || ' ms');
 select performs_within('select public.painel_do_inicio()', 112.5, 112.5, 5,
   'administrador (15 consultores, 250 clientes): painel_do_inicio() em até 150 ms na média (+50%)');
+select diag('Este ano, média medida: ' || testes.media_ms_ano() || ' ms');
+select performs_within('select public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje())', 225, 225, 5,
+  'administrador, Este ano (15 consultores): painel_do_inicio(de, até) em até 300 ms na média (+50%)');
 reset role;
 
 select testes.como('pessoa401');
 select diag('média medida: ' || testes.media_ms() || ' ms');
 select performs_within('select public.painel_do_inicio()', 75, 75, 5,
   'consultor (15 clientes, 67 check-ins): painel_do_inicio() em até 100 ms na média (+50%)');
+select diag('Este ano, média medida: ' || testes.media_ms_ano() || ' ms');
+select performs_within('select public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje())', 225, 225, 5,
+  'consultor, Este ano: painel_do_inicio(de, até) em até 300 ms na média (+50%)');
 reset role;
 
 select * from finish();

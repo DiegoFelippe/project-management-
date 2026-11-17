@@ -21,6 +21,12 @@ describe('painelDoInicio', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('painel_do_inicio', { p_mes: null })
   })
 
+  it('pede o período (de e até, dias de São Paulo) quando vem um objeto', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: {}, error: null })
+    await painelDoInicio({ de: '2026-09-16', ate: '2026-10-15' })
+    expect(supabase.rpc).toHaveBeenCalledWith('painel_do_inicio', { p_de: '2026-09-16', p_ate: '2026-10-15' })
+  })
+
   it('propaga o erro', async () => {
     vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: { code: '42501' } })
     await expect(painelDoInicio('2026-11-01')).rejects.toEqual({ code: '42501' })

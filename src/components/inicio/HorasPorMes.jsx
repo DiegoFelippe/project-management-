@@ -3,10 +3,11 @@ import { rotuloCurto } from '@/lib/mes'
 const COLUNA = 60 // largura de cada mês no viewBox; as linhas de texto em HTML usam o mesmo grid de colunas.
 const ALTURA = 100
 
-// Barras do realizado dos 6 meses; a previsão atual é só uma linha de referência (não há previsão de meses passados).
-// O SVG guarda só as barras e a linha tracejada (estica com a largura); os textos são HTML, então ficam do mesmo
-// tamanho em qualquer largura de tela.
-export default function HorasPorMes({ meses, previsao }) {
+// Barras do realizado de cada mês (6 no Mês; no período, os meses que ele toca, de 6 a 24), cada uma com o mês
+// inteiro; os meses do período (`no_periodo`, do banco) ficam em destaque. A previsão atual é só uma linha de referência
+// (não há previsão de meses passados) e não vem no período. O SVG guarda só as barras e a linha tracejada (estica com a
+// largura); os textos são HTML, então ficam do mesmo tamanho em qualquer largura de tela.
+export default function HorasPorMes({ meses, previsao, intervalo = false }) {
   const maximo = Math.max(1, previsao ?? 0, ...meses.map((m) => m.realizado))
   const alturaDe = (v) => (ALTURA * v) / maximo
   const largura = COLUNA * meses.length
@@ -15,7 +16,10 @@ export default function HorasPorMes({ meses, previsao }) {
   return (
     <section aria-label="Horas por mês" className="card min-w-0 p-4">
       <h2 className="text-subtitulo font-semibold text-muted-foreground">Horas por mês</h2>
-      <p className="mb-2 text-legenda text-muted-foreground">Realizado nos últimos {meses.length} meses</p>
+      <p className="mb-2 text-legenda text-muted-foreground">
+        {intervalo ? `Realizado de ${rotuloCurto(meses[0].mes)} a ${rotuloCurto(meses.at(-1).mes)}, mês a mês; em destaque, os meses do período`
+          : `Realizado nos últimos ${meses.length} meses`}
+      </p>
       <div className="mx-auto w-full max-w-xl">
         {previsao > 0 && <p className="mb-1 text-right text-legenda text-notice">previsão atual {formatarHoras(previsao)}</p>}
         <div role="img" aria-label={`Horas por mês. ${descricao}.${previsao ? ` Previsão atual: ${formatarHoras(previsao)}.` : ''}`}>
@@ -27,7 +31,7 @@ export default function HorasPorMes({ meses, previsao }) {
             {previsao > 0 && <line x1="0" x2={largura} y1={ALTURA - alturaDe(previsao)} y2={ALTURA - alturaDe(previsao)} stroke="var(--notice)" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />}
             {meses.map((m, i) => m.realizado > 0 && (
               <rect key={m.mes} x={i * COLUNA + 12} y={ALTURA - alturaDe(m.realizado)} width={COLUNA - 24} height={alturaDe(m.realizado)}
-                fill="var(--primary)" fillOpacity={i === meses.length - 1 ? 1 : 0.6} />
+                fill="var(--primary)" fillOpacity={(m.no_periodo ?? i === meses.length - 1) ? 1 : 0.6} />
             ))}
           </svg>
           <ul className="mt-1 grid text-center text-legenda text-muted-foreground" style={colunas}>

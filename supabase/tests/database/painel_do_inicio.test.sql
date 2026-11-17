@@ -3,7 +3,7 @@
 -- consultores_por_ocupacao e consultorias_por_ocupacao. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(87);
+select plan(124);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -309,6 +309,163 @@ select testes.como('pessoa_b');
 select is((select (public.painel_do_inicio(testes.passado()) -> 'indicadores' ->> 'realizado')::numeric), 23.1::numeric,
   'outro consultor vê só o dele (23,1 h)');
 reset role;
+
+-- ── Período (de/até, pedido do Diego em 17/11) ───────────────────────────────
+-- Realizado = check-ins que começam entre de e até (dias de São Paulo); capacidade = a do mês proporcional aos dias
+-- úteis de cada mês dentro do período (dias úteis sem feriado e sem ausência x carga / 5); utilização = realizado /
+-- capacidade; nada de reservado nem previsão fora do Mês.
+-- 16/09 a 15/10/2026: 11 dias úteis em setembro (16 a 30) + 10 em outubro (1 a 15, sem o feriado de 12/10) = 21
+-- x 44 / 5 = 184,8 h por consultor. pessoa_d tem 5 dias úteis de ausência dentro (28/09 a 02/10: 3 + 2) e uma fora
+-- (20 a 23/10): 16 x 8,8 = 140,8. Consultoria A: 4 x 184,8 + 140,8 + 0 (zero_a) = 880 h (inativo_a não conta).
+-- Check-ins da pessoa_c nas bordas: 23h de 15/09 e 00h de 16/10 ficam fora; 00h10 de 16/09 (1 h) e 22h de 15/10
+-- (1,5 h) entram. Realizado da A no período: 46,2 (pessoa_a, outubro) + 2,5 = 48,7 h.
+select set_config('request.jwt.claims', '', true);
+insert into public.ausencias (perfil_id, de, ate, motivo) values
+  (testes.id('pessoa_d'), '2026-09-28', '2026-10-02', 'Férias'),
+  (testes.id('pessoa_d'), '2026-10-20', '2026-10-23', 'Férias');
+select testes.como('pessoa_c');
+insert into public.checkins (cliente_id, inicio, fim, descricao) values
+  (testes.id('c200'), '2026-09-15 23:00-03', '2026-09-15 23:50-03', 'Antes do período'),
+  (testes.id('c200'), '2026-09-16 00:10-03', '2026-09-16 01:10-03', 'Primeiro dia'),
+  (testes.id('c200'), '2026-10-15 22:00-03', '2026-10-15 23:30-03', 'Último dia'),
+  (testes.id('c200'), '2026-10-16 00:00-03', '2026-10-16 02:00-03', 'Depois do período');
+reset role;
+select set_config('request.jwt.claims', '', true);
+
+-- Segundos fechados (soma direta dos check-ins, sem o resumo) que começam entre p_de e p_ate em São Paulo, das
+-- consultorias não arquivadas (p_consultoria nula = todas). Roda como o sistema (sem RLS).
+create function testes.segundos_no_periodo(p_consultoria uuid, p_de date, p_ate date) returns numeric language sql stable as $$
+  select coalesce(sum(extract(epoch from k.fim - k.inicio)), 0)
+  from public.checkins k
+  join public.consultorias co on co.id = k.consultoria_id and co.arquivada_em is null
+  where k.fim is not null
+    and (p_consultoria is null or k.consultoria_id = p_consultoria)
+    and k.inicio >= p_de::timestamp at time zone 'America/Sao_Paulo'
+    and k.inicio < (p_ate + 1)::timestamp at time zone 'America/Sao_Paulo'
+$$;
+
+select testes.como('admin_a');
+create temp table p_admin_periodo as select public.painel_do_inicio(p_de => '2026-09-16', p_ate => '2026-10-15') as j;
+create temp table p_admin_meio as select public.painel_do_inicio(p_de => '2026-08-20', p_ate => '2026-10-15') as j;
+create temp table p_admin_outubro as select public.painel_do_inicio(p_de => '2026-10-01', p_ate => '2026-10-31') as j;
+create temp table p_admin_mes_outubro as select public.painel_do_inicio(testes.passado()) as j;
+create temp table p_admin_trinta as select public.painel_do_inicio(
+  p_de => (now() at time zone 'America/Sao_Paulo')::date - 29, p_ate => (now() at time zone 'America/Sao_Paulo')::date) as j;
+reset role;
+
+select ok((select (j ->> 'intervalo')::boolean and j ->> 'de' = '2026-09-16' and j ->> 'ate' = '2026-10-15'
+    and j ->> 'mes' = '2026-10-01' and (j ->> 'passado')::boolean from p_admin_periodo),
+  'período: intervalo, de e até como pedidos, mês = o do fim do período, passado (sem previsão)');
+select ok((select not (j ->> 'intervalo')::boolean and j ->> 'de' = '2026-10-01' and j ->> 'ate' = '2026-10-31'
+    from p_admin_passado), 'Mês: intervalo = false, de e até = o mês inteiro');
+select is((select (j -> 'indicadores' ->> 'capacidade')::numeric from p_admin_periodo), 880::numeric,
+  'período: capacidade proporcional aos dias úteis de cada mês (21 dias), descontando a ausência dentro do período (880 h)');
+select is((select (r ->> 'capacidade')::numeric from p_admin_periodo, jsonb_array_elements(j -> 'ranking') r
+    where r ->> 'id' = testes.id('pessoa_d')::text), 140.8::numeric,
+  'período: a ausência fora do período não desconta (pessoa_d: 16 dias úteis, 140,8 h)');
+select is((select (j -> 'indicadores' ->> 'realizado')::numeric from p_admin_periodo), 48.7::numeric,
+  'período: realizado = check-ins que começam entre de e até em São Paulo (46,2 + 1 + 1,5; as bordas de fora não entram)');
+select is((select (j -> 'indicadores' ->> 'realizado')::numeric from p_admin_periodo),
+  round(testes.segundos_no_periodo(testes.id('A'), '2026-09-16', '2026-10-15') / 3600, 1),
+  'período: realizado igual à soma direta dos check-ins (sem mês inteiro, só bordas)');
+select is((select (j -> 'indicadores' ->> 'realizado')::numeric from p_admin_meio),
+  round(testes.segundos_no_periodo(testes.id('A'), '2026-08-20', '2026-10-15') / 3600, 1),
+  'período com um mês inteiro no meio (resumo) e duas bordas: realizado igual à soma direta (59,5 h)');
+select is((select (j -> 'indicadores' ->> 'realizado')::numeric from p_admin_meio), 59.5::numeric,
+  'período de 20/08 a 15/10: setembro inteiro (11,8 h) + 1 a 15/10 (47,7 h)');
+select ok((select (j -> 'indicadores' ->> 'ocupacao')::numeric = round(48.7 / 880, 4) from p_admin_periodo),
+  'período: ocupação = utilização = realizado / capacidade do período');
+select ok((select j -> 'indicadores' -> 'reservado' = 'null'::jsonb and j -> 'previsao_atual' = 'null'::jsonb from p_admin_periodo),
+  'período passado: sem reservado e sem previsão');
+select ok((select (j ->> 'intervalo')::boolean and (j ->> 'passado')::boolean and j -> 'indicadores' -> 'reservado' = 'null'::jsonb
+    and j -> 'previsao_atual' = 'null'::jsonb from p_admin_trinta),
+  'últimos 30 dias (inclui hoje): também sem reservado nem previsão (a previsão só existe no Mês)');
+select is((select (j -> 'indicadores' ->> 'clientes_novos')::int from p_admin_trinta), 3,
+  'últimos 30 dias: novos = criados dentro do período (a40, a30, c200)');
+select is((select (j -> 'indicadores' ->> 'clientes_novos')::int from p_admin_periodo), 0,
+  'período de setembro a outubro: nenhum cliente novo');
+select is((select j -> 'ranking' -> 0 ->> 'id' from p_admin_periodo), testes.id('pessoa_a')::text,
+  'período: ranking pela utilização no período (pessoa_a, 46,2 de 184,8, primeiro)');
+select ok((select (j -> 'ranking' -> 0 ->> 'ocupacao')::numeric = 0.25 and (j -> 'ranking' -> 0 ->> 'capacidade')::numeric = 184.8
+    from p_admin_periodo), 'período: utilização (25%) e capacidade do período no ranking');
+select ok((select not exists (
+    select 1 from p_admin_periodo, jsonb_array_elements(j -> 'ranking') with ordinality a(r, o)
+    join jsonb_array_elements(j -> 'ranking') with ordinality b(r, o) on b.o = a.o + 1
+    where coalesce((a.r ->> 'ocupacao')::numeric, -1) < coalesce((b.r ->> 'ocupacao')::numeric, -1))),
+  'período: ranking da maior para a menor utilização');
+select ok((select j -> 'extremos' -> 'acima' = '[]'::jsonb and jsonb_array_length(j -> 'extremos' -> 'folga') = 3
+    from p_admin_periodo), 'período: extremos pela utilização no período (ninguém acima de 100%, 3 com folga)');
+select ok((select j::text not like '%' || testes.id('B')::text || '%'
+    and j::text not like '%' || testes.id('pessoa_b')::text || '%'
+    and j::text not like '%Painel Teste B%' from p_admin_periodo),
+  'período: nada de outra consultoria (as 23,1 h da pessoa_b em outubro não entram)');
+select is((select array_agg(e ->> 'mes' order by o) from p_admin_periodo, jsonb_array_elements(j -> 'horas_por_mes') with ordinality t(e, o)),
+  array['2026-05-01', '2026-06-01', '2026-07-01', '2026-08-01', '2026-09-01', '2026-10-01'],
+  'período curto: gráfico com os 6 meses que terminam no mês do fim');
+select is((select array_agg((e ->> 'no_periodo')::boolean order by o) from p_admin_periodo, jsonb_array_elements(j -> 'horas_por_mes') with ordinality t(e, o)),
+  array[false, false, false, false, true, true], 'período: no_periodo marca os meses tocados pelo período');
+select is((select array_agg((e ->> 'realizado')::numeric order by o) from p_admin_periodo, jsonb_array_elements(j -> 'horas_por_mes') with ordinality t(e, o)),
+  array[0, 0, 0, 0, 11.8, 49.7]::numeric[], 'período: cada barra é o mês inteiro (setembro 11,8 h; outubro 49,7 h)');
+select is((select array_agg((e ->> 'no_periodo')::boolean order by o) from p_admin_passado, jsonb_array_elements(j -> 'horas_por_mes') with ordinality t(e, o)),
+  array[false, false, false, false, false, true], 'Mês: só o mês escolhido fica marcado no gráfico');
+select ok((select (o.j -> 'indicadores' ->> 'capacidade')::numeric = (m.j -> 'indicadores' ->> 'capacidade')::numeric
+    and (o.j -> 'indicadores' ->> 'realizado')::numeric = (m.j -> 'indicadores' ->> 'realizado')::numeric
+    and (o.j -> 'indicadores' ->> 'ocupacao')::numeric = (m.j -> 'indicadores' ->> 'ocupacao')::numeric
+    from p_admin_outubro o, p_admin_mes_outubro m),
+  'um mês inteiro como período dá a mesma capacidade, realizado e utilização do Mês passado');
+
+-- Central no período: realizado de todas as consultorias igual à soma direta.
+select testes.como('central');
+create temp table p_central_meio as select public.painel_do_inicio(p_de => '2026-08-20', p_ate => '2026-10-15') as j;
+reset role;
+select is((select (j -> 'indicadores' ->> 'realizado')::numeric from p_central_meio),
+  round(testes.segundos_no_periodo(null, '2026-08-20', '2026-10-15') / 3600, 1),
+  'central no período: realizado = soma direta dos check-ins de todas as consultorias ativas');
+
+-- Consultor no período: só o dele, sem previsto.
+select testes.como('pessoa_a');
+select ok((select (j -> 'indicadores' ->> 'capacidade')::numeric = 184.8 and (j -> 'indicadores' ->> 'realizado')::numeric = 46.2
+    and (j -> 'indicadores' ->> 'ocupacao')::numeric = 0.25 and j -> 'indicadores' -> 'reservado' = 'null'::jsonb
+    from (select public.painel_do_inicio(p_de => '2026-09-16', p_ate => '2026-10-15') as j) x),
+  'consultor no período: capacidade do período, o realizado dele e a utilização');
+select ok((select j -> 'meus_clientes' -> 0 ->> 'id' = testes.id('a40')::text
+    and (j -> 'meus_clientes' -> 0 ->> 'realizado')::numeric = 46.2 and j -> 'meus_clientes' -> 0 -> 'previsto' = 'null'::jsonb
+    from (select public.painel_do_inicio(p_de => '2026-09-16', p_ate => '2026-10-15') as j) x),
+  'consultor no período: meus clientes pelo realizado do período, sem previsto');
+reset role;
+select testes.como('pessoa_b');
+select is((select (public.painel_do_inicio(p_de => '2026-09-16', p_ate => '2026-10-15') -> 'indicadores' ->> 'realizado')::numeric),
+  23.1::numeric, 'outro consultor no período vê só o dele (23,1 h)');
+reset role;
+
+-- Limites do período (o banco confere, além da tela).
+select testes.como('admin_a');
+select throws_ok($$ select public.painel_do_inicio(p_de => '2026-10-15', p_ate => '2026-10-01') $$, '22023', null,
+  'período: de depois de até é recusado');
+select throws_ok($$ select public.painel_do_inicio(p_de => '2026-10-01', p_ate => null) $$, '22023', null,
+  'período: de sem até é recusado');
+select throws_ok($$ select public.painel_do_inicio(p_mes => '2026-10-01', p_de => '2026-10-01', p_ate => '2026-10-15') $$, '22023', null,
+  'período: mês e período juntos são recusados');
+select throws_ok($$ select public.painel_do_inicio(p_de => (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month')::date,
+    p_ate => (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month')::date) $$, '22023', null,
+  'período: até depois do fim do mês atual é recusado');
+select lives_ok($$ select public.painel_do_inicio(p_de => date_trunc('month', now() at time zone 'America/Sao_Paulo')::date,
+    p_ate => (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month - 1 day')::date) $$,
+  'período: até no último dia do mês atual é aceito');
+select throws_ok($$ select public.painel_do_inicio(p_de => '2024-01-01', p_ate => '2026-01-01') $$, '22023', null,
+  'período: mais de 2 anos é recusado');
+select is((select jsonb_array_length(public.painel_do_inicio(p_de => '2024-01-02', p_ate => '2026-01-01') -> 'horas_por_mes')), 24,
+  'período de 2 anos (25 meses tocados): o gráfico mostra no máximo 24 meses');
+select is((select public.painel_do_inicio(p_de => '2024-01-02', p_ate => '2026-01-01') -> 'horas_por_mes' -> 23 ->> 'mes'), '2026-01-01',
+  'período longo: o gráfico termina no mês do fim');
+select is((select jsonb_array_length(public.painel_do_inicio(p_de => '2025-01-01', p_ate => '2026-10-31') -> 'horas_por_mes')), 22,
+  'período de 22 meses: uma barra por mês do período');
+reset role;
+select is((select count(*)::int from pg_proc where proname = 'painel_do_inicio' and pronamespace = 'public'::regnamespace), 1,
+  'uma função painel_do_inicio só (sem sobrecarga ambígua para o PostgREST)');
+-- Desfaz a fixture do período (o teste do check-in aberto, mais abaixo, conta com a pessoa_c sem check-ins depois de 2025).
+delete from public.checkins where cliente_id = testes.id('c200') and inicio >= '2026-09-15' and inicio < '2026-10-17';
+delete from public.ausencias where perfil_id = testes.id('pessoa_d') and de in ('2026-09-28', '2026-10-20');
 
 -- ── Capacidade 0 ─────────────────────────────────────────────────────────────
 select testes.como('admin_z');

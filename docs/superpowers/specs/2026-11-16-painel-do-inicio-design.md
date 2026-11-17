@@ -59,3 +59,30 @@ Data: 2026-11-16. Projeto: `~/Documents/consultoria`. Branch: `feat/clientes` (P
 
 Exportar, filtros por consultoria/consultor dentro do painel, metas, comparação com o mês anterior em cada bloco,
 painéis de auditoria e plano de ação.
+
+## Filtro por período (17/11)
+
+Pedido do Diego (17/11): "Na dashboard inicial implemente um filtro por data e remova ou complemente o atual."
+Complementa o mês: a barra é `Filtros` → **Período** (`Seletor`): Mês (padrão, com a `NavegacaoDoMes` como antes),
+Últimos 30 dias, Últimos 90 dias, Este ano (de 1/1 até hoje) e Personalizado (`CampoData` De e Até). Os atalhos contam
+a partir de hoje (São Paulo). O período fica no endereço (`?periodo=mes&mes=AAAA-MM-01`, `?periodo=ultimos-30`,
+`?periodo=personalizado&de=…&ate=…`), então volta igual depois de abrir um cliente.
+
+- **Uma função só:** `painel_do_inicio(p_mes, p_de, p_ate)`, todos opcionais (sem sobrecarga ambígua). Com o mês, é o
+  painel de antes, sem mudar nada.
+- **Realizado** = check-ins fechados que começam entre De e Até. Meses inteiros saem do resumo por mês
+  (`checkins_horas_mes`); os pedaços de mês nas bordas, direto dos check-ins.
+- **Capacidade** = a do mês de cada consultor proporcional aos **dias úteis** de cada mês dentro do período (dias úteis
+  sem feriado e sem ausência × carga / 5, a mesma conta do mês; um mês inteiro dá a capacidade do mês). Uma ausência
+  fora do período não desconta.
+- **Utilização** = realizado ÷ capacidade do período. Reservado, ocupação e previsão só no Mês (a previsão não tem
+  histórico); qualquer outro período mostra Utilização. Ranking e extremos pela utilização no período.
+- Clientes ativos, aguardando e a fila são de hoje ("hoje" no rótulo, "Situação de hoje, não do período."); novos
+  contam os criados no período.
+- **Horas por mês:** os meses tocados pelo período (no mínimo os 6 que terminam no mês do Até, no máximo 24), cada barra
+  com o mês inteiro; os meses do período ficam em destaque. Sem a linha da previsão no período.
+- **Limites** (na tela e no banco): De ≤ Até (escolher De depois do Até leva o Até junto), Até no máximo no fim do mês
+  atual (o calendário trava) e no máximo 2 anos ("O período pode ter no máximo 2 anos.").
+- Os links de "Ver todos" e dos nomes vão ao mês do Até (Usuários e Consultorias são por mês).
+- Volume: no Mês, os limites de antes; "Este ano" (pior caso, 12 meses até hoje) em até 1000 ms para a central e 300 ms
+  para a consultoria e o consultor.

@@ -4,11 +4,14 @@ import { colunasDoMes, formatarHoras, formatarOcupacao } from '@/lib/horas'
 
 const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
 
-// Os números do mês, como vieram do banco (painel_do_inicio), nos cartões do padrão. Mês passado: "Utilização" e nada de
-// reservado. Sem `painel` (carregando), os rótulos saem de `pessoa` (o consultor) e `passado`, e os números ficam "—".
-export default function Indicadores({ painel, pessoa, passado: passadoAgora }) {
+// Os números do mês ou do período, como vieram do banco (painel_do_inicio), nos cartões do padrão. Mês passado e
+// qualquer período: "Utilização" e nada de reservado. Sem `painel` (carregando), os rótulos saem de `pessoa` (o
+// consultor), `passado` e `intervalo` (período que não é o Mês), e os números ficam "—".
+export default function Indicadores({ painel, pessoa, passado: passadoAgora, intervalo: intervaloAgora = false }) {
   const recorte = painel?.recorte ?? (pessoa ? 'pessoa' : 'consultoria')
   const passado = painel?.passado ?? passadoAgora
+  const intervalo = painel?.intervalo ?? intervaloAgora
+  const noQue = intervalo ? 'no período' : 'no mês'
   const i = painel?.indicadores
   const acima = i?.ocupacao > 1
   const hoje = passado ? ' hoje' : ''
@@ -28,7 +31,7 @@ export default function Indicadores({ painel, pessoa, passado: passadoAgora }) {
     ]
     : [
       { chave: 'clientes', rotulo: `Clientes ativos${hoje}`, icone: Users, valor: i?.clientes_ativos,
-        detalhe: i ? `${plural(i.clientes_novos, 'novo', 'novos')} no mês` : null },
+        detalhe: i ? `${plural(i.clientes_novos, 'novo', 'novos')} ${noQue}` : null },
       { chave: 'aguardando', rotulo: `Aguardando consultor${hoje}`, icone: Hourglass, tom: 'aviso', valor: i?.aguardando,
         destaque: i?.aguardando > 0 ? 'atencao' : null,
         detalhe: i && recorte === 'tudo'
@@ -38,5 +41,5 @@ export default function Indicadores({ painel, pessoa, passado: passadoAgora }) {
       realizado,
     ]
 
-  return <CartoesDeNumeros rotulo="Indicadores do mês" cartoes={cartoes} className="mb-0" />
+  return <CartoesDeNumeros rotulo={intervalo ? 'Indicadores do período' : 'Indicadores do mês'} cartoes={cartoes} className="mb-0" />
 }

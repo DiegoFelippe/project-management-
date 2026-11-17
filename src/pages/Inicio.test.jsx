@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { painelDoInicio } from '@/data/painel'
 import { deslocarMes, mesAtual } from '@/lib/mes'
+import { escolherData, escolherNoSeletor } from '@/test/campos'
 import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
 import Inicio from './Inicio'
@@ -225,5 +226,142 @@ describe('Início (painel)', () => {
     vi.useRealTimers()
     expect(within(fila.querySelectorAll('tbody tr')[0]).getByText('há 1 dia')).toBeInTheDocument()
     expect(within(fila.querySelectorAll('tbody tr')[1]).getByText('hoje')).toBeInTheDocument()
+  })
+})
+
+// Filtro por período (pedido do Diego, 17/11): Mês (padrão, com a navegação do mês), Últimos 30 e 90 dias, Este ano e
+// Personalizado (De e Até). Hoje fica fixo em 17/11/2026 (12h em São Paulo).
+describe('Início (período)', () => {
+  const PERIODO = { ...ADMIN, intervalo: true, passado: true, mes: '2026-11-01', de: '2026-10-19', ate: '2026-11-17', previsao_atual: null,
+    indicadores: { ...ADMIN.indicadores, reservado: null, ocupacao: 0.4 } }
+  const ultimaChamada = () => vi.mocked(painelDoInicio).mock.calls.at(-1)[0]
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-17T15:00:00Z'))
+    return () => vi.useRealTimers()
+  })
+
+  it('a barra começa em Filtros, com Período = Mês e a navegação do mês', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
+    renderizarTela(<Inicio />, { perfil: perfil('admin') })
+    const barra = screen.getByText('Filtros').closest('.card')
+    expect(within(barra).getByLabelText('Período')).toHaveTextContent('Mês')
+    expect(within(barra).getByRole('group', { name: 'Mês' })).toHaveTextContent('Novembro de 2026')
+    await waitFor(() => expect(painelDoInicio).toHaveBeenCalledWith('2026-11-01'))
+  })
+
+  it.each([
+    ['Últimos 30 dias', '2026-10-19', '19/10/2026 a 17/11/2026'],
+    ['Últimos 90 dias', '2026-08-20', '20/08/2026 a 17/11/2026'],
+    ['Este ano', '2026-01-01', '01/01/2026 a 17/11/2026'],
+  ])('%s: pede ao banco de %s até hoje, mostra as datas e tira a navegação do mês', async (rotulo, de, texto) => {
+    vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
+    const user = userEvent.setup()
+    renderizarTela(<Inicio />, { perfil: perfil('admin') })
+    await escolherNoSeletor(user, 'Período', rotulo)
+    await waitFor(() => expect(ultimaChamada()).toEqual({ de, ate: '2026-11-17' }))
+    const barra = screen.getByText('Filtros').closest('.card')
+    expect(within(barra).getByText(texto)).toBeInTheDocument()
+    expect(within(barra).queryByRole('button', { name: 'Mês anterior' })).not.toBeInTheDocument()
+  })
+
+  it('Personalizado: De e Até começam no período mostrado e mudar uma data pede o período novo', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
+    const user = userEvent.setup()
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=mes&mes=2026-10-01' })
+    await escolherNoSeletor(user, 'Período', 'Personalizado')
+    await waitFor(() => expect(ultimaChamada()).toEqual({ de: '2026-10-01', ate: '2026-10-31' }))
+    expect(screen.getByLabelText('De')).toHaveTextContent('1 de out de 2026')
+    expect(screen.getByLabelText('Até')).toHaveTextContent('31 de out de 2026')
+    await escolherData(user, 'De', '2026-09-16')
+    await waitFor(() => expect(ultimaChamada()).toEqual({ de: '2026-09-16', ate: '2026-10-31' }))
+  })
+
+  it('Personalizado: De depois do Até leva o Até junto (um dia só)', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
+    const user = userEvent.setup()
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=personalizado&de=2026-10-01&ate=2026-10-15' })
+    await escolherData(user, 'De', '2026-10-20')
+    await waitFor(() => expect(ultimaChamada()).toEqual({ de: '2026-10-20', ate: '2026-10-20' }))
+  })
+
+  it('Personalizado: mais de 2 anos avisa em português e não pede ao banco', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
+    const user = userEvent.setup()
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=personalizado&de=2026-10-01&ate=2026-10-31' })
+    await waitFor(() => expect(painelDoInicio).toHaveBeenCalledTimes(1))
+    await escolherData(user, 'De', '2024-10-01')
+    expect(await screen.findByRole('alert')).toHaveTextContent('O período pode ter no máximo 2 anos.')
+    expect(painelDoInicio).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('region', { name: /Indicadores/ })).not.toBeInTheDocument()
+  })
+
+  it('Personalizado: o Até não passa do fim do mês atual (o calendário trava e o endereço avisa)', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
+    const user = userEvent.setup()
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=personalizado&de=2026-11-01&ate=2026-12-05' })
+    expect(await screen.findByRole('alert')).toHaveTextContent('O período vai no máximo até o fim deste mês.')
+    expect(painelDoInicio).not.toHaveBeenCalled()
+    await user.click(screen.getByLabelText('Até'))
+    const calendario = await screen.findByRole('dialog', { name: 'Escolher data' })
+    expect(within(calendario).getByRole('button', { name: '1 de dezembro de 2026' })).toBeDisabled()
+    await user.click(within(calendario).getByRole('button', { name: 'Mês anterior' }))
+    expect(within(calendario).getByRole('button', { name: '30 de novembro de 2026' })).toBeEnabled()
+  })
+
+  it('o período vem do endereço e volta para ele', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
+    const user = userEvent.setup()
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=ultimos-90' })
+    expect(screen.getByLabelText('Período')).toHaveTextContent('Últimos 90 dias')
+    await waitFor(() => expect(ultimaChamada()).toEqual({ de: '2026-08-20', ate: '2026-11-17' }))
+    await escolherNoSeletor(user, 'Período', 'Mês')
+    await waitFor(() => expect(ultimaChamada()).toBe('2026-11-01'))
+    expect(screen.getByRole('group', { name: 'Mês' })).toHaveTextContent('Novembro de 2026')
+  })
+
+  it('de Personalizado para Mês: o mês do fim do período', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
+    const user = userEvent.setup()
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=personalizado&de=2026-09-16&ate=2026-10-15' })
+    await waitFor(() => expect(ultimaChamada()).toEqual({ de: '2026-09-16', ate: '2026-10-15' }))
+    await escolherNoSeletor(user, 'Período', 'Mês')
+    await waitFor(() => expect(ultimaChamada()).toBe('2026-10-01'))
+    expect(screen.getByRole('group', { name: 'Mês' })).toHaveTextContent('Outubro de 2026')
+  })
+
+  it('no período, os cartões e os blocos dizem "período" e mostram utilização, sem reservado', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(PERIODO)
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=ultimos-30' })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores do período')
+    await waitFor(() => expect(numeroDoCartao(cartoes, 'Utilização')).toBe('40%'))
+    expect(within(cartoes).getByText('3 novos no período')).toBeInTheDocument()
+    expect(within(cartoes).getByText('Clientes ativos hoje')).toBeInTheDocument()
+    expect(screen.queryByText(/reservado/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Situação de hoje, não do período.')).toBeInTheDocument()
+    expect(screen.queryByText(/previsão atual/)).not.toBeInTheDocument()
+  })
+
+  it('no período, os cartões carregam com o rótulo do período ("—")', async () => {
+    vi.mocked(painelDoInicio).mockReturnValue(new Promise(() => {}))
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=ano' })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores do período')
+    expect(numeroDoCartao(cartoes, 'Utilização')).toBe('—')
+  })
+
+  it('consultor no período: meus clientes no período, sem previsto', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue({ ...PESSOA, intervalo: true, passado: true, previsao_atual: null })
+    renderizarTela(<Inicio />, { perfil: perfil('pessoa'), endereco: '/?periodo=ultimos-30' })
+    const tabela = await screen.findByRole('table', { name: 'Meus clientes' })
+    expect(screen.getByRole('heading', { name: 'Meus clientes no período' })).toBeInTheDocument()
+    expect(within(tabela).queryByText('Previsto')).not.toBeInTheDocument()
+  })
+
+  it('a 360 px a barra quebra linha (nada de largura fixa que role para o lado)', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=personalizado&de=2026-10-01&ate=2026-10-31' })
+    const barra = screen.getByText('Filtros').closest('.card')
+    expect(barra).toHaveClass('flex-wrap')
+    expect(barra.innerHTML).not.toMatch(/min-w-\[(?:[4-9]\d\d|\d{4,})px\]/)
   })
 })
