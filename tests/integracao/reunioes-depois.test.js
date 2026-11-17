@@ -428,6 +428,30 @@ describe('pela tela: Buscar agora e Tentar de novo (núcleo, Google falso, IA fa
     expect(await pastasDoEvento(e.id)).toEqual([])
   })
 
+  it('organizador desativado: nem o token dele é lido; a reunião vira erro com o motivo, pela tela e pela rotina', async () => {
+    const DESATIVADO = 'O organizador foi desativado. A gravação, se houver, está no Google dele.'
+    const saiu = await pessoa('pessoa', C, 'Fabio Saiu', { comGoogle: true })
+    const pelaTela = await reuniao(p.gestora, { consultor_id: saiu.id, cliente_id: cli.daAna, titulo: 'Organizador saiu (tela)' })
+    const pelaRotina = await reuniao(p.gestora, { consultor_id: saiu.id, cliente_id: cli.daAna, titulo: 'Organizador saiu (rotina)' })
+    for (const e of [pelaTela, pelaRotina]) conferencia(saiu, e)
+    conferir(await admin.from('perfis').update({ ativo: false, desativado_em: new Date().toISOString() }).eq('id', saiu.id).select('id'))
+    const pedidosAntes = google.pedidos.length
+    const renovacoesAntes = google.pedidosPara('oauth2.googleapis.com/token').length
+    googlesPedidos.length = 0
+
+    expect((await buscar(p.gestora, pelaTela.id)).reuniao).toMatchObject({ reuniao: 'erro', reuniao_erro: DESATIVADO, pasta_id: null })
+    // "Tentar de novo" volta a olhar, e dá o mesmo motivo (sem chegar ao Google).
+    expect((await tentar(p.gestora, pelaTela.id)).reuniao).toMatchObject({ reuniao: 'erro', reuniao_erro: DESATIVADO })
+    await rotina({ proximaBusca: imediata })
+    expect(await linha(pelaRotina.id)).toMatchObject({ reuniao: 'erro', reuniao_erro: DESATIVADO, pasta_id: null })
+
+    // Nenhum pedido ao Google (nem a troca do token de renovação) e o Google dele nem foi montado.
+    expect(google.pedidos.length).toBe(pedidosAntes)
+    expect(google.pedidosPara('oauth2.googleapis.com/token')).toHaveLength(renovacoesAntes)
+    expect(googlesPedidos).not.toContain(saiu.id)
+    for (const e of [pelaTela, pelaRotina]) expect(await pastasDoEvento(e.id)).toEqual([])
+  })
+
   it('organizador sem Google: "Conecte o Google para buscar a gravação"; conectou, "Tentar de novo" cria a pasta', async () => {
     // O Beto ainda não conectou o Google, mas a reunião tem Meet (ele desconectou depois de criar).
     const comeco = Date.now() - 2 * HORA

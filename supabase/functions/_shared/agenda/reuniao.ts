@@ -5,6 +5,8 @@
 //
 // fecharReuniao, para uma reunião com Meet e com cliente que já terminou e ainda espera ("agendada" ou "aguardando"):
 // - sem cliente no evento: nada (não há onde criar a pasta; nem pergunta ao Google);
+// - organizador desativado → "erro": "O organizador foi desativado…" (a credencial de quem saiu nunca é usada: quem
+//   chama nem monta o Google dele);
 // - organizador sem Google → "erro": "Conecte o Google para buscar a gravação";
 // - lê, com o token do organizador, a gravação e a transcrição das conferências da janela do evento (uma reunião com
 //   queda tem mais de uma: as falas são juntadas). O Google recusa: se tentar de novo
@@ -24,6 +26,7 @@ import type { Banco } from './tokens.ts'
 export type BancoDaReuniao = Banco & { storage: { from: (bucket: string) => any } }
 
 export const SEM_GOOGLE = 'Conecte o Google para buscar a gravação'
+export const ORGANIZADOR_DESATIVADO = 'O organizador foi desativado. A gravação, se houver, está no Google dele.'
 export const GOOGLE_SEM_RESPOSTA = 'O Google não respondeu agora; tentamos de novo em seguida.'
 export const FALHOU = 'Não foi possível guardar a pasta da reunião agora; tentamos de novo em seguida.'
 const HORA_MS = 3_600_000
@@ -87,6 +90,8 @@ export type ReuniaoNoBanco = Situacao & {
   meet_codigo: string | null
   google_evento_id: string | null
   organizador: string
+  // O acesso do organizador está ativo (quem saiu não tem o Google usado).
+  organizador_ativo: boolean
   cliente: string | null
   participantes: ParticipanteDaReuniao[]
 }
@@ -251,7 +256,7 @@ export async function lerReuniao(db: Banco, id: string): Promise<ReuniaoNoBanco 
     .from('agenda_eventos')
     .select(`id, consultoria_id, consultor_id, cliente_id, titulo, descricao, inicio, fim, dia_inteiro, meet_link,
       meet_codigo, google_evento_id, ${COLUNAS_DA_SITUACAO},
-      organizador:perfis!agenda_eventos_consultor_id_fkey(nome), cliente:clientes(nome),
+      organizador:perfis!agenda_eventos_consultor_id_fkey(nome, ativo), cliente:clientes(nome),
       participantes:agenda_participantes(email, resposta, perfil:perfis(nome))`)
     .eq('id', id)
     .maybeSingle())
@@ -260,6 +265,7 @@ export async function lerReuniao(db: Banco, id: string): Promise<ReuniaoNoBanco 
   return {
     ...linha,
     organizador: linha.organizador?.nome ?? 'Organizador',
+    organizador_ativo: linha.organizador?.ativo === true,
     cliente: linha.cliente?.nome ?? null,
     participantes: [
       ...lista.filter((p) => p.perfil).map((p) => ({ nome: p.perfil!.nome, resposta: p.resposta }))
@@ -398,6 +404,7 @@ export async function fecharReuniao(
 ): Promise<Situacao> {
   const espera = ESPERANDO.includes(evento.reuniao)
   if (!espera || !evento.meet_codigo || !evento.cliente_id || Date.parse(evento.fim) > agora()) return situacaoDe(evento)
+  if (!evento.organizador_ativo) return marcar(db, evento, { reuniao: 'erro', reuniao_erro: ORGANIZADOR_DESATIVADO })
   if (!google) return marcar(db, evento, { reuniao: 'erro', reuniao_erro: SEM_GOOGLE })
 
   let artefatos: ArtefatosDaReuniao

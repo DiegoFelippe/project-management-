@@ -80,15 +80,17 @@ function iaPreguicosa(iaDa: IaDa, consultoriaId: string, ias: Guardados['ias']):
   }
 }
 
-// Uma reunião reservada: lê, pega o Google do organizador e fecha. Erro inesperado: a reunião fica aguardando, com o
-// motivo, para a próxima busca. Devolve a situação e o fim (para saber quando olhar de novo).
+// Uma reunião reservada: lê, pega o Google do organizador e fecha. Organizador desativado: o Google dele nem é montado
+// (a credencial de quem saiu nunca é lida) e fecharReuniao marca o motivo. Erro inesperado: a reunião fica aguardando,
+// com o motivo, para a próxima busca. Devolve a situação e o fim (para saber quando olhar de novo).
 async function processar(ctx: Contexto, id: string, guardados: Guardados) {
   const agora = ctx.agora ?? Date.now
   const evento = await lerReuniao(ctx.db, id)
   if (!evento) return null
   try {
     // O Google que falhou ao ser criado não fica guardado para as outras reuniões do organizador.
-    const google = await guardado(guardados.googles, evento.consultor_id, () => ctx.googleDe(evento.consultor_id))
+    const google = !evento.organizador_ativo ? null : await guardado(guardados.googles, evento.consultor_id,
+      () => ctx.googleDe(evento.consultor_id))
       .catch((erro) => {
         guardados.googles.delete(evento.consultor_id)
         throw erro
