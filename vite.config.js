@@ -25,7 +25,8 @@ export default defineConfig({
       // Em desenvolvimento o service worker não guarda o código (só a página inicial), então nada fica velho.
       devOptions: { enabled: true, navigateFallback: 'index.html', suppressWarnings: true },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
+        // Inter: só os subconjuntos latinos (o português usa esses) ficam guardados para uso offline.
+        globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}', 'assets/inter-latin*-wght-normal-*.woff2'],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
       },

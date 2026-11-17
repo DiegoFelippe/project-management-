@@ -41,6 +41,10 @@ describe('escala no CSS (src/index.css)', () => {
     expect(css).toMatch(/--font-sans:\s*'Inter Variable'/)
     expect(css).not.toMatch(/font-stretch/)
   })
+  it('todo token --text-<nome> do CSS tem par em TAMANHO (e vice-versa)', () => {
+    const tokens = [...css.matchAll(/--text-(\w+):\s*[\d.]+px;/g)].map((m) => m[1])
+    expect(tokens.sort()).toEqual(Object.keys(TAMANHO).sort())
+  })
   it('o texto sem classe de tamanho cai na escala: body usa text-corpo', () => {
     expect(css).toMatch(/body \{[^}]*\btext-corpo\b/)
   })
@@ -48,6 +52,12 @@ describe('escala no CSS (src/index.css)', () => {
     const regra = css.slice(css.indexOf('.texto-de-campo'))
     expect(regra).toMatch(/text-base/)
     expect(regra).toMatch(/sm:text-corpo/)
+  })
+})
+
+describe('vite.config.js', () => {
+  it('guarda para uso offline os subconjuntos latinos da Inter (woff2)', () => {
+    expect(readFileSync('vite.config.js', 'utf8')).toContain("'assets/inter-latin*-wght-normal-*.woff2'")
   })
 })
 

@@ -22,7 +22,7 @@ function Toaster(props) {
         '--normal-border': 'var(--border)',
         '--border-radius': '14px',
       }}
-      toastOptions={{ classNames: { toast: 'shadow-lg! font-sans!', title: 'font-semibold!' } }}
+      toastOptions={{ classNames: { toast: 'shadow-lg! font-sans! text-corpo!', title: 'font-semibold!', actionButton: 'text-rotulo!', cancelButton: 'text-rotulo!' } }}
       {...props}
     />
   )
