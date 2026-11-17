@@ -154,13 +154,19 @@ perfil, as próprias ausências e as próprias preferências).
 - Tabelas novas não aparecem sozinhas na API do Supabase: é preciso dar `GRANT` para `anon`/`authenticated`.
 - No navegador só vai a chave publicável (`sb_publishable_…`). A chave secreta nunca entra no app.
 
-## Integrações (IA, e-mail e Google)
+## Integrações (IA, e-mail, Google, Slack e WhatsApp)
 
 Menu **Integrações** (administrador da consultoria; o dono só olha): cada consultoria conecta a sua IA
-(Claude ou OpenAI), o seu e-mail (SMTP) e a sua conta Google, e todo o sistema usa a mesma conexão
-(`conexaoDa` em `supabase/functions/_shared/integracoes.ts`). Chaves, senhas e tokens ficam cifrados no
-Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. Desenho:
-`docs/superpowers/specs/2026-11-12-integracoes-design.md`.
+(Claude ou OpenAI), o seu e-mail (SMTP), a sua conta Google, o seu Slack e o seu WhatsApp, e todo o sistema usa a
+mesma conexão (`conexaoDa` em `supabase/functions/_shared/integracoes.ts`). Chaves, senhas e tokens ficam cifrados no
+Vault do Supabase e nunca voltam para o navegador. Desenho: `docs/superpowers/specs/2026-11-12-integracoes-design.md`.
+
+- **Testar na janela:** dentro da janela de cada integração (menos o Google, que conecta pelo próprio Google),
+  **Testar** testa o que foi digitado **antes de salvar, sem gravar nada**: a IA responde a uma pergunta curta (confere
+  a chave e o nome do modelo), o e-mail manda uma mensagem de teste para o e-mail de quem testa, o Slack posta uma
+  mensagem no canal do teste e o WhatsApp manda o modelo `hello_world` para o número do teste. Segredo em branco usa o
+  guardado. **Salvar** grava e testa a conexão de novo (a situação da linha vem desse teste, sem mandar mensagem). O
+  **Testar** da linha testa a conexão salva (o Slack também posta no canal salvo).
 
 - **E-mail no local:** dá para testar com o Mailpit do Supabase local: servidor
   `supabase_inbucket_consultoria`, porta `1025`, segurança "Sem cifra", sem usuário. Fora do local, o
@@ -176,6 +182,40 @@ Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. 
      `npx supabase stop && npx supabase start` (os dados ficam; antes, faça a cópia do banco com `pg_dumpall`, como
      no fim da seção "Google de cada pessoa").
   Sem isso, "Conectar" no Google avisa que falta configurar o app do Google.
+- **Slack** (só a conexão; para onde vão as mensagens fica para depois). Uma vez por consultoria:
+  1. Em [api.slack.com/apps](https://api.slack.com/apps), **Create New App → From scratch**: dê um nome (ex.:
+     "IXC Consult") e escolha o workspace da consultoria.
+  2. Em **OAuth & Permissions → Scopes → Bot Token Scopes**, adicione `chat:write` (mandar mensagens),
+     `chat:write.public` (mandar em canal público sem convidar o bot) e `users:read.email` (para, no futuro, achar a
+     pessoa pelo e-mail e mandar mensagem direta).
+  3. No topo da mesma página, **Install to Workspace** e autorize (em alguns workspaces o administrador do Slack precisa
+     aprovar o app). Mudou os escopos depois? Reinstale o app e, se o token mudar, cole o novo no sistema.
+  4. Copie o **Bot User OAuth Token** (começa com `xoxb-`).
+  5. No sistema, **Integrações → Slack → Conectar**: cole o token e, se quiser, o canal do teste (`#geral` ou o ID do
+     canal, que aparece nos detalhes do canal). Canal privado: convide o bot antes (`/invite @nome-do-app`). **Testar**
+     confere o token e posta "Teste da IXC Consult: conexão funcionando." no canal; a linha mostra o workspace e o canal.
+- **WhatsApp** pela **WhatsApp Business Cloud API** (a API oficial da Meta; só a conexão por enquanto). Uma vez por
+  consultoria:
+  1. Em [developers.facebook.com](https://developers.facebook.com), **Meus apps → Criar app**, do tipo empresa, com o
+     caso de uso do **WhatsApp** (conectar-se com clientes pelo WhatsApp), ligado ao portfólio empresarial (Business
+     Manager) da consultoria.
+  2. Em **WhatsApp → Configuração da API** (API Setup) ficam o **ID do número de telefone** (Phone number ID) e o **ID
+     da conta do WhatsApp Business** (WhatsApp Business Account ID). No começo a Meta dá um número de teste; para usar o
+     número da consultoria, adicione e verifique o número nessa página.
+  3. **Token permanente:** em [business.facebook.com](https://business.facebook.com) → **Configurações do negócio →
+     Usuários → Usuários do sistema**, crie um usuário do sistema (administrador), em **Atribuir ativos** dê a ele o app
+     e a conta do WhatsApp (controle total) e clique em **Gerar novo token**: escolha o app, validade **Nunca** e as
+     permissões `whatsapp_business_messaging` e `whatsapp_business_management`. Não use o token temporário da página
+     de Configuração da API: ele vence em 24 horas.
+  4. No sistema, **Integrações → WhatsApp → Conectar**: os dois IDs e o token. Opcional: um número para o teste, no
+     formato internacional (`+5511999998888`), que recebe o modelo `hello_world` (o número não fica guardado). **Testar**
+     confere o token e o número; a linha mostra o número e o nome verificado.
+  5. **Enquanto o app da Meta estiver em modo de desenvolvimento, o `hello_world` só chega a números liberados**: cadastre
+     o número na lista de destinatários (campo "Para" da Configuração da API; até 5 números). Para mandar a qualquer
+     número, o app precisa estar publicado (modo ativo), com a empresa verificada. Mensagem que a empresa começa precisa
+     de um modelo aprovado pela Meta; texto livre só nas 24 horas depois que a pessoa escreve.
+  6. A versão da Graph API fica na constante `VERSAO_DA_GRAPH` (`supabase/functions/_shared/conexoes.ts`, hoje
+     `v26.0`). Cada versão vale cerca de dois anos: quando a Meta avisar que ela vai vencer, suba a constante.
 
 ## Google de cada pessoa (Calendário)
 
