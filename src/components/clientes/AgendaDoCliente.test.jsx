@@ -182,4 +182,13 @@ describe('AgendaDoCliente', () => {
     expect(await screen.findByText('Reunião realizada')).toBeInTheDocument()
     expect(screen.getByText('Pasta da reunião criada')).toBeInTheDocument()
   })
+
+  it('se as reuniões falharem, check-ins e eventos continuam e aparece o aviso', async () => {
+    vi.mocked(eventosDoPeriodo).mockRejectedValue(new Error('x'))
+    tela()
+    expect(await screen.findByText('Não foi possível carregar as reuniões.')).toBeInTheDocument()
+    expect(screen.getByText('Ana Lima · 1 h')).toBeInTheDocument()
+    expect(screen.getByText('Mandado para Consultoria Exemplo')).toBeInTheDocument()
+    expect(screen.queryByText('Não foi possível carregar a agenda.')).not.toBeInTheDocument()
+  })
 })

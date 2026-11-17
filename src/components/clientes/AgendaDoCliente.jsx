@@ -145,9 +145,9 @@ export default function AgendaDoCliente({ clienteId, versao }) {
 
   useEffect(() => {
     let ativo = true
-    Promise.all([checkinsDoMes(clienteId, mes), eventosDoMes(clienteId, mes), eventosDoPeriodo({ ...limitesDoMes(mes), clienteId })])
+    Promise.all([checkinsDoMes(clienteId, mes), eventosDoMes(clienteId, mes), eventosDoPeriodo({ ...limitesDoMes(mes), clienteId }).catch(() => ({ falhou: true, itens: [], haMais: false }))])
       .then(([checkins, eventos, reunioes]) => ativo && setEstado({
-        chave, checkins, eventos: eventos.itens, totalDeEventos: eventos.total, reunioes: reunioes.itens, haMaisReunioes: reunioes.haMais,
+        chave, checkins, eventos: eventos.itens, totalDeEventos: eventos.total, reunioes: reunioes.itens, haMaisReunioes: reunioes.haMais, reunioesFalharam: Boolean(reunioes.falhou),
       }))
       .catch(() => ativo && setEstado({ chave, erro: 'Não foi possível carregar a agenda.' }))
     return () => {
@@ -201,6 +201,9 @@ export default function AgendaDoCliente({ clienteId, versao }) {
           <span className="text-corpo text-muted-foreground">Há mais reuniões neste mês do que a agenda mostra.</span>
         )}
       </div>
+      {pronto && !estado.erro && estado.reunioesFalharam && (
+        <p role="status" className="text-corpo text-muted-foreground">Não foi possível carregar as reuniões.</p>
+      )}
       {estado.erro && pronto && <p role="alert" className="text-corpo text-destructive">{estado.erro}</p>}
       {!pronto && <GraficoCarregando texto="Carregando a agenda…" className="py-2" />}
       <div className="overflow-x-auto">
