@@ -22,6 +22,7 @@ describe('NOME_DO_PAPEL', () => {
   it('o dono é o Administrador geral', () => {
     expect(NOME_DO_PAPEL.dono).toBe('Administrador geral')
     expect(NOME_DO_PAPEL.central).toBe('Central')
+    expect(NOME_DO_PAPEL.pessoa).toBe('Consultor')
   })
 })
 

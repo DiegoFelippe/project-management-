@@ -61,14 +61,14 @@ describe('FichaDoConsultor: Novo acesso', () => {
     expect(blocos).toEqual(['Dados', 'Contato', 'Capacidade', 'Papel e times', 'Acesso'])
   })
 
-  it('gestor só cria pessoa', async () => {
+  it('gestor só cria consultor (papel pessoa no banco)', async () => {
     montarNovo()
-    expect(await opcoesDoPapel()).toEqual(['Pessoa'])
+    expect(await opcoesDoPapel()).toEqual(['Consultor'])
   })
 
-  it('admin cria pessoa ou gestor', async () => {
+  it('admin cria consultor ou gestor', async () => {
     montarNovo({ perfilDeQuem: ADMIN })
-    expect(await opcoesDoPapel()).toEqual(['Pessoa', 'Gestor'])
+    expect(await opcoesDoPapel()).toEqual(['Consultor', 'Gestor'])
   })
 
   it('dono cria administrador ou central, sem times', async () => {

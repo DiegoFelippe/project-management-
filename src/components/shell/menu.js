@@ -22,7 +22,7 @@ export const NOME_DO_PAPEL = {
   central: 'Central',
   admin: 'Administrador',
   gestor: 'Gestor',
-  pessoa: 'Pessoa',
+  pessoa: 'Consultor',
 }
 
 export function itensDoMenu(papel) {

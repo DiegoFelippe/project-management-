@@ -10,9 +10,9 @@ Depois o código vai para a Vercel e o banco para o Supabase na nuvem.
 | --- | --- |
 | Administrador geral (`dono`) | Vê tudo e tem todos os poderes da central. Cadastra as consultorias e o administrador de cada uma (menu Consultorias). |
 | Central | Fica fora das consultorias e vê todas. Cadastra clientes, manda cada um para uma consultoria (com a sugestão de menor ocupação), cria e arquiva consultorias. |
-| Administrador da consultoria | Cria gestores e pessoas, vê a consultoria inteira, escolhe o consultor de cada cliente e cuida da capacidade. |
-| Gestor | Cria os times dele e os acessos das pessoas, só mexe nos times dele. Também escolhe consultores e vê a capacidade da consultoria. |
-| Pessoa (consultor) | Entra para trabalhar nos times em que está. Faz check-in e check-out nos clientes dela e lança horas. |
+| Administrador da consultoria | Cria gestores e consultores, vê a consultoria inteira, escolhe o consultor de cada cliente e cuida da capacidade. |
+| Gestor | Cria os times dele e os acessos dos consultores, só mexe nos times dele. Também escolhe consultores e vê a capacidade da consultoria (no painel do Início). |
+| Consultor | Entra para trabalhar nos times em que está. Faz check-in e check-out nos clientes dele e lança horas. No banco o papel se chama `pessoa`. |
 
 Uma consultoria nunca vê nada de outra: as regras ficam no banco (RLS) e são testadas em `supabase/tests`.
 Ninguém se cadastra sozinho; o acesso é criado por convite (e-mail) ou com senha provisória
