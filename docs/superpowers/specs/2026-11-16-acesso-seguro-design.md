@@ -16,15 +16,19 @@ Data: 2026-11-16. Projeto: `~/Documents/consultoria`. Branch: `feat/clientes` (P
 - **Na aba Acesso da ficha** (quem pode editar o acesso da pessoa — mesma regra de hoje):
   - cartão com chave **"Exigir verificação em duas etapas"** (guarda `perfis.exige_2fa`);
   - situação: "Ativa desde dd/mm" / "Ainda não configurada" / "Desligada";
-  - **"Zerar verificação em duas etapas"** (celular perdido): apaga os fatores da pessoa (confirmação âmbar dizendo que
-    ela vai configurar de novo no próximo acesso, se for exigida).
+  - **"Zerar verificação em duas etapas"** (celular perdido): apaga os fatores da pessoa e encerra as sessões dela em
+    todos os aparelhos (confirmação com o botão de perigo dizendo que ela sai de todos os aparelhos e, conforme a
+    chave "Exigir" como está na ficha, que vai configurar de novo no próximo acesso ou entrar só com a senha).
 - **Em Meu perfil**: a própria pessoa **ativa** (QR code + chave para copiar + código de 6 dígitos para confirmar) ou
   **desativa** (pede um código atual; se a verificação for exigida, não deixa desativar).
 - **Entrar**: depois da senha (ou do Google), quem tem a verificação ativa vê "Digite o código do seu app autenticador"
   (6 dígitos). Quem tem `exige_2fa` e ainda não configurou passa pela tela de configurar antes de entrar no app.
 - **No banco (minha)**: a sessão só vale por inteiro com o nível `aal2` quando a pessoa tem verificação ativa ou
   exigida — `private.liberado()` (usado pelas regras de acesso e funções) passa a exigir isso, e as Edge Functions
-  (`quemChama`) também. Assim, sem o código, nada é lido nem gravado.
+  (`quemChama`) também. Assim, sem o código, nada é lido nem gravado além do que é da própria pessoa: ela lê o
+  próprio perfil (é assim que a tela sabe que falta o código), as próprias ausências e lê e grava as próprias
+  preferências (tema). Se o token traz `session_id`, a sessão precisa existir no Auth (para todos) e, para quem
+  precisa do código, ser `aal2` também lá: depois do Zerar (ou do Sair), o token antigo para de valer na hora.
 - Supabase: ligar TOTP (`[auth.mfa.totp] enroll_enabled/verify_enabled = true` no `config.toml`; na nuvem, no painel do
   Supabase — README). SMS fica de fora.
 - **(minha)** Sem códigos de recuperação nesta entrega: quem perder o celular pede a quem administra para "Zerar".

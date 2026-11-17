@@ -92,7 +92,7 @@ Elas estão em `supabase/config.toml`.
 | `npm run app:logs` | Mostra o log do app |
 | `npm run db:start` / `db:stop` | Sobe e para o Supabase local |
 | `npm run db:status` | Mostra endereços e chaves do Supabase local |
-| `npm run db:reset` | Recria o banco local do zero com as migrações de `supabase/migrations` |
+| `npm run db:reset` | Recria o banco local do zero com as migrações de `supabase/migrations` (apaga todos os dados locais) |
 | `npm run env:local` | Refaz o `.env.local` |
 | `npm run functions:reiniciar` | Recarrega as Edge Functions depois de mudar o código delas |
 | `npm test` | Testes das telas (Vitest) |
@@ -117,20 +117,38 @@ Enquanto isso não for feito, o botão "Entrar com Google" avisa que o Google ai
 Cada pessoa pode ativar em **Meu perfil** (QR code ou chave no Google Authenticator, Microsoft Authenticator,
 1Password…, e o primeiro código de 6 dígitos). Na ficha da pessoa (aba **Acesso**), quem edita o acesso dela liga
 **Exigir verificação em duas etapas**: no próximo acesso ela configura o app antes de entrar. Quem tem o app ativo
-digita o código depois da senha ou do Google. Sem o código, o banco não entrega nada além do próprio perfil
-(`private.liberado()` exige a sessão `aal2`) e as Edge Functions respondem `verificacao_pendente`.
+digita o código depois da senha ou do Google. Sem o código, o banco só entrega o que é da própria pessoa: o próprio
+perfil (é assim que a tela sabe que falta o código), as próprias ausências e as próprias preferências (tema), que ela
+também grava. Todo o resto some (`private.liberado()` exige a sessão `aal2`) e as Edge Functions respondem
+`verificacao_pendente`. O banco também confere a sessão do token: encerrada no Auth (Zerar, Sair), o token antigo
+para de valer na hora, sem esperar vencer.
 
 - **Local:** já vem ligado em `supabase/config.toml` (`[auth.mfa.totp] enroll_enabled = true` e `verify_enabled = true`).
 - **Nuvem:** no painel do Supabase, **Authentication → Multi-Factor (MFA)**: ligue **TOTP (App Authenticator)**
-  para cadastrar e para verificar. SMS e chave física ficam desligados.
+  para cadastrar e para verificar. SMS e chave física ficam desligados. Junto, a política de senha (veja
+  [Publicar](#publicar-depois), passo 5).
 - **Perdeu o celular:** não há códigos de recuperação. Quem edita o acesso da pessoa abre a ficha → **Acesso** →
-  **Zerar verificação em duas etapas**. O app cadastrado deixa de valer; se a verificação for exigida, a pessoa
-  configura de novo no próximo acesso, senão passa a entrar só com a senha.
+  **Zerar verificação em duas etapas**. O app cadastrado deixa de valer e a pessoa **sai de todos os aparelhos** (as
+  sessões dela são encerradas, inclusive a do celular perdido); se a verificação for exigida, ela configura de novo no
+  próximo acesso, senão passa a entrar só com a senha.
+- **O dono perdeu o celular:** ninguém tem poder sobre o dono no app, então é pelo Supabase. Na nuvem: painel →
+  **Authentication → Users** → a conta do dono → remova o fator do app (MFA) e encerre as sessões dele. Se o painel
+  não mostrar uma das duas opções, o **SQL Editor** faz as duas (troque o e-mail):
+
+  ```sql
+  delete from auth.mfa_factors where user_id = (select id from auth.users where email = 'dono@exemplo.com');
+  select public.encerrar_sessoes_de((select id from auth.users where email = 'dono@exemplo.com'));
+  ```
+
+  No local, o mesmo pelo Studio (`http://127.0.0.1:54523`, SQL Editor). Depois o dono entra só com a senha e ativa
+  de novo em **Meu perfil**.
 - O segredo do app fica no Auth do Supabase; o app nunca guarda.
 
 ## Banco
 
-- Toda mudança de tabela vira uma migração: `npx supabase migration new <nome>` e depois `npm run db:reset`.
+- Toda mudança de tabela vira uma migração: `npx supabase migration new <nome> < /dev/null` e depois
+  `npx supabase migration up` (aplica só o que falta, sem apagar nada). Nunca `npm run db:reset` com dados que importam:
+  ele recria o banco do zero.
 - Toda tabela em `public` precisa de RLS ligado e de políticas.
 - Tabelas novas não aparecem sozinhas na API do Supabase: é preciso dar `GRANT` para `anon`/`authenticated`.
 - No navegador só vai a chave publicável (`sb_publishable_…`). A chave secreta nunca entra no app.
@@ -167,8 +185,12 @@ Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. 
 4. `npx supabase functions deploy` publica as Edge Functions (`criar-acesso`, `criar-consultoria`, `reenviar-convite`,
    `gerenciar-acesso`, `gerenciar-consultoria`, `integracoes`, `integracoes-google`).
 5. Em Authentication: Site URL e redirecionamentos com o endereço da Vercel (`https://.../**`),
-   cadastro aberto desligado, senha mínima 8, os modelos de e-mail de `supabase/templates`, o Google e a
-   verificação em duas etapas (Multi-Factor → TOTP, veja acima).
+   cadastro aberto desligado, a política de senha (**Authentication → Policies → Passwords**, ou no provedor
+   **Email**, conforme a versão do painel: tamanho mínimo **10** e requisitos **"Lowercase, uppercase letters, digits
+   and symbols"**, a mesma regra do app), os modelos de e-mail de `supabase/templates`, o Google e a verificação em
+   duas etapas (Multi-Factor → TOTP, veja acima). A política de senha e o TOTP também podem ir com
+   `npx supabase config push` (projeto ligado), mas ele manda todo o Auth do `supabase/config.toml`, inclusive o
+   Site URL local: rode antes `npx supabase config diff` e só envie se a diferença for a esperada.
 6. Configure um provedor de e-mail (Resend, SendGrid etc.): o e-mail que vem com o Supabase só entrega para o time do projeto.
 7. Crie o dono: `SUPABASE_URL=... SUPABASE_SECRET_KEY=... APP_URL=https://... npm run dono:criar -- seu@email.com "Seu Nome"`.
 

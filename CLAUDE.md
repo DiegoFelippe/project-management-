@@ -49,7 +49,8 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   grava ("Salvando…", "Criando…", "Testando…"). O botão de enviar fica no rodapé e liga ao formulário por
   `form="<id>"`. **Exceções:** `FichaDoConsultor` não é um `<form>` (o botão chama `enviar` e o Enter nos campos de
   texto salva, porque as ausências têm o formulário delas) e o formulário em linha de `GerirAusencias` tem o
-  próprio botão dentro dele.
+  próprio botão dentro dele. `VerificacaoDoPerfil` e `CadastroDoAutenticador` (Meu perfil) têm formulário em linha
+  com o próprio botão, como `GerirAusencias`.
 - **Campos só de `src/components/campos/`**: `Seletor`, `CampoData`, `CampoHora`, `CampoNumero`, `Caixa`, `Chave`.
   **Nunca** `<select>` nem `type="date|time|number|datetime-local"` nativos.
 - **`Seletor` com muitas opções** usa `buscar` (busca no banco), nunca a lista inteira.
