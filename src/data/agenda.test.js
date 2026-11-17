@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { chamarFuncao, supabase } from '@/lib/supabase'
 import {
+  apagarEvento,
   ausenciasDoPeriodo,
   buscarEvento,
   concluirGoogle,
@@ -10,6 +11,9 @@ import {
   feriadosDoPeriodo,
   indicadoresDaAgenda,
   meuGoogle,
+  novoIdDeEvento,
+  responderConvite,
+  salvarEvento,
   voltaDoGoogle,
 } from './agenda'
 
@@ -202,5 +206,50 @@ describe('conectar e desconectar o Google', () => {
     vi.mocked(chamarFuncao).mockResolvedValue({ status: 200, corpo: { ok: true, revogado: false } })
     expect(await desconectarGoogle()).toEqual({ erro: null, revogado: false })
     expect(chamarFuncao).toHaveBeenCalledWith('google-pessoa', { acao: 'desconectar' })
+  })
+})
+
+describe('criar, editar, apagar e responder (Edge Function agenda)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('salvarEvento manda o evento à função agenda e devolve o evento e o aviso', async () => {
+    const aviso = 'Fica só no app: Ana não conectou o Google.'
+    vi.mocked(chamarFuncao).mockResolvedValue({ status: 200, corpo: { evento: { id: 'e1' }, aviso } })
+    const dados = { id: 'e1', novo: true, titulo: 'Kickoff' }
+    expect(await salvarEvento(dados)).toEqual({ erro: null, evento: { id: 'e1' }, aviso })
+    expect(chamarFuncao).toHaveBeenCalledWith('agenda', { acao: 'salvar', evento: dados })
+
+    vi.mocked(chamarFuncao).mockResolvedValue({ status: 200, corpo: { evento: { id: 'e1' } } })
+    expect(await salvarEvento(dados)).toEqual({ erro: null, evento: { id: 'e1' }, aviso: null })
+  })
+
+  it('o erro em português que a função manda chega à tela, com o campo; sem ele, vale a tradução do código', async () => {
+    const recusa = 'O Google não deu permissão para criar o evento no Google Agenda nesta conta.'
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 502, corpo: { codigo: 'google_recusou', motivo: 'sem_permissao', erro: recusa } })
+    expect(await salvarEvento({ titulo: 'x' })).toEqual({ erro: recusa, campo: null })
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({
+      status: 400, corpo: { codigo: 'dados_invalidos', campo: 'titulo', erro: 'Escreva o título do evento.' },
+    })
+    expect(await salvarEvento({ titulo: '' })).toEqual({ erro: 'Escreva o título do evento.', campo: 'titulo' })
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 401, corpo: { codigo: 'nao_autenticado' } })
+    expect((await salvarEvento({ titulo: 'x' })).erro).toBe('Sua sessão terminou. Entre de novo.')
+  })
+
+  it('apagarEvento e responderConvite chamam a função com o id', async () => {
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 200, corpo: { ok: true } })
+    expect(await apagarEvento('e1')).toEqual({ erro: null, aviso: null })
+    expect(chamarFuncao).toHaveBeenLastCalledWith('agenda', { acao: 'apagar', id: 'e1' })
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 403, corpo: { codigo: 'sem_permissao', erro: 'Só quem organiza e a gestão da consultoria editam.' } })
+    expect(await apagarEvento('e1')).toEqual({ erro: 'Só quem organiza e a gestão da consultoria editam.', campo: null })
+
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 200, corpo: { ok: true, resposta: 'confirmou' } })
+    expect(await responderConvite('e1', 'confirmou')).toEqual({ erro: null, resposta: 'confirmou' })
+    expect(chamarFuncao).toHaveBeenLastCalledWith('agenda', { acao: 'responder', id: 'e1', resposta: 'confirmou' })
+  })
+
+  it('novoIdDeEvento dá um id novo a cada janela', () => {
+    const a = novoIdDeEvento()
+    expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(novoIdDeEvento()).not.toBe(a)
   })
 })

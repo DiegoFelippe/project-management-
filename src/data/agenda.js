@@ -1,4 +1,4 @@
-// Agenda (leituras). O banco (RLS) decide quem vê cada evento; quem grava é a Edge Function, que mexe no Google junto.
+// Agenda. O banco (RLS) decide quem vê cada evento; quem grava é a Edge Function `agenda`, que mexe no Google junto.
 import { traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
 
@@ -58,6 +58,43 @@ export async function meuGoogle() {
   const { data, error } = await supabase.from('google_pessoas').select('email, conectado_em, erro').maybeSingle()
   if (error) throw error
   return { conectado: Boolean(data), email: data?.email ?? null, erro: data?.erro ?? null }
+}
+
+// ── Criar, editar, apagar e responder (Edge Function agenda: grava no Google do organizador e depois no banco) ──
+
+// Id de um evento novo. A janela de "Novo evento" pede um quando abre e manda o mesmo em todas as tentativas: se a
+// resposta de uma tentativa se perder, a próxima não duplica o evento no Google (o id do evento no Google sai deste).
+export const novoIdDeEvento = () => crypto.randomUUID()
+
+async function agenda(corpo) {
+  const { status, corpo: resposta } = await chamarFuncao('agenda', corpo)
+  if (status === 200) return { erro: null, ...resposta }
+  // A função manda o motivo em português (inclusive a recusa do Google); sem ele, vale a tradução do código.
+  return { erro: resposta.erro ?? traduzirErroFuncao(resposta.codigo), campo: resposta.campo ?? null }
+}
+
+// Criar ({ id: novoIdDeEvento(), novo: true, ... }) ou editar ({ id, ... }; o que não vier fica como está):
+// { erro, evento, aviso }. Campos: consultor_id (de quem é a agenda; padrão: quem cria), cliente_id, titulo, descricao,
+// inicio e fim (ISO), dia_inteiro, cor (0 a 7), com_meet, gravar, participantes (ids dos consultores) e convidados
+// (e-mails de fora, até 20). O evento volta no formato de eventosDoPeriodo. aviso: "Fica só no app: <nome> não conectou
+// o Google." quando o organizador não conectou (o evento fica sem Meet). Erro: { erro, campo } (campo nos dados
+// inválidos). O consultor de um evento não muda, e o Meet, depois de criado, não sai pelo app.
+export async function salvarEvento(evento) {
+  const r = await agenda({ acao: 'salvar', evento })
+  return r.erro ? { erro: r.erro, campo: r.campo } : { erro: null, evento: r.evento, aviso: r.aviso ?? null }
+}
+
+// Apaga: cancela no Google do organizador (o Google avisa os convidados); a pasta da reunião fica nos Arquivos do
+// cliente. { erro, aviso } (aviso quando saiu só do app).
+export async function apagarEvento(id) {
+  const r = await agenda({ acao: 'apagar', id })
+  return r.erro ? { erro: r.erro, campo: r.campo } : { erro: null, aviso: r.aviso ?? null }
+}
+
+// O participante da casa responde ao convite: resposta 'confirmou' | 'recusou' → { erro, resposta }.
+export async function responderConvite(id, resposta) {
+  const r = await agenda({ acao: 'responder', id, resposta })
+  return r.erro ? { erro: r.erro, campo: r.campo } : { erro: null, resposta: r.resposta }
 }
 
 // ── Conectar o meu Google (Edge Function google-pessoa; o token nunca chega ao navegador) ──

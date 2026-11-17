@@ -181,8 +181,9 @@ Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. 
 No Calendário, cada pessoa conecta **o próprio** Google ("Conectar Google"): a agenda cria os eventos, o Meet e a
 gravação na conta de quem é dono da agenda. É o mesmo app OAuth das Integrações (`GOOGLE_OAUTH_CLIENT_ID` e
 `GOOGLE_OAUTH_CLIENT_SECRET`), com outro endereço de retorno. O token de cada pessoa fica só no Vault; o navegador
-vê apenas "conectado ou não" e o e-mail da conta. Edge Function: `google-pessoa` (núcleo em
-`supabase/functions/_shared/agenda/`).
+vê apenas "conectado ou não" e o e-mail da conta. Edge Functions: `google-pessoa` (conectar e desconectar) e
+`agenda` (criar, editar, apagar e responder aos eventos: grava no Google do organizador primeiro e depois no banco;
+quem não conectou o Google fica com o evento só no app, sem Meet), com o núcleo em `supabase/functions/_shared/agenda/`.
 
 1. No Google Cloud, no mesmo app: ative também a **Google Meet REST API** (além da Calendar API) e, na tela de
    consentimento, os escopos `calendar.events`, `meetings.space.settings` e `meetings.space.readonly`.
@@ -212,7 +213,7 @@ funções que o runtime já conhece.
 2. `npx supabase login` e `npx supabase link --project-ref <ref-do-projeto>`.
 3. `npx supabase db push --remote` envia as migrações. No CLI 3, sem `--remote` ele mexe no banco local.
 4. `npx supabase functions deploy` publica as Edge Functions (`criar-acesso`, `criar-consultoria`, `reenviar-convite`,
-   `gerenciar-acesso`, `gerenciar-consultoria`, `integracoes`, `integracoes-google`, `google-pessoa`).
+   `gerenciar-acesso`, `gerenciar-consultoria`, `integracoes`, `integracoes-google`, `google-pessoa`, `agenda`).
 5. Em Authentication: Site URL e redirecionamentos com o endereço da Vercel (`https://.../**`),
    cadastro aberto desligado, a política de senha (**Authentication → Policies → Passwords**, ou no provedor
    **Email**, conforme a versão do painel: tamanho mínimo **10** e requisitos **"Lowercase, uppercase letters, digits

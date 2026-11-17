@@ -1,7 +1,8 @@
 // Google em memória para os testes (o Vitest importa este arquivo no Node; nada de Deno aqui). Responde como
 // oauth2.googleapis.com, openidconnect.googleapis.com, Calendar v3 e Meet REST v2, no formato das APIs de verdade,
 // guarda cada pedido recebido (`pedidos`) e pode ser mandado falhar (`falhar`): 400 invalid_grant, 401, 403, 5xx
-// ou queda de rede. Cada conta (e-mail) tem a própria agenda e os próprios espaços do Meet.
+// ou queda de rede — antes de fazer, ou depois de fazer (`depois`: o Google fez, e a resposta se perdeu). Cada conta
+// (e-mail) tem a própria agenda e os próprios espaços do Meet.
 
 // O Google devolve alguns escopos pelo nome longo.
 const NOME_LONGO: Record<string, string> = {
@@ -36,6 +37,8 @@ export type RegraDeFalha = {
   erro?: string
   rede?: boolean
   vezes?: number
+  // O Google faz o pedido e só então falha (a resposta se perde no caminho).
+  depois?: boolean
 }
 
 export type ParticipanteFalso = { id: string; nome: string; tipo?: 'signedinUser' | 'anonymousUser' | 'phoneUser' }
@@ -210,9 +213,17 @@ export function criarGoogleFalso({ cliente = { id: 'cliente-falso', segredo: 'se
     if (partes[0] !== 'calendars' || partes[1] !== 'primary' || partes[2] !== 'events') return erroDaApi(404, 'Not Found', 'notFound')
     const id = partes[3]
     if (!id && metodo === 'POST') {
+      // Como o Google: o id pode vir de quem cria (base32hex, 5 a 1024); id já usado na agenda, mesmo de evento
+      // apagado, é 409.
+      if (corpo.id !== undefined) {
+        if (typeof corpo.id !== 'string' || !/^[0-9a-v]{5,1024}$/.test(corpo.id)) {
+          return erroDaApi(400, 'Invalid resource id value.', 'invalid')
+        }
+        if (c.eventos.has(corpo.id)) return erroDaApi(409, 'The requested identifier already exists.', 'duplicate')
+      }
       const evento: any = {
         kind: 'calendar#event',
-        id: base32hex(26),
+        id: corpo.id ?? base32hex(26),
         status: 'confirmed',
         htmlLink: `https://www.google.com/calendar/event?eid=${base32hex(20)}`,
         summary: corpo.summary,
@@ -231,14 +242,16 @@ export function criarGoogleFalso({ cliente = { id: 'cliente-falso', segredo: 'se
     }
     const evento = id ? c.eventos.get(id) : undefined
     if (!evento) return erroDaApi(404, 'Not Found', 'notFound')
-    if (evento.status === 'cancelled') return erroDaApi(410, 'Resource has been deleted', 'deleted')
+    // A leitura devolve até o evento apagado (status cancelled), como a API; mudar só o restaura (status confirmed).
     if (metodo === 'GET') return json(200, evento)
+    const restaura = metodo === 'PATCH' && corpo.status === 'confirmed'
+    if (evento.status === 'cancelled' && !restaura) return erroDaApi(410, 'Resource has been deleted', 'deleted')
     if (metodo === 'DELETE') {
       evento.status = 'cancelled'
       return json(204, null)
     }
     if (metodo === 'PATCH') {
-      for (const campo of ['summary', 'description', 'start', 'end']) if (campo in corpo) evento[campo] = corpo[campo]
+      for (const campo of ['summary', 'description', 'start', 'end', 'status']) if (campo in corpo) evento[campo] = corpo[campo]
       if ('attendees' in corpo) {
         const antes = new Map((evento.attendees ?? []).map((a: any) => [a.email, a.responseStatus]))
         evento.attendees = (corpo.attendees ?? []).map((a: any) => ({ ...a, responseStatus: antes.get(a.email) ?? 'needsAction' }))
@@ -344,14 +357,23 @@ export function criarGoogleFalso({ cliente = { id: 'cliente-falso', segredo: 'se
       r.restantes > 0 &&
       (!r.metodo || r.metodo.toUpperCase() === metodo) &&
       (typeof r.url === 'string' ? url.href.includes(r.url) : r.url.test(url.href)))
-    if (regra) {
-      regra.restantes -= 1
-      if (regra.rede) throw new TypeError('fetch failed')
-      const status = regra.status ?? 500
-      if (url.host === 'oauth2.googleapis.com') return json(status, { error: regra.erro ?? 'server_error', error_description: 'Falha simulada' })
-      return erroDaApi(status, 'Falha simulada', regra.erro)
+    if (regra) regra.restantes -= 1
+    const falhaSimulada = () => {
+      if (regra!.rede) throw new TypeError('fetch failed')
+      const status = regra!.status ?? 500
+      if (url.host === 'oauth2.googleapis.com') return json(status, { error: regra!.erro ?? 'server_error', error_description: 'Falha simulada' })
+      return erroDaApi(status, 'Falha simulada', regra!.erro)
     }
+    if (regra && !regra.depois) return falhaSimulada()
+    const resposta = await atender(url, metodo, token, corpo, busca)
+    if (regra) {
+      await resposta.body?.cancel()
+      return falhaSimulada()
+    }
+    return resposta
+  }
 
+  async function atender(url: URL, metodo: string, token: string | null, corpo: any, busca: Record<string, string>): Promise<Response> {
     if (url.host === 'oauth2.googleapis.com' && url.pathname === '/token' && metodo === 'POST') return oauthToken(corpo ?? {})
     if (url.host === 'oauth2.googleapis.com' && url.pathname === '/revoke' && metodo === 'POST') return revogar(corpo?.token ?? '')
 
@@ -432,6 +454,10 @@ export function criarGoogleFalso({ cliente = { id: 'cliente-falso', segredo: 'se
     },
     evento(email: string, id: string) {
       return conta(email).eventos.get(id)
+    },
+    // Todos os eventos da agenda daquela conta (inclusive os apagados, com status cancelled).
+    eventos(email: string) {
+      return [...conta(email).eventos.values()]
     },
     espaco(email: string, codigo: string) {
       return espacoPeloCodigo(conta(email), codigo)

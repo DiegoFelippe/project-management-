@@ -39,12 +39,15 @@ export type CodigoDoErro = 'reconectar' | 'sem_permissao' | 'recusado'
 export class ErroDoGoogle extends Error {
   codigo: CodigoDoErro
   status: number | null
+  // O pedido saiu e a resposta não veio (rede caiu ou o tempo acabou): o Google pode ter feito o que se pediu.
+  semResposta: boolean
 
-  constructor(codigo: CodigoDoErro, mensagem: string, status: number | null = null) {
+  constructor(codigo: CodigoDoErro, mensagem: string, status: number | null = null, semResposta = false) {
     super(mensagem)
     this.name = 'ErroDoGoogle'
     this.codigo = codigo
     this.status = status
+    this.semResposta = semResposta
   }
 }
 
@@ -66,6 +69,8 @@ export type OpcoesDoGoogle = {
   obterToken: ObterToken
   // Chamado quando o Google recusa até o token recém-renovado (401): tokens.ts marca google_pessoas.erro.
   aoReconectar?: (mensagem: string) => unknown
+  // Tempo máximo de cada pedido (o pedido é cancelado quando estoura). Padrão: 15 segundos.
+  limiteMs?: number
 }
 
 export type MeetDoEvento = { meetLink: string | null; meetCodigo: string | null }
@@ -172,6 +177,8 @@ function meetDoEvento(evento: any): MeetDoEvento {
 }
 
 const IDENTIFICADOR = /^[A-Za-z0-9_-]{1,1024}$/
+// Id escolhido pelo app para um evento novo: o Google aceita só base32hex (0-9 e a-v), de 5 a 1024 caracteres.
+const ID_ESCOLHIDO = /^[0-9a-v]{5,1024}$/
 const CODIGO_DO_MEET = /^[a-z0-9-]{3,64}$/i
 
 function conferir(valor: string, formato: RegExp, oQue: string): string {
@@ -219,7 +226,7 @@ function nomeDoParticipante(participante: any): string {
 
 const porHora = (a: { hora: string }, b: { hora: string }) => Date.parse(a.hora) - Date.parse(b.hora)
 
-export function criarGoogle({ fetch: buscar, obterToken, aoReconectar }: OpcoesDoGoogle) {
+export function criarGoogle({ fetch: buscar, obterToken, aoReconectar, limiteMs = LIMITE_MS }: OpcoesDoGoogle) {
   // Um pedido ao Google com o token da pessoa. 401 com o token guardado: renova uma vez e repete; 401 de novo:
   // a conexão não vale mais ("reconectar", e tokens.ts marca a pessoa).
   async function pedir(acao: string, metodo: string, url: string, corpo?: unknown, { faltaEhOk = false } = {}): Promise<any> {
@@ -227,6 +234,8 @@ export function criarGoogle({ fetch: buscar, obterToken, aoReconectar }: OpcoesD
     while (true) {
       const token = await obterToken(renovado ? { renovar: true } : undefined)
       let resposta: Response
+      // Estourou o tempo: o pedido é cancelado de verdade (não fica correndo depois que a função desistiu dele).
+      const controle = new AbortController()
       try {
         resposta = await comLimite(buscar(url, {
           method: metodo,
@@ -235,9 +244,10 @@ export function criarGoogle({ fetch: buscar, obterToken, aoReconectar }: OpcoesD
             ...(corpo === undefined ? {} : { 'content-type': 'application/json' }),
           },
           body: corpo === undefined ? undefined : JSON.stringify(corpo),
-        }), undefined, LIMITE_MS)
+          signal: controle.signal,
+        }), () => controle.abort(), limiteMs)
       } catch {
-        throw new ErroDoGoogle('recusado', `Não foi possível falar com o Google para ${acao}. Tente de novo.`)
+        throw new ErroDoGoogle('recusado', `Não foi possível falar com o Google para ${acao}. Tente de novo.`, null, true)
       }
       if (resposta.status === 401) {
         await resposta.body?.cancel()
@@ -277,13 +287,46 @@ export function criarGoogle({ fetch: buscar, obterToken, aoReconectar }: OpcoesD
   }
 
   const comAvisos = new URLSearchParams({ conferenceDataVersion: '1', sendUpdates: 'all' }).toString()
+  const enderecoDoEvento = (id: string) => `${CALENDARIO}/${encodeURIComponent(conferir(id, IDENTIFICADOR, 'Evento do Google'))}`
+
+  // O evento com o id escolhido já está no Google (uma tentativa anterior criou, ou esta criou e a resposta se perdeu):
+  // lê, e acerta com o que se quer agora — inclusive restaura o evento quando uma tentativa anterior foi desfeita
+  // (status cancelled; o Google guarda o id do evento apagado e não deixa criar outro com ele). null: não está lá.
+  async function retomar(id: string, evento: EventoParaOGoogle, convidados: string[], meet: boolean) {
+    const existente = await pedir('ler o evento no Google Agenda', 'GET', enderecoDoEvento(id), undefined, { faltaEhOk: true })
+    if (!existente) return null
+    const corpo: Record<string, unknown> = { ...corpoDoEvento(evento, convidados), status: 'confirmed' }
+    if (meet && !meetDoEvento(existente).meetCodigo) corpo.conferenceData = pedidoDeMeet()
+    return await pedir('criar o evento no Google Agenda', 'PATCH', `${enderecoDoEvento(id)}?${comAvisos}`, corpo)
+  }
 
   return {
     // Cria na agenda principal do organizador, avisando os convidados; com `meet`, pede a sala do Meet junto.
-    async criarEvento(evento: EventoParaOGoogle, { meet = false, convidados = [] as string[] } = {}) {
+    // `id` (base32hex): o app escolhe o id do evento no Google, e criar de novo com ele não duplica — o Google responde
+    // 409 (ou a resposta se perde), e o evento que já está lá é retomado.
+    async criarEvento(evento: EventoParaOGoogle, { meet = false, convidados = [] as string[], id }: {
+      meet?: boolean
+      convidados?: string[]
+      id?: string
+    } = {}) {
       const corpo = corpoDoEvento(evento, convidados)
+      if (id !== undefined) corpo.id = conferir(id, ID_ESCOLHIDO, 'Id do evento')
       if (meet) corpo.conferenceData = pedidoDeMeet()
-      let criado = await pedir('criar o evento no Google Agenda', 'POST', `${CALENDARIO}?${comAvisos}`, corpo)
+      let criado
+      try {
+        criado = await pedir('criar o evento no Google Agenda', 'POST', `${CALENDARIO}?${comAvisos}`, corpo)
+      } catch (erro) {
+        const talvezExista = erro instanceof ErroDoGoogle && (erro.status === 409 || erro.semResposta)
+        if (id === undefined || !talvezExista) throw erro
+        let retomado
+        try {
+          retomado = await retomar(id, evento, convidados, meet)
+        } catch {
+          throw erro
+        }
+        if (!retomado) throw erro
+        criado = retomado
+      }
       if (typeof criado?.id !== 'string') throw new ErroDoGoogle('recusado', 'O Google não devolveu o evento criado.')
       // A sala do Meet às vezes fica "pending" na resposta: uma leitura depois costuma trazê-la. Melhor esforço: o
       // evento já existe no Google, e um erro aqui não pode fazer o app achar que nada foi criado.
@@ -302,28 +345,30 @@ export function criarGoogle({ fetch: buscar, obterToken, aoReconectar }: OpcoesD
     async editarEvento(id: string, evento: EventoParaOGoogle, { convidados, meet = false }: { convidados?: string[]; meet?: boolean } = {}) {
       const corpo = corpoDoEvento(evento, convidados)
       if (meet) corpo.conferenceData = pedidoDeMeet()
-      const url = `${CALENDARIO}/${encodeURIComponent(conferir(id, IDENTIFICADOR, 'Evento do Google'))}?${comAvisos}`
-      const editado = await pedir('editar o evento no Google Agenda', 'PATCH', url, corpo)
+      const editado = await pedir('editar o evento no Google Agenda', 'PATCH', `${enderecoDoEvento(id)}?${comAvisos}`, corpo)
       return { googleEventoId: id, ...meetDoEvento(editado) }
     },
 
     // Cancela no Google avisando os convidados. Evento que já não existe no Google não é erro.
     async apagarEvento(id: string): Promise<void> {
-      const url = `${CALENDARIO}/${encodeURIComponent(conferir(id, IDENTIFICADOR, 'Evento do Google'))}?sendUpdates=all`
-      await pedir('apagar o evento no Google Agenda', 'DELETE', url, undefined, { faltaEhOk: true })
+      await pedir('apagar o evento no Google Agenda', 'DELETE', `${enderecoDoEvento(id)}?sendUpdates=all`, undefined, {
+        faltaEhOk: true,
+      })
     },
 
-    // Liga a gravação e a transcrição automáticas no espaço do Meet da reunião (o espaço é achado pelo código).
-    async ligarGravacao(meetCodigo: string): Promise<void> {
+    // Liga (ou, com ligar: false, desliga) a gravação e a transcrição automáticas no espaço do Meet da reunião (o
+    // espaço é achado pelo código).
+    async ligarGravacao(meetCodigo: string, { ligar = true }: { ligar?: boolean } = {}): Promise<void> {
       const codigo = conferir(meetCodigo, CODIGO_DO_MEET, 'Código do Meet')
-      const acao = 'ligar a gravação e a transcrição do Meet'
+      const acao = `${ligar ? 'ligar' : 'desligar'} a gravação e a transcrição do Meet`
+      const valor = ligar ? 'ON' : 'OFF'
       const espaco = await pedir(acao, 'GET', `${MEET}/spaces/${encodeURIComponent(codigo)}`)
       const nome = conferir(espaco?.name, /^spaces\/[A-Za-z0-9_-]+$/, 'Espaço do Meet')
       await pedir(acao, 'PATCH', `${MEET}/${nome}?${new URLSearchParams({ updateMask: ATUALIZAR_GRAVACAO })}`, {
         config: {
           artifactConfig: {
-            recordingConfig: { autoRecordingGeneration: 'ON' },
-            transcriptionConfig: { autoTranscriptionGeneration: 'ON' },
+            recordingConfig: { autoRecordingGeneration: valor },
+            transcriptionConfig: { autoTranscriptionGeneration: valor },
           },
         },
       })

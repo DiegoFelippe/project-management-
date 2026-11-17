@@ -140,6 +140,60 @@ describe('Google Agenda', () => {
     await expect(cliente.apagarEvento(googleEventoId)).resolves.toBeUndefined() // 410 do Google
     await expect(cliente.apagarEvento('naoexiste123')).resolves.toBeUndefined() // 404 do Google
   })
+
+  it('criar com o id escolhido pelo app: repetir não duplica (o 409 vira o mesmo evento, atualizado)', async () => {
+    const google = criarGoogleFalso()
+    const { cliente } = clienteDireto(google)
+    const id = '0f8e2c4a9b7d4e1f8a3c5b6d7e8f9a0b'
+    const r = await cliente.criarEvento(REUNIAO, { id, meet: true, convidados: ['ana@cliente.test'] })
+    expect(r.googleEventoId).toBe(id)
+    expect(google.pedidosPara(EVENTOS).at(-1).corpo.id).toBe(id)
+
+    const outra = await cliente.criarEvento({ ...REUNIAO, titulo: 'Kickoff (de novo)' }, { id, meet: true, convidados: ['ana@cliente.test'] })
+    expect(outra).toEqual(r)
+    expect(google.eventos(EMAIL).filter((e) => e.id === id)).toHaveLength(1)
+    expect(google.evento(EMAIL, id).summary).toBe('Kickoff (de novo)')
+    expect(google.pedidosPara(`${EVENTOS}/${id}`).map((p) => p.metodo)).toEqual(['GET', 'PATCH'])
+
+    // Uma tentativa anterior foi desfeita (o evento foi apagado no Google, que guarda o id): criar de novo com o mesmo
+    // id restaura aquele evento, com os dados de agora, sem criar outro.
+    await cliente.apagarEvento(id)
+    const restaurado = await cliente.criarEvento({ ...REUNIAO, titulo: 'Kickoff (outra tentativa)' }, { id, convidados: ['bia@cliente.test'] })
+    expect(restaurado.googleEventoId).toBe(id)
+    expect(google.evento(EMAIL, id)).toMatchObject({ status: 'confirmed', summary: 'Kickoff (outra tentativa)' })
+    expect(google.evento(EMAIL, id).attendees.map((a) => a.email)).toEqual(['bia@cliente.test'])
+    expect(google.eventos(EMAIL)).toHaveLength(1)
+
+    // id fora do formato do Google não chega a sair
+    await expect(cliente.criarEvento(REUNIAO, { id: 'Com-Hifen' })).rejects.toMatchObject({ codigo: 'recusado' })
+  })
+
+  it('resposta perdida depois de o Google criar: lê o evento pelo id e segue, sem duplicar', async () => {
+    const google = criarGoogleFalso()
+    const { cliente } = clienteDireto(google)
+    const id = '1a2b3c4d5e6f40718293a4b5c6d7e8f9'
+    google.falhar({ url: EVENTOS, metodo: 'POST', rede: true, depois: true })
+    const r = await cliente.criarEvento(REUNIAO, { id, meet: true })
+    expect(r.googleEventoId).toBe(id)
+    expect(r.meetCodigo).toBeTruthy()
+    expect(google.eventos(EMAIL)).toHaveLength(1)
+
+    // sem o id escolhido, a queda de rede é erro (não há como saber se criou)
+    google.falhar({ url: EVENTOS, metodo: 'POST', rede: true })
+    await expect(cliente.criarEvento(REUNIAO)).rejects.toMatchObject({ codigo: 'recusado' })
+  })
+
+  it('tempo esgotado cancela o pedido ao Google (AbortController)', async () => {
+    let sinal = null
+    const nuncaResponde = (_url, init) => {
+      sinal = init.signal
+      return new Promise(() => {})
+    }
+    const cliente = criarGoogle({ fetch: nuncaResponde, obterToken: async () => 'ya29.qualquer', limiteMs: 20 })
+    await expect(cliente.criarEvento(REUNIAO)).rejects.toMatchObject({ codigo: 'recusado' })
+    expect(sinal).toBeInstanceOf(AbortSignal)
+    expect(sinal.aborted).toBe(true)
+  })
 })
 
 describe('Google Meet', () => {
@@ -162,6 +216,13 @@ describe('Google Meet', () => {
     expect(espaco.config.artifactConfig).toEqual({
       recordingConfig: { autoRecordingGeneration: 'ON' },
       transcriptionConfig: { autoTranscriptionGeneration: 'ON' },
+    })
+
+    // desligar (o evento foi editado sem "Gravar e transcrever")
+    await cliente.ligarGravacao(meetCodigo, { ligar: false })
+    expect(espaco.config.artifactConfig).toEqual({
+      recordingConfig: { autoRecordingGeneration: 'OFF' },
+      transcriptionConfig: { autoTranscriptionGeneration: 'OFF' },
     })
   })
 

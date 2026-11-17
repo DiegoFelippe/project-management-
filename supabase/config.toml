@@ -453,6 +453,10 @@ verify_jwt = false
 [functions.google-pessoa]
 verify_jwt = false
 
+# Eventos da agenda: a função confere o token de quem chama e grava no Google do organizador antes do banco.
+[functions.agenda]
+verify_jwt = false
+
 [functions.gerenciar-acesso]
 verify_jwt = false
 
