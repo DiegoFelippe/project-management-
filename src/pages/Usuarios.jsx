@@ -235,7 +235,7 @@ export default function Usuarios() {
         <ListaVazia>{filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}</ListaVazia>
       )}
       {lista.length > 0 && (
-        <Tabela rotulo="Usuários" larguraMinima={ehDono ? 1480 : 1320}
+        <Tabela rotulo="Usuários" larguraMinima={ehDono ? 1260 : 1120}
           colunas={ehDono ? ['Nome', 'Cargo', 'Telefone', 'Papel', 'Consultoria', 'Times', ...colunasDoMes(passado), 'Situação'] : ['Nome', 'Cargo', 'Telefone', 'Papel', 'Times', ...colunasDoMes(passado), 'Situação']}
           paginacao={{ pagina, total, aoMudar: setPagina }}>
           {lista.map((p) => {
@@ -254,8 +254,8 @@ export default function Usuarios() {
                     </div>
                   </div>
                 </Celula>
-                <Celula className="text-muted-foreground">{p.cargo || '—'}</Celula>
-                <Celula className="text-muted-foreground">{p.telefone || '—'}</Celula>
+                <Celula className="max-w-36 truncate text-muted-foreground" title={p.cargo || undefined}>{p.cargo || '—'}</Celula>
+                <Celula className="max-w-36 truncate text-muted-foreground" title={p.telefone || undefined}>{p.telefone || '—'}</Celula>
                 <Celula className="text-muted-foreground">{NOME_DO_PAPEL[p.papel]}</Celula>
                 {ehDono && <Celula className="text-muted-foreground">{p.consultoria?.nome ?? '—'}</Celula>}
                 <Celula>

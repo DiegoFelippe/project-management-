@@ -39,7 +39,7 @@ export function Tabela({ rotulo, colunas, larguraMinima = 720, paginacao, childr
               {colunas.map((coluna) => (
                 <th key={coluna} className="px-4 py-2.5 font-medium">{coluna}</th>
               ))}
-              <th className="px-4 py-2.5"><span className="sr-only">Ações</span></th>
+              <th className="sticky right-0 border-l bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] px-4 py-2.5"><span className="sr-only">Ações</span></th>
             </tr>
           </thead>
           <tbody>{children}</tbody>
@@ -51,7 +51,7 @@ export function Tabela({ rotulo, colunas, larguraMinima = 720, paginacao, childr
 }
 
 export function Linha({ className, children }) {
-  return <tr className={cn('border-b transition-colors last:border-0 hover:bg-muted/40', className)}>{children}</tr>
+  return <tr className={cn('group border-b transition-colors last:border-0 hover:bg-muted/40', className)}>{children}</tr>
 }
 
 export function Celula({ className, children }) {
@@ -59,7 +59,7 @@ export function Celula({ className, children }) {
 }
 
 export function CelulaAcoes({ children }) {
-  return <td className="px-4 py-3 text-right whitespace-nowrap">{children}</td>
+  return <td className="bg-card group-hover:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))] sticky right-0 border-l px-4 py-3 text-right whitespace-nowrap">{children}</td>
 }
 
 export function ListaVazia({ children }) {

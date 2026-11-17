@@ -22,6 +22,18 @@ describe('Tabela (padrão das listas)', () => {
     expect(within(tabela).getAllByRole('row')).toHaveLength(3)
   })
 
+  it('a coluna de ações fica fixa à direita (cabeçalho e células), para as ações não sumirem na rolagem', () => {
+    render(
+      <Tabela rotulo="Times" colunas={['Time']}>
+        <Linha><Celula>Suporte</Celula><CelulaAcoes><button type="button" className="botao-animado">Editar</button></CelulaAcoes></Linha>
+      </Tabela>,
+    )
+    const tabela = screen.getByRole('table', { name: 'Times' })
+    const [, cabecalhoAcoes] = within(tabela).getAllByRole('columnheader')
+    expect(cabecalhoAcoes).toHaveClass('sticky', 'right-0')
+    expect(within(tabela).getByRole('button', { name: 'Editar' }).closest('td')).toHaveClass('sticky', 'right-0')
+  })
+
   it('lista vazia mostra o aviso', () => {
     render(<ListaVazia>Nenhum time ainda.</ListaVazia>)
     expect(screen.getByText('Nenhum time ainda.')).toBeInTheDocument()
