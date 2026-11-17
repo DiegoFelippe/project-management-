@@ -201,7 +201,7 @@ describe('Usuários', () => {
     const tabela = await screen.findByRole('table', { name: 'Usuários' })
     await within(tabela).findByRole('row', { name: /Dora/ })
     expect(screen.queryByRole('group', { name: 'Mês' })).toBeNull()
-    for (const nome of ['Capacidade', 'Reservado', 'Realizado', 'Ocupação', 'Utilização']) {
+    for (const nome of ['Capacidade', 'Reservado', 'Realizado', 'Ocupação', 'Utilização', 'Situação']) {
       expect(within(tabela).queryByRole('columnheader', { name: nome })).toBeNull()
     }
     expect(ocupacaoDasPessoas).not.toHaveBeenCalled()
@@ -318,21 +318,23 @@ describe('Usuários', () => {
   describe('capacidade do mês', () => {
     const NUMEROS = { capacidade: 160, reservado: 80, realizado: 40.5, ocupacao: 0.5, clientes: 3 }
 
-    it('mostra Capacidade, Reservado, Realizado e Ocupação do mês, com "—" para quem o banco não devolveu', async () => {
+    it('mostra Ocupação (porcentagem e "R h de C h") e Realizado do mês, com "—" para quem o banco não devolveu', async () => {
       vi.mocked(ocupacaoDasPessoas).mockResolvedValue({ p1: NUMEROS })
       renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
       const tabela = await screen.findByRole('table', { name: 'Usuários' })
-      for (const nome of ['Capacidade', 'Reservado', 'Realizado', 'Ocupação']) {
+      for (const nome of ['Ocupação', 'Realizado']) {
         expect(within(tabela).getByRole('columnheader', { name: nome })).toBeInTheDocument()
       }
+      for (const nome of ['Capacidade', 'Reservado', 'Situação']) {
+        expect(within(tabela).queryByRole('columnheader', { name: nome })).toBeNull()
+      }
       const ana = within(tabela).getByRole('row', { name: /Ana/ })
-      await waitFor(() => expect(within(ana).getByText('160 h')).toBeInTheDocument())
-      expect(within(ana).getByText('80 h')).toBeInTheDocument()
+      await waitFor(() => expect(within(ana).getByText('50%')).toBeInTheDocument())
+      expect(within(ana).getByText('80 h de 160 h')).toBeInTheDocument()
       expect(within(ana).getByText('40,5 h')).toBeInTheDocument()
-      expect(within(ana).getByText('50%')).toBeInTheDocument()
       const bruno = within(tabela).getByRole('row', { name: /Bruno/ })
-      expect(within(bruno).queryByText('160 h')).toBeNull()
-      expect(within(bruno).getAllByText('—').length).toBeGreaterThanOrEqual(4)
+      expect(within(bruno).queryByText(/160 h/)).toBeNull()
+      expect(within(bruno).getAllByText('—').length).toBeGreaterThanOrEqual(2)
       expect(ocupacaoDasPessoas).toHaveBeenCalledTimes(1)
       expect(ocupacaoDasPessoas).toHaveBeenCalledWith({ ids: ['p1', 'p2'], mes: mesAtual() })
     })
@@ -349,17 +351,51 @@ describe('Usuários', () => {
       expect(listarUsuarios).toHaveBeenCalledTimes(chamadasDaLista)
     })
 
-    it('em mês passado some o Reservado e a Ocupação vira Utilização; no mês atual é o contrário', async () => {
+    it('em mês passado a Ocupação vira Utilização, com "realizado de capacidade" e sem reservado', async () => {
       vi.mocked(ocupacaoDasPessoas).mockResolvedValue({ p1: NUMEROS })
       renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
       const tabela = await screen.findByRole('table', { name: 'Usuários' })
-      expect(within(tabela).getByRole('columnheader', { name: 'Reservado' })).toBeInTheDocument()
       expect(within(tabela).getByRole('columnheader', { name: 'Ocupação' })).toBeInTheDocument()
+      expect(await within(within(tabela).getByRole('row', { name: /Ana/ })).findByText('80 h de 160 h')).toBeInTheDocument()
       await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
       await waitFor(() => expect(within(tabela).getByRole('columnheader', { name: 'Utilização' })).toBeInTheDocument())
-      expect(within(tabela).queryByRole('columnheader', { name: 'Reservado' })).toBeNull()
       expect(within(tabela).queryByRole('columnheader', { name: 'Ocupação' })).toBeNull()
-      await waitFor(() => expect(within(within(tabela).getByRole('row', { name: /Ana/ })).queryByText('80 h')).toBeNull())
+      expect(within(tabela).queryByRole('columnheader', { name: 'Reservado' })).toBeNull()
+      const ana = within(tabela).getByRole('row', { name: /Ana/ })
+      await waitFor(() => expect(within(ana).getByText('40,5 h de 160 h')).toBeInTheDocument())
+      expect(within(ana).queryByText('80 h de 160 h')).toBeNull()
+    })
+
+    it('Situação vira etiqueta ao lado do nome só quando não é o estado normal, e Cargo e Telefone não cortam o texto', async () => {
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        itens: [
+          { id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [], consultoria_id: 'c1', cargo: 'Analista de projetos sênior', telefone: '(11) 98888-1111', convite_pendente: true },
+          { id: 'p2', nome: 'Bruno', email: 'bruno@x.test', papel: 'gestor', ativo: true, times: [], consultoria_id: 'c1', precisa_trocar_senha: true },
+          { id: 'p3', nome: 'Caio', email: 'caio@x.test', papel: 'pessoa', ativo: true, times: [], consultoria_id: 'c1' },
+        ],
+        total: 3,
+      })
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+      const tabela = await screen.findByRole('table', { name: 'Usuários' })
+      expect(within(tabela).queryByRole('columnheader', { name: 'Situação' })).toBeNull()
+      const ana = within(tabela).getByRole('row', { name: /Ana/ })
+      const etiqueta = within(ana).getByText('Convite pendente')
+      expect(etiqueta.closest('td')).toBe(within(ana).getByText('Ana').closest('td'))
+      expect(within(within(tabela).getByRole('row', { name: /Bruno/ })).getByText('Senha provisória')).toBeInTheDocument()
+      expect(within(within(tabela).getByRole('row', { name: /Caio/ })).queryByText('Ativo')).toBeNull()
+      for (const texto of ['Analista de projetos sênior', '(11) 98888-1111']) {
+        expect(within(ana).getByText(texto).className).not.toMatch(/truncate/)
+      }
+    })
+
+    it('as ações da linha são botões só com ícone, com nome acessível e title', async () => {
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+      const ana = await screen.findByRole('row', { name: /Ana/ })
+      for (const nome of ['Editar', 'Capacidade', 'Desativar']) {
+        const botao = within(ana).getByRole('button', { name: nome })
+        expect(botao).toHaveAttribute('title', nome)
+        expect(botao).toHaveTextContent('')
+      }
     })
 
     it('a linha da central mostra "—" nos quatro números', async () => {

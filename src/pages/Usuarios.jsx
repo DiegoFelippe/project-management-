@@ -22,17 +22,49 @@ import { buscarConsultoriasAtivas } from '@/data/consultorias'
 import { tirarFoto, trocarFoto } from '@/data/imagens'
 import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
-import { colunasDoMes, formatarHoras, formatarOcupacao } from '@/lib/horas'
+import { formatarHoras, formatarOcupacao } from '@/lib/horas'
 import { mesAtual } from '@/lib/mes'
 import { ehPapelDeConsultoria, veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
 
 const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'desativados', rotulo: 'Desativados' }]
+// Situação é etiqueta ao lado do nome, só quando não é o estado normal ("Ativo" não aparece).
 const COR_DA_SITUACAO = {
   'Convite pendente': 'notice',
   'Senha provisória': 'secondary',
-  Ativo: 'positive',
   Desativado: 'outline',
+}
+
+// Largura mínima da tabela (soma das colunas): abaixo disso ela rola dentro do cartão, com as ações fixas.
+function larguraDaTabela({ comNumeros, ehDono }) {
+  const base = comNumeros ? 1140 : 910
+  return ehDono ? base + 110 : base
+}
+
+// Ação da linha: só o ícone (Padrão Hub), com o nome da ação em aria-label e title.
+function AcaoDaLinha({ nome, className, children, ...props }) {
+  return (
+    <Button variant="ghost" size="icon" aria-label={nome} title={nome} className={className} {...props}>
+      {children}
+    </Button>
+  )
+}
+
+function Ocupacao({ n, passado }) {
+  if (!n) return <span className="text-muted-foreground">—</span>
+  const apoio = passado
+    ? `${formatarHoras(n.realizado)} de ${formatarHoras(n.capacidade)}`
+    : `${formatarHoras(n.reservado)} de ${formatarHoras(n.capacidade)}`
+  const largura = Math.max(0, Math.min(100, Math.round((n.ocupacao ?? 0) * 100)))
+  return (
+    <div className="w-32">
+      <p className="font-semibold">{formatarOcupacao(n.ocupacao)}</p>
+      <div aria-hidden="true" className="my-1 h-1 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${largura}%` }} />
+      </div>
+      <p className="text-xs whitespace-nowrap text-muted-foreground">{apoio}</p>
+    </div>
+  )
 }
 
 export default function Usuarios() {
@@ -239,10 +271,10 @@ export default function Usuarios() {
         <ListaVazia>{filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}</ListaVazia>
       )}
       {lista.length > 0 && (
-        <Tabela rotulo="Usuários" larguraMinima={comNumeros ? (ehDono ? 1260 : 1120) : (ehDono ? 960 : 840)}
+        <Tabela rotulo="Usuários" larguraMinima={larguraDaTabela({ comNumeros, ehDono })}
           colunas={[
             'Nome', 'Cargo', 'Telefone', 'Papel', ...(ehDono ? ['Consultoria'] : []), 'Times',
-            ...(comNumeros ? colunasDoMes(passado) : []), 'Situação',
+            ...(comNumeros ? [passado ? 'Utilização' : 'Ocupação', 'Realizado'] : []),
           ]}
           paginacao={{ pagina, total, aoMudar: setPagina }}>
           {lista.map((p) => {
@@ -256,13 +288,16 @@ export default function Usuarios() {
                   <div className="flex items-center gap-3">
                     <Avatar pessoa={p} className="size-8 text-[11px]" />
                     <div className="min-w-0">
-                      <p className="truncate font-semibold">{p.nome}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-semibold">{p.nome}</p>
+                        {s !== 'Ativo' && <Badge variant={COR_DA_SITUACAO[s]} className="shrink-0">{s}</Badge>}
+                      </div>
                       <p className="truncate text-xs text-muted-foreground">{p.email}</p>
                     </div>
                   </div>
                 </Celula>
-                <Celula className="max-w-36 truncate text-muted-foreground" title={p.cargo || undefined}>{p.cargo || '—'}</Celula>
-                <Celula className="max-w-36 truncate text-muted-foreground" title={p.telefone || undefined}>{p.telefone || '—'}</Celula>
+                <Celula className="min-w-28 max-w-44 text-muted-foreground">{p.cargo || '—'}</Celula>
+                <Celula className="whitespace-nowrap text-muted-foreground">{p.telefone || '—'}</Celula>
                 <Celula className="text-muted-foreground">{NOME_DO_PAPEL[p.papel]}</Celula>
                 {ehDono && <Celula className="text-muted-foreground">{p.consultoria?.nome ?? '—'}</Celula>}
                 <Celula>
@@ -275,39 +310,29 @@ export default function Usuarios() {
                 </Celula>
                 {comNumeros && (
                   <>
-                    <Celula className="tabular-nums">{formatarHoras(n?.capacidade)}</Celula>
-                    {!passado && <Celula className="tabular-nums">{formatarHoras(n?.reservado)}</Celula>}
+                    <Celula className="tabular-nums"><Ocupacao n={n} passado={passado} /></Celula>
                     <Celula className="tabular-nums">{formatarHoras(n?.realizado)}</Celula>
-                    <Celula className="tabular-nums font-semibold">{formatarOcupacao(n?.ocupacao)}</Celula>
                   </>
                 )}
-                <Celula><Badge variant={COR_DA_SITUACAO[s]}>{s}</Badge></Celula>
                 <CelulaAcoes>
                   {podeEditar(p) && p.ativo !== false && (
-                    <Button variant="ghost" size="sm" onClick={() => setEditando(p)}>
-                      <Pencil /> Editar
-                    </Button>
+                    <AcaoDaLinha nome="Editar" onClick={() => setEditando(p)}><Pencil /></AcaoDaLinha>
                   )}
                   {podeCapacidade(p) && (
-                    <Button variant="ghost" size="sm" onClick={() => setCapacidade(p)}>
-                      <Gauge /> Capacidade
-                    </Button>
+                    <AcaoDaLinha nome="Capacidade" onClick={() => setCapacidade(p)}><Gauge /></AcaoDaLinha>
                   )}
                   {podeDesativar(p) && (
-                    <Button variant="ghost" size="sm" onClick={() => setConfirmando({ pessoa: p, acao: p.ativo === false ? 'reativar' : 'desativar' })}
+                    <AcaoDaLinha nome={p.ativo === false ? 'Reativar' : 'Desativar'}
+                      onClick={() => setConfirmando({ pessoa: p, acao: p.ativo === false ? 'reativar' : 'desativar' })}
                       className={p.ativo === false ? '' : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'}>
-                      {p.ativo === false ? <><UserCheck /> Reativar</> : <><UserX /> Desativar</>}
-                    </Button>
+                      {p.ativo === false ? <UserCheck /> : <UserX />}
+                    </AcaoDaLinha>
                   )}
                   {podeMover(p) && (
-                    <Button variant="ghost" size="sm" onClick={() => setConfirmando({ pessoa: p, acao: 'mover' })}>
-                      <Landmark /> Mover para a central
-                    </Button>
+                    <AcaoDaLinha nome="Mover para a central" onClick={() => setConfirmando({ pessoa: p, acao: 'mover' })}><Landmark /></AcaoDaLinha>
                   )}
                   {p.convite_pendente && p.ativo !== false && (!ehDono || podeEditar(p)) && (
-                    <Button variant="ghost" size="sm" disabled={reenviando === p.id} onClick={() => reenviar(p)}>
-                      <Send /> Reenviar convite
-                    </Button>
+                    <AcaoDaLinha nome="Reenviar convite" disabled={reenviando === p.id} onClick={() => reenviar(p)}><Send /></AcaoDaLinha>
                   )}
                 </CelulaAcoes>
               </Linha>
