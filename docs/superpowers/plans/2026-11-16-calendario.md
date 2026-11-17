@@ -171,7 +171,8 @@ do Google do organizador ou `null` quando ele não conectou), `supabase/function
   `cliente_pastas` "Reunião dd/MM/yyyy HH:mm — <título>" (`evento_id` preenchido) com `transcricao.txt` e
   `documentacao.md` (título, data/hora, duração, organizador, participantes, links da gravação e do evento; resumo,
   decisões e próximos passos pela IA da consultoria quando conectada em Integrações) no bucket `arquivos`, marca
-  `pasta_criada` e grava `cliente_eventos` ("Reunião realizada", "Pasta da reunião criada"). 48 h depois do fim sem
+  `pasta_criada` e grava `cliente_eventos` ("Reunião realizada", "Pasta da reunião criada"; os tipos novos entram na
+  regra da tabela nesta migração). 48 h depois do fim sem
   transcrição → `sem_artefatos`. Organizador sem Google → `erro` "Conecte o Google para buscar a gravação". Erro do
   Google → `erro` com o motivo, sem parar as outras reuniões. Sem cliente no evento: não cria pasta (só marca a
   situação).
@@ -209,7 +210,7 @@ semana, próximos 60 dias, eventos que atravessam a meia-noite e de dia inteiro 
 ### Task 7: Reuniões no cliente, documentação e conferência
 
 **Arquivos:** `src/components/clientes/AgendaDoCliente.jsx` (+ reuniões do cliente no mês, com link para o evento),
-`src/components/clientes/rotulos.js` (eventos "Reunião marcada", "Reunião realizada", "Pasta da reunião criada"),
+`src/components/clientes/rotulos.js` (eventos "Reunião realizada" e "Pasta da reunião criada", gravados pela Task 5),
 `README.md` (Google por pessoa: app Interno no Workspace da IXCSoft x Externo verificado para outros domínios, escopos,
 Workspace com gravação e transcrição, segredo do `pg_cron` no Vault, URL de volta do `google-pessoa`), `CLAUDE.md`
 (seção Agenda: visão por papel, Google da pessoa só no Vault, núcleo sem Deno testado com Google falso),
