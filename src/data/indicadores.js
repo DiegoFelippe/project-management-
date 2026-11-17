@@ -28,6 +28,10 @@ export const indicadoresDeUsuarios = ({ consultoriaId, mes } = {}) =>
 // { mes, passado, consultorias_ativas, clientes_ativos, consultores, ocupacao_media }.
 export const indicadoresDeConsultorias = ({ mes } = {}) => ler('indicadores_de_consultorias', { p_mes: mes ?? null })
 
+// Aba Modelos de Check-ins: { recorte: 'tudo' | 'consultoria', ativos, da_central, da_consultoria, clientes_usando }.
+export const indicadoresDeModelos = ({ consultoriaId } = {}) =>
+  ler('indicadores_de_modelos', { p_consultoria: consultoriaId || null })
+
 // { conectadas, com_erro, nao_configuradas, ultimo_teste }.
 export const indicadoresDeIntegracoes = ({ consultoriaId } = {}) =>
   ler('indicadores_de_integracoes', { p_consultoria: consultoriaId || null })

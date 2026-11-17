@@ -153,6 +153,37 @@ describe('traduzirErroBanco com contexto', () => {
     expect(msg('filtro_invalido', '22023')).toBe('Esse filtro não existe. Limpe os filtros e tente de novo.')
   })
 
+  it('traduz as recusas dos modelos de check-in', () => {
+    const msg = (message, code = 'P0001') => traduzirErroBanco({ code, message }, { sobre: 'modelo' })
+    expect(msg('sem_permissao')).toBe('Você não tem permissão para isso.')
+    expect(msg('modelo_arquivado')).toBe('Este modelo está arquivado. Reative o modelo antes de editar.')
+    expect(msg('modelo_nome_curto')).toBe('O nome do modelo precisa ter pelo menos 2 letras.')
+    expect(msg('modelo_sem_tarefas')).toBe('O modelo precisa de pelo menos uma tarefa.')
+    expect(msg('etapa_sem_nome')).toBe('Dê um nome a cada etapa.')
+    expect(msg('etapa_sem_tarefas')).toBe('Cada etapa precisa de pelo menos uma tarefa. Acrescente uma ou apague a etapa.')
+    expect(msg('tarefa_sem_titulo')).toBe('Dê um título a cada tarefa.')
+    expect(msg('prazo_invalido')).toBe('O prazo de cada tarefa vai do dia 0 ao dia 365.')
+    expect(msg('dependencia_invalida')).toBe('Uma tarefa só pode depender de tarefas que vêm antes dela na lista.')
+    expect(msg('modelo_grande_demais')).toBe(
+      'O modelo passou do limite: até 50 etapas, 500 tarefas e 30 dependências por tarefa.',
+    )
+    expect(msg('consultoria_invalida')).toBe('Escolha uma consultoria ativa para o modelo.')
+    expect(msg('filtro_invalido', '22023')).toBe('Esse filtro não existe. Limpe os filtros e tente de novo.')
+    // Texto acima do tamanho (o banco confere ao gravar): diz os limites.
+    expect(msg('new row for relation "modelo_tarefas" violates check constraint "modelo_tarefas_titulo_check"', '23514'))
+      .toBe('Algum texto passou do tamanho: nome do modelo e título da tarefa até 80 letras, descrição do modelo até 400, ' +
+        'nome da etapa até 60 e descrição da tarefa até 160.')
+    expect(msg('new row for relation "modelos" violates check constraint "modelos_nome_check"', '23514'))
+      .toMatch(/^Algum texto passou do tamanho/)
+    // Outra regra da coluna (o tipo, que vem de uma lista): o texto de sempre.
+    expect(msg('new row for relation "modelos" violates check constraint "modelos_tipo_check"', '23514'))
+      .toBe('Confira os campos destacados.')
+    // Fora de "modelo", o 23514 continua o de sempre.
+    expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')
+    expect(traduzirErroBanco({ code: '23514', message: 'violates check constraint "modelos_nome_check"' }))
+      .toBe('Confira os campos destacados.')
+  })
+
   it('traduz as recusas da descrição do cartão', () => {
     const msg = (message) => traduzirErroBanco({ code: '23514', message })
     expect(msg('descricao_invalida')).toBe(

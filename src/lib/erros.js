@@ -85,7 +85,23 @@ const ERROS_MENSAGEM_BANCO = {
   link_invalido: 'Os links da descrição precisam começar com http://, https:// ou mailto:.',
   imagem_invalida:
     'A imagem da descrição precisa ser enviada por aqui, para este cartão (imagem de outro endereço não entra).',
+  // Modelos de check-in (salvar_modelo confere antes de gravar; a tela confere o mesmo)
+  modelo_arquivado: 'Este modelo está arquivado. Reative o modelo antes de editar.',
+  modelo_nome_curto: 'O nome do modelo precisa ter pelo menos 2 letras.',
+  modelo_sem_tarefas: 'O modelo precisa de pelo menos uma tarefa.',
+  etapa_sem_nome: 'Dê um nome a cada etapa.',
+  etapa_sem_tarefas: 'Cada etapa precisa de pelo menos uma tarefa. Acrescente uma ou apague a etapa.',
+  tarefa_sem_titulo: 'Dê um título a cada tarefa.',
+  prazo_invalido: 'O prazo de cada tarefa vai do dia 0 ao dia 365.',
+  dependencia_invalida: 'Uma tarefa só pode depender de tarefas que vêm antes dela na lista.',
+  modelo_grande_demais: 'O modelo passou do limite: até 50 etapas, 500 tarefas e 30 dependências por tarefa.',
+  consultoria_invalida: 'Escolha uma consultoria ativa para o modelo.',
 }
+
+// As regras das colunas dos modelos recusam (23514) texto acima do tamanho; a tela confere o mesmo antes de enviar.
+export const TEXTO_DO_MODELO_GRANDE_DEMAIS =
+  'Algum texto passou do tamanho: nome do modelo e título da tarefa até 80 letras, descrição do modelo até 400, ' +
+  'nome da etapa até 60 e descrição da tarefa até 160.'
 
 // O Storage recusa (413) arquivo acima do limite do bucket "arquivos"; a tela confere o mesmo antes de enviar.
 export const ARQUIVO_GRANDE_DEMAIS = 'O arquivo passa de 25 MB.'
@@ -101,7 +117,7 @@ function traduzirErroDoStorage(erro) {
   return null
 }
 
-// `sobre`: 'time' (padrão) | 'cliente' | 'checkin' | 'arquivo' — muda o texto de alguns códigos.
+// `sobre`: 'time' (padrão) | 'cliente' | 'checkin' | 'arquivo' | 'modelo' — muda o texto de alguns códigos.
 export function traduzirErroBanco(erro, { sobre = 'time' } = {}) {
   const mensagem = ERROS_MENSAGEM_BANCO[erro?.message]
   if (mensagem) return mensagem
@@ -118,7 +134,14 @@ export function traduzirErroBanco(erro, { sobre = 'time' } = {}) {
   if (erro?.code === '23503' && sobre === 'cliente') {
     return 'Este cliente tem horas, arquivos ou cartões registrados. Arquive em vez de apagar.'
   }
-  if (erro?.code === '23514') return sobre === 'checkin' ? CHECKIN_DE_MAIS_DE_24H : 'Confira os campos destacados.'
+  if (erro?.code === '23514') {
+    if (sobre === 'checkin') return CHECKIN_DE_MAIS_DE_24H
+    // Só as regras de tamanho dos textos (nome, descrição, título); as outras (ex.: tipo) ficam no texto de sempre.
+    if (sobre === 'modelo' && /_(nome|descricao|titulo)_check"/.test(erro.message ?? '')) {
+      return TEXTO_DO_MODELO_GRANDE_DEMAIS
+    }
+    return 'Confira os campos destacados.'
+  }
   if (erro?.code === '23P01') return 'Esse horário se sobrepõe a outro check-in seu.'
   if (erro?.code === '42501') return ERROS_FUNCAO.sem_permissao
   return PADRAO

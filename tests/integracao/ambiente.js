@@ -202,6 +202,20 @@ async function limparQuadrosDoBanco(clientes, consultorias) {
   conferirLimpeza('apagar os quadros de teste', await admin.from('quadros').delete().in('id', [...quadros]))
 }
 
+// Modelos de check-in das consultorias de teste (seguram a consultoria, restrict) e os que as pessoas de teste criaram
+// (os da Central para todas não têm consultoria). Etapas, tarefas e dependências saem junto. Antes de apagar as pessoas:
+// depois, quem criou fica nulo e o modelo não seria mais achado.
+async function limparModelos(consultorias) {
+  if (consultorias.length) {
+    conferirLimpeza('apagar os modelos das consultorias de teste',
+      await admin.from('modelos').delete().in('consultoria_id', consultorias))
+  }
+  if (criados.usuarios.size) {
+    conferirLimpeza('apagar os modelos das pessoas de teste',
+      await admin.from('modelos').delete().in('criado_por', [...criados.usuarios]))
+  }
+}
+
 export async function limparTudo() {
   const consultorias = [...criados.consultorias]
   // Arquivos, check-ins, quadros e clientes seguram consultorias e clientes (restrict): saem antes.
@@ -236,6 +250,7 @@ export async function limparTudo() {
     conferirLimpeza('ler as pessoas das consultorias de teste', resposta)
     for (const linha of resposta.data ?? []) criados.usuarios.add(linha.id)
   }
+  await limparModelos(consultorias)
   for (const id of criados.usuarios) {
     const resposta = await admin.auth.admin.deleteUser(id)
     // Usuário que já não existe é o que se queria.
