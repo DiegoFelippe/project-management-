@@ -187,7 +187,7 @@ describe('FichaDoConsultor: Novo acesso', () => {
   it('dono cria administrador ou central, sem times', async () => {
     const { aoCriar } = montarNovo({ perfilDeQuem: { id: 'd1', papel: 'dono' }, consultoriaId: 'c1', times: [] })
     expect(await opcoesDoPapel()).toEqual(['Administrador', 'Central'])
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Times' })).not.toBeInTheDocument()
     await irPara('Dados pessoais')
     await userEvent.type(screen.getByLabelText('Nome'), 'Rita Alves')
     await userEvent.type(screen.getByLabelText('E-mail'), 'rita@acme.com.br')
@@ -346,6 +346,33 @@ describe('FichaDoConsultor: Novo acesso', () => {
   })
 })
 
+describe('FichaDoConsultor: tipo de consultoria (Novo acesso)', () => {
+  it('tem o grupo "Tipo de consultoria" com quatro caixas, todas desmarcadas', () => {
+    montarNovo()
+    const grupo = screen.getByRole('group', { name: 'Tipo de consultoria' })
+    expect(within(grupo).getAllByRole('checkbox')).toHaveLength(4)
+    for (const nome of ['Gestão', 'Sucesso do Cliente', 'Assessoria Jurídica', 'Gestão de Pessoas']) {
+      expect(within(grupo).getByRole('checkbox', { name: nome })).not.toBeChecked()
+    }
+  })
+
+  it('criar com tipos manda a lista na ordem do pedido', async () => {
+    const { aoCriar } = montarNovo()
+    await preencher()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Gestão de Pessoas' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Gestão' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
+    expect(aoCriar.mock.calls[0][0].tipos_de_consultoria).toEqual(['gestao', 'gestao_de_pessoas'])
+  })
+
+  it('criar sem marcar nenhum não manda o campo', async () => {
+    const { aoCriar } = montarNovo()
+    await preencher()
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
+    expect(aoCriar.mock.calls[0][0]).not.toHaveProperty('tipos_de_consultoria')
+  })
+})
+
 const PESSOA = {
   id: 'p1', nome: 'Ana Lima', email: 'ana@exemplo.test', papel: 'pessoa', consultoria_id: 'c1',
   times: [{ id: 't1', nome: 'Implantação' }], cargo: 'Analista', telefone: '(11) 98888-1111', cidade: 'Santos', uf: 'SP',
@@ -461,7 +488,7 @@ describe('FichaDoConsultor: Editar', () => {
     expect(screen.getByRole('heading', { name: 'Capacidade' })).toBeInTheDocument()
     expect(screen.getByLabelText('Carga semanal (horas)')).toBeInTheDocument()
     expect(screen.queryByLabelText('Papel')).not.toBeInTheDocument()
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Times' })).not.toBeInTheDocument()
   })
 
   it('lista as ausências, com criar, editar e apagar', async () => {
@@ -610,6 +637,39 @@ describe('FichaDoConsultor: Editar', () => {
     expect(screen.queryByRole('button', { name: /Reenviar convite/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Desativar/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: 'Acesso' })).not.toBeInTheDocument()
+  })
+})
+
+describe('FichaDoConsultor: tipo de consultoria (Editar)', () => {
+  it('abre com os tipos da pessoa marcados', () => {
+    montarEditar({ pessoa: { ...PESSOA, tipos_de_consultoria: ['sucesso_do_cliente', 'gestao_de_pessoas'] } })
+    expect(screen.getByRole('checkbox', { name: 'Gestão' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Sucesso do Cliente' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Assessoria Jurídica' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Gestão de Pessoas' })).toBeChecked()
+  })
+
+  it('marcar e desmarcar manda a lista nova; sem mexer, não manda', async () => {
+    const { aoSalvar } = montarEditar({ pessoa: { ...PESSOA, tipos_de_consultoria: ['sucesso_do_cliente'] } })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar.mock.calls[0][0].mudancas).toEqual({})
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Assessoria Jurídica' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Sucesso do Cliente' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Gestão' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar.mock.calls[1][0].mudancas).toEqual({ tipos_de_consultoria: ['gestao', 'assessoria_juridica'] })
+  })
+
+  it('desmarcar todos manda a lista vazia (apagar = desmarcar)', async () => {
+    const { aoSalvar } = montarEditar({ pessoa: { ...PESSOA, tipos_de_consultoria: ['gestao'] } })
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Gestão' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar.mock.calls[0][0].mudancas).toEqual({ tipos_de_consultoria: [] })
+  })
+
+  it('pessoa sem a lista (dados antigos) abre com tudo desmarcado', () => {
+    montarEditar()
+    expect(screen.getAllByRole('checkbox', { name: /^(Gestão|Sucesso do Cliente|Assessoria Jurídica|Gestão de Pessoas)$/ }).filter((c) => c.checked)).toHaveLength(0)
   })
 })
 

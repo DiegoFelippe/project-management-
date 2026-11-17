@@ -14,7 +14,7 @@ vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn(), tirarFoto: vi.fn(), muda
 
 const perfil = {
   id: 'me', nome: 'Diego Felippe', email: 'diego@exemplo.test', papel: 'admin', consultoria: { nome: 'Acme' },
-  telefone: '(11) 97777-0000', cidade: 'Santos', uf: 'SP', cargo: 'Consultor sênior', data_entrada: '2026-01-10', carga_semanal: 40,
+  telefone: '(11) 97777-0000', cidade: 'Santos', uf: 'SP', cargo: 'Consultor sênior', tipos_de_consultoria: ['gestao', 'sucesso_do_cliente'], data_entrada: '2026-01-10', carga_semanal: 40,
 }
 let recarregarPerfil, definirSenha, aoFechar
 
@@ -147,5 +147,12 @@ describe('Meu perfil', () => {
     await userEvent.type(screen.getByLabelText('Telefone'), '9')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(atualizarMeuContato).toHaveBeenCalledWith({ telefone: '(11) 97777-00009', cidade: 'Santos', uf: 'SP' })
+  })
+
+  it('mostra os tipos de consultoria só para ler', () => {
+    const janela = screen.getByRole('dialog', { name: 'Meu perfil' })
+    expect(within(janela).getByText('Tipo de consultoria')).toBeInTheDocument()
+    expect(within(janela).getByText('Gestão, Sucesso do Cliente')).toBeInTheDocument()
+    expect(within(janela).queryByRole('checkbox', { name: 'Gestão' })).not.toBeInTheDocument()
   })
 })

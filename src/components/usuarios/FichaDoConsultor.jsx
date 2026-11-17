@@ -22,6 +22,7 @@ import { corDe } from '@/lib/cores'
 import { urlPublica } from '@/lib/imagem'
 import { hoje } from '@/lib/mes'
 import { iniciais } from '@/lib/nomes'
+import { TIPOS_DE_CONSULTORIA } from '@/lib/tiposDeConsultoria'
 import { UFS } from '@/lib/ufs'
 import { ehPapelDeConsultoria, papeisQuePodeDar, rotuloDoPapel, veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
@@ -58,6 +59,20 @@ function EscolhaDeTimes({ times, marcados, aoAlternar, aviso }) {
       <div className="grid gap-2 sm:grid-cols-2">
         {times.map((t, i) => (
           <Caixa key={t.id} id={i === 0 ? 'ficha-times' : undefined} rotulo={t.nome} marcado={marcados.includes(t.id)} aoMudar={() => aoAlternar(t.id)} />
+        ))}
+      </div>
+    </fieldset>
+  )
+}
+
+// Tipo de consultoria: pode ter mais de um (ou nenhum); desmarcar tudo é o "apagar".
+function EscolhaDeTipos({ marcados, aoAlternar }) {
+  return (
+    <fieldset className="grid gap-2">
+      <legend className="sr-only">Tipo de consultoria</legend>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {TIPOS_DE_CONSULTORIA.map((t, i) => (
+          <Caixa key={t.valor} id={i === 0 ? 'ficha-tipos' : undefined} rotulo={t.rotulo} marcado={marcados.includes(t.valor)} aoMudar={() => aoAlternar(t.valor)} />
         ))}
       </div>
     </fieldset>
@@ -193,6 +208,8 @@ export default function FichaDoConsultor({
   }))
   const timesIniciais = (pessoa?.times ?? []).map((t) => t.id).filter((id) => times.some((t) => t.id === id))
   const [marcados, setMarcados] = useState(timesIniciais)
+  const tiposIniciais = TIPOS_DE_CONSULTORIA.map((t) => t.valor).filter((v) => (pessoa?.tipos_de_consultoria ?? []).includes(v))
+  const [tipos, setTipos] = useState(tiposIniciais)
   const [foto, setFoto] = useState(null)
   const [corEscolhida, setCorEscolhida] = useState(undefined) // undefined = não mexeu; null = automática
   const focar = useRef(null)
@@ -212,6 +229,9 @@ export default function FichaDoConsultor({
     const { itens, total } = await buscarConsultorias(termo)
     return { itens: itens.map((c) => ({ valor: c.id, rotulo: c.nome })), total }
   }, [buscarConsultorias])
+  // Sempre na ordem do pedido (a mesma da lista e do filtro), qualquer que seja a ordem dos cliques.
+  const alternarTipo = (valor) => setTipos((atuais) => TIPOS_DE_CONSULTORIA.map((t) => t.valor)
+    .filter((v) => (v === valor ? !atuais.includes(v) : atuais.includes(v))))
   const alternarTime = (id) => setMarcados((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id]))
 
   const papelAtual = dados.papel
@@ -315,6 +335,7 @@ export default function FichaDoConsultor({
     if (dados.forma === 'senha') pedido.senha = dados.senha
     if (podeExigir2fa && dados.exige_2fa) pedido.exige_2fa = true
     for (const campo of CAMPOS_DE_TEXTO) if (dados[campo].trim()) pedido[campo] = dados[campo].trim()
+    if (tipos.length) pedido.tipos_de_consultoria = tipos
     if (papelAtual === 'admin') pedido.consultoria_id = consultoria
     const resposta = await aoCriar(pedido, { carga: cargaNova(), foto: foto ?? undefined, cor: corNova() })
     setEnviando(false)
@@ -334,6 +355,7 @@ export default function FichaDoConsultor({
     if (dados.nome.trim() !== pessoa.nome) mudancas.nome = dados.nome.trim()
     if (mudaPapel && dados.papel !== pessoa.papel) mudancas.papel = dados.papel
     if (podeExigir2fa && dados.exige_2fa !== !!pessoa.exige_2fa) mudancas.exige_2fa = dados.exige_2fa
+    if (tipos.join() !== tiposIniciais.join()) mudancas.tipos_de_consultoria = tipos
     for (const campo of CAMPOS_DE_TEXTO) {
       if (comoTexto(pessoa[campo]) !== dados[campo].trim()) mudancas[campo] = dados[campo].trim() || null
     }
@@ -470,6 +492,10 @@ export default function FichaDoConsultor({
                 <CampoData id="ficha-entrada" valor={dados.data_entrada} aoMudar={definir('data_entrada')} max={hoje()} />
               </Campo>
             </div>
+
+            <Bloco titulo="Tipo de consultoria">
+              <EscolhaDeTipos marcados={tipos} aoAlternar={alternarTipo} />
+            </Bloco>
 
             {mostraPapel && (
               <Bloco titulo="Papel e times">

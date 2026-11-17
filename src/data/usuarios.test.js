@@ -22,6 +22,26 @@ describe('listarUsuarios', () => {
   })
 })
 
+describe('listarUsuarios: tipo de consultoria', () => {
+  it('pede o campo tipos_de_consultoria', async () => {
+    banco.resposta = { data: [], error: null, count: 0 }
+    await listarUsuarios({ pagina: 1 })
+    expect(banco.chamadas.find(([m]) => m === 'select')[1]).toContain('tipos_de_consultoria')
+  })
+
+  it('com tipo, filtra no banco quem tem aquele tipo', async () => {
+    banco.resposta = { data: [], error: null, count: 0 }
+    await listarUsuarios({ pagina: 1, tipo: 'gestao' })
+    expect(banco.chamou('contains', 'tipos_de_consultoria', ['gestao'])).toBe(true)
+  })
+
+  it('sem tipo, não filtra', async () => {
+    banco.resposta = { data: [], error: null, count: 0 }
+    await listarUsuarios({ pagina: 1 })
+    expect(banco.chamadas.some(([m]) => m === 'contains')).toBe(false)
+  })
+})
+
 describe('buscarUsuario', () => {
   it('carrega uma pessoa por id (o RLS decide se ela aparece) com os times achatados', async () => {
     banco.resposta = { data: { id: 'p1', nome: 'Ana', times: [{ time: { id: 't1', nome: 'X' } }] }, error: null }

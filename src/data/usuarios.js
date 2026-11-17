@@ -5,7 +5,7 @@ import { buscarPagina } from './paginar'
 
 const CAMPOS =
   'id, nome, email, foto, cor, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ativo, exige_2fa, verificacao_desde, ' +
-  'telefone, cidade, uf, cargo, data_entrada, carga_semanal, ' +
+  'telefone, cidade, uf, cargo, data_entrada, tipos_de_consultoria, carga_semanal, ' +
   'consultoria:consultorias(nome), ' +
   'times:time_membros!time_membros_pessoa_id_fkey(time:times(id, nome))'
 
@@ -13,7 +13,7 @@ const redirectTo = () => `${window.location.origin}/definir-senha`
 
 // Uma página de pessoas (ativas ou desativadas), filtrada e paginada no banco.
 // Os times que quem olha não enxerga vêm nulos e ficam de fora.
-export async function listarUsuarios({ consultoriaId, ativos = true, pagina = 1 } = {}) {
+export async function listarUsuarios({ consultoriaId, ativos = true, pagina = 1, tipo } = {}) {
   let consulta = supabase
     .from('perfis')
     .select(CAMPOS, { count: 'exact' })
@@ -22,6 +22,8 @@ export async function listarUsuarios({ consultoriaId, ativos = true, pagina = 1 
     .order('nome')
     .order('id')
   if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
+  // Pessoas que têm aquele tipo de consultoria (a lista é de vários; índice GIN).
+  if (tipo) consulta = consulta.contains('tipos_de_consultoria', [tipo])
   const resultado = await buscarPagina(consulta, pagina)
   return { ...resultado, itens: resultado.itens.map((p) => ({ ...p, times: (p.times ?? []).map((m) => m.time).filter(Boolean) })) }
 }
@@ -44,7 +46,7 @@ export async function reenviarConvite(pessoaId) {
   return { erro: status === 200 ? null : traduzirErroFuncao(corpo.codigo) }
 }
 
-// editar ({ nome?, papel?, cargo?, telefone?, cidade?, uf?, data_entrada?, exige_2fa? }), desativar, reativar, mover_para_central ou
+// editar ({ nome?, papel?, cargo?, telefone?, cidade?, uf?, data_entrada?, tipos_de_consultoria?, exige_2fa? }), desativar, reativar, mover_para_central ou
 // zerar_2fa (apaga o app autenticador da pessoa) (Edge Function gerenciar-acesso).
 export async function gerenciarAcesso(acao, pessoaId, extra = {}) {
   const { status, corpo } = await chamarFuncao('gerenciar-acesso', { acao, pessoa_id: pessoaId, ...extra })

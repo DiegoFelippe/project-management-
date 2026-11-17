@@ -6,7 +6,7 @@ import { adotarTemaDoPerfil } from '@/tema/tema'
 import { AuthContext } from './useAuth'
 
 const CAMPOS_PERFIL =
-  'id, nome, email, foto, cor, papel, consultoria_id, precisa_trocar_senha, exige_2fa, verificacao_desde, telefone, cidade, uf, cargo, data_entrada, carga_semanal, consultoria:consultorias(nome, logo), preferencias(tema)'
+  'id, nome, email, foto, cor, papel, consultoria_id, precisa_trocar_senha, exige_2fa, verificacao_desde, telefone, cidade, uf, cargo, data_entrada, tipos_de_consultoria, carga_semanal, consultoria:consultorias(nome, logo), preferencias(tema)'
 // O que pode mudar com a sessão aberta (quem administra exige a verificação ou zera o app): conferido de novo a cada
 // tela, ao voltar para a aba e quando algo é recusado. A própria pessoa sempre lê o próprio perfil, mesmo com aal1.
 const CAMPOS_DA_VERIFICACAO = 'exige_2fa, verificacao_desde'

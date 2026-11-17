@@ -108,4 +108,45 @@ describe('ficha do consultor', () => {
     expect(error).toBeNull()
     expect(await perfil(pessoa.id)).toMatchObject({ telefone: '999', cidade: 'Natal', uf: 'RN' })
   })
+
+  describe('tipos de consultoria', () => {
+    it('criar acesso grava os tipos (sem repetir) e sem tipos fica vazio', async () => {
+      const r = await criar(comoAdminA, {
+        forma: 'senha', senha: 'Senha-1234!x', nome: 'Com Tipos', email: emailDeTeste('tipos'), papel: 'pessoa',
+        tipos_de_consultoria: ['gestao', 'assessoria_juridica'],
+      })
+      expect(r.status).toBe(201)
+      expect((await perfil(r.corpo.pessoa_id)).tipos_de_consultoria).toEqual(['gestao', 'assessoria_juridica'])
+      const v = await criar(comoAdminA, { forma: 'senha', senha: 'Senha-1234!x', nome: 'Sem Tipos', email: emailDeTeste('semtipos'), papel: 'pessoa' })
+      expect(v.status).toBe(201)
+      expect((await perfil(v.corpo.pessoa_id)).tipos_de_consultoria).toEqual([])
+    })
+
+    it('criar recusa tipo fora da lista, repetido ou que não é lista', async () => {
+      const base = { forma: 'senha', senha: 'Senha-1234!x', nome: 'Erro Tipos', papel: 'pessoa' }
+      for (const [n, tipos] of [['a', ['financeiro']], ['b', ['gestao', 'gestao']], ['c', 'gestao']]) {
+        const r = await criar(comoAdminA, { ...base, email: emailDeTeste(`tipo${n}`), tipos_de_consultoria: tipos })
+        expect(r.status).toBe(400)
+        expect(r.corpo).toMatchObject({ codigo: 'dados_invalidos', campo: 'tipos_de_consultoria' })
+      }
+    })
+
+    it('admin edita e desmarca; gestor edita de quem vê; a pessoa não muda os próprios', async () => {
+      expect((await acesso(comoAdminA, { acao: 'editar', pessoa_id: pessoa2.id, tipos_de_consultoria: ['sucesso_do_cliente', 'gestao_de_pessoas'] })).status).toBe(200)
+      expect((await perfil(pessoa2.id)).tipos_de_consultoria).toEqual(['sucesso_do_cliente', 'gestao_de_pessoas'])
+      expect((await acesso(comoAdminA, { acao: 'editar', pessoa_id: pessoa2.id, tipos_de_consultoria: [] })).status).toBe(200)
+      expect((await perfil(pessoa2.id)).tipos_de_consultoria).toEqual([])
+      expect((await acesso(comoGestor, { acao: 'editar', pessoa_id: pessoa.id, tipos_de_consultoria: ['gestao'] })).status).toBe(200)
+      expect((await perfil(pessoa.id)).tipos_de_consultoria).toEqual(['gestao'])
+      expect((await acesso(comoGestor, { acao: 'editar', pessoa_id: pessoa2.id, tipos_de_consultoria: ['gestao'] })).status).toBe(403)
+      expect((await acesso(comoPessoa, { acao: 'editar', pessoa_id: pessoa.id, tipos_de_consultoria: ['gestao_de_pessoas'] })).status).toBe(403)
+      expect((await perfil(pessoa.id)).tipos_de_consultoria).toEqual(['gestao'])
+    })
+
+    it('editar recusa valor inválido', async () => {
+      const r = await acesso(comoAdminA, { acao: 'editar', pessoa_id: pessoa2.id, tipos_de_consultoria: ['outro'] })
+      expect(r.status).toBe(400)
+      expect(r.corpo).toMatchObject({ campo: 'tipos_de_consultoria' })
+    })
+  })
 })

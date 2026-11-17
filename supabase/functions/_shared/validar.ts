@@ -26,7 +26,10 @@ export type Ficha = {
   uf?: string | null
   cargo?: string | null
   data_entrada?: string | null
+  tipos_de_consultoria?: string[]
 }
+
+export const TIPOS_DE_CONSULTORIA = ['gestao', 'sucesso_do_cliente', 'assessoria_juridica', 'gestao_de_pessoas'] as const
 
 const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO']
 
@@ -120,6 +123,14 @@ export function validarDataEntrada(valor: unknown, campo = 'data_entrada'): stri
   return texto
 }
 
+// Lista de tipos de consultoria: só os quatro valores, sem repetir. [] limpa.
+export function validarTipos(valor: unknown, campo = 'tipos_de_consultoria'): string[] {
+  if (!Array.isArray(valor)) invalido(campo)
+  for (const t of valor) if (typeof t !== 'string' || !(TIPOS_DE_CONSULTORIA as readonly string[]).includes(t)) invalido(campo)
+  if (new Set(valor).size !== valor.length) invalido(campo)
+  return valor as string[]
+}
+
 // Só os campos que vieram no corpo entram (assim "editar" não apaga o que não foi enviado).
 export function validarFicha(corpo: Record<string, unknown>): Ficha {
   const ficha: Ficha = {}
@@ -128,6 +139,7 @@ export function validarFicha(corpo: Record<string, unknown>): Ficha {
   if (corpo.uf !== undefined) ficha.uf = validarUf(corpo.uf)
   if (corpo.cargo !== undefined) ficha.cargo = textoOpcional(corpo.cargo, 'cargo', 80)
   if (corpo.data_entrada !== undefined) ficha.data_entrada = validarDataEntrada(corpo.data_entrada)
+  if (corpo.tipos_de_consultoria !== undefined) ficha.tipos_de_consultoria = validarTipos(corpo.tipos_de_consultoria)
   return ficha
 }
 

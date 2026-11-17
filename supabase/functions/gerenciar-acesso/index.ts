@@ -1,6 +1,6 @@
-// POST /functions/v1/gerenciar-acesso — { acao: 'editar' | 'desativar' | 'reativar' | 'mover_para_central' | 'zerar_2fa', pessoa_id, nome?, papel?, telefone?, cidade?, uf?, cargo?, data_entrada?, exige_2fa? }
+// POST /functions/v1/gerenciar-acesso — { acao: 'editar' | 'desativar' | 'reativar' | 'mover_para_central' | 'zerar_2fa', pessoa_id, nome?, papel?, telefone?, cidade?, uf?, cargo?, data_entrada?, tipos_de_consultoria?, exige_2fa? }
 // Dono cuida dos administradores e da central; a central, dos administradores; só o dono move alguém para a central; administrador, de gestores e pessoas da consultoria dele;
-// gestor só muda o nome e a ficha (telefone, cidade, uf, cargo, data_entrada) das pessoas que vê. Em si mesmo ("Meu perfil"), cada um muda só o próprio nome:
+// gestor só muda o nome e a ficha (telefone, cidade, uf, cargo, data_entrada, tipos_de_consultoria) das pessoas que vê. Em si mesmo ("Meu perfil"), cada um muda só o próprio nome:
 // não troca o próprio papel nem se desativa. E-mail não muda.
 // Verificação em duas etapas: exigir (editar com exige_2fa) e zerar (apaga os fatores do app autenticador e encerra as
 // sessões da pessoa em todos os aparelhos, para quem perdeu o celular) são de quem pode editar o acesso da pessoa
@@ -10,7 +10,7 @@ import { clienteAdmin, type Perfil, quemChama } from '../_shared/clientes.ts'
 import { Falha, lerJson, responder, servir } from '../_shared/http.ts'
 import { validarFicha, validarNome, validarSimNao, validarUuid } from '../_shared/validar.ts'
 
-const CAMPOS_DA_FICHA = ['telefone', 'cidade', 'uf', 'cargo', 'data_entrada']
+const CAMPOS_DA_FICHA = ['telefone', 'cidade', 'uf', 'cargo', 'data_entrada', 'tipos_de_consultoria']
 
 type Poder = 'tudo' | 'nome' | null
 
@@ -90,7 +90,7 @@ servir(async (req) => {
   if (!poder) throw new Falha(403, 'sem_permissao')
 
   if (acao === 'editar') {
-    const mudancas: Record<string, string | boolean | null> = {}
+    const mudancas: Record<string, string | boolean | string[] | null> = {}
     if (corpo.nome !== undefined) mudancas.nome = validarNome(corpo.nome)
     if (euMesmo) {
       // Em si mesmo só o nome; o contato vai por atualizar_meu_contato. Confere antes de validar.

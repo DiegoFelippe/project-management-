@@ -1,6 +1,6 @@
 // Meu perfil (abre pela bolinha da pessoa no trilho, acima do Sair): foto, nome, contato, senha e verificação em duas
 // etapas de quem está usando.
-// E-mail e papel quem muda é o administrador; cargo, data de entrada e carga semanal aparecem só para ler.
+// E-mail e papel quem muda é o administrador; cargo, tipo de consultoria, data de entrada e carga semanal aparecem só para ler.
 // O nome passa pela Edge Function; o contato, pela função do banco; a foto, pelo Storage.
 import { UserRound } from 'lucide-react'
 import { useState } from 'react'
@@ -25,6 +25,7 @@ import { formatarHoras } from '@/lib/horas'
 import { urlPublica } from '@/lib/imagem'
 import { formatarDia } from '@/lib/mes'
 import { iniciais } from '@/lib/nomes'
+import { rotulosDosTipos } from '@/lib/tiposDeConsultoria'
 import { UFS } from '@/lib/ufs'
 
 const OPCOES_DE_UF = UFS.map((u) => ({ valor: u, rotulo: u }))
@@ -45,6 +46,7 @@ export default function MeuPerfil({ aberto, aoFechar }) {
   const corMarcada = corEscolhida === undefined ? (perfil.cor ?? null) : corEscolhida
   const corMostrada = corMarcada ?? corDaPessoa({ id: perfil.id })
   const semFoto = foto?.arquivo ? false : foto?.tirar ? true : !perfil.foto
+  const tipos = rotulosDosTipos(perfil.tipos_de_consultoria)
   const naConsultoria = ['admin', 'gestor', 'pessoa'].includes(perfil.papel)
 
   const contatoMudou = telefone.trim() !== (perfil.telefone ?? '') || cidade.trim() !== (perfil.cidade ?? '') || uf !== (perfil.uf ?? '')
@@ -132,9 +134,10 @@ export default function MeuPerfil({ aberto, aoFechar }) {
           <p className="text-corpo text-muted-foreground">
             {NOME_DO_PAPEL[perfil.papel]} · {perfil.consultoria?.nome ?? 'Plataforma'}
           </p>
-          {(perfil.cargo || perfil.data_entrada || naConsultoria) && (
+          {(perfil.cargo || perfil.data_entrada || tipos.length > 0 || naConsultoria) && (
             <dl className="grid gap-3 text-corpo sm:grid-cols-3">
               {perfil.cargo && <div><dt className="text-rotulo text-muted-foreground">Cargo</dt><dd>{perfil.cargo}</dd></div>}
+              {tipos.length > 0 && <div><dt className="text-rotulo text-muted-foreground">Tipo de consultoria</dt><dd>{tipos.join(', ')}</dd></div>}
               {perfil.data_entrada && <div><dt className="text-rotulo text-muted-foreground">Data de entrada</dt><dd>{formatarDia(perfil.data_entrada)}</dd></div>}
               {naConsultoria && perfil.carga_semanal != null && (
                 <div><dt className="text-rotulo text-muted-foreground">Carga semanal</dt><dd>{formatarHoras(Number(perfil.carga_semanal))} por semana</dd></div>

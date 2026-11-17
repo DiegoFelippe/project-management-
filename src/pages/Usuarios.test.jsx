@@ -44,6 +44,7 @@ beforeEach(() => {
       {
         id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [], consultoria_id: 'c1',
         cargo: 'Analista', telefone: '(11) 98888-1111', cidade: 'Santos', uf: 'SP', data_entrada: '2026-01-10', carga_semanal: 40,
+        tipos_de_consultoria: ['gestao', 'assessoria_juridica'],
       },
       { id: 'p2', nome: 'Bruno', email: 'bruno@x.test', papel: 'gestor', ativo: true, times: [], consultoria_id: 'c1', carga_semanal: 44 },
     ],
@@ -65,6 +66,29 @@ describe('Usuários', () => {
     const janela = screen.getByRole('dialog', { name: 'Ficha de Bruno' })
     expect(within(janela).getByLabelText('Nome')).toHaveValue('Bruno')
     expect(within(janela).getByLabelText('E-mail')).toHaveValue('bruno@x.test')
+  })
+
+  it('tem a coluna "Tipo de consultoria" com os rótulos e "—" para quem não tem', async () => {
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    const tabela = await screen.findByRole('table', { name: 'Usuários' })
+    expect(within(tabela).getByRole('columnheader', { name: 'Tipo de consultoria' })).toBeInTheDocument()
+    const ana = within(tabela).getByRole('row', { name: /Ana/ })
+    expect(within(ana).getByText('Gestão')).toBeInTheDocument()
+    expect(within(ana).getByText('Assessoria Jurídica')).toBeInTheDocument()
+    expect(within(within(tabela).getByRole('row', { name: /Bruno/ })).getAllByText('—').length).toBeGreaterThan(0)
+  })
+
+  it('filtro Tipo: pede ao banco só quem tem o tipo e volta para a página 1', async () => {
+    vi.mocked(listarUsuarios).mockResolvedValue({
+      itens: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [], consultoria_id: 'c1' }], total: 40,
+    })
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await userEvent.click(await screen.findByRole('button', { name: 'Próxima' }))
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: true, pagina: 2 }))
+    await escolherNoSeletor(userEvent, 'Tipo', 'Sucesso do Cliente')
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: true, pagina: 1, tipo: 'sucesso_do_cliente' }))
+    await escolherNoSeletor(userEvent, 'Tipo', 'Todos')
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: true, pagina: 1, tipo: undefined }))
   })
 
   it('Editar abre a ficha com cargo, telefone, cidade, UF, data de entrada e carga da linha', async () => {

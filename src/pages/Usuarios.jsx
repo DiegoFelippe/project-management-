@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
+import Seletor from '@/components/campos/Seletor'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import Avatar from '@/components/comum/Avatar'
 import BarraDeFiltros, { AcaoPrincipal } from '@/components/comum/BarraDeFiltros'
@@ -16,6 +17,7 @@ import { frase, juntar, useClientesAtivos } from '@/components/clientes/useClien
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import CapacidadeDaPessoa from '@/components/usuarios/CapacidadeDaPessoa'
 import FichaDoConsultor from '@/components/usuarios/FichaDoConsultor'
 import { definirCarga, ocupacaoDasPessoas } from '@/data/capacidade'
@@ -27,6 +29,7 @@ import { formatarHoras, formatarOcupacao } from '@/lib/horas'
 import { mesAtual } from '@/lib/mes'
 import { ehPapelDeConsultoria, veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
+import { OPCOES_DE_TIPO, rotulosDosTipos } from '@/lib/tiposDeConsultoria'
 
 const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'desativados', rotulo: 'Desativados' }]
 // Situação é etiqueta ao lado do nome, só quando não é o estado normal ("Ativo" não aparece).
@@ -38,7 +41,7 @@ const COR_DA_SITUACAO = {
 
 // Largura mínima da tabela (soma das colunas): abaixo disso ela rola dentro do cartão, com as ações fixas.
 function larguraDaTabela({ comNumeros, ehDono }) {
-  const base = comNumeros ? 1140 : 910
+  const base = comNumeros ? 1340 : 1110
   return ehDono ? base + 110 : base
 }
 
@@ -90,6 +93,7 @@ export default function Usuarios() {
   const [novo, setNovo] = useState(false)
   const [reenviando, setReenviando] = useState(null)
   const [filtro, setFiltro] = useState('ativos')
+  const [tipo, setTipo] = useState('')
   const [editando, setEditando] = useState(null)
   const [capacidade, setCapacidade] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
@@ -111,7 +115,7 @@ export default function Usuarios() {
   // Uma página por vez, filtrada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
     let ativo = true
-    listarUsuarios({ consultoriaId: consultoriaId || undefined, ativos: filtro === 'ativos', pagina })
+    listarUsuarios({ consultoriaId: consultoriaId || undefined, ativos: filtro === 'ativos', pagina, tipo: tipo || undefined })
       .then((r) => {
         if (!ativo) return
         if (r.foraDaFaixa && pagina > 1) return setPagina(1)
@@ -122,7 +126,7 @@ export default function Usuarios() {
     return () => {
       ativo = false
     }
-  }, [consultoriaId, filtro, pagina, versao])
+  }, [consultoriaId, filtro, tipo, pagina, versao])
 
   // Capacidade do mês: uma chamada por (página, mês), com os ids das linhas da página (o banco calcula).
   // Mudar o mês não muda a página. Se falhar, a lista segue com "—" e um aviso.
@@ -317,6 +321,13 @@ export default function Usuarios() {
       <BarraDeFiltros>
         <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1); setResultado(null) }} />
         {comNumeros && <NavegacaoDoMes mes={mes} aoMudar={setMes} />}
+        <div className="flex items-center gap-2">
+          <Label htmlFor="filtro-tipo" className="shrink-0 text-muted-foreground">Tipo</Label>
+          <div className="w-48">
+            <Seletor id="filtro-tipo" tamanho="sm" valor={tipo} aoMudar={(valor) => { setTipo(valor); setPagina(1) }}
+              opcoes={OPCOES_DE_TIPO} rotuloTodos="Todos" />
+          </div>
+        </div>
         {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />}
         {(!ehDono || ehAdminGeral) && (
           <AcaoPrincipal>
@@ -336,7 +347,7 @@ export default function Usuarios() {
       {lista.length > 0 && (
         <Tabela rotulo="Usuários" larguraMinima={larguraDaTabela({ comNumeros, ehDono })}
           colunas={[
-            'Nome', 'Cargo', 'Telefone', 'Papel', ...(ehDono ? ['Consultoria'] : []), 'Times',
+            'Nome', 'Cargo', 'Tipo de consultoria', 'Telefone', 'Papel', ...(ehDono ? ['Consultoria'] : []), 'Times',
             ...(comNumeros ? [passado ? 'Utilização' : 'Ocupação', 'Realizado'] : []),
           ]}
           paginacao={{ pagina, total, aoMudar: setPagina }}>
@@ -360,6 +371,14 @@ export default function Usuarios() {
                   </div>
                 </Celula>
                 <Celula className="min-w-28 max-w-44 text-muted-foreground">{p.cargo || '—'}</Celula>
+                <Celula>
+                  <div className="flex flex-wrap gap-1">
+                    {rotulosDosTipos(p.tipos_de_consultoria).map((r) => (
+                      <Badge key={r} variant="outline" className="font-medium">{r}</Badge>
+                    ))}
+                    {!p.tipos_de_consultoria?.length && <span className="text-muted-foreground">—</span>}
+                  </div>
+                </Celula>
                 <Celula className="whitespace-nowrap text-muted-foreground">{p.telefone || '—'}</Celula>
                 <Celula className="text-muted-foreground">{NOME_DO_PAPEL[p.papel]}</Celula>
                 {ehDono && <Celula className="text-muted-foreground">{p.consultoria?.nome ?? '—'}</Celula>}
