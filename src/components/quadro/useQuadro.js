@@ -10,9 +10,10 @@ export const FILTROS_VAZIOS = { busca: '', prioridade: '', responsavel: '', nome
 export const temFiltro = (f) => Boolean(f.busca.trim() || f.prioridade || f.responsavel || f.prazo)
 const doBanco = ({ busca, prioridade, responsavel, prazo }) => ({ busca: busca.trim(), prioridade, responsavel, prazo })
 
-// O banco disse que a pessoa não vê mais (o quadro, a coluna ou o cartão sumiram para ela): reler o quadro.
-const PERDEU = /sem_permissao|coluna_invalida/
-const perdeuAcesso = (erro) => erro?.code === '42501' || PERDEU.test(erro?.message ?? '')
+// O banco disse que a pessoa não vê mais (o quadro, a coluna ou o cartão sumiram para ela, ou a sessão deixou de
+// valer): reler o quadro.
+const semPermissao = (erro) => erro?.code === '42501' || /sem_permissao/.test(erro?.message ?? '')
+const perdeuAcesso = (erro) => semPermissao(erro) || /coluna_invalida/.test(erro?.message ?? '')
 
 function juntar(a, b) {
   if (!a) return b
@@ -28,8 +29,9 @@ function juntar(a, b) {
 
 const inserir = (lista, indice, item) => [...lista.slice(0, indice), item, ...lista.slice(indice)]
 
-// O quadro do cliente na tela: o quadro (colunas), uma página de cartões por coluna (mais com "ver mais"), os 4 números,
-// o tempo real e o arrastar otimista. Quem vê o quê é do banco: a central lista os quadros do cliente (um por
+// O quadro do cliente na tela: o quadro (colunas), uma página de cartões por coluna (mais com "ver mais"), os 4 números
+// (seguem só o filtro de responsável: busca, prioridade e prazo não mudam os números, regra do CLAUDE.md), o tempo real e
+// o arrastar otimista. Quem vê o quê é do banco: a central lista os quadros do cliente (um por
 // consultoria que o atendeu) e abre o escolhido (`escolher(id)`; sem escolha, o atual) só para ler; os outros recebem o
 // quadro da consultoria que atende. `filtros` já vem com a busca atrasada (a pessoa parou de digitar).
 //
@@ -37,7 +39,10 @@ const inserir = (lista, indice, item) => [...lista.slice(0, indice), item, ...li
 // relê o quadro todo; aviso de colunas relê o quadro (nomes, cores, ordem) e as colunas novas; aviso de cartões relê só
 // as colunas citadas. Enquanto um cartão está levantado ou indo para o banco, os avisos esperam (a releitura no meio do
 // arrasto bagunçaria a ordem da tela) e são aplicados juntos depois. Leitura velha de uma coluna (pedida antes de outra)
-// é descartada. Se a releitura disser que a pessoa não vê mais o quadro, para de ouvir e `semAcesso` fica ligado.
+// é descartada, sem perder o que ela trazia: a releitura que a atropela inclui a página do "ver mais" pendente, e o
+// "ver mais" que atropela uma releitura a refaz quando termina. Do mesmo jeito, a leitura do quadro que vale cumpre o que
+// as atropeladas pediam ("reler tudo", colunas). Se a releitura disser que a pessoa não vê mais o quadro (nulo ou
+// sem_permissao), para de ouvir e `semAcesso` fica ligado.
 export function useQuadro({ clienteId, central, filtros }) {
   const [quadros, setQuadros] = useState(null)
   const [escolhido, setEscolhido] = useState(null)
@@ -52,7 +57,13 @@ export function useQuadro({ clienteId, central, filtros }) {
   const filtrosRef = useRef(doBanco(filtros))
   const escolhidoRef = useRef(escolhido)
   const paginas = useRef({}) // colunaId → páginas carregadas
-  const pedidos = useRef({}) // colunaId → número do último pedido
+  const pedidos = useRef({}) // colunaId → número do último pedido (releitura ou "ver mais")
+  const lendo = useRef({}) // colunaId → número da releitura em andamento
+  const pedindoMais = useRef({}) // colunaId → true: a página seguinte foi pedida e ainda não entrou
+  const relerDepois = useRef({}) // colunaId → true: o "ver mais" atropelou uma releitura, que é refeita depois dele
+  const querTudo = useRef(false) // alguma leitura do quadro pediu "reler tudo" e ainda não foi cumprida
+  const colunasPedidas = useRef(new Set()) // colunas que alguma leitura do quadro pediu para reler
+  const relerOQuadro = useRef(() => {})
   const pedidoDoQuadro = useRef(0)
   const pedidoDosNumeros = useRef(0)
   const teveQuadro = useRef(false)
@@ -74,7 +85,54 @@ export function useQuadro({ clienteId, central, filtros }) {
     mudarColunas((c) => ({ ...c, [colunaId]: { ...c[colunaId], ...campos } }))
   }, [mudarColunas])
 
-  const lerQuadro = useCallback(async () => {
+  // Descarta as leituras em andamento da coluna; true se havia alguma (quem chama a refaz depois).
+  const invalidar = useCallback((colunaId) => {
+    pedidos.current[colunaId] = (pedidos.current[colunaId] ?? 0) + 1
+    return lendo.current[colunaId] != null || Boolean(pedindoMais.current[colunaId] || relerDepois.current[colunaId])
+  }, [])
+
+  const lerNumeros = useCallback(async (quadroId) => {
+    const numero = ++pedidoDosNumeros.current
+    try {
+      const r = await indicadoresDoQuadro({ quadroId, responsavel: filtrosRef.current.responsavel })
+      if (numero === pedidoDosNumeros.current) setIndicadores(r)
+    } catch (falha) {
+      // Sem permissão: relê o quadro (quem não vê mais recebe o aviso). Outro erro: os números ficam como estavam.
+      if (semPermissao(falha)) relerOQuadro.current()
+    }
+  }, [])
+
+  // Relê a coluna com as páginas que já estavam abertas ("ver mais"), mais a que foi pedida e ainda não entrou.
+  const lerColuna = useCallback(async (quadroId, colunaId) => {
+    const numero = (pedidos.current[colunaId] ?? 0) + 1
+    pedidos.current[colunaId] = numero
+    lendo.current[colunaId] = numero
+    relerDepois.current[colunaId] = false
+    const quantas = (paginas.current[colunaId] ?? 1) + (pedindoMais.current[colunaId] ? 1 : 0)
+    try {
+      const respostas = await Promise.all(Array.from({ length: quantas }, (_, i) =>
+        cartoesDoQuadro({ quadroId, colunaId, pagina: i + 1, ...filtrosRef.current })))
+      if (pedidos.current[colunaId] !== numero) return
+      const vistos = new Set()
+      const itens = respostas.flatMap((r) => r.itens).filter((c) => !vistos.has(c.id) && vistos.add(c.id))
+      paginas.current[colunaId] = quantas
+      pedindoMais.current[colunaId] = false
+      mudarColuna(colunaId, { itens, total: respostas[0].total, erro: null, carregandoMais: false })
+    } catch (falha) {
+      if (pedidos.current[colunaId] !== numero) return
+      pedindoMais.current[colunaId] = false
+      mudarColuna(colunaId, { erro: 'Não foi possível carregar os cartões.', carregandoMais: false })
+      if (perdeuAcesso(falha)) relerOQuadro.current()
+    } finally {
+      if (lendo.current[colunaId] === numero) lendo.current[colunaId] = null
+    }
+  }, [mudarColuna])
+
+  // Lê o quadro. `tudo`: relê todas as colunas e os números; `colunas`: relê essas. A leitura que vale (a mais nova)
+  // cumpre o que as atropeladas pediram; sempre carrega as colunas que ainda não estavam na tela.
+  const lerQuadro = useCallback(async ({ tudo = false, colunas: ids = [] } = {}) => {
+    if (tudo) querTudo.current = true
+    for (const id of ids) colunasPedidas.current.add(id)
     const numero = ++pedidoDoQuadro.current
     const atual = () => numero === pedidoDoQuadro.current
     try {
@@ -96,79 +154,70 @@ export function useQuadro({ clienteId, central, filtros }) {
       }
       if (q) teveQuadro.current = true
       mudarQuadro(q ?? null)
+      const reler = querTudo.current
+      const pedidas = colunasPedidas.current
+      querTudo.current = false
+      colunasPedidas.current = new Set()
+      if (q) {
+        for (const c of q.colunas) {
+          if (reler || pedidas.has(c.id) || !(c.id in colunasRef.current)) lerColuna(q.id, c.id)
+        }
+        if (reler) lerNumeros(q.id)
+      }
       return q ?? null
-    } catch {
-      // Na abertura, o erro aparece no lugar do quadro; numa releitura, o quadro que está na tela fica (a próxima
-      // releitura, ou o plano B, tenta de novo).
-      if (atual() && quadroRef.current === undefined) setErro('Não foi possível carregar o quadro.')
+    } catch (falha) {
+      if (!atual()) return undefined
+      if (quadroRef.current && semPermissao(falha)) {
+        // A sessão deixou de valer (ou a pessoa perdeu o quadro) no meio do uso: para de ouvir e avisa.
+        setSemAcesso(true)
+        parar.current?.()
+        mudarQuadro(null)
+      } else if (quadroRef.current === undefined) {
+        // Na abertura, o erro aparece no lugar do quadro; numa releitura, o quadro que está na tela fica (a próxima
+        // releitura, ou o plano B, tenta de novo e cumpre o que esta pedia).
+        setErro('Não foi possível carregar o quadro.')
+      }
       return undefined
     }
-  }, [central, clienteId, mudarQuadro])
+  }, [central, clienteId, lerColuna, lerNumeros, mudarQuadro])
 
-  const lerNumeros = useCallback(async (quadroId) => {
-    const numero = ++pedidoDosNumeros.current
-    try {
-      const r = await indicadoresDoQuadro({ quadroId, ...filtrosRef.current })
-      if (numero === pedidoDosNumeros.current) setIndicadores(r)
-    } catch {
-      // Os números ficam como estavam; a próxima releitura tenta de novo.
-    }
-  }, [])
+  useEffect(() => {
+    relerOQuadro.current = () => lerQuadro()
+  }, [lerQuadro])
 
-  // Relê a coluna com as páginas que já estavam abertas ("ver mais").
-  const lerColuna = useCallback(async (quadroId, colunaId) => {
-    const numero = (pedidos.current[colunaId] ?? 0) + 1
-    pedidos.current[colunaId] = numero
-    const quantas = paginas.current[colunaId] ?? 1
-    try {
-      const respostas = await Promise.all(Array.from({ length: quantas }, (_, i) =>
-        cartoesDoQuadro({ quadroId, colunaId, pagina: i + 1, ...filtrosRef.current })))
-      if (pedidos.current[colunaId] !== numero) return
-      const vistos = new Set()
-      const itens = respostas.flatMap((r) => r.itens).filter((c) => !vistos.has(c.id) && vistos.add(c.id))
-      paginas.current[colunaId] = quantas
-      mudarColuna(colunaId, { itens, total: respostas[0].total, erro: null })
-    } catch (falha) {
-      if (pedidos.current[colunaId] !== numero) return
-      mudarColuna(colunaId, { erro: 'Não foi possível carregar os cartões.' })
-      if (perdeuAcesso(falha)) lerQuadro()
-    }
-  }, [lerQuadro, mudarColuna])
+  const lerTudo = useCallback(() => lerQuadro({ tudo: true }), [lerQuadro])
 
-  const lerTudo = useCallback(async () => {
-    const q = await lerQuadro()
-    if (!q) return
-    await Promise.all([...q.colunas.map((c) => lerColuna(q.id, c.id)), lerNumeros(q.id)])
-  }, [lerColuna, lerNumeros, lerQuadro])
-
-  // Relê o quadro (colunas) e carrega as colunas que ainda não estavam na tela.
-  const relerQuadro = useCallback(async (colunasParaReler = []) => {
-    const q = await lerQuadro()
-    if (!q) return
-    for (const c of q.colunas) {
-      if (colunasParaReler.includes(c.id) || !(c.id in colunasRef.current)) lerColuna(q.id, c.id)
-    }
-  }, [lerColuna, lerQuadro])
+  // Relê o quadro (colunas) e as colunas pedidas; as que ainda não estavam na tela entram sempre.
+  const relerQuadro = useCallback((colunasParaReler = []) => lerQuadro({ colunas: colunasParaReler }), [lerQuadro])
 
   const verMais = useCallback(async (colunaId) => {
     const q = quadroRef.current
-    if (!q) return
+    if (!q || pedindoMais.current[colunaId]) return
     const numero = (pedidos.current[colunaId] ?? 0) + 1
     pedidos.current[colunaId] = numero
+    // Uma releitura em andamento fica velha (vai ser descartada): é refeita quando esta página chegar.
+    if (lendo.current[colunaId] != null) relerDepois.current[colunaId] = true
+    pedindoMais.current[colunaId] = true
     const proxima = (paginas.current[colunaId] ?? 1) + 1
     mudarColuna(colunaId, { carregandoMais: true })
     try {
       const r = await cartoesDoQuadro({ quadroId: q.id, colunaId, pagina: proxima, ...filtrosRef.current })
+      // Atropelado por uma releitura (que já traz esta página) ou por um arrasto (que relê depois): nada a fazer.
       if (pedidos.current[colunaId] !== numero) return
       paginas.current[colunaId] = proxima
+      pedindoMais.current[colunaId] = false
       const antes = colunasRef.current[colunaId]?.itens ?? []
       const vistos = new Set(antes.map((c) => c.id))
       mudarColuna(colunaId, { itens: [...antes, ...r.itens.filter((c) => !vistos.has(c.id))], total: r.total, carregandoMais: false })
-    } catch {
-      if (pedidos.current[colunaId] === numero) mudarColuna(colunaId, { carregandoMais: false })
-      toast.error('Não foi possível carregar mais cartões.')
+    } catch (falha) {
+      if (pedidos.current[colunaId] !== numero) return
+      pedindoMais.current[colunaId] = false
+      mudarColuna(colunaId, { carregandoMais: false })
+      if (perdeuAcesso(falha)) relerOQuadro.current()
+      else toast.error('Não foi possível carregar mais cartões.')
     }
-  }, [mudarColuna])
+    if (relerDepois.current[colunaId]) lerColuna(q.id, colunaId)
+  }, [lerColuna, mudarColuna])
 
   // ── Tempo real ──
 
@@ -222,6 +271,11 @@ export function useQuadro({ clienteId, central, filtros }) {
   const escolher = useCallback((id) => {
     pedidos.current = {}
     paginas.current = {}
+    lendo.current = {}
+    pedindoMais.current = {}
+    relerDepois.current = {}
+    querTudo.current = false
+    colunasPedidas.current = new Set()
     teveQuadro.current = false
     pendente.current = null
     colunasRef.current = {}
@@ -237,11 +291,19 @@ export function useQuadro({ clienteId, central, filtros }) {
     filtrosRef.current = JSON.parse(chaveDosFiltros)
     const q = quadroRef.current
     if (!q) return
-    // Filtro novo volta para a primeira página de cada coluna.
+    // Filtro novo volta para a primeira página de cada coluna (o "ver mais" pendente fica para trás).
     paginas.current = {}
+    pedindoMais.current = {}
+    relerDepois.current = {}
     for (const c of q.colunas) lerColuna(q.id, c.id)
-    lerNumeros(q.id)
-  }, [chaveDosFiltros, lerColuna, lerNumeros])
+  }, [chaveDosFiltros, lerColuna])
+
+  // Os números só mudam com o responsável (depois do efeito acima, que guarda os filtros).
+  const responsavel = filtros.responsavel
+  useEffect(() => {
+    const q = quadroRef.current
+    if (q) lerNumeros(q.id)
+  }, [responsavel, lerNumeros])
 
   // ── Arrastar ──
 
@@ -275,8 +337,8 @@ export function useQuadro({ clienteId, central, filtros }) {
     const antesId = destino[destination.index - 1]?.id ?? null
     const depoisId = destino[destination.index]?.id ?? null
     const fotografia = { [de]: colunasRef.current[de], [para]: colunasRef.current[para] }
-    // Leitura dessas colunas pedida antes do arrasto chegaria com a ordem velha: descarta.
-    for (const id of [de, para]) pedidos.current[id] = (pedidos.current[id] ?? 0) + 1
+    // Leitura dessas colunas pedida antes do arrasto chegaria com a ordem velha: descarta, e relê depois do banco.
+    const refazer = [...new Set([de, para])].filter(invalidar)
     const movido = { ...cartao, coluna_id: para }
     mudarColunas((c) => (de === para
       ? { ...c, [de]: { ...c[de], itens: inserir(semEle, destination.index, movido) } }
@@ -289,10 +351,11 @@ export function useQuadro({ clienteId, central, filtros }) {
     if (resposta.erro) {
       mudarColunas((c) => ({ ...c, ...fotografia }))
       desfazer(resposta.erro)
-    } else if (resposta.renumerou) {
-      lerColuna(q.id, para)
+      return
     }
-  }, [desfazer, lerColuna, mudarColunas])
+    if (resposta.renumerou && !refazer.includes(para)) refazer.push(para)
+    for (const id of refazer) lerColuna(q.id, id)
+  }, [desfazer, invalidar, lerColuna, mudarColunas])
 
   const soltarColuna = useCallback(async ({ draggableId, destination }) => {
     const q = quadroRef.current

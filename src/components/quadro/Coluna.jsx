@@ -157,8 +157,8 @@ export default function Coluna({
         </Button>
       )}
       {podeMexer && (
-        <Button type="button" variant="ghost" size="sm" className="w-full" onClick={aoNovoCartao}>
-          <Plus /> Adicionar cartão<span className="sr-only"> em {coluna.nome}</span>
+        <Button type="button" variant="ghost" size="sm" className="w-full" aria-label={`Adicionar cartão em ${coluna.nome}`} onClick={aoNovoCartao}>
+          <Plus /> Adicionar cartão
         </Button>
       )}
     </section>

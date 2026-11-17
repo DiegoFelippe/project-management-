@@ -237,6 +237,13 @@ describe('aba Quadro: o que cada um vê', () => {
     await pronto()
     const area = screen.getByRole('region', { name: 'Colunas do quadro' })
     expect(area).toHaveClass('overflow-x-auto')
+    // Texto só para leitor de tela (sr-only, position: absolute) dentro do quadro fica preso na área que rola, não no
+    // <main> (a 360 px a página inteira rolava para o lado): a área é o bloco de posição dele.
+    expect(area).toHaveClass('relative')
+    for (const el of area.querySelectorAll('.sr-only')) {
+      expect(area.contains(el.parentElement.closest('.relative, .absolute, .fixed, .sticky'))).toBe(true)
+    }
+    expect(screen.getByRole('button', { name: 'Adicionar cartão em A fazer' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Coluna A fazer' }).closest('[data-rfd-draggable-id]').firstElementChild)
       .toHaveClass('w-[300px]')
   })
@@ -319,9 +326,14 @@ describe('filtros', () => {
     const user = userEvent.setup()
     tela()
     await pronto()
+    vi.mocked(cartoesDoQuadro).mockImplementation(async ({ colunaId }) => {
+      const itens = cartoes[colunaId].filter((c) => c.prioridade === 'alta')
+      return { itens, total: itens.length }
+    })
     await escolherNoSeletor(user, 'Prioridade', 'Alta')
     await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ colunaId: 'col1', pagina: 1, prioridade: 'alta' })))
-    expect(indicadoresDoQuadro).toHaveBeenLastCalledWith(expect.objectContaining({ quadroId: 'q1', prioridade: 'alta' }))
+    // Quantos com o filtro: a soma das contagens das colunas filtradas (do banco), não os números do topo.
+    expect(await screen.findByText(/^1 cartão com esses filtros\./)).toBeInTheDocument()
     expect(screen.getByText(/Com filtro ligado não dá para arrastar/)).toBeInTheDocument()
     await arrastarComTeclado(screen.getByRole('button', { name: 'Cartão Mapear boletos' }), ['baixo'])
     expect(moverCartao).not.toHaveBeenCalled()
@@ -341,6 +353,26 @@ describe('filtros', () => {
     expect(pessoasDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ quadroId: 'q1' }))
     await escolherNoSeletor(user, 'Prazo', 'Atrasados')
     await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ prazo: 'atrasados', responsavel: 'g1' })))
+  })
+
+  it('os 4 números seguem só o Responsável: busca, Prioridade e Prazo não mudam os números', async () => {
+    const user = userEvent.setup()
+    tela()
+    const numeros = await cartoesAbaixoDaBarra('Indicadores do quadro')
+    await pronto()
+    expect(indicadoresDoQuadro).toHaveBeenCalledTimes(1)
+    expect(indicadoresDoQuadro).toHaveBeenCalledWith({ quadroId: 'q1', responsavel: '' })
+    await escolherNoSeletor(user, 'Prioridade', 'Alta')
+    await escolherNoSeletor(user, 'Prazo', 'Atrasados')
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar cartões' }), 'boleto')
+    await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ busca: 'boleto', prazo: 'atrasados' })))
+    expect(indicadoresDoQuadro).toHaveBeenCalledTimes(1)
+    expect(numeroDoCartao(numeros, 'Cartões no quadro')).toBe('4')
+    vi.mocked(indicadoresDoQuadro).mockResolvedValue({ cartoes: 2, atrasados: 0, vencem_em_7_dias: 1, sem_responsavel: 0 })
+    await escolherNoSeletor(user, 'Responsável', 'Gabi Souza')
+    await waitFor(() => expect(indicadoresDoQuadro).toHaveBeenLastCalledWith({ quadroId: 'q1', responsavel: 'g1' }))
+    expect(indicadoresDoQuadro).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(numeroDoCartao(numeros, 'Cartões no quadro')).toBe('2'))
   })
 
   it('busca no banco, depois que a pessoa para de digitar', async () => {
@@ -366,6 +398,80 @@ describe('colunas', () => {
     expect(cartoesDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ colunaId: 'col1', pagina: 2 }))
     expect(await screen.findByRole('button', { name: 'Cartão Tarefa 51' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cartão Tarefa 1' })).toBeInTheDocument()
+  })
+
+  it('releitura (tempo real) no meio do "ver mais": a página pedida entra junto e o botão não fica preso', async () => {
+    const muitos = Array.from({ length: 50 }, (_, i) => cartao(`m${i}`, 'col1', `Tarefa ${i + 1}`))
+    let falharVerMais
+    let paginas2 = 0
+    vi.mocked(cartoesDoQuadro).mockImplementation(async ({ colunaId, pagina }) => {
+      if (colunaId !== 'col1') return { itens: cartoes[colunaId], total: cartoes[colunaId].length }
+      if (pagina === 1) return { itens: muitos, total: 53 }
+      paginas2 += 1
+      // O primeiro pedido da página 2 (o "ver mais") demora e depois falha: já foi atropelado, não pode avisar nada.
+      if (paginas2 === 1) return new Promise((_, rejeitar) => { falharVerMais = rejeitar })
+      return { itens: [cartao('m50', 'col1', 'Tarefa 51')], total: 53 }
+    })
+    const user = userEvent.setup()
+    tela()
+    await user.click(await screen.findByRole('button', { name: 'Ver mais 3 cartões' }))
+    await act(async () => avisar({
+      eventos: [{ tabela: 'cartoes', operacao: 'update', cartoes: ['m3'], colunas: ['col1'] }],
+      tudo: false, acesso: false, tabelas: ['cartoes'], colunas: ['col1'], cartoes: ['m3'],
+    }))
+    expect(await screen.findByRole('button', { name: 'Cartão Tarefa 51' })).toBeInTheDocument()
+    const verMais = screen.getByRole('button', { name: 'Ver mais 2 cartões' })
+    expect(verMais).toBeEnabled()
+    await act(async () => falharVerMais(new Error('rede')))
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(screen.getAllByRole('button', { name: 'Cartão Tarefa 51' })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Ver mais 2 cartões' })).toBeEnabled()
+  })
+
+  it('"ver mais" no meio de uma releitura não perde a releitura: ela é refeita depois', async () => {
+    const muitos = Array.from({ length: 50 }, (_, i) => cartao(`m${i}`, 'col1', `Tarefa ${i + 1}`))
+    let leituraVelha
+    let novo = false
+    let paginas1 = 0
+    vi.mocked(cartoesDoQuadro).mockImplementation(async ({ colunaId, pagina }) => {
+      if (colunaId !== 'col1') return { itens: cartoes[colunaId], total: cartoes[colunaId].length }
+      if (pagina === 2) return { itens: [cartao('m50', 'col1', 'Tarefa 51')], total: 53 }
+      paginas1 += 1
+      // A 2ª leitura da página 1 (a do aviso) demora; quando chega já está velha.
+      if (paginas1 === 2) return new Promise((pronto) => { leituraVelha = pronto })
+      const itens = novo ? [cartao('n1', 'col1', 'Feito por outra pessoa'), ...muitos.slice(0, 49)] : muitos
+      return { itens, total: novo ? 54 : 53 }
+    })
+    const user = userEvent.setup()
+    tela()
+    await screen.findByRole('button', { name: 'Ver mais 3 cartões' })
+    novo = true
+    await act(async () => avisar({
+      eventos: [{ tabela: 'cartoes', operacao: 'insert', cartoes: ['n1'], colunas: ['col1'] }],
+      tudo: false, acesso: false, tabelas: ['cartoes'], colunas: ['col1'], cartoes: ['n1'],
+    }))
+    await user.click(screen.getByRole('button', { name: 'Ver mais 3 cartões' }))
+    // O aviso não se perde: depois do "ver mais", a coluna é relida (páginas 1 e 2) e o cartão novo aparece.
+    expect(await screen.findByRole('button', { name: 'Cartão Feito por outra pessoa' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cartão Tarefa 51' })).toBeInTheDocument()
+    await act(async () => leituraVelha({ itens: muitos, total: 53 }))
+    expect(screen.getByRole('button', { name: 'Cartão Feito por outra pessoa' })).toBeInTheDocument()
+  })
+
+  it('"ver mais" recusado por permissão relê o quadro (sem aviso de erro de rede)', async () => {
+    const muitos = Array.from({ length: 50 }, (_, i) => cartao(`m${i}`, 'col1', `Tarefa ${i + 1}`))
+    vi.mocked(cartoesDoQuadro).mockImplementation(async ({ colunaId, pagina }) => {
+      if (colunaId !== 'col1') return { itens: cartoes[colunaId], total: cartoes[colunaId].length }
+      if (pagina === 2) throw { code: 'P0001', message: 'sem_permissao' }
+      return { itens: muitos, total: 53 }
+    })
+    const user = userEvent.setup()
+    tela()
+    const verMais = await screen.findByRole('button', { name: 'Ver mais 3 cartões' })
+    vi.mocked(quadroDoCliente).mockResolvedValue(null)
+    await user.click(verMais)
+    expect(await screen.findByText('Você não tem mais acesso a este quadro.')).toBeInTheDocument()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 
   it('+ Nova coluna no fim do quadro', async () => {
@@ -498,6 +604,46 @@ describe('tempo real', () => {
     await act(async () => avisar({ eventos: [{ motivo: 'conectou' }], tudo: true, acesso: false, tabelas: [], colunas: [], cartoes: [] }))
     await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledTimes(3))
     expect(quadroDoCliente).toHaveBeenCalledWith('k1')
+  })
+
+  it('"reler tudo" atropelado por outra leitura do quadro: a leitura que vale relê todas as colunas', async () => {
+    vi.mocked(quadroDoCliente).mockResolvedValue({ ...QUADRO, pode_gerir: true })
+    const user = userEvent.setup()
+    tela(gestora)
+    await pronto()
+    vi.mocked(cartoesDoQuadro).mockClear()
+    vi.mocked(indicadoresDoQuadro).mockClear()
+    let leituraVelha
+    vi.mocked(quadroDoCliente).mockReturnValueOnce(new Promise((pronto) => { leituraVelha = pronto }))
+    await act(async () => avisar({ eventos: [{ motivo: 'reconectou' }], tudo: true, acesso: false, tabelas: [], colunas: [], cartoes: [] }))
+    // Abrir "Apagar coluna" relê o quadro e atropela a leitura do "reler tudo".
+    await user.click(screen.getByRole('button', { name: 'Apagar a coluna Em andamento' }))
+    await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledTimes(3))
+    expect(cartoesDoQuadro.mock.calls.map(([p]) => p.colunaId).sort()).toEqual(['col1', 'col2', 'col3'])
+    expect(indicadoresDoQuadro).toHaveBeenCalled()
+    await act(async () => leituraVelha({ ...QUADRO, pode_gerir: true }))
+    expect(cartoesDoQuadro).toHaveBeenCalledTimes(3)
+  })
+
+  it('sessão que deixou de valer (sem_permissao) numa releitura do quadro: para de ouvir e avisa', async () => {
+    tela()
+    await pronto()
+    vi.mocked(quadroDoCliente).mockRejectedValue({ code: 'P0001', message: 'sem_permissao' })
+    await act(async () => avisar({ eventos: [{ motivo: 'plano_b' }], tudo: true, acesso: false, tabelas: [], colunas: [], cartoes: [] }))
+    expect(await screen.findByText('Você não tem mais acesso a este quadro.')).toBeInTheDocument()
+    expect(parar).toHaveBeenCalled()
+  })
+
+  it('números recusados (sem_permissao) relêem o quadro, e quem não vê mais recebe o aviso', async () => {
+    tela()
+    await pronto()
+    vi.mocked(indicadoresDoQuadro).mockRejectedValue({ code: 'P0001', message: 'sem_permissao' })
+    vi.mocked(quadroDoCliente).mockResolvedValue(null)
+    await act(async () => avisar({
+      eventos: [{ tabela: 'cartao_comentarios', operacao: 'insert', cartoes: ['c4'], colunas: ['col2'] }],
+      tudo: false, acesso: false, tabelas: ['cartao_comentarios'], colunas: ['col2'], cartoes: ['c4'],
+    }))
+    expect(await screen.findByText('Você não tem mais acesso a este quadro.')).toBeInTheDocument()
   })
 
   it('quem perdeu o acesso para de ouvir e vê o aviso', async () => {

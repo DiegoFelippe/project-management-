@@ -42,10 +42,19 @@ describe('JanelaArquivados', () => {
     expect(cartoesArquivados).toHaveBeenCalledWith({ quadroId: 'q1', busca: '', pagina: 1 })
     expect(within(tabela).getByText('Arquivado 1')).toBeInTheDocument()
     expect(within(tabela).getAllByText('A fazer')).toHaveLength(2)
+    expect(screen.getByRole('navigation', { name: 'Paginação' })).toBeInTheDocument()
     expect(screen.getByText('1–15 de 16')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Próxima/ }))
     expect(cartoesArquivados).toHaveBeenCalledWith({ quadroId: 'q1', busca: '', pagina: 2 })
     expect(await within(tabela).findByText('Arquivado 16')).toBeInTheDocument()
+  })
+
+  it('com 15 ou menos, a paginação some', async () => {
+    vi.mocked(cartoesArquivados).mockResolvedValue({ itens: [arquivado(1), arquivado(2)], total: 15 })
+    abrir()
+    await screen.findByRole('table', { name: 'Cartões arquivados' })
+    expect(screen.queryByRole('navigation', { name: 'Paginação' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Próxima/ })).not.toBeInTheDocument()
   })
 
   it('busca no banco e volta para a página 1', async () => {

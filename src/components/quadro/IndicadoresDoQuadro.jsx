@@ -1,8 +1,9 @@
 import { AlarmClock, CalendarClock, LayoutList, UserX } from 'lucide-react'
 import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 
-// Os 4 números do quadro, como no Mochi, contados no banco (indicadores_do_quadro) com os filtros da barra: só cartões
-// não arquivados; atrasados e "vencem em 7 dias" sem as colunas de concluídos. Sem `indicadores` (carregando), "—".
+// Os 4 números do quadro, como no Mochi, contados no banco (indicadores_do_quadro): só cartões não arquivados; atrasados
+// e "vencem em 7 dias" sem as colunas de concluídos. Seguem só o filtro de responsável da barra (busca, prioridade e
+// prazo não mudam os números, como nas outras telas: CLAUDE.md). Sem `indicadores` (carregando), "—".
 const CARTOES = [
   { chave: 'cartoes', rotulo: 'Cartões no quadro', icone: LayoutList, tom: 'azul' },
   { chave: 'atrasados', rotulo: 'Atrasados', icone: AlarmClock, tom: 'perigo', destaque: 'perigo' },

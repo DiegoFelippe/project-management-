@@ -54,6 +54,10 @@ export default function QuadroDoCliente({ cliente, perfil, aoAbrirCartao = nada 
   const podeMexer = quadro.pode_mexer
   const filtrando = temFiltro(filtros)
   const hoje = hojeEmSP()
+  // Quantos cartões passam pelos filtros: a soma das contagens do banco de cada coluna filtrada (os números do topo
+  // seguem só o responsável). Enquanto alguma coluna não chegou, a frase fica sem o número.
+  const totais = quadro.colunas.map((c) => colunas[c.id]?.total)
+  const comFiltro = totais.every((t) => typeof t === 'number') ? totais.reduce((soma, t) => soma + t, 0) : null
 
   // Mudança numa coluna: mostra na hora; se o banco recusar, avisa e relê o quadro.
   async function mudarColuna(coluna, campos) {
@@ -138,7 +142,7 @@ export default function QuadroDoCliente({ cliente, perfil, aoAbrirCartao = nada 
           {somenteLeitura && <p>{somenteLeitura}</p>}
           {filtrando && (
             <p role="status">
-              {indicadores ? `${Number(indicadores.cartoes).toLocaleString('pt-BR')} ${Number(indicadores.cartoes) === 1 ? 'cartão' : 'cartões'} com esses filtros. ` : ''}
+              {comFiltro != null ? `${comFiltro.toLocaleString('pt-BR')} ${comFiltro === 1 ? 'cartão' : 'cartões'} com esses filtros. ` : ''}
               {podeMexer && 'Com filtro ligado não dá para arrastar cartões; limpe os filtros para reorganizar.'}
             </p>
           )}
@@ -149,8 +153,10 @@ export default function QuadroDoCliente({ cliente, perfil, aoAbrirCartao = nada 
         dragHandleUsageInstructions="Para arrastar, aperte espaço. Use as setas para mover, espaço de novo para soltar e Esc para cancelar.">
         <Droppable droppableId="colunas" type="coluna" direction="horizontal" isDropDisabled={!podeMexer}>
           {(provided) => (
+            // relative: o texto só para leitor de tela (position: absolute) fica preso aqui; sem isso, ele sai pelo
+            // <main> e, a 360 px, a página inteira rola para o lado.
             <div role="region" aria-label="Colunas do quadro"
-              className="flex items-start gap-4 overflow-x-auto pb-4">
+              className="relative flex items-start gap-4 overflow-x-auto pb-4">
               <div ref={provided.innerRef} {...provided.droppableProps} className="flex items-start gap-4">
                 {quadro.colunas.map((coluna, i) => (
                   <Draggable key={coluna.id} draggableId={coluna.id} index={i} isDragDisabled={!podeMexer}>
