@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
-import BarraDeFiltros, { AcaoPrincipal } from '@/components/comum/BarraDeFiltros'
+import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
@@ -21,6 +21,7 @@ import { POR_PAGINA } from '@/data/paginar'
 import { colunasDoMes, formatarHoras, formatarOcupacao } from '@/lib/horas'
 import { mesAtual } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
+import { useAtraso } from '@/lib/useAtraso'
 import { urlPublica } from '@/lib/imagem'
 import { criarAcesso } from '@/data/usuarios'
 
@@ -32,6 +33,8 @@ export default function Consultorias() {
   const { perfil } = useAuth()
   const abas = veTudo(perfil) ? [...ABAS, ABA_OCUPACAO] : ABAS
   const [mes, setMes] = useState(mesAtual)
+  const [busca, setBusca] = useState('')
+  const buscaAtrasada = useAtraso(busca.trim(), 300)
   const [resultado, setResultado] = useState(null)
   const [pagina, setPagina] = useState(1)
   const [erro, setErro] = useState(null)
@@ -82,7 +85,7 @@ export default function Consultorias() {
     let ativo = true
     // "Ocupação do mês": uma página do resumo por consultoria, calculado no banco.
     const pedido = emOcupacao
-      ? consultoriasPorOcupacao({ limite: POR_PAGINA, deslocamento: (pagina - 1) * POR_PAGINA, mes })
+      ? consultoriasPorOcupacao({ limite: POR_PAGINA, deslocamento: (pagina - 1) * POR_PAGINA, mes, busca: buscaAtrasada || undefined })
         .then((r) => ({ ...r, foraDaFaixa: r.itens.length === 0 }))
       : listarConsultorias({ arquivadas: filtro === 'arquivadas', pagina })
     pedido
@@ -96,7 +99,7 @@ export default function Consultorias() {
     return () => {
       ativo = false
     }
-  }, [filtro, emOcupacao, mes, pagina, versao])
+  }, [filtro, emOcupacao, mes, buscaAtrasada, pagina, versao])
 
   async function criar(dados) {
     const resposta = await criarConsultoria(dados)
@@ -131,6 +134,10 @@ export default function Consultorias() {
       <BarraDeFiltros>
         <AbasSegmentadas rotulo="Mostrar" abas={abas} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1); setResultado(null) }} />
         {emOcupacao && <NavegacaoDoMes mes={mes} aoMudar={(m) => { setMes(m); setPagina(1); setResultado(null) }} />}
+        {emOcupacao && (
+          <CampoBusca rotulo="Buscar consultorias" placeholder="Buscar consultoria" valor={busca}
+            aoMudar={(texto) => { setBusca(texto); setPagina(1) }} />
+        )}
         {!emOcupacao && (
           <AcaoPrincipal>
             <Button onClick={() => setNova(true)}>
@@ -143,7 +150,7 @@ export default function Consultorias() {
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as consultorias…" className="py-12" />}
       {resultado && lista.length === 0 && (
         <ListaVazia>
-          {emOcupacao ? 'Nenhuma consultoria ainda.' : filtro === 'ativas' ? 'Nenhuma consultoria ainda. Cadastre a primeira em "Nova consultoria".' : 'Nenhuma consultoria arquivada.'}
+          {emOcupacao ? (buscaAtrasada ? 'Nenhuma consultoria encontrada.' : 'Nenhuma consultoria ainda.') : filtro === 'ativas' ? 'Nenhuma consultoria ainda. Cadastre a primeira em "Nova consultoria".' : 'Nenhuma consultoria arquivada.'}
         </ListaVazia>
       )}
       {lista.length > 0 && emOcupacao && (

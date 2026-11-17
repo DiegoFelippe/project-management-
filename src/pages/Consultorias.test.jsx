@@ -131,6 +131,20 @@ describe('Consultorias', () => {
       expect(within(tabela).getByRole('columnheader', { name: 'Ocupação' })).toBeInTheDocument()
     })
 
+    it('a busca vai para o banco e volta para a página 1', async () => {
+      vi.mocked(consultoriasPorOcupacao).mockResolvedValue({
+        itens: Array.from({ length: 15 }, (_, i) => ({ id: `c${i}`, nome: `Consultoria ${i}`, consultores: 1, capacidade: 40, reservado: 0, realizado: 0, ocupacao: 0, clientes: 0, aguardando: 0 })),
+        total: 20,
+      })
+      renderizarTela(<Consultorias />, { perfil: dono })
+      await userEvent.click(await screen.findByRole('button', { name: 'Ocupação do mês' }))
+      await screen.findByRole('table', { name: 'Ocupação do mês' })
+      await userEvent.click(screen.getByRole('button', { name: /Próxima/ }))
+      await vi.waitFor(() => expect(consultoriasPorOcupacao).toHaveBeenLastCalledWith({ limite: 15, deslocamento: 15, mes: mesAtual() }))
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar consultorias' }), 'Acme')
+      await vi.waitFor(() => expect(consultoriasPorOcupacao).toHaveBeenLastCalledWith({ busca: 'Acme', limite: 15, deslocamento: 0, mes: mesAtual() }))
+    })
+
     it('Próxima pede a página 2 ao banco quando passa de 15', async () => {
       vi.mocked(consultoriasPorOcupacao).mockResolvedValue({
         itens: Array.from({ length: 15 }, (_, i) => ({ id: `c${i}`, nome: `Consultoria ${i}`, consultores: 1, capacidade: 40, reservado: 0, realizado: 0, ocupacao: 0, clientes: 0, aguardando: 0 })),
@@ -147,7 +161,7 @@ describe('Consultorias', () => {
       renderizarTela(<Consultorias />, { perfil: dono })
       await userEvent.click(await screen.findByRole('button', { name: 'Ocupação do mês' }))
       await screen.findByRole('table', { name: 'Ocupação do mês' })
-      await userEvent.click(screen.getByRole('button', { name: /Anterior/ }))
+      await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
       await vi.waitFor(() => expect(consultoriasPorOcupacao).toHaveBeenLastCalledWith({ limite: 15, deslocamento: 0, mes: deslocarMes(mesAtual(), -1) }))
       const tabela = await screen.findByRole('table', { name: 'Ocupação do mês' })
       expect(within(tabela).getByRole('columnheader', { name: 'Utilização' })).toBeInTheDocument()
