@@ -38,7 +38,7 @@ type Linha = {
   google_evento_id: string | null
   criado_por: string | null
 }
-type Pessoa = { id: string; nome: string; consultoria_id: string | null }
+type Pessoa = { id: string; nome: string; consultoria_id: string | null; ativo: boolean }
 type Participantes = { perfis: string[]; emails: string[] }
 type Passo = () => Promise<unknown>
 
@@ -240,7 +240,7 @@ async function lerEvento(db: Banco, id: string): Promise<Linha | null> {
 }
 
 async function lerPessoa(db: Banco, id: string): Promise<Pessoa | null> {
-  return conferir(await db.from('perfis').select('id, nome, consultoria_id').eq('id', id).maybeSingle())
+  return conferir(await db.from('perfis').select('id, nome, consultoria_id, ativo').eq('id', id).maybeSingle())
 }
 
 async function lerParticipantes(db: Banco, eventoId: string): Promise<Participantes> {
@@ -497,8 +497,11 @@ export async function salvarEvento(db: Banco, googleDe: GoogleDe, quem: Quem, da
 }
 
 // Apagar: cancela no Google do organizador (o Google avisa os convidados) e depois sai do banco, com os participantes.
-// A pasta da reunião fica nos Arquivos do cliente (só perde o vínculo com o evento). Organizador sem Google: sai só do
-// app, com aviso. Google recusou: nada muda.
+// A pasta da reunião fica nos Arquivos do cliente (só perde o vínculo com o evento).
+// Sai só do app, com aviso, quando o Google do organizador não tem como cancelar: ele não conectou; a conexão dele não
+// vale mais (já marcada, ou o Google responde agora que é preciso reconectar — ex.: a conta foi suspensa quando a pessoa
+// saiu); ou o acesso dele está desativado (quem saiu não reconecta, e a gestão não pode ficar sem apagar). Outra recusa
+// do Google (sem permissão, fora do ar, rede): nada muda, e dá para tentar de novo.
 export async function apagarEvento(db: Banco, googleDe: GoogleDe, quem: Quem, id: unknown) {
   const eventoId = uuid(id, 'id')
   await conferirQuem(db, quem)
@@ -511,15 +514,23 @@ export async function apagarEvento(db: Banco, googleDe: GoogleDe, quem: Quem, id
   let aviso: string | undefined
   if (atual.google_evento_id) {
     const organizador = (await lerPessoa(db, atual.consultor_id))!
-    const google = await googleDe(atual.consultor_id)
-    if (google) {
+    const soNoApp = (motivo: string) =>
+      `Saiu só do app: ${motivo}. O evento pode continuar no Google Agenda de ${organizador.nome}.`
+    const quebrada = `o Google de ${organizador.nome} não aceita mais a conexão`
+    const conexao = conferir(
+      await db.from('google_pessoas').select('erro').eq('perfil_id', organizador.id).maybeSingle(),
+    ) as { erro: string | null } | null
+    const google = organizador.ativo && conexao && !conexao.erro ? await googleDe(organizador.id) : null
+    if (!organizador.ativo) aviso = soNoApp(`o acesso de ${organizador.nome} está desativado`)
+    else if (conexao?.erro) aviso = soNoApp(quebrada)
+    else if (!google) aviso = soNoApp(`${organizador.nome} não conectou o Google`)
+    else {
       try {
         await google.apagarEvento(atual.google_evento_id)
       } catch (erro) {
-        throw falhaDoGoogle(erro, organizador, quem)
+        if (!(erro instanceof ErroDoGoogle) || erro.codigo !== 'reconectar') throw falhaDoGoogle(erro, organizador, quem)
+        aviso = soNoApp(quebrada)
       }
-    } else {
-      aviso = `Saiu só do app: ${organizador.nome} não conectou o Google, e o evento continua no Google Agenda.`
     }
   }
   conferir(await db.from('agenda_eventos').delete().eq('id', eventoId))

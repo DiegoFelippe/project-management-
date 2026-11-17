@@ -393,9 +393,81 @@ describe('agenda: criar, editar, apagar e responder (núcleo da Edge Function, G
     await admin.from('google_pessoas').delete().eq('perfil_id', semGoogle.id)
     expect(await apagar(p.gestora, e.id)).toEqual({
       ok: true,
-      aviso: `Saiu só do app: ${semGoogle.nome} não conectou o Google, e o evento continua no Google Agenda.`,
+      aviso: `Saiu só do app: ${semGoogle.nome} não conectou o Google. ` +
+        `O evento pode continuar no Google Agenda de ${semGoogle.nome}.`,
     })
     expect(await linha(e.id)).toBeNull()
+  })
+
+  it('colega da mesma consultoria, sem convite, não edita nem apaga o evento (nem mandando novo: true)', async () => {
+    const { evento: e } = await salvar(p.ana, evento({ participantes: [p.beto.id], convidados: ['contato@cliente.test'] }))
+    const antes = google.pedidos.length
+    const tentativas = [
+      () => salvar(p.edu, { id: e.id, titulo: 'Do colega' }),
+      // novo: true com o id do evento dela cai na edição, e a edição recusa
+      () => salvar(p.edu, { ...evento({ titulo: 'Do colega', convidados: [] }), id: e.id }),
+      () => apagar(p.edu, e.id),
+    ]
+    for (const tentar of tentativas) {
+      expect(await recusa(tentar())).toMatchObject({ status: 404, codigo: 'evento_nao_encontrado' })
+    }
+    expect(google.pedidos.length).toBe(antes)
+    expect(await linha(e.id)).toMatchObject({ titulo: 'Kickoff com o cliente', consultor_id: p.ana.id, criado_por: p.ana.id })
+    expect(quemParticipa(await participantes(e.id))).toEqual([p.beto.id, 'contato@cliente.test'].sort())
+    expect(google.evento(p.ana.googleEmail, e.google_evento_id)).toMatchObject({
+      summary: 'Kickoff com o cliente',
+      status: 'confirmed',
+    })
+  })
+
+  it('apagar com o Google do organizador quebrado ou com o acesso desativado: sai só do app; outra recusa do Google não apaga', async () => {
+    const saiu = await pessoa('pessoa', C, { comGoogle: true })
+    const criar = async () => (await salvar(p.gestora, evento({ consultor_id: saiu.id, convidados: ['contato@cliente.test'] }))).evento
+    const e1 = await criar()
+    const e2 = await criar()
+    const quebrado = `Saiu só do app: o Google de ${saiu.nome} não aceita mais a conexão. ` +
+      `O evento pode continuar no Google Agenda de ${saiu.nome}.`
+
+    // Google fora do ar (5xx): continua recusando (dá para tentar de novo), e nada muda.
+    google.falhar({ url: `${EVENTOS}/${e1.google_evento_id}`, metodo: 'DELETE', status: 503 })
+    expect(await recusa(apagar(p.gestora, e1.id))).toMatchObject({
+      status: 502,
+      codigo: 'google_recusou',
+      extra: { motivo: 'recusado' },
+    })
+    expect(await linha(e1.id)).not.toBeNull()
+
+    // A conta do Google dele foi suspensa (invalid_grant): a gestão apaga, sai só do app, com aviso.
+    google.revogarConta(saiu.googleEmail)
+    expect(await apagar(p.gestora, e1.id)).toEqual({ ok: true, aviso: quebrado })
+    expect(await linha(e1.id)).toBeNull()
+    expect(await participantes(e1.id)).toEqual([])
+    expect(google.evento(saiu.googleEmail, e1.google_evento_id).status).toBe('confirmed')
+    const conexao = await admin.from('google_pessoas').select('erro').eq('perfil_id', saiu.id).single()
+    expect(conexao.data.erro).toMatch(/Reconecte o Google/)
+
+    // Com a conexão já marcada como quebrada, nem tenta o Google.
+    const antes = google.pedidos.length
+    expect(await apagar(p.gestora, e2.id)).toEqual({ ok: true, aviso: quebrado })
+    expect(await linha(e2.id)).toBeNull()
+    expect(google.pedidos.length).toBe(antes)
+
+    // Organizador com o acesso desativado (saiu da consultoria), mesmo com o Google ainda valendo: sai só do app, sem
+    // mexer no Google dele.
+    const desativado = await pessoa('pessoa', C, { comGoogle: true })
+    const { evento: e3 } = await salvar(p.gestora, evento({ consultor_id: desativado.id }))
+    const desativar = await admin.from('perfis')
+      .update({ ativo: false, desativado_em: new Date().toISOString() }).eq('id', desativado.id)
+    if (desativar.error) throw desativar.error
+    const antesDoDesativado = google.pedidos.length
+    expect(await apagar(p.gestora, e3.id)).toEqual({
+      ok: true,
+      aviso: `Saiu só do app: o acesso de ${desativado.nome} está desativado. ` +
+        `O evento pode continuar no Google Agenda de ${desativado.nome}.`,
+    })
+    expect(await linha(e3.id)).toBeNull()
+    expect(google.pedidos.length).toBe(antesDoDesativado)
+    expect(google.evento(desativado.googleEmail, e3.google_evento_id).status).toBe('confirmed')
   })
 
   it('outra consultoria recusada', async () => {
