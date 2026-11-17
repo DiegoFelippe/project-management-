@@ -3,12 +3,12 @@ import { traduzirErroBanco } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import { buscarPagina } from './paginar'
 
-const GESTOR = 'gestor:perfis!times_gestor_id_fkey(id, nome, foto)'
+const GESTOR = 'gestor:perfis!times_gestor_id_fkey(id, nome, foto, cor)'
 const CAMPOS = `id, nome, descricao, consultoria_id, gestor_id, ${GESTOR}`
 // Na lista: só os 4 primeiros rostos e o total de membros (contado no banco), nunca todos os membros.
 const ROSTOS = 4
 const CAMPOS_DA_LISTA =
-  `${CAMPOS}, membros:time_membros(pessoa:perfis!time_membros_pessoa_id_fkey(id, nome, foto)), total:time_membros(count)`
+  `${CAMPOS}, membros:time_membros(pessoa:perfis!time_membros_pessoa_id_fkey(id, nome, foto, cor)), total:time_membros(count)`
 
 // Uma página de times, paginada no banco. Membro que quem olha não pode ver vem nulo e fica de fora.
 export async function listarTimes({ consultoriaId, pagina = 1 } = {}) {
@@ -47,7 +47,7 @@ export async function buscarTime(id) {
 export async function listarMembros(timeId, { pagina = 1 } = {}) {
   const consulta = supabase
     .from('time_membros')
-    .select('pessoa:perfis!time_membros_pessoa_id_fkey(id, nome, email, foto, papel)', { count: 'exact' })
+    .select('pessoa:perfis!time_membros_pessoa_id_fkey(id, nome, email, foto, cor, papel)', { count: 'exact' })
     .eq('time_id', timeId)
     .order('pessoa(nome)')
     .order('pessoa_id')

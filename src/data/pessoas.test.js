@@ -16,7 +16,7 @@ describe('buscarPessoas', () => {
     banco.resposta = { data: [{ id: 'g1', nome: 'Gil' }], error: null, count: 45 }
     expect(await buscarPessoas({ consultoriaId: 'c1', papeis: ['gestor', 'admin'], termo: 'gi' })).toEqual({ itens: [{ id: 'g1', nome: 'Gil' }], total: 45 })
     expect(banco.chamou('from', 'perfis')).toBe(true)
-    expect(banco.chamou('select', 'id, nome, email, papel, foto', { count: 'exact' })).toBe(true)
+    expect(banco.chamou('select', 'id, nome, email, papel, foto, cor', { count: 'exact' })).toBe(true)
     expect(banco.chamou('eq', 'consultoria_id', 'c1')).toBe(true)
     expect(banco.chamou('in', 'papel', ['gestor', 'admin'])).toBe(true)
     expect(banco.chamou('ilike', 'nome_busca', '%gi%')).toBe(true)

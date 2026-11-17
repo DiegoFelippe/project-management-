@@ -6,11 +6,11 @@ const MAXIMO_DE_IDS_NA_BUSCA = 100
 
 // Seletores de pessoa com busca no banco (nunca a lista inteira): pelo nome sem acento (ilike em nome_busca), em ordem de nome, `limite` por
 // vez. `papeis` filtra o papel e `excluirIds` esconde quem não deve aparecer (ex.: quem já está no time).
-// Devolve { itens: [{ id, nome, email, papel, foto }], total } (total = quantas combinam, para "N de TOTAL").
+// Devolve { itens: [{ id, nome, email, papel, foto, cor }], total } (total = quantas combinam, para "N de TOTAL").
 export async function buscarPessoas({ consultoriaId, papeis, termo = '', excluirIds = [], limite = 20 } = {}) {
   const ids = [...excluirIds]
   const noBanco = ids.slice(0, MAXIMO_DE_IDS_NA_BUSCA)
-  let consulta = supabase.from('perfis').select('id, nome, email, papel, foto', { count: 'exact' }).order('nome').order('id').limit(limite)
+  let consulta = supabase.from('perfis').select('id, nome, email, papel, foto, cor', { count: 'exact' }).order('nome').order('id').limit(limite)
   if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
   if (papeis) consulta = consulta.in('papel', papeis)
   if (noBanco.length) consulta = consulta.not('id', 'in', `(${noBanco.join(',')})`)

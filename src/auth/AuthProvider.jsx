@@ -5,7 +5,7 @@ import { adotarTemaDoPerfil } from '@/tema/tema'
 import { AuthContext } from './useAuth'
 
 const CAMPOS_PERFIL =
-  'id, nome, email, foto, papel, consultoria_id, precisa_trocar_senha, telefone, cidade, uf, cargo, data_entrada, carga_semanal, consultoria:consultorias(nome, logo), preferencias(tema)'
+  'id, nome, email, foto, cor, papel, consultoria_id, precisa_trocar_senha, telefone, cidade, uf, cargo, data_entrada, carga_semanal, consultoria:consultorias(nome, logo), preferencias(tema)'
 
 const resultado = (error) => ({ erro: error ? traduzirErroAuth(error) : null })
 

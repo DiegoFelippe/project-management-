@@ -4,7 +4,7 @@ import { chamarFuncao, supabase } from '@/lib/supabase'
 import { buscarPagina } from './paginar'
 
 const CAMPOS =
-  'id, nome, email, foto, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ativo, ' +
+  'id, nome, email, foto, cor, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ativo, ' +
   'telefone, cidade, uf, cargo, data_entrada, carga_semanal, ' +
   'consultoria:consultorias(nome), ' +
   'times:time_membros!time_membros_pessoa_id_fkey(time:times(id, nome))'

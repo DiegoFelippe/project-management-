@@ -8,7 +8,7 @@ import { buscarPagina, POR_PAGINA } from './paginar'
 
 const CAMPOS_DA_LISTA =
   'id, nome, razao_social, cnpj, cidade, uf, horas_mes, enviado_em, consultor_desde, arquivado, ' +
-  'consultoria_id, consultor_id, consultoria:consultorias(id, nome), consultor(id, nome, foto, ativo), ' +
+  'consultoria_id, consultor_id, consultoria:consultorias(id, nome), consultor(id, nome, foto, cor, ativo), ' +
   'realizado_no_mes'
 const CAMPOS_DO_CLIENTE =
   `${CAMPOS_DA_LISTA}, contato_nome, contato_telefone, contato_email, observacoes, criado_em, atualizado_em`

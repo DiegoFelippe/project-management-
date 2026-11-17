@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import Avatar from './Avatar'
+import { corDe } from '@/lib/cores'
 
 describe('Avatar', () => {
   it('mostra a foto quando a pessoa tem, e as iniciais quando não tem', () => {
@@ -9,5 +10,12 @@ describe('Avatar', () => {
     rerender(<Avatar pessoa={{ id: 'p1', nome: 'Ana Lima' }} />)
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(screen.getByText('AL')).toBeInTheDocument()
+  })
+
+  it('usa a cor escolhida pela pessoa e, sem escolha, a automática', () => {
+    const { rerender } = render(<Avatar pessoa={{ id: 'p1', nome: 'Ana Lima', cor: '#16a34a' }} />)
+    expect(screen.getByText('AL')).toHaveStyle({ backgroundColor: '#16a34a' })
+    rerender(<Avatar pessoa={{ id: 'p1', nome: 'Ana Lima', cor: null }} />)
+    expect(screen.getByText('AL')).toHaveStyle({ backgroundColor: corDe('p1') })
   })
 })
