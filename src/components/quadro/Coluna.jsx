@@ -72,8 +72,10 @@ function NomeNoLugar({ nome, aoSalvar, aoTerminar }) {
 }
 
 // Uma coluna do quadro (300 px): cabeçalho com o contador na cor da coluna, o nome e as ações de quem mexe (renomear,
-// cor e concluídos; apagar só a gestão); os cartões (lista onde se solta o arrasto); "ver mais" (50 por vez) e
-// "Adicionar cartão". `alca`: as dragHandleProps da coluna (reordenar arrastando o cabeçalho); nula para quem só lê.
+// cor e concluídos; apagar só a gestão); os cartões (lista onde se solta o arrasto) com o "ver mais" (50 por vez) no fim;
+// e "Adicionar cartão" no pé. A coluna vai até a altura da faixa e a lista rola por dentro: ela é a área de rolagem do
+// arrasto (a biblioteca rola a lista perto da borda e acompanha a rolagem). `alca`: as dragHandleProps da coluna
+// (reordenar arrastando o cabeçalho); nula para quem só lê.
 export default function Coluna({
   coluna, posicao, estado, hoje, podeMexer, podeApagar, arrastarCartoes, filtrando, alca,
   aoRenomear, aoMudarCor, aoMudarConcluidos, aoApagar, aoVerMais, aoNovoCartao, aoAbrirCartao,
@@ -91,8 +93,8 @@ export default function Coluna({
 
   return (
     <section aria-label={`Coluna ${coluna.nome}`}
-      className={cn('flex w-[300px] shrink-0 flex-col gap-2.5 rounded-2xl border p-2.5', escolhida ? paleta.corpo : CORPO_NEUTRO)}>
-      <div className="flex min-h-8 items-center justify-between gap-1 px-1 pt-0.5">
+      className={cn('flex min-h-0 w-[300px] flex-col gap-2.5 rounded-2xl border p-2.5', escolhida ? paleta.corpo : CORPO_NEUTRO)}>
+      <div className="flex min-h-8 shrink-0 items-center justify-between gap-1 px-1 pt-0.5">
         {renomeando ? (
           <NomeNoLugar nome={coluna.nome} aoSalvar={aoRenomear} aoTerminar={() => setRenomeando(false)} />
         ) : (
@@ -130,8 +132,10 @@ export default function Coluna({
 
       <Droppable droppableId={coluna.id} type="cartao" isDropDisabled={!arrastarCartoes}>
         {(provided, snapshot) => (
-          <div ref={provided.innerRef} {...provided.droppableProps}
-            className={cn('flex min-h-[90px] flex-col gap-2 rounded-xl p-0.5 transition-colors', snapshot.isDraggingOver && 'bg-primary/5 ring-2 ring-primary/25')}>
+          // A margem negativa deixa espaço para a sombra e o anel dos cartões sem cortar na borda da rolagem.
+          <div ref={provided.innerRef} {...provided.droppableProps} data-rolagem-da-coluna=""
+            className={cn('-mx-1.5 flex min-h-[90px] flex-col gap-2 overflow-x-hidden overflow-y-auto rounded-xl px-2 py-1 transition-colors [scrollbar-width:thin]',
+              snapshot.isDraggingOver && 'bg-primary/5 ring-2 ring-primary/25')}>
             {!itens && !estado?.erro && [0, 1].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-card/70" />)}
             {estado?.erro && <p role="alert" className="px-1 text-rotulo text-destructive">{estado.erro}</p>}
             {itens?.length === 0 && !snapshot.isDraggingOver && (
@@ -145,19 +149,19 @@ export default function Coluna({
                 arrastavel={arrastarCartoes} aoAbrir={aoAbrirCartao} />
             ))}
             {provided.placeholder}
+            {faltam > 0 && itens && (
+              <Button type="button" variant="ghost" size="sm" className="w-full shrink-0" disabled={estado?.carregandoMais} onClick={aoVerMais}>
+                {estado?.carregandoMais ? <Loader2 className="animate-spin" /> : <ChevronsDown />}
+                Ver mais {contar(proxima, 'cartão', 'cartões')}
+                {faltam > proxima && <span className="font-normal text-muted-foreground tabular-nums">· faltam {faltam.toLocaleString('pt-BR')}</span>}
+              </Button>
+            )}
           </div>
         )}
       </Droppable>
 
-      {faltam > 0 && itens && (
-        <Button type="button" variant="ghost" size="sm" className="w-full" disabled={estado?.carregandoMais} onClick={aoVerMais}>
-          {estado?.carregandoMais ? <Loader2 className="animate-spin" /> : <ChevronsDown />}
-          Ver mais {contar(proxima, 'cartão', 'cartões')}
-          {faltam > proxima && <span className="font-normal text-muted-foreground tabular-nums">· faltam {faltam.toLocaleString('pt-BR')}</span>}
-        </Button>
-      )}
       {podeMexer && (
-        <Button type="button" variant="ghost" size="sm" className="w-full" aria-label={`Adicionar cartão em ${coluna.nome}`} onClick={aoNovoCartao}>
+        <Button type="button" variant="ghost" size="sm" className="w-full shrink-0" aria-label={`Adicionar cartão em ${coluna.nome}`} onClick={aoNovoCartao}>
           <Plus /> Adicionar cartão
         </Button>
       )}

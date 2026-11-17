@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -215,6 +215,30 @@ describe('aba Quadro: o que cada um vê', () => {
     await waitFor(() => expect(quadroPorId).toHaveBeenCalledWith('q0'))
     await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ quadroId: 'q0', colunaId: 'col1' })))
     expect(ouvirQuadro).toHaveBeenLastCalledWith('q0', expect.any(Function), { juntarMs: 300 })
+    // O quadro escolhido é de quem atendeu antes: a barra diz.
+    expect(await screen.findByText('Atendeu antes')).toBeInTheDocument()
+  })
+
+  it('a central vê que o quadro é de uma consultoria anterior mesmo quando é o único (sem seletor)', async () => {
+    vi.mocked(quadrosDoCliente).mockResolvedValue([
+      { id: 'q0', atual: false, criado_em: '2026-10-01T10:00:00Z', consultoria: { id: 's0', nome: 'Consultoria Alfa' } },
+    ])
+    vi.mocked(quadroPorId).mockImplementation(async (id) => ({ ...QUADRO, id, pode_mexer: false }))
+    tela(central)
+    await pronto()
+    expect(quadroPorId).toHaveBeenCalledWith('q0')
+    expect(screen.queryByLabelText('Consultoria')).not.toBeInTheDocument()
+    expect(screen.getByText('Atendeu antes · Consultoria Alfa')).toBeInTheDocument()
+  })
+
+  it('o quadro da consultoria que atende hoje não ganha o aviso', async () => {
+    vi.mocked(quadrosDoCliente).mockResolvedValue([
+      { id: 'q1', atual: true, criado_em: '2026-11-10T10:00:00Z', consultoria: { id: 's1', nome: 'Consultoria Beta' } },
+    ])
+    vi.mocked(quadroPorId).mockImplementation(async (id) => ({ ...QUADRO, id, pode_mexer: false }))
+    tela(central)
+    await pronto()
+    expect(screen.queryByText(/Atendeu antes/)).not.toBeInTheDocument()
   })
 
   it('cliente arquivado: o quadro é só para ler', async () => {
@@ -335,6 +359,117 @@ describe('aba Quadro: o que cada um vê', () => {
     expect(screen.getByRole('button', { name: 'Adicionar cartão em A fazer' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Coluna A fazer' }).closest('[data-rfd-draggable-id]').firstElementChild)
       .toHaveClass('w-[300px]')
+  })
+})
+
+// Área que rola nos testes (o jsdom não rola): scrollTop e scrollLeft guardam o valor.
+const rolavel = (el) => {
+  const valor = { scrollTop: 0, scrollLeft: 0 }
+  for (const campo of Object.keys(valor)) {
+    Object.defineProperty(el, campo, { configurable: true, get: () => valor[campo], set: (v) => { valor[campo] = v } })
+  }
+  return el
+}
+
+// Arrasto com o mouse (o do teclado é cancelado pela biblioteca quando a roda gira): aperta, passa do limite de 5 px
+// (levanta), move até o ponto e solta.
+const esperarQuadro = () => act(() => new Promise((pronto) => setTimeout(pronto, 40)))
+async function levantarComMouse(alca) {
+  const { left, top } = alca.getBoundingClientRect()
+  const ponto = { x: left + 10, y: top + 10 }
+  fireEvent.mouseDown(alca, { button: 0, clientX: ponto.x, clientY: ponto.y })
+  fireEvent.mouseMove(alca, { button: 0, clientX: ponto.x, clientY: ponto.y + 10 })
+  await esperarQuadro()
+  return ponto
+}
+async function soltarComMouse(alca, { x, y }) {
+  fireEvent.mouseMove(alca, { button: 0, clientX: x, clientY: y })
+  await esperarQuadro()
+  fireEvent.mouseUp(alca, { button: 0, clientX: x, clientY: y })
+  await esperarQuadro()
+  // A animação de soltar espera o fim da transição (o jsdom não anima).
+  fireEvent.transitionEnd(alca, { propertyName: 'transform' })
+  await esperarQuadro()
+}
+
+describe('rolagem (decisão do Diego: o quadro ocupa o resto da tela e cada coluna rola sozinha)', () => {
+  it('a lista de cartões de cada coluna é a área que rola (a do arrasto), com o "ver mais" no fim', async () => {
+    vi.mocked(cartoesDoQuadro).mockImplementation(async ({ colunaId }) => ({
+      itens: cartoes[colunaId], total: colunaId === 'col1' ? 60 : cartoes[colunaId].length,
+    }))
+    tela()
+    await pronto()
+    const coluna = screen.getByRole('region', { name: 'Coluna A fazer' })
+    const lista = coluna.querySelector('[data-rfd-droppable-id="col1"]')
+    expect(lista).toHaveAttribute('data-rolagem-da-coluna')
+    expect(lista).toHaveClass('overflow-y-auto')
+    expect(within(lista).getAllByRole('button', { name: /^Cartão / })).toHaveLength(3)
+    expect(within(lista).getByRole('button', { name: /^Ver mais/ })).toBeInTheDocument()
+    // "Adicionar cartão" fica fora da rolagem, sempre à vista no pé da coluna.
+    expect(lista).not.toContainElement(within(coluna).getByRole('button', { name: 'Adicionar cartão em A fazer' }))
+    // A coluna encolhe até a altura da faixa (e a lista rola por dentro); a faixa só rola de lado.
+    // (shrink-0 na coluna a deixava com a altura de todos os cartões, passando do fim da tela.)
+    expect(coluna).toHaveClass('min-h-0')
+    expect(coluna).not.toHaveClass('shrink-0')
+    expect(coluna.closest('[data-rfd-draggable-id]')).toHaveClass('max-h-full', 'flex-col')
+    expect(screen.getByRole('region', { name: 'Colunas do quadro' })).toHaveClass('overflow-x-auto', 'overflow-y-hidden')
+  })
+
+  it('no meio do arrasto, a roda rola só a coluna sob o ponteiro; a página e a faixa das colunas ficam paradas', async () => {
+    simularGeometria()
+    renderizarTela(<main><QuadroDoCliente cliente={CLIENTE} perfil={consultor} /></main>, { perfil: consultor })
+    await pronto()
+    const pagina = rolavel(document.querySelector('main'))
+    const faixa = rolavel(screen.getByRole('region', { name: 'Colunas do quadro' }))
+    const lista = rolavel(document.querySelector('[data-rfd-droppable-id="col2"]'))
+    // Sem arrasto, a roda é da página.
+    expect(fireEvent.wheel(pagina, { deltaY: 120 })).toBe(true)
+
+    const alca = screen.getByRole('button', { name: 'Cartão Mapear boletos' })
+    const ponto = await levantarComMouse(alca)
+    expect(fireEvent.wheel(pagina, { deltaY: 120 })).toBe(false)
+    expect(fireEvent.wheel(faixa, { deltaX: 80 })).toBe(false)
+    expect(faixa.scrollLeft).toBe(0)
+    expect(fireEvent.wheel(lista, { deltaY: 120 })).toBe(false)
+    expect(lista.scrollTop).toBe(120)
+    expect(fireEvent.wheel(lista, { deltaY: 3, deltaMode: 1 })).toBe(false)
+    expect(lista.scrollTop).toBe(168)
+    // Se a página rolar por outro caminho (teclas, barra de rolagem), volta na hora.
+    pagina.scrollTop = 300
+    fireEvent.scroll(pagina)
+    expect(pagina.scrollTop).toBe(0)
+    faixa.scrollLeft = 200
+    fireEvent.scroll(faixa)
+    expect(faixa.scrollLeft).toBe(0)
+
+    // Um cartão para baixo e solta: cai onde apareceu.
+    await soltarComMouse(alca, { x: ponto.x, y: ponto.y + 100 })
+    expect(moverCartao).toHaveBeenCalledWith({ cartaoId: 'c1', colunaId: 'col1', antesId: 'c2', depoisId: 'c3' })
+    // Solto, tudo volta a rolar normalmente.
+    expect(fireEvent.wheel(pagina, { deltaY: 120 })).toBe(true)
+    pagina.scrollTop = 300
+    fireEvent.scroll(pagina)
+    expect(pagina.scrollTop).toBe(300)
+  })
+
+  it('arrastando uma coluna, a faixa rola de lado (é a área da lista de colunas) e a página fica parada', async () => {
+    simularGeometria()
+    renderizarTela(<main><QuadroDoCliente cliente={CLIENTE} perfil={consultor} /></main>, { perfil: consultor })
+    await pronto()
+    const pagina = rolavel(document.querySelector('main'))
+    const faixa = rolavel(screen.getByRole('region', { name: 'Colunas do quadro' }))
+    const alca = screen.getByRole('button', { name: 'Mover a coluna A fazer' })
+    const ponto = await levantarComMouse(alca)
+    expect(fireEvent.wheel(faixa, { deltaX: 80 })).toBe(false)
+    expect(faixa.scrollLeft).toBe(80)
+    expect(fireEvent.wheel(pagina, { deltaY: 120 })).toBe(false)
+    pagina.scrollTop = 300
+    fireEvent.scroll(pagina)
+    expect(pagina.scrollTop).toBe(0)
+    faixa.scrollLeft = 0
+    await soltarComMouse(alca, { x: ponto.x + 320, y: ponto.y })
+    expect(moverColuna).toHaveBeenCalledWith({ colunaId: 'col1', antesId: 'col2', depoisId: 'col3' })
+    expect(fireEvent.wheel(pagina, { deltaY: 120 })).toBe(true)
   })
 })
 

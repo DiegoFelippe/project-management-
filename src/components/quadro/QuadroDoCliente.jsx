@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
 import { RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -10,6 +10,7 @@ import { hoje as hojeEmSP } from '@/lib/mes'
 import { useAtraso } from '@/lib/useAtraso'
 import { veTudo } from '@/lib/papeis'
 import AbrirCartao from './AbrirCartao'
+import { useAlturaDoQuadro } from './alturaDoQuadro'
 import ApagarColuna from './ApagarColuna'
 import BarraDoQuadro from './BarraDoQuadro'
 import Coluna from './Coluna'
@@ -17,13 +18,15 @@ import IndicadoresDoQuadro from './IndicadoresDoQuadro'
 import JanelaArquivados from './JanelaArquivados'
 import JanelaNovoCartao from './JanelaNovoCartao'
 import NovaColuna from './NovaColuna'
+import { travarRolagem } from './travaDaRolagem'
 import { FILTROS_VAZIOS, temFiltro, useQuadro } from './useQuadro'
 
 // Aba Quadro do cliente (Kanban do Mochi; desenho em docs/superpowers/specs/2026-11-17-kanban-do-cliente-design.md): barra
-// de filtros → 4 números → colunas lado a lado (300 px; o quadro rola dentro da área dele e, no celular, uma coluna por
-// vez). Quem mexe (consultor do cliente, administrador e gestor da consultoria, com o cliente ativo) cria e arrasta
-// cartões e colunas; apagar coluna é da gestão; a central e o dono só leem (e escolhem o quadro de uma consultoria
-// anterior). O banco decide (pode_mexer, pode_gerir); a tela só esconde o que a pessoa não pode. Clicar num cartão (ou
+// de filtros → 4 números → colunas lado a lado (300 px; o quadro rola de lado dentro da área dele e, no celular, uma
+// coluna por vez). O quadro ocupa o resto da tela e cada coluna rola sozinha (decisão do Diego, 17/11, como no Trello):
+// arrastar perto da borda rola a coluna, e no meio do arrasto a página não rola (travaDaRolagem.js). Quem mexe
+// (consultor do cliente, administrador e gestor da consultoria, com o cliente ativo) cria e arrasta cartões e colunas;
+// apagar coluna é da gestão; a central e o dono só leem (e escolhem o quadro de uma consultoria anterior). O banco decide (pode_mexer, pode_gerir); a tela só esconde o que a pessoa não pode. Clicar num cartão (ou
 // criar um pelo "Novo cartão") abre a janela do cartão; ao fechar, o quadro relê as colunas que ela mexeu (mesmo sem o
 // tempo real, no plano B).
 export default function QuadroDoCliente({ cliente, perfil }) {
@@ -37,6 +40,14 @@ export default function QuadroDoCliente({ cliente, perfil }) {
     escolher, lerTudo, relerQuadro, lerColuna, lerNumeros, mudarQuadro, verMais, comecarArrasto, soltar,
   } = useQuadro({ clienteId: cliente.id, central, filtros: { ...filtros, busca: buscaAtrasada } })
   const abrirCartao = useCallback((id) => setCartaoAberto(id), [])
+  const faixa = useRef(null)
+  const altura = useAlturaDoQuadro(faixa, Boolean(quadro) && !erro && !semAcesso)
+  const destravar = useRef(null)
+  const soltarRolagem = useCallback(() => {
+    destravar.current?.()
+    destravar.current = null
+  }, [])
+  useEffect(() => soltarRolagem, [soltarRolagem])
 
   if (semAcesso) return <ListaVazia>Você não tem mais acesso a este quadro.</ListaVazia>
   if (erro) {
@@ -127,6 +138,8 @@ export default function QuadroDoCliente({ cliente, perfil }) {
     : `posição ${destino.index + 1} da coluna ${quadro.colunas.find((c) => c.id === destino.droppableId)?.nome ?? ''}`)
   function aoLevantar(inicio, aviso) {
     aviso.announce(`${inicio.type === 'coluna' ? 'Coluna levantada' : 'Cartão levantado'}. Use as setas para mover, espaço para soltar e Esc para cancelar.`)
+    soltarRolagem()
+    destravar.current = travarRolagem({ faixa: faixa.current, coluna: inicio.type === 'coluna' })
     comecarArrasto()
   }
   function aoMover(atual, aviso) {
@@ -134,6 +147,7 @@ export default function QuadroDoCliente({ cliente, perfil }) {
   }
   function aoSoltar(fim, aviso) {
     aviso.announce(fim.destination ? `Solto na ${lugar(fim.destination)}.` : 'Arrasto cancelado; voltou para o lugar.')
+    soltarRolagem()
     soltar(fim)
   }
 
@@ -163,14 +177,15 @@ export default function QuadroDoCliente({ cliente, perfil }) {
         <Droppable droppableId="colunas" type="coluna" direction="horizontal" isDropDisabled={!podeMexer}>
           {(provided) => (
             // relative: o texto só para leitor de tela (position: absolute) fica preso aqui; sem isso, ele sai pelo
-            // <main> e, a 360 px, a página inteira rola para o lado.
-            <div role="region" aria-label="Colunas do quadro"
-              className="relative flex items-start gap-4 overflow-x-auto pb-4">
-              <div ref={provided.innerRef} {...provided.droppableProps} className="flex items-start gap-4">
+            // <main> e, a 360 px, a página inteira rola para o lado. A altura é a do resto da tela (alturaDoQuadro.js):
+            // as colunas vão até ela e a lista de cartões de cada uma rola por dentro.
+            <div ref={faixa} role="region" aria-label="Colunas do quadro" style={altura ? { height: altura } : undefined}
+              className="relative flex items-start gap-4 overflow-x-auto overflow-y-hidden pb-4">
+              <div ref={provided.innerRef} {...provided.droppableProps} className="flex h-full items-start gap-4">
                 {quadro.colunas.map((coluna, i) => (
                   <Draggable key={coluna.id} draggableId={coluna.id} index={i} isDragDisabled={!podeMexer}>
                     {(arrasto) => (
-                      <div ref={arrasto.innerRef} {...arrasto.draggableProps}>
+                      <div ref={arrasto.innerRef} {...arrasto.draggableProps} className="flex max-h-full shrink-0 flex-col">
                         <Coluna coluna={coluna} posicao={i} estado={colunas[coluna.id]} hoje={hoje} filtrando={filtrando}
                           podeMexer={podeMexer} podeApagar={quadro.pode_gerir && quadro.colunas.length > 1}
                           arrastarCartoes={podeMexer && !filtrando} alca={arrasto.dragHandleProps}

@@ -32,7 +32,7 @@ function CartaoNoQuadro({ cartao, indice, concluidos, hoje, arrastavel, aoAbrir 
             }
           }}
           className={cn(
-            'card flex flex-col gap-2 rounded-xl p-3 text-left outline-none transition-[box-shadow,translate,border-color] duration-200 focus-visible:ring-2 focus-visible:ring-primary/50',
+            'card flex shrink-0 flex-col gap-2 rounded-xl p-3 text-left outline-none transition-[box-shadow,translate,border-color] duration-200 focus-visible:ring-2 focus-visible:ring-primary/50',
             arrastavel ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
             snapshot.isDragging ? 'rotate-[1.5deg] border-primary/40 shadow-lg ring-2 ring-primary/20' : 'hover:-translate-y-px hover:border-primary/30 hover:shadow-md',
           )}>

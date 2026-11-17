@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { Archive, Plus } from 'lucide-react'
 import Seletor from '@/components/campos/Seletor'
 import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { pessoasDoQuadro } from '@/data/quadro'
@@ -21,7 +22,8 @@ function Filtro({ id, rotulo, children }) {
 
 // Barra do quadro (BarraDeFiltros, como a do Mochi): Consultoria (só a central e o dono, e só quando o cliente teve mais
 // de um quadro), busca no título e na descrição, Prioridade, Responsável (com "Sem responsável"; as pessoas vêm do banco),
-// Prazo e Limpar; no fim, Arquivados e Novo cartão (quem mexe). Tudo filtra no banco.
+// Prazo e Limpar; no fim, Arquivados e Novo cartão (quem mexe). Tudo filtra no banco. Quando o quadro aberto é de uma
+// consultoria que atendeu antes (não a de hoje), o selo "Atendeu antes" aparece, com o nome dela quando não há seletor.
 export default function BarraDoQuadro({ quadroId, quadros, escolhido, aoEscolher, filtros, aoFiltrar, podeMexer, aoArquivados, aoNovoCartao }) {
   const buscarPessoas = useCallback(async (termo) => {
     const { itens, total } = await pessoasDoQuadro({ quadroId, termo })
@@ -30,6 +32,7 @@ export default function BarraDoQuadro({ quadroId, quadros, escolhido, aoEscolher
     return termo ? { itens: pessoas, total } : { itens: [SEM_RESPONSAVEL, ...pessoas], total: total + 1 }
   }, [quadroId])
   const mudar = (campos) => aoFiltrar({ ...filtros, ...campos })
+  const aberto = quadros?.find((q) => q.id === escolhido)
   const responsavel = filtros.responsavel === 'sem' ? [SEM_RESPONSAVEL]
     : filtros.responsavel ? [{ valor: filtros.responsavel, rotulo: filtros.nomeDoResponsavel ?? 'Responsável escolhido' }] : []
 
@@ -40,6 +43,9 @@ export default function BarraDoQuadro({ quadroId, quadros, escolhido, aoEscolher
           <Seletor id="filtro-quadro" tamanho="sm" valor={escolhido} aoMudar={aoEscolher}
             opcoes={quadros.map((q) => ({ valor: q.id, rotulo: q.consultoria.nome, detalhe: q.atual ? 'Atende hoje' : 'Atendeu antes' }))} />
         </Filtro>
+      )}
+      {aberto && !aberto.atual && (
+        <Badge variant="notice">{quadros.length > 1 ? 'Atendeu antes' : `Atendeu antes · ${aberto.consultoria.nome}`}</Badge>
       )}
       <CampoBusca rotulo="Buscar cartões" placeholder="Buscar cartão" valor={filtros.busca} aoMudar={(busca) => mudar({ busca })} />
       <Filtro id="filtro-prioridade" rotulo="Prioridade">
