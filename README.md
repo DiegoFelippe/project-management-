@@ -176,6 +176,34 @@ Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. 
      `npx supabase stop && npx supabase start` (os dados ficam).
   Sem isso, "Conectar" no Google avisa que falta configurar o app do Google.
 
+## Google de cada pessoa (Calendário)
+
+No Calendário, cada pessoa conecta **o próprio** Google ("Conectar Google"): a agenda cria os eventos, o Meet e a
+gravação na conta de quem é dono da agenda. É o mesmo app OAuth das Integrações (`GOOGLE_OAUTH_CLIENT_ID` e
+`GOOGLE_OAUTH_CLIENT_SECRET`), com outro endereço de retorno. O token de cada pessoa fica só no Vault; o navegador
+vê apenas "conectado ou não" e o e-mail da conta. Edge Function: `google-pessoa` (núcleo em
+`supabase/functions/_shared/agenda/`).
+
+1. No Google Cloud, no mesmo app: ative também a **Google Meet REST API** (além da Calendar API) e, na tela de
+   consentimento, os escopos `calendar.events`, `meetings.space.settings` e `meetings.space.readonly`.
+2. Cadastre um **segundo endereço de retorno** no "ID do cliente OAuth": a tela do Calendário do app,
+   `https://<endereço-da-vercel>/calendario` (no local: `http://localhost:5173/calendario`). O Google volta para a
+   tela, e a tela termina a conexão com o login da pessoa (assim ninguém pendura o Google de outra pessoa na própria
+   conta).
+3. Passe para as Edge Functions `GOOGLE_PESSOA_REDIRECT_URI` com esse endereço (na nuvem:
+   `npx supabase secrets set GOOGLE_PESSOA_REDIRECT_URI=https://<endereço-da-vercel>/calendario`; no local, como as
+   outras, em `[edge_runtime.secrets]`).
+4. **Interno ou externo:** com o app "Interno" no Workspace da IXCSoft, quem é do mesmo domínio conecta sem
+   verificação do Google. Consultores de outro domínio (ex.: STI) exigem o app "Externo", verificado pelo Google (os
+   escopos do Meet pedem verificação). **Gravação e transcrição** só funcionam em contas Google Workspace com esses
+   recursos ligados.
+5. Desconectar apaga o token aqui e revoga a permissão no Google. A revogação vale para o app inteiro naquela conta:
+   se a mesma conta do Google também estiver conectada nas Integrações da consultoria, aquela conexão pode cair junto.
+
+No Supabase local, uma Edge Function **nova** só passa a ser servida depois de recriar o runtime
+(`npx supabase stop && npx supabase start`; os dados ficam). `npm run functions:reiniciar` recarrega o código das
+funções que o runtime já conhece.
+
 ## Publicar (depois)
 
 **Supabase na nuvem**
@@ -184,7 +212,7 @@ Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. 
 2. `npx supabase login` e `npx supabase link --project-ref <ref-do-projeto>`.
 3. `npx supabase db push --remote` envia as migrações. No CLI 3, sem `--remote` ele mexe no banco local.
 4. `npx supabase functions deploy` publica as Edge Functions (`criar-acesso`, `criar-consultoria`, `reenviar-convite`,
-   `gerenciar-acesso`, `gerenciar-consultoria`, `integracoes`, `integracoes-google`).
+   `gerenciar-acesso`, `gerenciar-consultoria`, `integracoes`, `integracoes-google`, `google-pessoa`).
 5. Em Authentication: Site URL e redirecionamentos com o endereço da Vercel (`https://.../**`),
    cadastro aberto desligado, a política de senha (**Authentication → Policies → Passwords**, ou no provedor
    **Email**, conforme a versão do painel: tamanho mínimo **10** e requisitos **"Lowercase, uppercase letters, digits

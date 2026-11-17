@@ -3,7 +3,11 @@
 // precise usar IA, e-mail ou Google, e os testes de conexão ficam aqui também.
 import Anthropic from 'npm:@anthropic-ai/sdk@1.3.0'
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
+import { appDoGoogle, comLimite, emailDoGoogle, tokenDoGoogle } from './google-oauth.ts'
 import { Falha } from './http.ts'
+
+// O OAuth do Google mora em google-oauth.ts (sem Deno, para os testes); quem já importava daqui continua igual.
+export { appDoGoogle, emailDoGoogle, tokenDoGoogle }
 
 export type Tipo = 'ia' | 'smtp' | 'google'
 export const TIPOS: Tipo[] = ['ia', 'smtp', 'google']
@@ -84,21 +88,6 @@ export async function conexaoDa(admin: SupabaseClient, consultoriaId: string, ti
 }
 
 // ---------- Testes de conexão (lançam Error com a mensagem para a tela) ----------
-
-async function comLimite<T>(promessa: Promise<T>, aoEstourar?: () => void): Promise<T> {
-  let relogio: number | undefined
-  const limite = new Promise<never>((_, falhar) => {
-    relogio = setTimeout(() => {
-      aoEstourar?.()
-      falhar(new Error('O serviço demorou demais para responder.'))
-    }, LIMITE_DO_TESTE_MS)
-  })
-  try {
-    return await Promise.race([promessa, limite])
-  } finally {
-    clearTimeout(relogio)
-  }
-}
 
 async function testarIa(config: ConfigIa, chave: string | null) {
   if (!chave) throw new Error('Falta a chave de API.')
@@ -221,40 +210,13 @@ async function testarSmtp(config: ConfigSmtp, senha: string | null) {
   }
 }
 
-// Google: troca o token guardado (refresh) por um de acesso e lê o e-mail da conta.
-export function appDoGoogle() {
-  const id = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')
-  const segredo = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')
-  const volta = Deno.env.get('GOOGLE_OAUTH_REDIRECT_URI')
-  return id && segredo && volta ? { id, segredo, volta } : null
-}
-
+// Google: troca o token guardado (refresh) por um de acesso e lê o e-mail da conta (funções em google-oauth.ts).
 export const ESCOPOS_DO_GOOGLE = [
   'openid',
   'email',
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/drive.file',
 ]
-
-export async function tokenDoGoogle(corpo: Record<string, string>) {
-  const resposta = await comLimite(fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(corpo),
-  }))
-  const dados = await resposta.json().catch(() => ({}))
-  if (!resposta.ok) throw new Error(dados.error === 'invalid_grant' ? 'O Google não aceita mais esta conexão. Conecte de novo.' : 'O Google recusou a conexão.')
-  return dados as { access_token: string; refresh_token?: string }
-}
-
-export async function emailDoGoogle(tokenDeAcesso: string): Promise<string> {
-  const resposta = await comLimite(fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-    headers: { authorization: `Bearer ${tokenDeAcesso}` },
-  }))
-  const dados = await resposta.json().catch(() => ({}))
-  if (!resposta.ok || typeof dados.email !== 'string') throw new Error('Não foi possível ler a conta do Google.')
-  return dados.email
-}
 
 async function testarGoogle(tokenGuardado: string | null) {
   const app = appDoGoogle()

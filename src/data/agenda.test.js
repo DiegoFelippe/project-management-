@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { supabase } from '@/lib/supabase'
+import { chamarFuncao, supabase } from '@/lib/supabase'
 import {
   ausenciasDoPeriodo,
   buscarEvento,
+  concluirGoogle,
+  conectarGoogle,
+  desconectarGoogle,
   eventosDoPeriodo,
   feriadosDoPeriodo,
   indicadoresDaAgenda,
   meuGoogle,
+  voltaDoGoogle,
 } from './agenda'
 
-vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
+vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() }, chamarFuncao: vi.fn() }))
 
 // Consulta encadeável que registra as chamadas e resolve com { data, error } quando aguardada.
 function consulta(resposta) {
@@ -139,5 +143,50 @@ describe('meuGoogle', () => {
     const { proxy } = consulta({ data: { email: 'a@gmail.test', conectado_em: 'x', erro: 'invalid_grant' }, error: null })
     vi.mocked(supabase.from).mockReturnValue(proxy)
     expect(await meuGoogle()).toEqual({ conectado: true, email: 'a@gmail.test', erro: 'invalid_grant' })
+  })
+})
+
+describe('conectar e desconectar o Google', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('conectarGoogle pede o endereço do Google à função google-pessoa', async () => {
+    vi.mocked(chamarFuncao).mockResolvedValue({ status: 200, corpo: { url: 'https://accounts.google.com/o/oauth2/v2/auth?x=1' } })
+    expect(await conectarGoogle()).toEqual({ erro: null, url: 'https://accounts.google.com/o/oauth2/v2/auth?x=1' })
+    expect(chamarFuncao).toHaveBeenCalledWith('google-pessoa', { acao: 'conectar' })
+  })
+
+  it('conectarGoogle sem o app do Google configurado devolve o aviso em português', async () => {
+    vi.mocked(chamarFuncao).mockResolvedValue({ status: 409, corpo: { codigo: 'google_nao_configurado' } })
+    const r = await conectarGoogle()
+    expect(r.url).toBeUndefined()
+    expect(r.erro).toMatch(/app do Google/)
+  })
+
+  it('voltaDoGoogle lê o código e o estado que o Google devolveu (ou a recusa)', () => {
+    expect(voltaDoGoogle('?state=abc&code=4%2Fx&scope=openid')).toEqual({ estado: 'abc', codigo: '4/x', recusou: false })
+    expect(voltaDoGoogle(new URLSearchParams({ state: 'abc', error: 'access_denied' }))).toEqual({ estado: 'abc', codigo: null, recusou: true })
+    expect(voltaDoGoogle('?google=ok')).toBeNull()
+    expect(voltaDoGoogle('')).toBeNull()
+  })
+
+  it('concluirGoogle manda o estado e o código e devolve o e-mail da conta', async () => {
+    vi.mocked(chamarFuncao).mockResolvedValue({ status: 200, corpo: { email: 'ana@gmail.test' } })
+    expect(await concluirGoogle({ estado: 'abc', codigo: '4/x' })).toEqual({ erro: null, email: 'ana@gmail.test' })
+    expect(chamarFuncao).toHaveBeenCalledWith('google-pessoa', { acao: 'concluir', estado: 'abc', codigo: '4/x' })
+  })
+
+  it('concluirGoogle traduz o estado vencido ou de outra pessoa e as permissões que faltaram', async () => {
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 400, corpo: { codigo: 'estado_invalido' } })
+    expect((await concluirGoogle({ estado: 'a', codigo: 'b' })).erro).toMatch(/Conectar Google/)
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 400, corpo: { codigo: 'google_sem_permissoes', faltam: ['x'] } })
+    expect((await concluirGoogle({ estado: 'a', codigo: 'b' })).erro).toMatch(/permissões/)
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 502, corpo: { codigo: 'google_recusou' } })
+    expect((await concluirGoogle({ estado: 'a', codigo: 'b' })).erro).toMatch(/Google recusou/)
+  })
+
+  it('desconectarGoogle avisa quando o Google não confirmou a revogação', async () => {
+    vi.mocked(chamarFuncao).mockResolvedValue({ status: 200, corpo: { ok: true, revogado: false } })
+    expect(await desconectarGoogle()).toEqual({ erro: null, revogado: false })
+    expect(chamarFuncao).toHaveBeenCalledWith('google-pessoa', { acao: 'desconectar' })
   })
 })

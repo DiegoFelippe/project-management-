@@ -39,6 +39,9 @@ const ERROS_FUNCAO = {
   consultoria_arquivada: 'A consultoria dessa pessoa está arquivada. Reative a consultoria antes.',
   nome_em_uso: 'Já existe uma consultoria com esse nome.',
   google_nao_configurado: 'Falta configurar o app do Google na plataforma (veja o README).',
+  estado_invalido: 'O pedido ao Google venceu ou não é seu. Clique em Conectar Google de novo.',
+  google_sem_permissoes: 'Marque todas as permissões que o Google pedir (agenda e Meet) e conecte de novo.',
+  google_recusou: 'O Google recusou a conexão. Tente de novo.',
   verificacao_pendente: 'Confirme o código do seu app autenticador para continuar.',
 }
 
