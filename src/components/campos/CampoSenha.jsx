@@ -8,9 +8,11 @@ import { cn } from '@/lib/utils'
 const COR_DA_FORCA = { fraca: 'bg-destructive', media: 'bg-notice', forte: 'bg-positive' }
 const COR_DO_TEXTO = { fraca: 'text-destructive', media: 'text-notice', forte: 'text-positive' }
 
-// Campo de senha forte: mostrar/esconder, medidor Fraca/Média/Forte, regras, Validar, Gerar senha e Copiar.
-// Só senha Forte deve ser salva: quem usa o campo confere com `avaliarSenha(valor).forte`.
-export default function CampoSenha({ id, valor, aoMudar, gerador = true, invalido, autoFocus, autoComplete = 'new-password' }) {
+// Campo de senha forte: mostrar/esconder, medidor Fraca/Média/Forte (da largura do campo, com o nome na mesma linha),
+// regras em duas colunas, Gerar senha, Copiar e Validar (por último: as regras já mudam ao digitar; o Validar explica
+// numa frase, inclusive o espaço nas pontas, que a lista não mostra). `dica` (opcional): texto de apoio logo abaixo
+// dos botões. Só senha Forte deve ser salva: quem usa o campo confere com `avaliarSenha(valor).forte`.
+export default function CampoSenha({ id, valor, aoMudar, gerador = true, invalido, autoFocus, autoComplete = 'new-password', dica }) {
   const [visivel, setVisivel] = useState(false)
   const [validacao, setValidacao] = useState(null)
   const [copiada, setCopiada] = useState(false)
@@ -57,7 +59,7 @@ export default function CampoSenha({ id, valor, aoMudar, gerador = true, invalid
         <span className={cn('w-12 text-right text-rotulo font-semibold', COR_DO_TEXTO[analise.forca])}>{NOME_DAS_FORCAS[analise.forca]}</span>
       </div>
 
-      <ul aria-label="Regras da senha" className="grid gap-1 sm:grid-cols-2">
+      <ul aria-label="Regras da senha" className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
         {analise.regras.map((r) => (
           <li key={r.id} data-ok={r.ok} className={cn('flex items-center gap-1.5 text-rotulo', r.ok ? 'text-positive' : 'text-muted-foreground')}>
             {r.ok ? <Check className="size-3.5 shrink-0" aria-hidden="true" /> : <X className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />}
@@ -67,9 +69,6 @@ export default function CampoSenha({ id, valor, aoMudar, gerador = true, invalid
       </ul>
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={() => setValidacao(mensagemDeValidacao(valor))}>
-          <ShieldCheck aria-hidden="true" /> Validar
-        </Button>
         {gerador && (
           <>
             <Button type="button" variant="outline" size="sm" onClick={gerar}>
@@ -80,9 +79,16 @@ export default function CampoSenha({ id, valor, aoMudar, gerador = true, invalid
             </Button>
           </>
         )}
+        <Button type="button" variant="outline" size="sm" onClick={() => setValidacao(mensagemDeValidacao(valor))}>
+          <ShieldCheck aria-hidden="true" /> Validar
+        </Button>
       </div>
 
-      <p role="status" className={cn('min-h-4 text-rotulo', validacao && (analise.forte && !validacao.startsWith('Não deu') ? 'text-positive' : 'text-destructive'))}>{validacao}</p>
+      {/* Com a dica embaixo, a linha do Validar só ocupa espaço quando tem o que dizer (a dica segura o lugar). */}
+      <div>
+        <p role="status" className={cn('text-rotulo', !dica && 'min-h-4', validacao && (analise.forte && !validacao.startsWith('Não deu') ? 'text-positive' : 'text-destructive'))}>{validacao}</p>
+        {dica && <p className={cn('text-muted-foreground text-legenda', validacao && 'mt-1')}>{dica}</p>}
+      </div>
     </div>
   )
 }

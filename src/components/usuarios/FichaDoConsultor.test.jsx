@@ -118,6 +118,21 @@ describe('FichaDoConsultor: Novo acesso', () => {
     expect(screen.getByText(/O acesso é criado quando você clica em/)).toBeInTheDocument()
   })
 
+  it('Acesso com senha provisória: campo, medidor, regras, botões e a dica num cartão só; a chave "Exigir" na seção dela', async () => {
+    montarNovo({ perfilDeQuem: ADMIN })
+    await irPara('Acesso')
+    await userEvent.click(screen.getByRole('radio', { name: /Definir senha provisória/ }))
+    const cartao = screen.getByLabelText('Senha provisória').closest('[data-slot="cartao-secao"]')
+    expect(cartao).not.toBeNull()
+    expect(within(cartao).getByRole('meter', { name: 'Força da senha' })).toBeInTheDocument()
+    expect(within(cartao).getByRole('list', { name: 'Regras da senha' })).toBeInTheDocument()
+    expect(within(cartao).getAllByRole('button').map((b) => b.textContent.trim()).filter(Boolean)).toEqual(['Gerar senha', 'Copiar', 'Validar'])
+    expect(within(cartao).getByText('Só senha forte é aceita. A pessoa troca no primeiro acesso.')).toBeInTheDocument()
+    const verificacao = screen.getByRole('heading', { name: 'Verificação em duas etapas' }).closest('section')
+    const exigir = within(verificacao).getByRole('switch', { name: /Exigir verificação em duas etapas/ })
+    expect(cartao).not.toContainElement(exigir)
+  })
+
   it('Dados pessoais traz, depois dos campos, as seções Papel e times e Capacidade (nada de abas para elas)', () => {
     montarNovo()
     const painel = screen.getByRole('tabpanel', { name: 'Dados pessoais' })
@@ -602,6 +617,19 @@ describe('FichaDoConsultor: Editar', () => {
     expect(desativar).toHaveClass('text-notice')
     await userEvent.click(desativar)
     expect(aoPedirAtivo).toHaveBeenCalledWith('desativar')
+  })
+
+  it('aba Acesso: Situação (estado e e-mail de acesso) e a verificação num cartão só, com a chave e a situação', async () => {
+    montarEditar({ podeDesativar: true })
+    await irPara('Acesso')
+    const situacao = screen.getByRole('heading', { name: 'Situação' }).closest('section')
+    expect(within(situacao).getByText('Ativo')).toBeInTheDocument()
+    expect(within(situacao).getByText('Pode entrar no app.')).toBeInTheDocument()
+    expect(within(situacao).getByText('E-mail de acesso')).toBeInTheDocument()
+    expect(within(situacao).getByText('ana@exemplo.test')).toBeInTheDocument()
+    const cartao = screen.getByRole('switch', { name: /Exigir verificação em duas etapas/ }).closest('[data-slot="cartao-secao"]')
+    expect(within(cartao).getByText('Desligada')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Verificação em duas etapas' }).closest('section')).toContainElement(cartao)
   })
 
   it('Desativar fica no rodapé em qualquer aba; pessoa desativada tem Reativar em verde', async () => {

@@ -1,4 +1,4 @@
-import { CheckCircle2, KeyRound, MailCheck, Pencil, Power, RotateCcw, RotateCcwKey, Send, ShieldAlert, ShieldCheck, ShieldOff, Smartphone, UserPlus, UserRound, UserX, User } from 'lucide-react'
+import { AtSign, CheckCircle2, KeyRound, MailCheck, Pencil, Power, RotateCcw, RotateCcwKey, Send, ShieldAlert, ShieldCheck, ShieldOff, Smartphone, UserPlus, UserRound, UserX, User } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import Caixa from '@/components/campos/Caixa'
@@ -12,7 +12,7 @@ import { GerirAusencias } from '@/components/capacidade/GerirAusencias'
 import { lerHoras } from '@/components/clientes/rotulos'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import CampoImagem from '@/components/comum/CampoImagem'
-import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import JanelaFormulario, { CartaoDaSecao, SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import SeletorDeCor from '@/components/comum/SeletorDeCor'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -132,27 +132,40 @@ const ESTADOS_DO_ACESSO = {
   Desativado: { icone: UserX, cor: 'bg-muted text-muted-foreground', linha: 'Não entra no app enquanto estiver desativada.' },
 }
 
+// Seção Situação: um cartão com duas linhas, o estado (e Reenviar convite, se cabe) e o e-mail de acesso.
 function CartaoDoAcesso({ pessoa, aoReenviar, podeReenviar }) {
   const estado = situacao(pessoa)
   const { icone: Icone, cor, linha } = ESTADOS_DO_ACESSO[estado]
   return (
-    <div data-slot="cartao-acesso" className="bg-muted/40 flex flex-wrap items-center gap-3 rounded-2xl border p-4">
-      <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', cor)}><Icone className="size-4" aria-hidden="true" /></span>
-      <div className="min-w-0 flex-1">
-        <p className="text-corpo font-semibold">{estado}</p>
-        <p className="text-muted-foreground text-rotulo">{linha}</p>
-        {pessoa.email && <p className="text-muted-foreground text-rotulo">{pessoa.email}</p>}
-      </div>
-      {podeReenviar && pessoa.convite_pendente && (
-        <Button type="button" variant="outline" size="sm" onClick={aoReenviar}><Send /> Reenviar convite</Button>
-      )}
-    </div>
+    <Bloco titulo="Situação">
+      <CartaoDaSecao data-slot="cartao-acesso" className="divide-y overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 px-3 py-2.5">
+          <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', cor)}><Icone className="size-4" aria-hidden="true" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="text-rotulo font-semibold">{estado}</p>
+            <p className="text-muted-foreground text-legenda">{linha}</p>
+          </div>
+          {podeReenviar && pessoa.convite_pendente && (
+            <Button type="button" variant="outline" size="sm" onClick={aoReenviar}><Send /> Reenviar convite</Button>
+          )}
+        </div>
+        {pessoa.email && (
+          <div className="flex items-center gap-3 px-3 py-2.5">
+            <span className="bg-muted text-muted-foreground grid size-8 shrink-0 place-items-center rounded-lg"><AtSign className="size-4" aria-hidden="true" /></span>
+            <dl className="min-w-0 flex-1">
+              <dt className="text-muted-foreground text-legenda">E-mail de acesso</dt>
+              <dd className="text-rotulo font-medium break-all">{pessoa.email}</dd>
+            </dl>
+          </div>
+        )}
+      </CartaoDaSecao>
+    </Bloco>
   )
 }
 
-// Verificação em duas etapas da pessoa (aba Acesso), para quem pode editar o acesso dela: a chave "Exigir" (salva com
-// a ficha), a situação (Ativa desde…, Ainda não configurada, Desligada) e "Zerar" (celular perdido), que a página
-// confirma antes. Sem o app ativo não há o que zerar.
+// Verificação em duas etapas da pessoa (aba Acesso), para quem pode editar o acesso dela, num cartão só: a chave
+// "Exigir" (salva com a ficha) em cima e, depois do traço, a situação (Ativa desde…, Ainda não configurada, Desligada)
+// com "Zerar" (celular perdido), que a página confirma antes. Sem o app ativo não há o que zerar.
 const SITUACAO_DA_VERIFICACAO = {
   ativa: { icone: ShieldCheck, cor: 'bg-positive-soft text-positive', linha: 'A pessoa entra com a senha e o código do app autenticador.' },
   pendente: { icone: ShieldAlert, cor: 'bg-notice-soft text-notice', linha: 'No próximo acesso, a pessoa configura o app autenticador antes de entrar.' },
@@ -164,18 +177,20 @@ function VerificacaoDaPessoa({ exigida, aoMudarExigida, verificacaoDesde, aoZera
   const { icone: Icone, cor, linha } = SITUACAO_DA_VERIFICACAO[estado]
   return (
     <Bloco titulo="Verificação em duas etapas">
-      <CartaoChave titulo="Exigir verificação em duas etapas" icone={Smartphone} ligada={exigida} aoMudar={aoMudarExigida}
-        dica="A pessoa só entra com o código de 6 dígitos do app autenticador do celular (Google Authenticator, Microsoft Authenticator…)." />
-      <div data-slot="situacao-2fa" className="flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5">
-        <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', cor)}><Icone className="size-4" aria-hidden="true" /></span>
-        <div className="min-w-0 flex-1">
-          <p className="text-rotulo font-semibold">{rotulo}</p>
-          <p className="text-muted-foreground text-legenda">{linha}</p>
+      <CartaoDaSecao className={cn('divide-y overflow-hidden', exigida && 'border-primary/50')}>
+        <CartaoChave embutido titulo="Exigir verificação em duas etapas" icone={Smartphone} ligada={exigida} aoMudar={aoMudarExigida}
+          dica="A pessoa só entra com o código de 6 dígitos do app autenticador do celular (Google Authenticator, Microsoft Authenticator…)." />
+        <div data-slot="situacao-2fa" className="flex flex-wrap items-center gap-3 px-3 py-2.5">
+          <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', cor)}><Icone className="size-4" aria-hidden="true" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="text-rotulo font-semibold">{rotulo}</p>
+            <p className="text-muted-foreground text-legenda">{linha}</p>
+          </div>
+          {verificacaoDesde && aoZerar && (
+            <Button type="button" variant="outline" size="sm" onClick={aoZerar}><RotateCcwKey /> Zerar verificação em duas etapas</Button>
+          )}
         </div>
-        {verificacaoDesde && aoZerar && (
-          <Button type="button" variant="outline" size="sm" onClick={aoZerar}><RotateCcwKey /> Zerar verificação em duas etapas</Button>
-        )}
-      </div>
+      </CartaoDaSecao>
     </Bloco>
   )
 }
@@ -450,15 +465,16 @@ export default function FichaDoConsultor({
     <div role="tabpanel" id={`${idBase}-painel-${valor}`} aria-labelledby={`${idBase}-aba-${valor}`} className="space-y-5">{children}</div>
   )
 
+  // No celular (360 px) o rodapé não cabe com o texto: fica só o ícone, e o nome continua para o leitor de tela.
   const acaoEsquerda = !novo && !propria && podeDesativar ? (
     pessoa.ativo === false
       ? (
         <Button type="button" variant="ghost" className="text-positive hover:bg-positive-soft hover:text-positive" disabled={enviando}
-          onClick={() => aoPedirAtivo('reativar')}><RotateCcw /> Reativar</Button>
+          onClick={() => aoPedirAtivo('reativar')}><RotateCcw /> <span className="max-sm:sr-only">Reativar</span></Button>
       )
       : (
         <Button type="button" variant="ghost" className="text-notice hover:bg-notice-soft hover:text-notice" disabled={enviando}
-          onClick={() => aoPedirAtivo('desativar')}><Power /> Desativar</Button>
+          onClick={() => aoPedirAtivo('desativar')}><Power /> <span className="max-sm:sr-only">Desativar</span></Button>
       )
   ) : null
 
@@ -616,38 +632,47 @@ export default function FichaDoConsultor({
           </>
         ))}
 
+        {/* Aba Acesso: cada bloco é um rótulo de seção e um cartão só (Situação, Como a pessoa entra ou Trocar senha,
+            Verificação em duas etapas), no mesmo espaçamento. */}
         {painel('acesso', novo ? (
-          <Bloco titulo="Como a pessoa entra">
-            <EscolhaDeAcesso valor={dados.forma} aoMudar={(forma) => setDados((d) => ({ ...d, forma }))} />
-            {dados.forma === 'senha' && (
-              <div className="max-w-sm">
-                <Campo id="ficha-senha" rotulo="Senha provisória" erro={erros.senha}>
-                  <CampoSenha id="ficha-senha" valor={dados.senha} invalido={!!erros.senha}
-                    aoMudar={(senha) => setDados((d) => ({ ...d, senha }))} />
-                  {!erros.senha && <p className="text-rotulo text-muted-foreground">Só senha forte é aceita. A pessoa troca no primeiro acesso.</p>}
-                </Campo>
-              </div>
-            )}
+          <>
+            <Bloco titulo="Como a pessoa entra">
+              <EscolhaDeAcesso valor={dados.forma} aoMudar={(forma) => setDados((d) => ({ ...d, forma }))} />
+              {dados.forma === 'senha' && (
+                <CartaoDaSecao className="p-3">
+                  <Campo id="ficha-senha" rotulo="Senha provisória" erro={erros.senha}>
+                    <CampoSenha id="ficha-senha" valor={dados.senha} invalido={!!erros.senha}
+                      aoMudar={(senha) => setDados((d) => ({ ...d, senha }))}
+                      dica={erros.senha ? undefined : 'Só senha forte é aceita. A pessoa troca no primeiro acesso.'} />
+                  </Campo>
+                </CartaoDaSecao>
+              )}
+            </Bloco>
             {podeExigir2fa && (
-              <CartaoChave titulo="Exigir verificação em duas etapas" icone={Smartphone} ligada={dados.exige_2fa}
-                aoMudar={definir('exige_2fa')}
-                dica="No primeiro acesso, a pessoa configura o app autenticador do celular antes de entrar." />
+              <Bloco titulo="Verificação em duas etapas">
+                <CartaoDaSecao className={cn('overflow-hidden', dados.exige_2fa && 'border-primary/50')}>
+                  <CartaoChave embutido titulo="Exigir verificação em duas etapas" icone={Smartphone} ligada={dados.exige_2fa}
+                    aoMudar={definir('exige_2fa')}
+                    dica="No primeiro acesso, a pessoa configura o app autenticador do celular antes de entrar." />
+                </CartaoDaSecao>
+              </Bloco>
             )}
-            <p className="text-muted-foreground text-legenda">O acesso é criado quando você clica em {dados.forma === 'convite' ? 'Enviar convite' : 'Criar pessoa'}.</p>
-          </Bloco>
+            {/* Nota da última seção: o -mt-2 encosta a nota no cartão de cima (as margens do space-y se juntam). */}
+            <p className="text-muted-foreground -mt-2 text-legenda">O acesso é criado quando você clica em {dados.forma === 'convite' ? 'Enviar convite' : 'Criar pessoa'}.</p>
+          </>
         ) : propria ? (
           <>
             <Bloco titulo="Trocar senha (opcional)">
-              <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+              <CartaoDaSecao className="grid items-start gap-x-4 gap-y-3 p-3 sm:grid-cols-2">
                 <Campo id="ficha-senha" rotulo="Senha nova" erro={erros.senha}>
-                  <CampoSenha id="ficha-senha" valor={dados.senha} invalido={!!erros.senha} aoMudar={definir('senha')} />
+                  <CampoSenha id="ficha-senha" valor={dados.senha} invalido={!!erros.senha} aoMudar={definir('senha')}
+                    dica="Só senha forte é aceita. Deixe em branco para manter a atual; ela muda quando você salva." />
                 </Campo>
                 <Campo id="ficha-senha-repetida" rotulo="Repita a senha nova" erro={erros.repetida}>
                   <Input id="ficha-senha-repetida" type="password" autoComplete="new-password" className="h-10"
                     aria-invalid={erros.repetida ? true : undefined} value={dados.repetida} onChange={mudar('repetida')} />
                 </Campo>
-              </div>
-              <p className="text-rotulo text-muted-foreground">Só senha forte é aceita. Deixe em branco para manter a atual; ela muda quando você salva.</p>
+              </CartaoDaSecao>
             </Bloco>
             <VerificacaoDoPerfil perfil={pessoa} aoMudar={aoMudarVerificacao} />
           </>

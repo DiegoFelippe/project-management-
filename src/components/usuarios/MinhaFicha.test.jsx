@@ -217,6 +217,9 @@ describe('Meu perfil: ativar a verificação em duas etapas (aba Acesso)', () =>
     await usuario.click(within(secao).getByRole('button', { name: /Ativar/ }))
     expect(iniciarCadastro).toHaveBeenCalledTimes(1)
     expect(await within(secao).findByRole('img', { name: /QR code/ })).toHaveAttribute('src', 'data:image/svg+xml;utf-8,<svg/>')
+    // A ativação abre dentro do mesmo cartão da chave e da situação (a seção tem um cartão só).
+    expect(within(secao).getByRole('switch', { name: /Exigir verificação/ }).closest('[data-slot="cartao-secao"]'))
+      .toContainElement(within(secao).getByRole('img', { name: /QR code/ }))
     expect(within(secao).getByText('ABCD EFGH IJKL MNOP')).toBeInTheDocument()
     await usuario.click(within(secao).getByRole('button', { name: /Copiar a chave/ }))
     expect(escrever).toHaveBeenCalledWith('ABCDEFGHIJKLMNOP')

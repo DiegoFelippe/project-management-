@@ -87,3 +87,9 @@ export function SecaoFormulario({ titulo, className, children }) {
     </section>
   )
 }
+
+// O cartão de uma seção (o mesmo canto e borda dos cartões de opção): um bloco só por seção. Com linhas
+// (chave, situação), passe `divide-y overflow-hidden` e cada linha traz o próprio `px-3 py-2.5`; com campos, `p-3`.
+export function CartaoDaSecao({ className, children, ...props }) {
+  return <div data-slot="cartao-secao" className={cn('bg-card rounded-xl border', className)} {...props}>{children}</div>
+}
