@@ -122,7 +122,8 @@ describe('Integrações', () => {
 })
 
 describe('Integrações: cartões de números abaixo dos filtros', () => {
-  const dataCurta = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+  const dia = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+  const hora = (iso) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
   it('Conectadas, Com erro, Não configuradas e Último teste (o mais recente), do banco', async () => {
     renderizarTela(<Integracoes />, { perfil: admin })
@@ -130,8 +131,16 @@ describe('Integrações: cartões de números abaixo dos filtros', () => {
     await vi.waitFor(() => expect(numeroDoCartao(cartoes, 'Conectadas')).toBe('1'))
     expect(numeroDoCartao(cartoes, 'Com erro')).toBe('0')
     expect(numeroDoCartao(cartoes, 'Não configuradas')).toBe('2')
-    expect(numeroDoCartao(cartoes, 'Último teste')).toBe(dataCurta('2026-11-12T16:00:00Z'))
+    expect(numeroDoCartao(cartoes, 'Último teste')).toBe(dia('2026-11-12T16:00:00Z'))
+    expect(within(cartoes).getByText(`às ${hora('2026-11-12T16:00:00Z')}`)).toBeInTheDocument()
     expect(indicadoresDeIntegracoes).toHaveBeenCalledWith({ consultoriaId: 'c1' })
+  })
+
+  it('no celular (360 px) o ícone vai para cima do número, para "Nenhum" e a data caberem', async () => {
+    renderizarTela(<Integracoes />, { perfil: admin })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores das integrações')
+    const ultimo = within(cartoes).getByText('Último teste').closest('[data-cartao]')
+    expect(ultimo).toHaveClass('max-sm:flex-col', 'max-sm:items-start')
   })
 
   it('nunca testada: "Nenhum"; o filtro Conectadas/Não conectadas não muda os cartões; Testar recarrega', async () => {

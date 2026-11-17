@@ -3,7 +3,7 @@
 -- Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(101);
+select plan(102);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -134,31 +134,39 @@ select testes.cliente('arq_a', 15, 'A', null, 40, true);
 select testes.cliente('arq_a2', 15, 'A', 'pessoa_a', 40, true);
 select testes.cliente('b10', 10, 'B', 'pessoa_b');
 select testes.cliente('sem_b', 12, 'B', null);
+-- mudou: estava na A (check-in de 1 h da pessoa_a) e passou para a B no mesmo mês (meia hora da pessoa_b). Previsão
+-- 1 h: só somando as duas consultorias passaria; a B não vê as horas da A.
+select testes.cliente('mudou', 1, 'B', 'pessoa_b', 0);
 select testes.cliente('dist', 8, null, null);
 
--- Check-ins de agora (até 2 h, dentro do mês, um depois do outro): pessoa_a em a40 e depois em pouco.
-select testes.como('pessoa_a');
-insert into public.checkins (cliente_id, inicio, fim, descricao)
-select testes.id(c), h.ini + (now() - h.ini) / 2 * o, h.ini + (now() - h.ini) / 2 * (o + 1), 'Atendimento'
-from (select greatest(now() - interval '2 hours',
-        date_trunc('month', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo') as ini) h
-cross join unnest(array['a40', 'pouco']) with ordinality u(c, n)
-cross join lateral (select (u.n - 1)::int as o) x;
-reset role;
-select set_config('request.jwt.claims', '', true);
+-- Check-ins em horas fixas do mês corrente (início do mês em SP + 1 h…), seja qual for a hora em que o teste roda.
+-- Gravados direto, sem o gatilho de validação (que exige ser quem atende e proíbe o futuro), só nesta transação de
+-- teste. As horas da pessoa_a no mês, na A: a40 1 h + pouco 1 h + mudou 1 h = 3,0 h.
+set local session_replication_role = replica;
+insert into public.checkins (cliente_id, consultor_id, consultoria_id, inicio, fim, descricao)
+select testes.id(x.cliente), testes.id(x.consultor), testes.id(x.consultoria), m.ini + x.de, m.ini + x.ate, 'Atendimento'
+from (select date_trunc('month', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo' as ini) m
+cross join (values
+  ('a40', 'pessoa_a', 'A', interval '1 hour', interval '2 hours'),
+  ('pouco', 'pessoa_a', 'A', interval '2 hours', interval '3 hours'),
+  ('mudou', 'pessoa_a', 'A', interval '3 hours', interval '4 hours'),
+  ('mudou', 'pessoa_b', 'B', interval '1 hour', interval '90 minutes')) x(cliente, consultor, consultoria, de, ate);
+-- Atividade dentro dos últimos 30 dias em a40 e pouco (de outra pessoa: não mexe nas horas da pessoa_a nem no selo).
+insert into public.checkins (cliente_id, consultor_id, consultoria_id, inicio, fim, descricao)
+select testes.id(c), testes.id('pessoa_d'), testes.id('A'), now() - interval '5 days' + d, now() - interval '5 days' + d + interval '30 minutes', 'Visita'
+from (values ('a40', interval '0 hours'), ('pouco', interval '1 hour')) x(c, d);
+set local session_replication_role = origin;
 
 -- Integrações da A: IA conectada (testada em 10/11) e e-mail com erro (testado em 12/11); Google não configurado.
 insert into public.integracoes (consultoria_id, tipo, situacao, ultimo_teste_em) values
   (testes.id('A'), 'ia', 'conectada', '2026-11-10 10:00-03'),
   (testes.id('A'), 'smtp', 'com_erro', '2026-11-12 10:00-03');
 
--- Contas diretas (o que a lista mostraria), para os recortes que dependem do banco inteiro.
-create function testes.passaram(p_consultoria uuid, p_consultor uuid) returns bigint language sql stable as $$
-  select count(*) from public.clientes c
-  where not c.arquivado
-    and (p_consultoria is null or c.consultoria_id = p_consultoria)
-    and (p_consultor is null or c.consultor_id = p_consultor)
-    and public.realizado_no_mes(c) > c.horas_mes
+-- O selo "Passou da previsão" da lista, visto por quem chama: realizado_no_mes roda com o RLS dela (os check-ins que
+-- ela enxerga), sobre os clientes ativos que ela vê.
+create function testes.selo(p_nome text) returns numeric language sql as $$
+  select testes.n(testes.ver(p_nome, '(select jsonb_build_object(''n'', count(*)) from public.clientes c '
+    'where not c.arquivado and public.realizado_no_mes(c) > c.horas_mes)'), 'n')
 $$;
 
 -- ── Times sem acento ────────────────────────────────────────────────────────
@@ -223,8 +231,8 @@ create temp table j as select testes.ver('admin_a', format('public.indicadores_d
 select is((select v ->> 'recorte' from j), 'consultoria', 'clientes, administrador: recorte consultoria');
 select is((select testes.n(v, 'aguardando_consultor') from j), 1::numeric, 'administrador A: 1 aguardando consultor (pedir a B não muda nada)');
 select is((select testes.n(v, 'em_atendimento') from j), 4::numeric, 'administrador A: 4 em atendimento');
-select is((select testes.n(v, 'passaram_da_previsao') from j), testes.passaram(testes.id('A'), null)::numeric,
-  'administrador A: passaram da previsão = clientes com o selo "Passou da previsão" da lista');
+select is((select testes.n(v, 'passaram_da_previsao') from j), testes.selo('admin_a'),
+  'administrador A: passaram da previsão = clientes com o selo "Passou da previsão" que ele vê na lista');
 select is((select testes.n(v, 'passaram_da_previsao') from j), 1::numeric, 'administrador A: só o "pouco" passou da previsão');
 select is((select testes.n(v, 'sem_checkin_30_dias') from j), 1::numeric,
   'administrador A: sem check-in há 30 dias = c200 (c_novo chegou hoje; a40 e pouco têm check-in)');
@@ -244,21 +252,21 @@ select is((select array[testes.n(v, 'aguardando_consultor'), testes.n(v, 'em_ate
 drop table j;
 create temp table j as select testes.ver('admin_b', 'public.indicadores_de_clientes()') as v;
 select is((select array[testes.n(v, 'aguardando_consultor'), testes.n(v, 'em_atendimento'), testes.n(v, 'passaram_da_previsao'),
-  testes.n(v, 'sem_checkin_30_dias')] from j), array[1, 1, 0, 1]::numeric[], 'administrador B: só a B (a A nunca conta)');
+  testes.n(v, 'sem_checkin_30_dias')] from j), array[1, 2, 0, 1]::numeric[],
+  'administrador B: só a B (a A nunca conta); mudou não passou da previsão com as horas da B');
+select is((select testes.n(v, 'passaram_da_previsao') from j), testes.selo('admin_b'),
+  'administrador B: passaram da previsão = o selo que ele vê (as horas da A não entram)');
 drop table j;
 
 -- Consultor: os dele.
 create temp table j as select testes.ver('pessoa_a', format('public.indicadores_de_clientes(%L, %L)', testes.id('B'), testes.id('pessoa_b'))) as v;
 select is((select v ->> 'recorte' from j), 'pessoa', 'clientes, consultor: recorte pessoa');
 select is((select testes.n(v, 'meus_clientes') from j), 2::numeric, 'pessoa_a: 2 clientes ativos (filtros pedidos não valem)');
-select is((select testes.n(v, 'passaram_da_previsao') from j), testes.passaram(testes.id('A'), testes.id('pessoa_a'))::numeric,
-  'pessoa_a: passaram da previsão = os dele com o selo');
-select is((select testes.n(v, 'horas_no_mes') from j),
-  (select round(sum(extract(epoch from k.fim - k.inicio)) / 3600, 1) from public.checkins k
-   where k.consultor_id = testes.id('pessoa_a') and k.fim is not null and k.consultoria_id = testes.id('A')
-     and k.inicio >= date_trunc('month', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo'),
-  'pessoa_a: horas no mês = check-ins fechados dele no mês, na consultoria');
-select ok((select testes.n(v, 'horas_no_mes') > 0 from j), 'pessoa_a: tem horas no mês');
+select is((select testes.n(v, 'passaram_da_previsao') from j), testes.selo('pessoa_a'),
+  'pessoa_a: passaram da previsão = os dele com o selo que ele vê');
+select is((select testes.n(v, 'passaram_da_previsao') from j), 1::numeric, 'pessoa_a: só o "pouco" passou da previsão');
+select is((select testes.n(v, 'horas_no_mes') from j), 3.0,
+  'pessoa_a: horas no mês = check-ins fechados dele no mês, na consultoria (inclui o do cliente que foi para a B)');
 select is((select testes.n(v, 'sem_checkin_30_dias') from j), 0::numeric, 'pessoa_a: nenhum sem check-in');
 drop table j;
 create temp table j as select testes.ver('pessoa_c', 'public.indicadores_de_clientes()') as v;

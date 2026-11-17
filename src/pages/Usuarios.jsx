@@ -29,7 +29,7 @@ import { indicadoresDeUsuarios } from '@/data/indicadores'
 import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
 import { buscarUsuario, criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { formatarHoras, formatarOcupacao } from '@/lib/horas'
-import { mesAtual } from '@/lib/mes'
+import { mesAtual, rotuloCurto } from '@/lib/mes'
 import { ehPapelDeConsultoria, veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
 import { OPCOES_DE_TIPO, rotulosDosTipos } from '@/lib/tiposDeConsultoria'
@@ -39,10 +39,10 @@ const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'desativados', rot
 
 // Cartões (contados no banco, no recorte de quem vê): seguem a consultoria do filtro e o mês; as abas e o Tipo, não.
 const lerNumeros = ({ consultoriaId, mes }) => indicadoresDeUsuarios({ consultoriaId, mes })
-const cartoesDoMes = (n, passado) => [
+const cartoesDoMes = (n, passado, mes) => [
   { chave: 'ativas', rotulo: 'Pessoas ativas', icone: Users, valor: n?.pessoas_ativas },
   { chave: 'ocupacao', rotulo: passado ? 'Utilização média do mês' : 'Ocupação média do mês', icone: Gauge, tom: 'ceu',
-    valor: n ? formatarOcupacao(n.ocupacao_media) : null },
+    valor: n ? formatarOcupacao(n.ocupacao_media) : null, detalhe: `média por pessoa · ${rotuloCurto(mes)}` },
   { chave: 'acima', rotulo: 'Acima de 100%', icone: TrendingUp, tom: 'perigo', valor: n?.acima_de_100,
     destaque: n?.acima_de_100 > 0 ? 'perigo' : null },
   { chave: 'sem_tipo', rotulo: 'Sem tipo de consultoria', icone: Tags, tom: 'aviso', valor: n?.sem_tipo },
@@ -355,7 +355,7 @@ export default function Usuarios() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
-      <CartoesDeNumeros rotulo="Indicadores dos usuários" cartoes={cartoesDoMes(cartoes, cartoes ? cartoes.passado : mes < mesAtual())} />
+      <CartoesDeNumeros rotulo="Indicadores dos usuários" cartoes={cartoesDoMes(cartoes, cartoes ? cartoes.passado : mes < mesAtual(), mes)} />
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {aviso && <p role="status" className="mb-3 text-corpo text-muted-foreground">{aviso}</p>}
       {comNumeros && erroNumeros && !erro && <p role="status" className="mb-3 text-corpo text-muted-foreground">Não foi possível carregar a capacidade do mês.</p>}

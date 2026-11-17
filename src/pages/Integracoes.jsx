@@ -59,16 +59,18 @@ const quando = (data) =>
   data ? new Date(data).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'
 
 // Cartões (contados no banco): a consultoria escolhida (o dono, antes de escolher, vê todas); o filtro
-// Conectadas/Não conectadas não muda os números. "Último teste": dia/mês e hora do teste mais recente.
+// Conectadas/Não conectadas não muda os números. "Último teste": o dia/mês do teste mais recente no número e a hora
+// embaixo (a 360 px, data e hora juntas não cabem no número).
 const lerNumeros = ({ consultoriaId }) => indicadoresDeIntegracoes({ consultoriaId })
-const testeCurto = (data) =>
-  data ? new Date(data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Nenhum'
+const diaDoTeste = (data) => (data ? new Date(data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'Nenhum')
+const horaDoTeste = (data) => (data ? `às ${new Date(data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : null)
 const cartoesDasIntegracoes = (n) => [
   { chave: 'conectadas', rotulo: 'Conectadas', icone: CircleCheck, tom: 'positivo', valor: n?.conectadas },
   { chave: 'com_erro', rotulo: 'Com erro', icone: CircleAlert, tom: 'perigo', valor: n?.com_erro,
     destaque: n?.com_erro > 0 ? 'perigo' : null },
   { chave: 'nao_configuradas', rotulo: 'Não configuradas', icone: Plug, tom: 'neutro', valor: n?.nao_configuradas },
-  { chave: 'ultimo_teste', rotulo: 'Último teste', icone: History, tom: 'ceu', valor: n ? testeCurto(n.ultimo_teste) : null },
+  { chave: 'ultimo_teste', rotulo: 'Último teste', icone: History, tom: 'ceu', valor: n ? diaDoTeste(n.ultimo_teste) : null,
+    detalhe: horaDoTeste(n?.ultimo_teste) },
 ]
 
 function avisarResultado(resposta, sucesso) {

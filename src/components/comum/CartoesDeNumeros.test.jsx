@@ -60,11 +60,13 @@ describe('CartoesDeNumeros', () => {
     expect(screen.getByRole('region')).not.toHaveClass('mb-4')
   })
 
-  it('anima ao passar o mouse (e ao focar): o cartão sobe 1px com sombra e o ícone dá o pulinho dos botões', () => {
+  it('anima ao passar o mouse: o cartão sobe 1px com sombra e o ícone dá o pulinho dos botões (não é focável: nada de foco)', () => {
     render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={CARTOES} />)
     for (const cartao of screen.getByRole('region').querySelectorAll('[data-cartao]')) {
       expect(cartao).toHaveClass('cartao-animado', 'transition-[translate,box-shadow]', 'duration-200', 'hover:-translate-y-px',
-        'hover:shadow-md', 'focus-visible:-translate-y-px', 'focus-visible:shadow-md')
+        'hover:shadow-md')
+      expect(cartao.className).not.toMatch(/focus-visible:/)
+      expect(cartao).not.toHaveAttribute('tabindex')
     }
     const [ativos] = screen.getByRole('region').querySelectorAll('[data-cartao]')
     expect(ativos.querySelector('svg')).toHaveClass('icone-do-cartao')
@@ -72,9 +74,17 @@ describe('CartoesDeNumeros', () => {
 
   it('a animação do ícone está em src/index.css, com keyframes que já existem, e "reduzir movimento" a para', () => {
     const css = readFileSync('src/index.css', 'utf8')
-    const regra = /\.cartao-animado:hover \.icone-do-cartao,\s*\.cartao-animado:focus-visible \.icone-do-cartao\s*\{\s*animation:\s*([\w-]+)/.exec(css)
+    const regra = /\.cartao-animado:hover \.icone-do-cartao\s*\{\s*animation:\s*([\w-]+)/.exec(css)
     expect(regra, 'regra .cartao-animado:hover .icone-do-cartao em src/index.css').not.toBeNull()
+    expect(css).not.toContain('.cartao-animado:focus-visible')
     expect(css).toContain(`@keyframes ${regra[1]} {`)
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\*, \*::before, \*::after \{ animation-duration: 0\.01ms !important; transition-duration: 0\.01ms !important; \}/)
+  })
+
+  it('no celular o ícone fica em cima do número (o número ganha a largura toda do cartão)', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={CARTOES} />)
+    for (const cartao of screen.getByRole('region').querySelectorAll('[data-cartao]')) {
+      expect(cartao).toHaveClass('flex', 'items-center', 'max-sm:flex-col', 'max-sm:items-start')
+    }
   })
 })

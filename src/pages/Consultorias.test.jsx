@@ -6,7 +6,7 @@ import { contarClientesAtivos } from '@/data/clientes'
 import { gerenciarConsultoria, listarConsultorias } from '@/data/consultorias'
 import { indicadoresDeConsultorias } from '@/data/indicadores'
 import { trocarLogo } from '@/data/imagens'
-import { deslocarMes, mesAtual } from '@/lib/mes'
+import { deslocarMes, mesAtual, rotuloCurto } from '@/lib/mes'
 import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
 import Consultorias from './Consultorias'
@@ -207,6 +207,9 @@ describe('Consultorias: cartões de números abaixo dos filtros', () => {
     expect(numeroDoCartao(cartoes, 'Clientes ativos')).toBe('1.340')
     expect(numeroDoCartao(cartoes, 'Consultores')).toBe('88')
     expect(numeroDoCartao(cartoes, 'Ocupação média do mês')).toBe('71%')
+    expect(within(cartoes).getByText(`média por consultoria · ${rotuloCurto(mesAtual())}`)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Arquivadas' }))
+    expect(within(cartoes).getByText(`média por consultoria · ${rotuloCurto(mesAtual())}`)).toBeInTheDocument()
     expect(indicadoresDeConsultorias).toHaveBeenCalledWith({ mes: mesAtual() })
   })
 

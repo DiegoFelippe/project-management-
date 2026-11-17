@@ -22,7 +22,7 @@ import { tirarLogo, trocarLogo } from '@/data/imagens'
 import { useAuth } from '@/auth/useAuth'
 import { POR_PAGINA } from '@/data/paginar'
 import { colunasDoMes, formatarHoras, formatarOcupacao } from '@/lib/horas'
-import { mesAtual } from '@/lib/mes'
+import { mesAtual, rotuloCurto } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
 import { useLeitura } from '@/lib/useLeitura'
@@ -35,12 +35,12 @@ const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um :
 
 // Cartões da plataforma (só quem vê todas; contados no banco): seguem o mês da aba Ocupação; as abas e a busca, não.
 const lerNumeros = ({ mes }) => indicadoresDeConsultorias({ mes })
-const cartoesDoMes = (n, passado) => [
+const cartoesDoMes = (n, passado, mes) => [
   { chave: 'ativas', rotulo: 'Consultorias ativas', icone: Building2, valor: n?.consultorias_ativas },
   { chave: 'clientes', rotulo: 'Clientes ativos', icone: RadioTower, tom: 'positivo', valor: n?.clientes_ativos },
   { chave: 'consultores', rotulo: 'Consultores', icone: Users, tom: 'ceu', valor: n?.consultores },
   { chave: 'ocupacao', rotulo: passado ? 'Utilização média do mês' : 'Ocupação média do mês', icone: Gauge, tom: 'aviso',
-    valor: n ? formatarOcupacao(n.ocupacao_media) : null },
+    valor: n ? formatarOcupacao(n.ocupacao_media) : null, detalhe: `média por consultoria · ${rotuloCurto(mes)}` },
 ]
 
 export default function Consultorias() {
@@ -167,7 +167,7 @@ export default function Consultorias() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
-      {veTudo(perfil) && <CartoesDeNumeros rotulo="Indicadores das consultorias" cartoes={cartoesDoMes(numeros, numeros ? numeros.passado : passado)} />}
+      {veTudo(perfil) && <CartoesDeNumeros rotulo="Indicadores das consultorias" cartoes={cartoesDoMes(numeros, numeros ? numeros.passado : passado, mes)} />}
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as consultorias…" className="py-12" />}
       {resultado && lista.length === 0 && (

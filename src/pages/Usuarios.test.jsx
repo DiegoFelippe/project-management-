@@ -8,7 +8,7 @@ import { apagarAusencia, definirCarga, listarAusencias, ocupacaoDasPessoas } fro
 import { buscarConsultorias, buscarConsultoriasAtivas } from '@/data/consultorias'
 import { indicadoresDeUsuarios } from '@/data/indicadores'
 import { atualizarMeuContato, buscarUsuario, criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
-import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
+import { deslocarMes, mesAtual, rotuloCurto, rotuloDoMes } from '@/lib/mes'
 import { escolherNoSeletor } from '@/test/campos'
 import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
@@ -743,6 +743,7 @@ describe('Usuários: cartões de números abaixo dos filtros', () => {
     const cartoes = await cartoesAbaixoDaBarra('Indicadores dos usuários')
     await waitFor(() => expect(numeroDoCartao(cartoes, 'Pessoas ativas')).toBe('6'))
     expect(numeroDoCartao(cartoes, 'Ocupação média do mês')).toBe('62%')
+    expect(within(cartoes).getByText(`média por pessoa · ${rotuloCurto(mesAtual())}`)).toBeInTheDocument()
     expect(numeroDoCartao(cartoes, 'Acima de 100%')).toBe('1')
     expect(numeroDoCartao(cartoes, 'Sem tipo de consultoria')).toBe('3')
     expect(indicadoresDeUsuarios).toHaveBeenCalledWith({ consultoriaId: 'c1', mes: mesAtual() })
@@ -767,5 +768,14 @@ describe('Usuários: cartões de números abaixo dos filtros', () => {
     expect(indicadoresDeUsuarios).toHaveBeenCalledTimes(1)
     await escolherNoSeletor(userEvent, 'Consultoria', 'Acme')
     await waitFor(() => expect(indicadoresDeUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'k1', mes: mesAtual() }))
+  })
+
+  it('na aba Desativados (sem a navegação do mês) o cartão da ocupação ainda diz de que mês é', async () => {
+    renderizarTela(<Usuarios />, { perfil: admin })
+    await cartoesAbaixoDaBarra('Indicadores dos usuários')
+    await userEvent.click(screen.getByRole('button', { name: 'Desativados' }))
+    expect(screen.queryByRole('button', { name: 'Mês anterior' })).toBeNull()
+    const cartoes = screen.getByRole('region', { name: 'Indicadores dos usuários' })
+    expect(within(cartoes).getByText(`média por pessoa · ${rotuloCurto(mesAtual())}`)).toBeInTheDocument()
   })
 })

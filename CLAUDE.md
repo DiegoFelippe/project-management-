@@ -91,9 +91,9 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   banco** por uma função por tela (`indicadores_de_clientes`, `_de_times`, `_de_usuarios`, `_de_consultorias`,
   `_de_integracoes`; Início e Calendário: `painel_do_inicio` e `indicadores_da_agenda`), no recorte de quem vê e
   seguindo os filtros de consultoria/consultor (e o mês) da barra; situação/abas e busca não mudam os cartões. Leitura
-  em `src/data/indicadores.js`, uma por tela, pelo `useLeitura`. **Os cartões animam ao passar o mouse** (e ao focar):
-  sobem 1px com sombra e o ícone dá o pulinho dos botões (`.cartao-animado` em `src/index.css`; "reduzir movimento"
-  para). Teste de tela com `cartoesAbaixoDaBarra` (`src/test/cartoes.js`).
+  em `src/data/indicadores.js`, uma por tela, pelo `useLeitura`. **Os cartões animam ao passar o mouse**: sobem 1px
+  com sombra e o ícone dá o pulinho dos botões (`.cartao-animado` em `src/index.css`; "reduzir movimento" para). No
+  celular o ícone fica em cima do número. Teste de tela com `cartoesAbaixoDaBarra` (`src/test/cartoes.js`).
 - **Botões do cabeçalho da página** (`Cabecalho`): a ação principal do contexto é `default` (cheia, `--primary`) e as
   demais são `outline`, tamanho padrão, com ícone. Apagar no cabeçalho é `outline` com o realce de perigo no hover.
   `ghost sm` só dentro de linhas de tabela e listas. Ações que servem aos dois lugares (`AcoesDaLinha`,
