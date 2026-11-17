@@ -170,6 +170,46 @@ describe('Integrações: Testar dentro da janela (antes de salvar)', () => {
     expect(testarRascunho).toHaveBeenCalledTimes(1)
   })
 
+  it('falha da rede no Testar: o aviso aparece na janela e o botão volta', async () => {
+    vi.mocked(testarRascunho).mockRejectedValue(new TypeError('Failed to fetch'))
+    renderizarTela(<Integracoes />, { perfil: admin })
+    await abrir('E-mail', 'Editar')
+    const janela = screen.getByRole('dialog', { name: /E-mail \(SMTP\)/ })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Testar' }))
+    expect(await within(janela).findByRole('alert')).toHaveTextContent('Não foi possível testar agora. Confira a conexão e tente de novo.')
+    expect(within(janela).getByRole('button', { name: 'Testar' })).toBeEnabled()
+    expect(within(janela).getByRole('button', { name: 'Salvar' })).toBeEnabled()
+  })
+
+  it('falha da rede no Salvar: o aviso aparece e a janela não fica presa em "Salvando…"', async () => {
+    vi.mocked(salvarIntegracao).mockRejectedValue(new TypeError('Failed to fetch'))
+    renderizarTela(<Integracoes />, { perfil: admin })
+    await abrir('E-mail', 'Editar')
+    const janela = screen.getByRole('dialog', { name: /E-mail \(SMTP\)/ })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
+    expect(await within(janela).findByRole('alert')).toHaveTextContent('Não foi possível salvar agora. Confira a conexão e tente de novo.')
+    expect(within(janela).getByRole('button', { name: 'Salvar' })).toBeEnabled()
+    expect(within(janela).queryByRole('button', { name: 'Salvando…' })).not.toBeInTheDocument()
+  })
+
+  it('o resultado do teste some quando qualquer campo muda (de digitar ou de escolher)', async () => {
+    vi.mocked(testarRascunho).mockResolvedValue({ erro: null, mensagem: 'A Anthropic respondeu usando o modelo claude-opus-5-5.' })
+    renderizarTela(<Integracoes />, { perfil: admin })
+    await abrir('Inteligência artificial', 'Conectar')
+    const janela = screen.getByRole('dialog', { name: /Inteligência artificial/ })
+    await userEvent.type(within(janela).getByLabelText('Chave de API'), 'sk-ant-123')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Testar' }))
+    expect(await within(janela).findByRole('status')).toBeInTheDocument()
+    await userEvent.type(within(janela).getByLabelText('Modelo'), 'x')
+    expect(within(janela).queryByRole('status')).not.toBeInTheDocument()
+    await userEvent.clear(within(janela).getByLabelText('Modelo'))
+    await userEvent.type(within(janela).getByLabelText('Modelo'), 'claude-opus-5-5')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Testar' }))
+    expect(await within(janela).findByRole('status')).toBeInTheDocument()
+    await escolherNoSeletor(userEvent, 'Provedor', 'OpenAI')
+    expect(within(janela).queryByRole('status')).not.toBeInTheDocument()
+  })
+
   it('IA: Testar pergunta ao modelo digitado com a chave digitada', async () => {
     vi.mocked(testarRascunho).mockResolvedValue({ erro: null, mensagem: 'A Anthropic respondeu usando o modelo claude-opus-5-5.' })
     renderizarTela(<Integracoes />, { perfil: admin })

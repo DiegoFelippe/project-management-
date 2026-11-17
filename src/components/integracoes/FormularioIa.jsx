@@ -15,7 +15,7 @@ export default function FormularioIa({ integracao, aoFechar, aoSalvar, aoTestar 
   const [provedor, setProvedor] = useState(atual.provedor ?? 'anthropic')
   const [modelo, setModelo] = useState(atual.modelo ?? MODELO_PADRAO.anthropic)
   const [chave, setChave] = useState('')
-  const { erro, enviando, salvar, testar } = useEnvioDaIntegracao(montar, aoSalvar, aoTestar)
+  const { erro, enviando, testando, resultado, salvar, testar } = useEnvioDaIntegracao(montar, aoSalvar, aoTestar)
 
   function trocarProvedor(novo) {
     // o modelo sugerido acompanha o provedor, a não ser que a pessoa já tenha escrito outro
@@ -31,6 +31,7 @@ export default function FormularioIa({ integracao, aoFechar, aoSalvar, aoTestar 
 
   return (
     <JanelaIntegracao titulo="Inteligência artificial" aoFechar={aoFechar} aoSalvar={salvar} aoTestar={testar} erro={erro} enviando={enviando}
+      testando={testando} resultado={resultado}
       descricao="A chave de API da consultoria, usada por todos os recursos de IA do sistema.">
       <SecaoFormulario titulo="Modelo">
         <div className="grid gap-4 sm:grid-cols-2">

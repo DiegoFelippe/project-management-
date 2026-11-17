@@ -14,7 +14,7 @@ const CANAL = /^#?[a-z0-9][a-z0-9._-]{0,79}$/i
 export default function FormularioSlack({ integracao, aoFechar, aoSalvar, aoTestar }) {
   const [token, setToken] = useState('')
   const [canal, setCanal] = useState(integracao?.config?.canal ?? '')
-  const { erro, enviando, salvar, testar } = useEnvioDaIntegracao(montar, aoSalvar, aoTestar)
+  const { erro, enviando, testando, resultado, salvar, testar } = useEnvioDaIntegracao(montar, aoSalvar, aoTestar)
 
   function montar() {
     const tokenLimpo = token.trim()
@@ -27,6 +27,7 @@ export default function FormularioSlack({ integracao, aoFechar, aoSalvar, aoTest
 
   return (
     <JanelaIntegracao titulo="Slack" aoFechar={aoFechar} aoSalvar={salvar} aoTestar={testar} erro={erro} enviando={enviando}
+      testando={testando} resultado={resultado}
       descricao="O app do Slack da consultoria, que o sistema vai usar para mandar mensagens no workspace.">
       <SecaoFormulario titulo="Acesso">
         <Campo id="slack-token" rotulo="Token do bot"
