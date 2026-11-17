@@ -64,6 +64,10 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   sentido (Início: o mês; Times: busca pelo nome; Integrações: Todas/Conectadas/Não conectadas). As abas são
   `AbasSegmentadas`; `comoAbas` só nas abas de página, como as do cliente. Times: "Novo time" é o botão principal
   da barra (administrador e gestor), e o dono vê a consultoria no lugar dele.
+- **Botões do cabeçalho da página** (`Cabecalho`): a ação principal do contexto é `default` (cheia, `--primary`) e as
+  demais são `outline`, tamanho padrão, com ícone. Apagar no cabeçalho é `outline` com o realce de perigo no hover.
+  `ghost sm` só dentro de linhas de tabela e listas. Ações que servem aos dois lugares (`AcoesDaLinha`,
+  `BotaoCheckin`) recebem `noCabecalho` e usam `estiloDaAcao` (`src/components/clientes/estiloDaAcao.js`).
 - **Mês sempre pela `NavegacaoDoMes`** (`maximo` trava o Próximo); nunca montar Anterior/Próximo de mês à mão.
   `src/components/comum/navegacaoDoMesVarredura.test.js` falha se `deslocarMes` aparecer fora dela.
   **Exceção: o Calendário.** O "Hoje ‹ ›" dele anda por semana ou por mês, como o Hub, conforme a visão, e por isso
