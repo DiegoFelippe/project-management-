@@ -3,7 +3,7 @@
 -- consultores_por_ocupacao e consultorias_por_ocupacao. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(68);
+select plan(73);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -318,6 +318,32 @@ select testes.como('central');
 select ok((select (j -> 'indicadores' ->> 'realizado')::numeric = (j -> 'horas_por_mes' -> 5 ->> 'realizado')::numeric
     from (select public.painel_do_inicio('2026-08-01') as j) x),
   'realizado do topo = barra do mês, arredondando uma vez só no fim');
+reset role;
+
+-- ── Resumo de horas por mês (checkins_horas_mes), mantido por gatilho ────────────
+-- O resumo bate com a soma direta dos check-ins fechados, em cada consultoria e mês.
+select ok((select not exists (
+    select 1 from (
+      select k.consultoria_id, date_trunc('month', k.inicio at time zone 'America/Sao_Paulo')::date as mes,
+        sum(extract(epoch from k.fim - k.inicio)) as segundos
+      from public.checkins k where k.fim is not null group by 1, 2) d
+    full join public.checkins_horas_mes r on r.consultoria_id = d.consultoria_id and r.mes = d.mes
+    where coalesce(d.segundos, 0) is distinct from coalesce(r.segundos, 0))),
+  'resumo de horas: igual à soma direta dos check-ins fechados');
+-- Check-in fechado soma no mês de início; mudar o fim ajusta; apagar desfaz.
+select testes.como('pessoa_a');
+insert into public.checkins (cliente_id, inicio, fim, descricao) values (testes.id('a40'), '2026-07-03 08:00-03', '2026-07-03 10:00-03', 'Julho');
+reset role;
+select is((select segundos from public.checkins_horas_mes where consultoria_id = testes.id('A') and mes = '2026-07-01'), 7200::numeric,
+  'resumo de horas: check-in fechado soma as horas no mês dele');
+update public.checkins set fim = '2026-07-03 09:00-03' where cliente_id = testes.id('a40') and inicio = '2026-07-03 08:00-03';
+select is((select segundos from public.checkins_horas_mes where consultoria_id = testes.id('A') and mes = '2026-07-01'), 3600::numeric,
+  'resumo de horas: mudar o fim ajusta o resumo');
+delete from public.checkins where cliente_id = testes.id('a40') and inicio = '2026-07-03 08:00-03';
+select is((select coalesce(sum(segundos), 0) from public.checkins_horas_mes where consultoria_id = testes.id('A') and mes = '2026-07-01'), 0::numeric,
+  'resumo de horas: apagar o check-in desfaz a soma');
+select testes.como('pessoa_a');
+select throws_ok($$ select * from public.checkins_horas_mes $$, '42501', null, 'resumo de horas: sem acesso direto para quem está logado');
 reset role;
 
 -- ── Sem recorte ──────────────────────────────────────────────────────────────

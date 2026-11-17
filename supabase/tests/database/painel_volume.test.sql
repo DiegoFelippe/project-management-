@@ -1,10 +1,10 @@
--- Volume do painel do Início: 200 consultorias, 3.000 consultores, 50.000 clientes e 200.000 check-ins fechados no mês, criados
+-- Volume do painel do Início: 200 consultorias, 3.000 consultores, 50.000 clientes e 200.000 check-ins fechados no mês atual mais 500.000 nos 5 meses anteriores (o gráfico lê 6 meses), criados
 -- aqui e desfeitos no fim (rollback: nada fica no banco). painel_do_inicio precisa responder em até 500 ms
 -- para a central (tudo), 150 ms para uma consultoria e 100 ms para um consultor (média de 5 execuções, com 50% de
 -- folga). Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(6);
+select plan(7);
 
 create schema testes;
 grant usage on schema testes to authenticated;
@@ -14,6 +14,16 @@ grant select on testes.fx to authenticated;
 create function testes.id(p_nome text) returns uuid language sql stable as $$
   select id from testes.fx where nome = p_nome
 $$;
+
+-- Média (ms) de 5 execuções, só para o relatório (diag): o limite de verdade é o performs_within.
+create function testes.media_ms() returns numeric language plpgsql as $$
+declare t0 timestamptz; i int;
+begin
+  t0 := clock_timestamp();
+  for i in 1..5 loop perform public.painel_do_inicio(); end loop;
+  return round(extract(epoch from clock_timestamp() - t0) * 1000 / 5, 1);
+end $$;
+grant execute on function testes.media_ms() to authenticated;
 
 create function testes.como(p_nome text) returns void language plpgsql as $$
 begin
@@ -93,6 +103,20 @@ join v_pessoas p on p.n = x.n
 join v_consultorias c on c.n = (x.n - 1) % 200 + 1
 join v_clientes cl on cl.n = x.n + 3200 * (x.i % 15);
 
+-- Histórico: 100.000 check-ins em cada um dos 5 meses anteriores (o gráfico "Horas por mês" lê 6 meses). O i-ésimo
+-- do consultor no mês começa em início do mês + i x 9 h e dura 4 h (34 por consultor: cabem no mês, sem sobreposição).
+insert into public.checkins (cliente_id, consultor_id, consultoria_id, inicio, fim, descricao)
+select cl.id, p.id, c.id, m.de + x.i * interval '9 hours', m.de + x.i * interval '9 hours' + interval '4 hours', 'Histórico'
+from generate_series(1, 5) atras
+cross join generate_series(1, 100000) k
+cross join lateral (select (k - 1) % 3000 + 1 as n, (k - 1) / 3000 as i) x
+cross join lateral (
+  select (date_trunc('month', now() at time zone 'America/Sao_Paulo') - atras * interval '1 month') at time zone 'America/Sao_Paulo' as de
+) m
+join v_pessoas p on p.n = x.n
+join v_consultorias c on c.n = (x.n - 1) % 200 + 1
+join v_clientes cl on cl.n = x.n + 3200 * (x.i % 15);
+
 alter table public.checkins enable trigger checkins_validar;
 
 -- ── Tempos ───────────────────────────────────────────────────────────────────
@@ -101,10 +125,13 @@ insert into testes.fx select 'adm1', id from v_pessoas where n = 1;
 insert into testes.fx select 'pessoa401', id from v_pessoas where n = 401;
 
 select testes.como('central');
+select diag('média medida: ' || testes.media_ms() || ' ms');
 select is(public.painel_do_inicio() ->> 'recorte', 'tudo', 'a central recebe o recorte tudo');
 select ok((public.painel_do_inicio() -> 'indicadores' ->> 'clientes_ativos')::int >= 50000,
   'a central conta os 50.000 clientes');
 select ok(jsonb_array_length(public.painel_do_inicio() -> 'ranking') = 8, 'ranking limitado a 8');
+select ok((select bool_and((e ->> 'realizado')::numeric > 0) from jsonb_array_elements(public.painel_do_inicio() -> 'horas_por_mes') e),
+  'os 6 meses do gráfico têm horas (o volume cobre o histórico inteiro)');
 
 -- Média de 5 execuções (o pgTAP descarta a mais rápida); janela "média +- folga" centrada em 0,75 x limite com
 -- folga de 0,75 x limite: o limite como média, com 50% de tolerância.
@@ -113,11 +140,13 @@ select performs_within('select public.painel_do_inicio()', 375, 375, 5,
 reset role;
 
 select testes.como('adm1');
+select diag('média medida: ' || testes.media_ms() || ' ms');
 select performs_within('select public.painel_do_inicio()', 112.5, 112.5, 5,
   'administrador (15 consultores, 250 clientes): painel_do_inicio() em até 150 ms na média (+50%)');
 reset role;
 
 select testes.como('pessoa401');
+select diag('média medida: ' || testes.media_ms() || ' ms');
 select performs_within('select public.painel_do_inicio()', 75, 75, 5,
   'consultor (15 clientes, 67 check-ins): painel_do_inicio() em até 100 ms na média (+50%)');
 reset role;

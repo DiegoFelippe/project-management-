@@ -3,15 +3,12 @@ import { GraficoCarregando } from '@/components/comum/Carregando'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import { checkinsPorSemana, horasPorConsultor, horasPorMes } from '@/data/clientes'
 import { formatarHoras } from '@/lib/horas'
-import { mesAtual, rotuloDoMes } from '@/lib/mes'
+import { mesAtual, rotuloCurto, rotuloDoMes } from '@/lib/mes'
 
 // Gráficos da aba Geral, em SVG próprio (cores do tema, sem animação): horas por mês com a previsão atual,
 // horas por consultor e check-ins por semana. Os dois últimos seguem o mês escolhido. O banco soma só o que
 // cada pessoa enxerga.
 const LARGURA = 340
-const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
-
-const rotuloCurto = (mes) => `${MESES_CURTOS[Number(mes.slice(5, 7)) - 1]}/${mes.slice(2, 4)}`
 const rotuloDaSemana = (semana) => `sem. de ${semana.slice(8, 10)}/${semana.slice(5, 7)}`
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`
 const cortar = (texto, max) => (texto.length > max ? `${texto.slice(0, max - 1)}…` : texto)

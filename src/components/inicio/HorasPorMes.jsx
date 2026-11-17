@@ -1,7 +1,5 @@
 import { formatarHoras } from '@/lib/horas'
-
-const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
-const rotuloCurto = (mes) => `${MESES[Number(mes.slice(5, 7)) - 1]}/${mes.slice(2, 4)}`
+import { rotuloCurto } from '@/lib/mes'
 const COLUNA = 60 // largura de cada mês no viewBox; as linhas de texto em HTML usam o mesmo grid de colunas.
 const ALTURA = 100
 

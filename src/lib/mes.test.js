@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deslocarMes, formatarDia, hoje, limitesDoMesEmSP, mesAtual, rotuloDoMes } from './mes'
+import { deslocarMes, formatarDia, hoje, limitesDoMesEmSP, mesAtual, rotuloCurto, rotuloDoMes } from './mes'
 
 describe('mes', () => {
   it('desloca o mês atravessando o ano', () => {
@@ -44,5 +44,12 @@ describe('mes', () => {
   it('hoje segue o fuso de São Paulo', () => {
     expect(hoje(new Date('2026-12-01T02:00:00Z'))).toBe('2026-11-30')
     expect(hoje(new Date('2026-12-01T03:00:00Z'))).toBe('2026-12-01')
+  })
+})
+
+describe('rotuloCurto', () => {
+  it('"2026-03-01" -> "mar/26"', () => {
+    expect(rotuloCurto('2026-03-01')).toBe('mar/26')
+    expect(rotuloCurto('2027-12-01')).toBe('dez/27')
   })
 })

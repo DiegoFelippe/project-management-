@@ -120,8 +120,8 @@ times e consultorias.** Nada pode depender de "são poucos registros".
   arquivamento com check-in aberto fecha o check-in na hora.
 - **Uma consultoria nunca vê clientes, horas ou nomes de outra.** Quem não é da central só alcança dados de
   colegas pelas funções do banco, não por leitura direta.
-- **Ocupação, capacidade e sugestões vêm do banco**: `consultores_por_ocupacao`, `consultorias_por_ocupacao` e `ocupacao_das_pessoas` (a lista de Usuários).
-  Nunca recalcular na tela.
+- **Ocupação, capacidade, sugestões e o painel do Início vêm do banco**: `consultores_por_ocupacao`, `consultorias_por_ocupacao`,
+  `ocupacao_das_pessoas` (a lista de Usuários) e `painel_do_inicio` (os números do Início). Nunca recalcular na tela.
 
 ## Segurança
 
