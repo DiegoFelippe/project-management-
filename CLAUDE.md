@@ -138,8 +138,11 @@ Design: `docs/superpowers/specs/2026-11-16-calendario-design.md` (decisões da c
   (`npm test`), sem rede.
 - **Edge Function NOVA no Supabase local** exige `npx supabase stop && npx supabase start` (faça antes um backup com
   `pg_dumpall`; os dados ficam). `npm run functions:reiniciar` só recarrega as que o runtime já conhece.
-- Na página do cliente, a aba Agenda mostra as reuniões do cliente (link para `/calendario?evento=<id>`) e o
-  Histórico traz "Reunião realizada" e "Pasta da reunião criada".
+- **Agenda dentro do cliente** (pedido do Diego, 17/11): a aba Agenda usa o mesmo calendário do menu
+  (`CalendarioDaAgenda` com o cliente), recortado pelo cliente e **só com os eventos dele** — os números contam só as
+  reuniões do cliente, a barra não tem consultor/consultoria/cliente, "Mostrar" tem reuniões e feriados e "Novo
+  evento" abre com o cliente travado. Check-ins ficam na aba Check-ins e o histórico na aba Histórico (que traz
+  "Reunião realizada" e "Pasta da reunião criada").
 
 ## Layout
 
