@@ -112,6 +112,22 @@ Elas estão em `supabase/config.toml`.
 
 Enquanto isso não for feito, o botão "Entrar com Google" avisa que o Google ainda não foi configurado.
 
+## Verificação em duas etapas (app autenticador)
+
+Cada pessoa pode ativar em **Meu perfil** (QR code ou chave no Google Authenticator, Microsoft Authenticator,
+1Password…, e o primeiro código de 6 dígitos). Na ficha da pessoa (aba **Acesso**), quem edita o acesso dela liga
+**Exigir verificação em duas etapas**: no próximo acesso ela configura o app antes de entrar. Quem tem o app ativo
+digita o código depois da senha ou do Google. Sem o código, o banco não entrega nada além do próprio perfil
+(`private.liberado()` exige a sessão `aal2`) e as Edge Functions respondem `verificacao_pendente`.
+
+- **Local:** já vem ligado em `supabase/config.toml` (`[auth.mfa.totp] enroll_enabled = true` e `verify_enabled = true`).
+- **Nuvem:** no painel do Supabase, **Authentication → Multi-Factor (MFA)**: ligue **TOTP (App Authenticator)**
+  para cadastrar e para verificar. SMS e chave física ficam desligados.
+- **Perdeu o celular:** não há códigos de recuperação. Quem edita o acesso da pessoa abre a ficha → **Acesso** →
+  **Zerar verificação em duas etapas**. O app cadastrado deixa de valer; se a verificação for exigida, a pessoa
+  configura de novo no próximo acesso, senão passa a entrar só com a senha.
+- O segredo do app fica no Auth do Supabase; o app nunca guarda.
+
 ## Banco
 
 - Toda mudança de tabela vira uma migração: `npx supabase migration new <nome>` e depois `npm run db:reset`.
@@ -151,7 +167,8 @@ Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. 
 4. `npx supabase functions deploy` publica as Edge Functions (`criar-acesso`, `criar-consultoria`, `reenviar-convite`,
    `gerenciar-acesso`, `gerenciar-consultoria`, `integracoes`, `integracoes-google`).
 5. Em Authentication: Site URL e redirecionamentos com o endereço da Vercel (`https://.../**`),
-   cadastro aberto desligado, senha mínima 8, os modelos de e-mail de `supabase/templates` e o Google.
+   cadastro aberto desligado, senha mínima 8, os modelos de e-mail de `supabase/templates`, o Google e a
+   verificação em duas etapas (Multi-Factor → TOTP, veja acima).
 6. Configure um provedor de e-mail (Resend, SendGrid etc.): o e-mail que vem com o Supabase só entrega para o time do projeto.
 7. Crie o dono: `SUPABASE_URL=... SUPABASE_SECRET_KEY=... APP_URL=https://... npm run dono:criar -- seu@email.com "Seu Nome"`.
 
