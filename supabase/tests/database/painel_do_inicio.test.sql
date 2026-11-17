@@ -3,7 +3,7 @@
 -- consultores_por_ocupacao e consultorias_por_ocupacao. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(62);
+select plan(63);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -37,7 +37,7 @@ begin
   return v;
 end $$;
 
--- p_criado e p_enviado servem para datas antigas (o gatilho grava "agora" ao inserir).
+-- p_criado e p_enviado servem para datas antigas (séculos atrás: nenhum cliente real é mais velho, então os da fila vêm primeiro em qualquer banco) (o gatilho grava "agora" ao inserir).
 create function testes.cliente(p_nome text, p_horas numeric, p_consultoria text, p_consultor text,
   p_criado timestamptz default null, p_enviado timestamptz default null, p_arquivado boolean default false)
 returns uuid language plpgsql as $$
@@ -64,6 +64,16 @@ end $$;
 create function testes.futuro() returns date language sql immutable as $$ select date '2037-11-01' $$;
 create function testes.passado() returns date language sql immutable as $$ select date '2026-10-01' $$;
 
+-- Todas as consultorias de consultorias_por_ocupacao (página a página, 50 por vez), para comparar sem depender de
+-- quantas existem no banco.
+create function testes.todas_consultorias(p_mes date)
+returns table (id uuid, nome text, capacidade numeric, reservado numeric, realizado numeric, ocupacao numeric)
+language sql stable as $$
+  select c.id, c.nome, c.capacidade, c.reservado, c.realizado, c.ocupacao
+  from generate_series(0, 2000, 50) o
+  cross join lateral public.consultorias_por_ocupacao(null, 50, o, p_mes) c
+$$;
+
 select testes.consultoria('A');
 select testes.consultoria('B');
 select testes.consultoria('Z');
@@ -81,12 +91,12 @@ select testes.perfil('admin_z', 'admin', 'Z', 0);
 select testes.cliente('a40', 40, 'A', 'pessoa_a');
 select testes.cliente('a30', 30, 'A', 'pessoa_a');
 select testes.cliente('c200', 200, 'A', 'pessoa_c');
-select testes.cliente('sem_a', 25, 'A', null, '2000-12-01', '2003-01-01');
-select testes.cliente('arq_a', 15, 'A', null, '2000-12-01', '2000-12-01', true);
+select testes.cliente('sem_a', 25, 'A', null, '1900-12-01', '1903-01-01');
+select testes.cliente('arq_a', 15, 'A', null, '1900-12-01', '1900-12-01', true);
 select testes.cliente('b10', 10, 'B', 'pessoa_b');
-select testes.cliente('sem_b', 12, 'B', null, '2000-12-01', '2004-01-01');
-select testes.cliente('dist1', 8, null, null, '2001-01-01');
-select testes.cliente('dist2', 9, null, null, '2002-01-01');
+select testes.cliente('sem_b', 12, 'B', null, '1900-12-01', '1904-01-01');
+select testes.cliente('dist1', 8, null, null, '1901-01-01');
+select testes.cliente('dist2', 9, null, null, '1902-01-01');
 
 -- Check-ins: outubro/2026 de pessoa_a (2 x 23 h 06 = 46,2 h) e setembro/2026 (10 h); pessoa_b em outubro (23 h 06).
 select testes.como('pessoa_a');
@@ -120,7 +130,8 @@ select is((select (j -> 'indicadores' ->> 'clientes_ativos')::bigint from p_cent
   (select count(*) from public.clientes where not arquivado), 'central: clientes ativos = todos os não arquivados');
 select is((select (j -> 'indicadores' ->> 'clientes_novos')::bigint from p_central), 0::bigint,
   'central: em novembro/2037 nenhum cliente é novo (criado_em dentro do mês)');
-select is((select jsonb_array_length(j -> 'esperando') from p_central), 5, 'central: esperando traz no máximo 5');
+select ok((select jsonb_array_length(j -> 'esperando') between 4 and 5 from p_central),
+  'central: esperando traz no máximo 5 (os 4 da fixture, mais algum de verdade se houver)');
 select is((select array_agg(e ->> 'id' order by o) from p_central, jsonb_array_elements(j -> 'esperando') with ordinality t(e, o) where o <= 4),
   array[testes.id('dist1')::text, testes.id('dist2')::text, testes.id('sem_a')::text, testes.id('sem_b')::text],
   'central: esperando do mais antigo ao mais novo, a distribuir e sem consultor juntos');
@@ -133,15 +144,20 @@ select ok((select not exists (
   'central: cliente arquivado não espera');
 select ok((select jsonb_array_length(j -> 'ranking') <= 8 and not exists (
     select 1 from p_central, jsonb_array_elements(j -> 'ranking') r
-    left join public.consultorias_por_ocupacao(null, 50, 0, testes.futuro()) c on c.id = (r ->> 'id')::uuid
+    left join testes.todas_consultorias(testes.futuro()) c on c.id = (r ->> 'id')::uuid
     where c.id is null
       or row(c.nome, c.capacidade, c.ocupacao)
         is distinct from row(r ->> 'nome', (r ->> 'capacidade')::numeric, (r ->> 'ocupacao')::numeric))
     from p_central),
   'central: ranking de consultorias (até 8) com os números de consultorias_por_ocupacao');
-select ok((select (j -> 'indicadores' ->> 'capacidade')::numeric = (select sum(c.capacidade) from public.consultorias_por_ocupacao(null, 50, 0, testes.futuro()) c)
-    and (j -> 'indicadores' ->> 'reservado')::numeric = (select sum(c.reservado) from public.consultorias_por_ocupacao(null, 50, 0, testes.futuro()) c)
-    and (j -> 'indicadores' ->> 'realizado')::numeric = (select sum(c.realizado) from public.consultorias_por_ocupacao(null, 50, 0, testes.futuro()) c)
+select ok((select not exists (
+    select 1 from p_central, jsonb_array_elements(j -> 'ranking') with ordinality a(r, o)
+    join jsonb_array_elements(j -> 'ranking') with ordinality b(r, o) on b.o = a.o + 1
+    where (a.r ->> 'ocupacao')::numeric < (b.r ->> 'ocupacao')::numeric) from p_central),
+  'central: ranking do mais ocupado ao menos ocupado');
+select ok((select (j -> 'indicadores' ->> 'capacidade')::numeric = (select sum(c.capacidade) from testes.todas_consultorias(testes.futuro()) c)
+    and (j -> 'indicadores' ->> 'reservado')::numeric = (select sum(c.reservado) from testes.todas_consultorias(testes.futuro()) c)
+    and (j -> 'indicadores' ->> 'realizado')::numeric = (select sum(c.realizado) from testes.todas_consultorias(testes.futuro()) c)
     from p_central),
   'central: capacidade, reservado e realizado somam as consultorias de consultorias_por_ocupacao');
 select ok((select (j ->> 'passado')::boolean is false from p_central), 'mês futuro: passado = false');
@@ -157,7 +173,7 @@ select testes.como('central');
 create temp table p_central_passado as select public.painel_do_inicio(testes.passado()) as j;
 grant select on p_central_passado to authenticated;
 select ok((select (j ->> 'passado')::boolean from p_central_passado), 'mês passado: passado = true');
-select ok((select (j -> 'indicadores' ->> 'realizado')::numeric = (select sum(c.realizado) from public.consultorias_por_ocupacao(null, 50, 0, testes.passado()) c)
+select ok((select (j -> 'indicadores' ->> 'realizado')::numeric = (select sum(c.realizado) from testes.todas_consultorias(testes.passado()) c)
     from p_central_passado), 'central, mês passado: realizado = soma de consultorias_por_ocupacao');
 select ok((select j -> 'indicadores' -> 'reservado' = 'null'::jsonb from p_central_passado), 'mês passado: reservado nulo');
 reset role;
@@ -170,7 +186,7 @@ grant select on p_admin to authenticated;
 select is((select j ->> 'recorte' from p_admin), 'consultoria', 'administrador: recorte consultoria');
 select is((select j ->> 'mes' from p_admin), '2037-11-01', 'devolve o mês pedido');
 select is((select (public.painel_do_inicio() -> 'indicadores' ->> 'clientes_novos')::int), 3,
-  'administrador: novos do mês atual (a40, a30, c200; sem_a e arq_a são de 2000)');
+  'administrador: novos do mês atual (a40, a30, c200; sem_a e arq_a são de 1900)');
 select is((select (j -> 'indicadores' ->> 'clientes_ativos')::int from p_admin), 4,
   'administrador: ativos da consultoria (a40, a30, c200, sem_a; o arquivado não conta)');
 select is((select (j -> 'indicadores' ->> 'aguardando')::int from p_admin), 1, 'administrador: aguardando = sem consultor da consultoria');
