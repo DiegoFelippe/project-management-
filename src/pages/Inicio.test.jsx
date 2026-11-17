@@ -54,7 +54,7 @@ describe('Início (painel)', () => {
     vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
     renderizarTela(<Inicio />, { perfil: perfil('admin') })
     expect(await screen.findByRole('region', { name: 'Ocupação por consultor' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Ver todos' })).toHaveAttribute('href', '/usuarios')
+    expect(screen.getByRole('link', { name: 'Ver todos' })).toHaveAttribute('href', `/usuarios?mes=${MES}`)
     expect(screen.queryByText(/a distribuir/i)).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Cliente Sem Consultor' })).toHaveAttribute('href', '/clientes/c2')
   })
