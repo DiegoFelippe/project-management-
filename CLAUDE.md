@@ -18,7 +18,8 @@ Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na 
 ## Menu lateral (trilho): sempre animar no hover
 
 - **Todo ícone do trilho tem uma animação ao passar o mouse** (e ao focar pelo teclado). Sem exceção:
-  itens do menu, itens "em breve", a bolinha da pessoa e o Sair. Pedido do Diego (2026-11-12).
+  itens do menu, a bolinha da pessoa e o Sair. Pedido do Diego (2026-11-12). O menu não tem itens "em breve"
+  (o Projetos saiu em 2026-11-16): só entra no trilho o que já funciona.
 - **Item novo no menu:** em `src/components/shell/menu.js`, preencha `animacao` com uma de
   `ANIMACOES_DO_MENU` (`subir`, `balancar`, `pulsar`, `abrir`, `erguer`, `conectar`, `sair`). Prefira uma que
   combine com o ícone e que ainda não esteja em uso no trilho.

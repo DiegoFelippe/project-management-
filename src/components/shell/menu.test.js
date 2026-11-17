@@ -5,15 +5,16 @@ const ids = (papel) => itensDoMenu(papel).map((item) => item.id)
 
 describe('itensDoMenu', () => {
   it('cada papel vê os seus itens', () => {
-    expect(ids('pessoa')).toEqual(['inicio', 'clientes', 'projetos'])
-    expect(ids('gestor')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios'])
-    expect(ids('admin')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios', 'integracoes'])
-    expect(ids('central')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios', 'consultorias'])
-    expect(ids('dono')).toEqual(['inicio', 'clientes', 'projetos', 'times', 'usuarios', 'consultorias', 'integracoes'])
+    expect(ids('pessoa')).toEqual(['inicio', 'clientes'])
+    expect(ids('gestor')).toEqual(['inicio', 'clientes', 'times', 'usuarios'])
+    expect(ids('admin')).toEqual(['inicio', 'clientes', 'times', 'usuarios', 'integracoes'])
+    expect(ids('central')).toEqual(['inicio', 'clientes', 'times', 'usuarios', 'consultorias'])
+    expect(ids('dono')).toEqual(['inicio', 'clientes', 'times', 'usuarios', 'consultorias', 'integracoes'])
   })
 
-  it('projetos ainda está em breve', () => {
-    expect(itensDoMenu('gestor').find((item) => item.id === 'projetos').emBreve).toBe(true)
+  it('o menu não tem mais Projetos nem itens "em breve" (pedido do Diego, 16/11)', () => {
+    expect(ids('dono')).not.toContain('projetos')
+    expect(itensDoMenu('dono').some((item) => item.emBreve)).toBe(false)
   })
 })
 
