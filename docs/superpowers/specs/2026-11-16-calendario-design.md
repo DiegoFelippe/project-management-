@@ -108,6 +108,17 @@ dono em todos. Participante convidado só responde (Confirmar/Recusar).
   buscar a gravação".
 - A reunião aparece na aba Agenda do cliente e no Histórico ("Reunião realizada", "Pasta criada").
 
+## Agenda dentro do cliente (pedido do Diego, 17/11)
+
+- "A agenda que aparece dentro do cliente deve ser uma agenda parecida com a agenda do menu. Porém ela vai filtrada
+  apenas com os compromissos do cliente." Confirmado: **só compromissos** (os check-ins ficam na aba Check-ins e o
+  histórico na aba Histórico).
+- A aba Agenda do cliente usa o mesmo calendário do menu (Mês, Semana e Agenda, "Hoje ‹ ›", detalhe do dia, próximos
+  7 dias e os 4 números), recortado pelo cliente: os números contam só as reuniões deste cliente; a barra não tem
+  consultor, consultoria nem cliente; "Mostrar" fica com reuniões, compromissos e feriados (ausências saem — são das
+  pessoas, não do cliente); "Novo evento" abre com o cliente escolhido e travado. Quem vê e quem mexe: as mesmas
+  regras do menu.
+
 ## Pastas nos Arquivos do cliente
 
 Como no design anterior: criar pasta (quem envia arquivo no cliente), consultar (quem vê o cliente; paginado),
