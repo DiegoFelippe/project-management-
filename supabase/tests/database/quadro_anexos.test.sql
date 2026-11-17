@@ -538,9 +538,8 @@ select testes.enviar('a_del', 'cDel', 'kdel');
 select testes.subir(testes.c_imagem('cDel', 'kdel', 'i_del'));
 select is(jsonb_array_length(public.apagar_cartao(testes.id('kdel')) -> 'caminhos'), 2,
   'o consultor apaga o cartão (e tirar os objetos falha: eles ficam)');
-select is(testes.ordenado(public.objetos_para_tirar_do_quadro(testes.id('cDel'))),
-  testes.ordem(array[testes.c_anexo('cDel', 'kdel', 'a_del'), testes.c_imagem('cDel', 'kdel', 'i_del')]),
-  'quem apagou acha o que sobrou na pasta do cliente, para tentar de novo');
+select throws_ok(format($$select public.objetos_para_tirar_do_quadro(%L)$$, testes.id('cDel')), 'P0001', 'sem_permissao',
+  'só a central procura o que sobrou na pasta do cliente (quem apagou o cartão, não)');
 reset role;
 select testes.como('central1');
 select lives_ok(format($$delete from public.clientes where id = %L$$, testes.id('cDel')),
@@ -550,7 +549,8 @@ reset role;
 update private.quadro_objetos_apagados set apagado_em = now() - interval '2 days'
 where caminho in (testes.c_anexo('cDel', 'kdel', 'a_del'), testes.c_imagem('cDel', 'kdel', 'i_del'));
 select testes.como('a1');
-select is(public.objetos_para_tirar_do_quadro(testes.id('cDel')), '[]'::jsonb, 'dias depois, quem apagou não acha mais nada');
+select throws_ok(format($$select public.objetos_para_tirar_do_quadro(%L)$$, testes.id('cDel')), 'P0001', 'sem_permissao',
+  'dias depois, quem apagou continua sem procurar');
 select is(testes.tirar(array[testes.c_anexo('cDel', 'kdel', 'a_del'), testes.c_imagem('cDel', 'kdel', 'i_del')]), 0::bigint,
   'nem tira');
 reset role;

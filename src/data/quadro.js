@@ -409,7 +409,8 @@ export async function urlsAssinadas(caminhos) {
 }
 
 // Logo depois de apagar o cliente (o quadro vazio sai junto; os cartões já tinham saído): tira da pasta dele no balde o
-// que sobrou de cartões apagados (quando tirar falhou). O banco diz o que quem pede pode tirar, 1000 por vez. { erro }.
+// que sobrou de cartões apagados (quando tirar falhou). O banco diz o que tirar, 1000 por vez, só para a central (é ela
+// quem apaga o cliente; os outros recebem sem_permissao). { erro }.
 export async function limparQuadroDoCliente(clienteId) {
   if (!clienteId) return { erro: null }
   for (;;) {

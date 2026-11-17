@@ -398,18 +398,21 @@ select testes.como('gestor_a');
 select testes.novo_cartao('k3', 'afazer', 'Cartão da gestão');
 reset role;
 select testes.como('a1');
-with u as (delete from public.cartoes where id = testes.id('k3') returning 1)
-select is(count(*), 0::bigint, 'o consultor não apaga cartão que outra pessoa criou') from u;
+-- Cartão só se apaga por apagar_cartao (a tabela não aceita delete de quem está logado: 20261117144310_quadro_ao_vivo.sql).
+select throws_ok(format($$select public.apagar_cartao(%L)$$, testes.id('k3')), 'P0001', 'sem_permissao',
+  'o consultor não apaga cartão que outra pessoa criou');
 select testes.novo_cartao('k4', 'afazer');
-with u as (delete from public.cartoes where id = testes.id('k4') returning 1)
-select is(count(*), 1::bigint, 'o consultor apaga o cartão que ele criou') from u;
+select public.apagar_cartao(testes.id('k4'));
+select is((select count(*) from public.cartoes where id = testes.id('k4')), 0::bigint,
+  'o consultor apaga o cartão que ele criou');
 select testes.novo_cartao('k5', 'afazer');
 insert into public.cartao_checklist (cartao_id, texto) values (testes.id('k5'), 'Some junto');
 select testes.comentar('m5', 'k5', 'Some junto');
 reset role;
 select testes.como('gestor_a');
-with u as (delete from public.cartoes where id = testes.id('k5') returning 1)
-select is(count(*), 1::bigint, 'a gestão apaga cartão de qualquer um') from u;
+select public.apagar_cartao(testes.id('k5'));
+select is((select count(*) from public.cartoes where id = testes.id('k5')), 0::bigint,
+  'a gestão apaga cartão de qualquer um');
 reset role;
 select is((select count(*) from public.cartao_checklist where cartao_id = testes.id('k5'))
   + (select count(*) from public.cartao_comentarios where cartao_id = testes.id('k5')), 0::bigint,
@@ -483,8 +486,8 @@ select throws_ok(format($$insert into public.cartoes (coluna_id, titulo) values 
   '42501', null, 'a central não cria cartão');
 with u as (update public.cartoes set titulo = 'Trocado' where id = testes.id('k1') returning 1)
 select is(count(*), 0::bigint, 'a central não edita cartão') from u;
-with u as (delete from public.cartoes where id = testes.id('k1') returning 1)
-select is(count(*), 0::bigint, 'a central não apaga cartão') from u;
+select throws_ok(format($$select public.apagar_cartao(%L)$$, testes.id('k1')), 'P0001', 'sem_permissao',
+  'a central não apaga cartão');
 select throws_ok(format($$insert into public.quadro_colunas (quadro_id, nome) values (%L, 'X')$$, testes.id('qA')),
   '42501', null, 'a central não cria coluna');
 select throws_ok(format($$insert into public.cartao_comentarios (cartao_id, texto) values (%L, 'X')$$, testes.id('k1')),
@@ -561,8 +564,8 @@ select throws_ok(format($$select public.mover_cartao(%L, %L)$$, testes.id('karq'
   'P0001', 'sem_permissao', 'cliente arquivado: não move cartão');
 select throws_ok(format($$insert into public.cartao_comentarios (cartao_id, texto) values (%L, 'X')$$, testes.id('karq')),
   '42501', null, 'cliente arquivado: não comenta');
-with u as (delete from public.cartoes where id = testes.id('karq') returning 1)
-select is(count(*), 0::bigint, 'cliente arquivado: não apaga o próprio cartão') from u;
+select throws_ok(format($$select public.apagar_cartao(%L)$$, testes.id('karq')), 'P0001', 'sem_permissao',
+  'cliente arquivado: não apaga o próprio cartão');
 select is(public.quadro_do_cliente(testes.id('cArq2')), null, 'cliente arquivado sem quadro: não cria');
 reset role;
 select testes.como('gestor_a');
