@@ -34,10 +34,11 @@ const VISOES = [
 // O que o Google pode pôr no endereço na volta do "Conectar Google" (sai dele depois de lido).
 const PARAMETROS_DO_GOOGLE = ['code', 'state', 'scope', 'authuser', 'prompt', 'hd', 'iss', 'error', 'error_description', 'error_uri']
 const SEM_FILTRO = { valor: '', nome: null }
-// Na agenda do cliente, as ausências saem do "Mostrar": são das pessoas, não do cliente (design, "Agenda dentro do
-// cliente"). Ficam reuniões, compromissos e feriados.
-const TIPOS_DO_CLIENTE = TIPOS.filter((t) => t.chave !== 'ausencias')
-const TUDO_DO_CLIENTE = { ...TUDO, ausencias: false }
+// Na agenda do cliente, o "Mostrar" fica com reuniões e feriados: as ausências são das pessoas, não do cliente (design,
+// "Agenda dentro do cliente"), e compromisso é evento sem cliente (nunca aparece dentro de um). Com as reuniões, o banco
+// recebe tipo 'reunioes' (todo evento do cliente é uma); sem elas, os eventos nem são lidos.
+const TIPOS_DO_CLIENTE = TIPOS.filter((t) => t.chave === 'reunioes' || t.chave === 'feriados')
+const TUDO_DO_CLIENTE = { ...TUDO, compromissos: false, ausencias: false }
 
 // No celular (abaixo de md) a visão inicial é a Agenda: o mês do Hub não cabe.
 const ehCelular = () => typeof window.matchMedia === 'function' && !window.matchMedia('(min-width: 768px)').matches
@@ -104,8 +105,9 @@ function useItensDoPeriodo({ de, ate, filtros, mostrar, versao, ligado = true })
 // - Sem `cliente`: o menu Calendário. Aqui também termina a conexão do Google da pessoa (o Google volta para
 //   /calendario?code=…&state=…).
 // - Com `cliente` ({ id, nome, consultoria_id, arquivado, contato_nome, contato_email }, a aba Agenda do cliente): só os
-//   eventos daquele cliente e os números só dele; a barra fica sem consultor, consultoria e cliente, e o "Mostrar", sem
-//   ausências; "Novo evento" já nasce no cliente (travado). Cliente arquivado ou sem consultoria não ganha evento novo.
+//   eventos daquele cliente e os números só dele; a barra fica sem consultor, consultoria e cliente, e o "Mostrar", só
+//   com reuniões e feriados; "Novo evento" já nasce no cliente (travado). Cliente arquivado ou sem consultoria não ganha
+//   evento novo.
 export default function CalendarioDaAgenda({ cliente = null }) {
   const { perfil } = useAuth()
   const central = veTudo(perfil)

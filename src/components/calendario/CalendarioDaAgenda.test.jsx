@@ -94,7 +94,8 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
     expect(await within(grade).findByRole('button', { name: /Kickoff Alfa/ })).toBeInTheDocument()
     expect(eventosDoPeriodo).toHaveBeenCalledTimes(1)
-    expect(eventosDoPeriodo).toHaveBeenCalledWith({ ...MES, consultorId: undefined, consultoriaId: undefined, clienteId: 'k1', tipo: undefined })
+    // Na aba, todo evento é do cliente (uma reunião com cliente): o "Mostrar" pede as reuniões dele.
+    expect(eventosDoPeriodo).toHaveBeenCalledWith({ ...MES, consultorId: undefined, consultoriaId: undefined, clienteId: 'k1', tipo: 'reunioes' })
     expect(indicadoresDaAgenda).toHaveBeenCalledWith('2026-11-17', { clienteId: 'k1' })
     const indicadores = screen.getByRole('region', { name: 'Indicadores da agenda' })
     await waitFor(() => expect(within(indicadores).getByText('Reuniões no mês').parentElement).toHaveTextContent('2'))
@@ -104,7 +105,7 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     expect(screen.getByRole('region', { name: 'Próximos 7 dias' })).toBeInTheDocument()
   })
 
-  it('a barra não tem consultor, consultoria nem cliente; o Mostrar não tem ausências e elas nem são lidas', async () => {
+  it('a barra não tem consultor, consultoria nem cliente; o Mostrar só tem reuniões e feriados (ausências nem são lidas)', async () => {
     const user = userEvent.setup()
     for (const perfil of [central, gestora, consultor]) {
       const { unmount } = tela(perfil)
@@ -121,15 +122,22 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
     await user.click(screen.getByRole('button', { name: /Mostrar: tudo/ }))
     expect(screen.getByRole('checkbox', { name: 'Reuniões com cliente' })).toBeChecked()
-    expect(screen.getByRole('checkbox', { name: 'Compromissos' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Feriados' })).toBeChecked()
+    // Compromisso é evento sem cliente: dentro do cliente nunca aparece, então não está no Mostrar.
+    expect(screen.queryByRole('checkbox', { name: 'Compromissos' })).not.toBeInTheDocument()
     expect(screen.queryByRole('checkbox', { name: 'Ausências' })).not.toBeInTheDocument()
-    expect(screen.getAllByRole('checkbox')).toHaveLength(3)
-    // Esconder os feriados conta "2 de 3"; Limpar filtros volta ao Mostrar do cliente (ainda sem ausências).
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2)
+    // Esconder os feriados conta "1 de 2"; sem as reuniões, os eventos nem são pedidos; Limpar filtros volta ao Mostrar
+    // do cliente (ainda sem ausências).
     await user.click(screen.getByRole('checkbox', { name: 'Feriados' }))
-    expect(screen.getByRole('button', { name: /Mostrar: 2 de 3/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Mostrar: 1 de 2/ })).toBeInTheDocument()
+    const pedidos = vi.mocked(eventosDoPeriodo).mock.calls.length
+    await user.click(screen.getByRole('checkbox', { name: 'Reuniões com cliente' }))
+    expect(screen.getByRole('button', { name: /Mostrar: 0 de 2/ })).toBeInTheDocument()
+    expect(eventosDoPeriodo).toHaveBeenCalledTimes(pedidos)
     await user.click(screen.getByRole('button', { name: 'Limpar filtros' }))
     expect(screen.getByRole('button', { name: /Mostrar: tudo/ })).toBeInTheDocument()
+    await waitFor(() => expect(eventosDoPeriodo).toHaveBeenLastCalledWith(expect.objectContaining({ clienteId: 'k1', tipo: 'reunioes' })))
     expect(ausenciasDoPeriodo).not.toHaveBeenCalled()
   })
 
