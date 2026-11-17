@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { CalendarDays, Check, CheckCircle2, Info, Mail, Plus, Trash2, Users, Video, X } from 'lucide-react'
+import { CalendarDays, Check, CheckCircle2, Info, Mail, Plus, Send, Trash2, Users, Video, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import CampoData from '@/components/campos/CampoData'
@@ -81,14 +81,21 @@ function ListaDaCasa({ participantes, aoTirar }) {
   )
 }
 
-function ListaDeFora({ convidados, aoTirar }) {
+// Convidados de fora: a resposta deles fica no Google e ainda não volta para o app, então a lista não mostra resposta.
+// `noGoogle`: o evento está no Google, e quem já estava na lista recebeu o convite ("Convite enviado"); quem acabou de
+// entrar na lista (ainda não salvo) e o evento só do app não têm selo.
+function ListaDeFora({ convidados, noGoogle = false, aoTirar }) {
   return (
     <ul aria-label="Convidados de fora" className="grid gap-1.5">
       {convidados.map((c) => (
         <li key={c.email} className="flex items-center gap-2.5 rounded-lg border bg-card px-2.5 py-1.5">
           <Mail className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate text-rotulo">{c.email}</span>
-          <SeloDaResposta resposta={c.resposta} />
+          {noGoogle && c.resposta !== 'novo' && (
+            <span className="inline-flex shrink-0 items-center gap-1 text-legenda text-muted-foreground">
+              <Send className="size-3" aria-hidden="true" /> Convite enviado
+            </span>
+          )}
           {aoTirar && <BotaoTirar rotulo={`Tirar ${c.email}`} aoTirar={() => aoTirar(c.email)} />}
         </li>
       ))}
@@ -240,7 +247,11 @@ function FormularioDoEvento({ aberto, evento, diaInicial, perfil, google, aoFech
   const erroDoHorario = erroDoQuando?.chave === chaveDoQuando ? erroDoQuando : null
   const souOrganizador = consultor?.id === perfil.id
   const meetFixo = !novo && Boolean(evento.com_meet)
-  const semGoogleProprio = souOrganizador && !google?.conectado
+  // O meu Google pede para reconectar: como sem Google (o evento fica só no app, sem Meet).
+  const meuGoogleQuebrado = Boolean(google?.conectado && google.erro)
+  const semGoogleProprio = souOrganizador && (!google?.conectado || meuGoogleQuebrado)
+  // A pasta da reunião já foi criada nos Arquivos do cliente: o cliente não muda mais.
+  const clienteFixo = !novo && Boolean(evento.pasta_id)
   const meuConvite = evento?.participantes?.find((p) => p.perfil_id === perfil.id)
   const consultoriaDoEvento = consultor?.consultoria_id ?? null
 
@@ -373,9 +384,9 @@ function FormularioDoEvento({ aberto, evento, diaInicial, perfil, google, aoFech
     }
     if (!consultor) return 'O evento vai para o Google Agenda do consultor escolhido, com os convidados.'
     if (!souOrganizador) {
-      return `Vai para o Google Agenda de ${consultor.nome}, com os convidados. Se ${primeiroNome(consultor.nome)} não conectou o Google, o evento fica só no app, sem Meet.`
+      return `Vai para o Google Agenda de ${consultor.nome}, com os convidados. Se o Google de ${primeiroNome(consultor.nome)} não estiver conectado (ou pedir para reconectar), o evento fica só no app, sem Meet.`
     }
-    return google?.conectado ? 'Vai para o seu Google Agenda, com os convidados.' : null
+    return semGoogleProprio ? null : 'Vai para o seu Google Agenda, com os convidados.'
   })()
 
   return (
@@ -406,8 +417,9 @@ function FormularioDoEvento({ aberto, evento, diaInicial, perfil, google, aoFech
             <div className="grid gap-2">
               <Label htmlFor="evento-cliente">Cliente</Label>
               <Seletor id="evento-cliente" valor={cliente?.id ?? ''} buscar={buscarOsClientes} rotuloTodos="Sem cliente"
-                desabilitado={!consultoriaDoEvento} placeholder={consultoriaDoEvento ? 'Sem cliente' : 'Escolha o consultor primeiro'}
+                desabilitado={!consultoriaDoEvento || clienteFixo} placeholder={consultoriaDoEvento ? 'Sem cliente' : 'Escolha o consultor primeiro'}
                 opcoes={cliente ? [{ valor: cliente.id, rotulo: cliente.nome }] : []} aoMudar={escolherCliente} />
+              {clienteFixo && <p className="text-legenda text-muted-foreground">A pasta da reunião já está neste cliente.</p>}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="evento-descricao">Descrição</Label>
@@ -516,7 +528,8 @@ function FormularioDoEvento({ aberto, evento, diaInicial, perfil, google, aoFech
             </div>
             {erroConvidado && <p id="evento-convidado-erro" role="alert" className="text-rotulo text-destructive">{erroConvidado}</p>}
             {convidados.length > 0 && (
-              <ListaDeFora convidados={convidados} aoTirar={(email) => setConvidados((lista) => lista.filter((c) => c.email !== email))} />
+              <ListaDeFora convidados={convidados} noGoogle={Boolean(evento?.google_evento_id)}
+                aoTirar={(email) => setConvidados((lista) => lista.filter((c) => c.email !== email))} />
             )}
           </SecaoFormulario>
           {erro && <Aviso>{erro}</Aviso>}
@@ -550,7 +563,9 @@ function FormularioDoEvento({ aberto, evento, diaInicial, perfil, google, aoFech
             <Chave id="evento-meet" rotulo="Google Meet" ligada={comMeet} desabilitado={meetFixo || semGoogleProprio}
               aoMudar={(ligar) => { setMeetTocado(true); ligarMeet(ligar) }} />
             {meetFixo && <p className="text-legenda text-muted-foreground">O Meet desta reunião já foi criado no Google e não sai pelo app.</p>}
-            {semGoogleProprio && !meetFixo && <p className="text-legenda text-muted-foreground">Conecte o Google para a reunião ter Meet.</p>}
+            {semGoogleProprio && !meetFixo && (
+              <p className="text-legenda text-muted-foreground">{meuGoogleQuebrado ? 'Reconecte' : 'Conecte'} o Google para a reunião ter Meet.</p>
+            )}
             <Chave id="evento-gravar" rotulo="Gravar e transcrever" ligada={comMeet && gravar} desabilitado={!comMeet} aoMudar={setGravar} />
             <p className="flex gap-2 text-legenda text-muted-foreground">
               <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
@@ -566,8 +581,10 @@ function FormularioDoEvento({ aberto, evento, diaInicial, perfil, google, aoFech
               </p>
             ) : (
               <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card px-3 py-2.5">
-                <span className="min-w-0 flex-1 text-rotulo text-foreground/80">Conecte o Google para o evento ir para a sua agenda, com o Meet e os convidados.</span>
-                <Button type="button" variant="outline" size="sm" onClick={aoConectarGoogle}>Conectar Google</Button>
+                <span className="min-w-0 flex-1 text-rotulo text-foreground/80">
+                  {meuGoogleQuebrado ? 'O Google pede para reconectar. Reconecte' : 'Conecte'} o Google para o evento ir para a sua agenda, com o Meet e os convidados.
+                </span>
+                <Button type="button" variant="outline" size="sm" onClick={aoConectarGoogle}>{meuGoogleQuebrado ? 'Reconectar Google' : 'Conectar Google'}</Button>
               </div>
             )}
           </SecaoFormulario>
@@ -601,7 +618,9 @@ function EventoSoLeitura({ aberto, evento, perfil, aoFechar, aoMudar }) {
           <ListaDaCasa participantes={daCasa} />
         </SecaoFormulario>
       )}
-      {deFora.length > 0 && <SecaoFormulario titulo="Convidados de fora"><ListaDeFora convidados={deFora} /></SecaoFormulario>}
+      {deFora.length > 0 && (
+        <SecaoFormulario titulo="Convidados de fora"><ListaDeFora convidados={deFora} noGoogle={Boolean(evento.google_evento_id)} /></SecaoFormulario>
+      )}
       <DetalheDoEvento evento={evento} podeEditar={false} />
       {meuConvite && <ConviteDoEvento evento={evento} convite={meuConvite} aoMudar={aoMudar} />}
       <p className="flex items-start gap-2.5 rounded-xl border border-notice/25 bg-notice-soft px-3 py-2.5 text-rotulo text-notice">

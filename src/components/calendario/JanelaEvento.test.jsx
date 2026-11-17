@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -77,7 +77,9 @@ describe('JanelaEvento: editar', () => {
     expect(within(participantes).getByText('Confirmou')).toBeInTheDocument()
     const deFora = within(dialogo).getByRole('list', { name: 'Convidados de fora' })
     expect(within(deFora).getByText('carla@alfa.com.br')).toBeInTheDocument()
-    expect(within(deFora).getByText('Pendente')).toBeInTheDocument()
+    // A resposta de quem é de fora não volta do Google: a lista diz só que o convite saiu.
+    expect(within(deFora).getByText('Convite enviado')).toBeInTheDocument()
+    expect(within(deFora).queryByText('Pendente')).not.toBeInTheDocument()
     expect(within(dialogo).getByLabelText('Consultor')).toBeDisabled()
     expect(within(dialogo).getByLabelText('Consultor')).toHaveTextContent('Ana Souza')
     expect(within(dialogo).getByRole('switch', { name: 'Google Meet' })).toBeDisabled()
@@ -105,6 +107,31 @@ describe('JanelaEvento: editar', () => {
     expect(novoIdDeEvento).not.toHaveBeenCalled()
     expect(toast.success).toHaveBeenCalledWith('Alterações salvas.')
     expect(aoSalvo).toHaveBeenCalled()
+  })
+
+  it('convidado de fora: "Convite enviado" só quando o convite saiu pelo Google; o recém-adicionado não tem selo', async () => {
+    const user = userEvent.setup()
+    janela({ evento: { ...EVENTO, google_evento_id: null } })
+    const soNoApp = screen.getByRole('list', { name: 'Convidados de fora' })
+    expect(within(soNoApp).getByText('carla@alfa.com.br')).toBeInTheDocument()
+    expect(within(soNoApp).queryByText(/Convite enviado|Pendente/)).not.toBeInTheDocument()
+    cleanup()
+
+    janela()
+    await user.type(screen.getByLabelText('E-mail do convidado de fora'), 'novo@alfa.com.br{Enter}')
+    const item = within(screen.getByRole('list', { name: 'Convidados de fora' })).getByText('novo@alfa.com.br').closest('li')
+    expect(item).not.toHaveTextContent(/Convite enviado|Pendente|Novo/)
+  })
+
+  it('com a pasta da reunião criada, o cliente fica só para leitura', () => {
+    janela()
+    expect(screen.getByLabelText('Cliente')).toBeDisabled()
+    expect(screen.getByLabelText('Cliente')).toHaveTextContent('Provedor Alfa')
+    expect(screen.getByText('A pasta da reunião já está neste cliente.')).toBeInTheDocument()
+    cleanup()
+    janela({ evento: { ...EVENTO, pasta_id: null } })
+    expect(screen.getByLabelText('Cliente')).toBeEnabled()
+    expect(screen.queryByText('A pasta da reunião já está neste cliente.')).not.toBeInTheDocument()
   })
 
   it('aviso de "fica só no app" vira aviso na tela', async () => {
@@ -179,6 +206,20 @@ describe('JanelaEvento: novo', () => {
     expect(screen.queryByRole('group', { name: 'Sugestão de convidado' })).not.toBeInTheDocument()
   })
 
+  it('o meu Google pede para reconectar: sem Meet e com o botão Reconectar Google', async () => {
+    const user = userEvent.setup()
+    const { aoConectarGoogle } = janela({
+      perfil: consultora, evento: null, google: { ...GOOGLE, erro: 'O Google não aceita mais esta conexão. Reconecte o Google.' },
+    })
+    await escolherNoSeletor(user, 'Cliente', 'Provedor Alfa')
+    expect(screen.getByRole('switch', { name: 'Google Meet' })).toBeDisabled()
+    expect(screen.getByRole('switch', { name: 'Google Meet' })).not.toBeChecked()
+    expect(screen.getByText('Reconecte o Google para a reunião ter Meet.')).toBeInTheDocument()
+    expect(screen.queryByText('Vai para o seu Google Agenda, com os convidados.')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Reconectar Google' }))
+    expect(aoConectarGoogle).toHaveBeenCalled()
+  })
+
   it('o 21º convidado de fora é recusado na tela; e-mail inválido também', async () => {
     const user = userEvent.setup()
     const vinte = Array.from({ length: 20 }, (_, i) => ({ id: `x${i}`, perfil_id: null, email: `pessoa${i}@fora.test`, resposta: 'pendente', nome: null }))
@@ -238,6 +279,9 @@ describe('JanelaEvento: só leitura e convite', () => {
     expect(within(dialogo).getByText('Só quem organiza e a gestão da consultoria editam.')).toBeInTheDocument()
     expect(within(dialogo).queryByRole('button', { name: /Salvar|Apagar/ })).not.toBeInTheDocument()
     expect(within(dialogo).getByText('Sua resposta: Confirmou')).toBeInTheDocument()
+    const deFora = within(dialogo).getByRole('list', { name: 'Convidados de fora' })
+    expect(within(deFora).getByText('Convite enviado')).toBeInTheDocument()
+    expect(within(deFora).queryByText('Pendente')).not.toBeInTheDocument()
     vi.mocked(responderConvite).mockResolvedValue({ erro: null, resposta: 'recusou' })
     await user.click(within(dialogo).getByRole('button', { name: 'Recusar' }))
     expect(responderConvite).toHaveBeenCalledWith('e1', 'recusou')
