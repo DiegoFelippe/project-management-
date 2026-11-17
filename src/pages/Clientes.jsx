@@ -170,7 +170,7 @@ export default function Clientes() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
-      {doConsultor && aberto && clientes?.some((c) => c.id !== aberto.cliente_id) && (
+      {!central && aberto && clientes?.some((c) => c.id !== aberto.cliente_id && (doConsultor || c.consultor_id === perfil.id)) && (
         <p id={idDoAviso} className="mb-3 text-corpo text-muted-foreground">
           Você está com check-in aberto em {aberto.cliente?.nome ?? 'outro cliente'} desde {HORA.format(new Date(aberto.inicio))}.
           {' '}Faça o check-out para começar outro.

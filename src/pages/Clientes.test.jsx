@@ -397,6 +397,24 @@ describe('Clientes: check-in do consultor', () => {
     expect(beta).toHaveAccessibleDescription(screen.getByText(aviso).textContent)
   })
 
+  it('admin e gestor com check-in aberto em outro cliente: aviso visível e botão descrito por ele', async () => {
+    vi.mocked(consultoresPorOcupacao).mockResolvedValue({ itens: [{ id: 'g1', nome: 'Gui', capacidade: 100, reservado: 40, ocupacao: 0.4 }], total: 1 })
+    vi.mocked(meuCheckinAberto).mockResolvedValue({
+      id: 'a1', cliente_id: 'k1', inicio: new Date(Date.now() - 3_900_000).toISOString(), cliente: { nome: 'Provedor Alfa' },
+    })
+    for (const papel of ['admin', 'gestor']) {
+      vi.mocked(listarClientes).mockResolvedValue({ itens: MEUS.map((c) => ({ ...c, consultor_id: 'g1', consultor: { id: 'g1', nome: 'Gui', ativo: true } })), total: 2 })
+      const { unmount } = renderizarTela(<Clientes />, { perfil: { id: 'g1', papel, consultoria_id: 's1' } })
+      await screen.findByRole('table', { name: 'Clientes' })
+      const aviso = /Você está com check-in aberto em Provedor Alfa desde \d{2}:\d{2}\. Faça o check-out para começar outro\./
+      const beta = await within(linha('Provedor Beta')).findByRole('button', { name: 'Fazer check-in' })
+      expect(beta).toBeDisabled()
+      expect(await screen.findByText(aviso)).toBeInTheDocument()
+      expect(beta).toHaveAccessibleDescription(screen.getByText(aviso).textContent)
+      unmount()
+    }
+  })
+
   it('com o check-in aberto no único cliente da lista não há botão desabilitado a explicar: sem aviso', async () => {
     vi.mocked(listarClientes).mockResolvedValue({ itens: [MEUS[0]], total: 1 })
     vi.mocked(meuCheckinAberto).mockResolvedValue({
