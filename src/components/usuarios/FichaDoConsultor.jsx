@@ -45,7 +45,7 @@ function Campo({ id, rotulo, erro, children }) {
     <div className="grid gap-2">
       <Label htmlFor={id}>{rotulo}</Label>
       {children}
-      {erro && <p className="text-xs text-destructive">{erro}</p>}
+      {erro && <p className="text-rotulo text-destructive">{erro}</p>}
     </div>
   )
 }
@@ -53,8 +53,8 @@ function Campo({ id, rotulo, erro, children }) {
 function EscolhaDeTimes({ times, marcados, aoAlternar, aviso }) {
   return (
     <fieldset className="grid gap-2">
-      <legend className="mb-2 text-sm font-medium">Times</legend>
-      {times.length === 0 && aviso && <p className="text-xs text-muted-foreground">{aviso}</p>}
+      <legend className="mb-2 text-corpo font-medium">Times</legend>
+      {times.length === 0 && aviso && <p className="text-rotulo text-muted-foreground">{aviso}</p>}
       <div className="grid gap-2 sm:grid-cols-2">
         {times.map((t, i) => (
           <Caixa key={t.id} id={i === 0 ? 'ficha-times' : undefined} rotulo={t.nome} marcado={marcados.includes(t.id)} aoMudar={() => aoAlternar(t.id)} />
@@ -92,8 +92,8 @@ function EscolhaDeAcesso({ valor, aoMudar }) {
               <o.icone className="size-4" aria-hidden="true" />
             </span>
             <span className="min-w-0">
-              <span className="block text-[12.5px] font-semibold">{o.titulo}</span>
-              <span className="text-muted-foreground block text-[11.5px]">{o.dica}</span>
+              <span className="block text-rotulo font-semibold">{o.titulo}</span>
+              <span className="text-muted-foreground block text-legenda">{o.dica}</span>
             </span>
           </button>
         )
@@ -117,9 +117,9 @@ function CartaoDoAcesso({ pessoa, aoReenviar, podeReenviar }) {
     <div data-slot="cartao-acesso" className="bg-muted/40 flex flex-wrap items-center gap-3 rounded-2xl border p-4">
       <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', cor)}><Icone className="size-4" aria-hidden="true" /></span>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold">{estado}</p>
-        <p className="text-muted-foreground text-[12px]">{linha}</p>
-        {pessoa.email && <p className="text-muted-foreground text-[12px]">{pessoa.email}</p>}
+        <p className="text-corpo font-semibold">{estado}</p>
+        <p className="text-muted-foreground text-rotulo">{linha}</p>
+        {pessoa.email && <p className="text-muted-foreground text-rotulo">{pessoa.email}</p>}
       </div>
       {podeReenviar && pessoa.convite_pendente && (
         <Button type="button" variant="outline" size="sm" onClick={aoReenviar}><Send /> Reenviar convite</Button>
@@ -147,8 +147,8 @@ function VerificacaoDaPessoa({ exigida, aoMudarExigida, verificacaoDesde, aoZera
       <div data-slot="situacao-2fa" className="flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5">
         <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', cor)}><Icone className="size-4" aria-hidden="true" /></span>
         <div className="min-w-0 flex-1">
-          <p className="text-[12.5px] font-semibold">{rotulo}</p>
-          <p className="text-muted-foreground text-[11.5px]">{linha}</p>
+          <p className="text-rotulo font-semibold">{rotulo}</p>
+          <p className="text-muted-foreground text-legenda">{linha}</p>
         </div>
         {verificacaoDesde && aoZerar && (
           <Button type="button" variant="outline" size="sm" onClick={aoZerar}><RotateCcwKey /> Zerar verificação em duas etapas</Button>
@@ -449,7 +449,7 @@ export default function FichaDoConsultor({
                   : (
                     <>
                       <Input id="ficha-email" className="h-10" value={pessoa.email ?? ''} disabled readOnly />
-                      <p className="text-muted-foreground text-[11.5px]">O e-mail não muda. Para trocar, crie um acesso novo e desative este.</p>
+                      <p className="text-muted-foreground text-legenda">O e-mail não muda. Para trocar, crie um acesso novo e desative este.</p>
                     </>
                   )}
               </Campo>
@@ -498,11 +498,11 @@ export default function FichaDoConsultor({
                   <Campo id="ficha-carga" rotulo="Carga semanal (horas)" erro={erros.carga}>
                     <CampoNumero id="ficha-carga" valor={dados.carga} aoMudar={definir('carga')} min={0} max={99} passo={0.5} decimal unidade="h" />
                   </Campo>
-                  <p className="mt-2 text-xs text-muted-foreground">De 0 a 60. Com 0, a pessoa sai da sugestão de consultor.</p>
+                  <p className="mt-2 text-rotulo text-muted-foreground">De 0 a 60. Com 0, a pessoa sai da sugestão de consultor.</p>
                 </div>
                 {!novo && (
                   <div className="grid gap-2">
-                    <h4 className="text-sm font-medium">Ausências</h4>
+                    <h4 className="text-corpo font-medium">Ausências</h4>
                     <GerirAusencias pessoa={pessoa} aoMudar={aoMudarAusencias} />
                   </div>
                 )}
@@ -519,7 +519,7 @@ export default function FichaDoConsultor({
                 <Campo id="ficha-senha" rotulo="Senha provisória" erro={erros.senha}>
                   <CampoSenha id="ficha-senha" valor={dados.senha} invalido={!!erros.senha}
                     aoMudar={(senha) => setDados((d) => ({ ...d, senha }))} />
-                  {!erros.senha && <p className="text-xs text-muted-foreground">Só senha forte é aceita. A pessoa troca no primeiro acesso.</p>}
+                  {!erros.senha && <p className="text-rotulo text-muted-foreground">Só senha forte é aceita. A pessoa troca no primeiro acesso.</p>}
                 </Campo>
               </div>
             )}
@@ -528,7 +528,7 @@ export default function FichaDoConsultor({
                 aoMudar={definir('exige_2fa')}
                 dica="No primeiro acesso, a pessoa configura o app autenticador do celular antes de entrar." />
             )}
-            <p className="text-muted-foreground text-[11.5px]">O acesso é criado quando você clica em {dados.forma === 'convite' ? 'Enviar convite' : 'Criar pessoa'}.</p>
+            <p className="text-muted-foreground text-legenda">O acesso é criado quando você clica em {dados.forma === 'convite' ? 'Enviar convite' : 'Criar pessoa'}.</p>
           </Bloco>
         ) : (
           <>

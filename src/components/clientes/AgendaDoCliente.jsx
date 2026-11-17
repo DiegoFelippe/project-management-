@@ -77,7 +77,7 @@ function DetalheDoDia({ dia, itens, aoFechar }) {
         </DialogHeader>
         <ul className="grid gap-3">
           {itens.map((item) => (
-            <li key={`${item.tipo}-${item.id}`} className="rounded-lg border p-3 text-sm">
+            <li key={`${item.tipo}-${item.id}`} className="rounded-lg border p-3 text-corpo">
               {item.tipo === 'checkin' ? (
                 <>
                   <p className="font-medium">
@@ -166,18 +166,18 @@ export default function AgendaDoCliente({ clienteId, versao }) {
       <div className="flex flex-wrap items-center gap-2">
         <NavegacaoDoMes mes={mes} aoMudar={mudarMes} />
         {eventosAlemDosCarregados > 0 && (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-corpo text-muted-foreground">
             e mais {eventosAlemDosCarregados} {eventosAlemDosCarregados === 1 ? 'evento' : 'eventos'}
           </span>
         )}
       </div>
-      {estado.erro && pronto && <p role="alert" className="text-sm text-destructive">{estado.erro}</p>}
+      {estado.erro && pronto && <p role="alert" className="text-corpo text-destructive">{estado.erro}</p>}
       {!pronto && <GraficoCarregando texto="Carregando a agenda…" className="py-2" />}
       <div className="overflow-x-auto">
         <div role="grid" aria-label={`Agenda de ${rotuloDoMes(mes)}`} className="grid min-w-[44rem] gap-px rounded-xl border bg-border">
           <div role="row" className="grid grid-cols-7 gap-px">
             {SEMANA.map((s) => (
-              <div key={s} role="columnheader" className="bg-muted px-2 py-1 text-center text-xs font-medium uppercase text-muted-foreground">{s}</div>
+              <div key={s} role="columnheader" className="bg-muted px-2 py-1 text-center text-rotulo font-medium uppercase text-muted-foreground">{s}</div>
             ))}
           </div>
           {semanas.map((semana) => (
@@ -186,7 +186,7 @@ export default function AgendaDoCliente({ clienteId, versao }) {
                 if (!doMes) {
                   return (
                     <div key={dia} role="gridcell" aria-disabled="true" aria-label={String(numero)}
-                      className="min-h-24 bg-muted/40 p-1.5 text-xs text-muted-foreground/50">
+                      className="min-h-24 bg-muted/40 p-1.5 text-rotulo text-muted-foreground/50">
                       {numero}
                     </div>
                   )
@@ -202,18 +202,18 @@ export default function AgendaDoCliente({ clienteId, versao }) {
                       'min-h-24 cursor-pointer bg-card p-1.5 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
                       dia === diaFocavel && 'bg-accent/50',
                     )}>
-                    <span className={cn('inline-grid size-6 place-items-center rounded-full text-xs font-medium', ehHoje && 'bg-primary text-primary-foreground')}>
+                    <span className={cn('inline-grid size-6 place-items-center rounded-full text-rotulo font-medium', ehHoje && 'bg-primary text-primary-foreground')}>
                       {numero}
                     </span>
                     <ul className="mt-1 grid gap-0.5">
                       {itens.slice(0, MARCAS_POR_DIA).map((item) => (
                         <li key={`${item.tipo}-${item.id}`}
-                          className={cn('truncate rounded px-1 text-xs', item.tipo === 'checkin' ? 'bg-primary/10 text-foreground' : 'bg-muted text-muted-foreground')}>
+                          className={cn('truncate rounded px-1 text-rotulo', item.tipo === 'checkin' ? 'bg-primary/10 text-foreground' : 'bg-muted text-muted-foreground')}>
                           {textoDaMarca(item)}
                         </li>
                       ))}
                       {itens.length > MARCAS_POR_DIA && (
-                        <li className="px-1 text-xs font-medium text-muted-foreground">+{itens.length - MARCAS_POR_DIA}</li>
+                        <li className="px-1 text-rotulo font-medium text-muted-foreground">+{itens.length - MARCAS_POR_DIA}</li>
                       )}
                     </ul>
                   </div>

@@ -4,10 +4,10 @@ import { cn } from '@/lib/utils'
 function Indicador({ rotulo, valor, detalhe, tom }) {
   return (
     <div className="card p-4" data-indicador={rotulo}>
-      <p className="text-sm text-muted-foreground">{rotulo}</p>
-      <p className={cn('mt-1 text-2xl font-bold tracking-tight tabular-nums',
+      <p className="text-corpo text-muted-foreground">{rotulo}</p>
+      <p className={cn('mt-1 text-destaque font-bold tabular-nums',
         tom === 'atencao' && 'text-notice', tom === 'acima' && 'text-destructive')}>{valor}</p>
-      {detalhe && <p className="mt-0.5 text-xs text-muted-foreground">{detalhe}</p>}
+      {detalhe && <p className="mt-0.5 text-rotulo text-muted-foreground">{detalhe}</p>}
     </div>
   )
 }

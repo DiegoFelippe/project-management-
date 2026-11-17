@@ -20,7 +20,7 @@ export default function TelaDeAcesso({ children }) {
           <AnimacaoGestao />
         </div>
         <div>
-          <h2 className="text-xl leading-tight font-bold text-balance md:text-3xl">
+          <h2 className="text-janela md:text-titulo leading-tight font-bold text-balance">
             Projetos, times e pessoas no mesmo lugar.
           </h2>
           <p className="mt-3 hidden text-muted-foreground md:block">
@@ -43,8 +43,8 @@ export function Titulo({ titulo, children }) {
   }, [titulo])
   return (
     <div className="mb-6 grid gap-1.5">
-      <h1 className="text-3xl font-bold tracking-tight">{titulo}</h1>
-      {children && <p className="text-sm text-muted-foreground">{children}</p>}
+      <h1 className="text-titulo font-bold">{titulo}</h1>
+      {children && <p className="text-corpo text-muted-foreground">{children}</p>}
     </div>
   )
 }
@@ -55,7 +55,7 @@ export function Aviso({ children, tipo = 'erro' }) {
       ? 'border-destructive/30 bg-destructive/5 text-destructive'
       : 'border-primary/25 bg-primary/5 text-foreground'
   return (
-    <p role={tipo === 'erro' ? 'alert' : 'status'} className={`rounded-lg border px-3 py-2 text-sm text-pretty ${cores}`}>
+    <p role={tipo === 'erro' ? 'alert' : 'status'} className={`rounded-lg border px-3 py-2 text-corpo text-pretty ${cores}`}>
       {children}
     </p>
   )

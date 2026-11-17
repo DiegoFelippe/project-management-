@@ -18,7 +18,7 @@ export default function Avatar({ pessoa, className }) {
   }
   return (
     <span title={pessoa.nome} style={{ backgroundColor: corDaPessoa(pessoa) }}
-      className={cn(base, 'grid place-items-center text-[10px] font-bold text-white', className)}>
+      className={cn(base, 'grid place-items-center text-mini font-bold text-white', className)}>
       {iniciais(pessoa.nome)}
     </span>
   )

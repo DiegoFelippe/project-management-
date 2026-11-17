@@ -20,18 +20,18 @@ export default function ClientesEsperando({ recorte, esperando, passado }) {
     <section aria-label="Clientes esperando há mais tempo">
       {esperando.length === 0 ? (
         <div className="card p-4">
-          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Clientes esperando há mais tempo</h2>
-          <p className="text-sm text-muted-foreground">Nenhum cliente esperando. Tudo distribuído.</p>
+          <h2 className="mb-2 text-subtitulo font-semibold text-muted-foreground">Clientes esperando há mais tempo</h2>
+          <p className="text-corpo text-muted-foreground">Nenhum cliente esperando. Tudo distribuído.</p>
         </div>
       ) : (
         <>
-        {passado && <p className="mb-1 text-xs text-muted-foreground">Situação de hoje, não do mês.</p>}
+        {passado && <p className="mb-1 text-rotulo text-muted-foreground">Situação de hoje, não do mês.</p>}
         <Tabela rotulo="Clientes esperando" titulo="Clientes esperando há mais tempo" semAcoes colunas={['Cliente', 'Situação', 'Esperando']} larguraMinima={420}>
           {esperando.map((c) => (
             <Linha key={c.id}>
               <Celula>
                 <Link to={`/clientes/${c.id}`} className="font-medium hover:underline">{c.nome}</Link>
-                {recorte === 'tudo' && c.consultoria_nome && <span className="block text-xs text-muted-foreground">{c.consultoria_nome}</span>}
+                {recorte === 'tudo' && c.consultoria_nome && <span className="block text-rotulo text-muted-foreground">{c.consultoria_nome}</span>}
               </Celula>
               <Celula><Badge variant="notice">{SITUACAO[c.situacao] ?? c.situacao}</Badge></Celula>
               <Celula className="tabular-nums">{haQuantoTempo(c.desde)}</Celula>

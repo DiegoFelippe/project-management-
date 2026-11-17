@@ -22,8 +22,8 @@ describe('HorasPorMes', () => {
   it('textos em HTML com a classe de legenda (não <text> do SVG), então não encolhem no celular', () => {
     const { container } = render(<HorasPorMes meses={meses} previsao={120} />)
     expect(container.querySelectorAll('svg text')).toHaveLength(0)
-    expect(screen.getByText('nov/26')).toHaveClass('text-xs')
-    expect(screen.getByText('50 h')).toHaveClass('text-xs')
-    expect(screen.getByText('previsão atual 120 h')).toHaveClass('text-xs')
+    expect(screen.getByText('nov/26')).toHaveClass('text-rotulo')
+    expect(screen.getByText('50 h')).toHaveClass('text-rotulo')
+    expect(screen.getByText('previsão atual 120 h')).toHaveClass('text-rotulo')
   })
 })

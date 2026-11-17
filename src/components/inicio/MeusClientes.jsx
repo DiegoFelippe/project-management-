@@ -8,8 +8,8 @@ export default function MeusClientes({ passado, clientes }) {
     <section aria-label="Meus clientes no mês">
       {clientes.length === 0 ? (
         <div className="card p-4">
-          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Meus clientes no mês</h2>
-          <p className="text-sm text-muted-foreground">Nenhum cliente seu neste mês.</p>
+          <h2 className="mb-2 text-subtitulo font-semibold text-muted-foreground">Meus clientes no mês</h2>
+          <p className="text-corpo text-muted-foreground">Nenhum cliente seu neste mês.</p>
         </div>
       ) : (
         <Tabela rotulo="Meus clientes" titulo="Meus clientes no mês" semAcoes colunas={['Cliente', ...(passado ? [] : ['Previsto']), 'Realizado']} larguraMinima={380}>

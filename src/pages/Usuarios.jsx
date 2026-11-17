@@ -69,11 +69,11 @@ function Ocupacao({ n, passado }) {
   const largura = Math.max(0, Math.min(100, Math.round((n.ocupacao ?? 0) * 100)))
   return (
     <div className="w-32">
-      <p className="font-semibold">{formatarOcupacao(n.ocupacao)}</p>
+      <p className="font-semibold tabular-nums">{formatarOcupacao(n.ocupacao)}</p>
       <div aria-hidden="true" className="my-1 h-1 overflow-hidden rounded-full bg-muted">
         <div className="h-full rounded-full bg-primary" style={{ width: `${largura}%` }} />
       </div>
-      <p className="text-xs whitespace-nowrap text-muted-foreground">{apoio}</p>
+      <p className="text-rotulo whitespace-nowrap tabular-nums text-muted-foreground">{apoio}</p>
     </div>
   )
 }
@@ -326,9 +326,9 @@ export default function Usuarios() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
-      {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
-      {aviso && <p role="status" className="mb-3 text-sm text-muted-foreground">{aviso}</p>}
-      {comNumeros && erroNumeros && !erro && <p role="status" className="mb-3 text-sm text-muted-foreground">Não foi possível carregar a capacidade do mês.</p>}
+      {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
+      {aviso && <p role="status" className="mb-3 text-corpo text-muted-foreground">{aviso}</p>}
+      {comNumeros && erroNumeros && !erro && <p role="status" className="mb-3 text-corpo text-muted-foreground">Não foi possível carregar a capacidade do mês.</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as pessoas…" className="py-12" />}
       {resultado && lista.length === 0 && (
         <ListaVazia>{filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}</ListaVazia>
@@ -349,13 +349,13 @@ export default function Usuarios() {
               <Linha key={p.id}>
                 <Celula>
                   <div className="flex items-center gap-3">
-                    <Avatar pessoa={p} className="size-8 text-[11px]" />
+                    <Avatar pessoa={p} className="size-8 text-legenda" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-semibold">{p.nome}</p>
                         {s !== 'Ativo' && <Badge variant={COR_DA_SITUACAO[s]} className="shrink-0">{s}</Badge>}
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">{p.email}</p>
+                      <p className="truncate text-rotulo text-muted-foreground">{p.email}</p>
                     </div>
                   </div>
                 </Celula>

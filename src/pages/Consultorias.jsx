@@ -153,7 +153,7 @@ export default function Consultorias() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
-      {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+      {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as consultorias…" className="py-12" />}
       {resultado && lista.length === 0 && (
         <ListaVazia>
@@ -201,7 +201,7 @@ export default function Consultorias() {
                 {c.admins.map((a) => (
                   <p key={a.id} className="truncate">
                     <span>{a.nome}</span>{' '}
-                    <span className="text-xs text-muted-foreground">· {a.email}{a.convite_pendente ? ' · convite pendente' : ''}</span>
+                    <span className="text-rotulo text-muted-foreground">· {a.email}{a.convite_pendente ? ' · convite pendente' : ''}</span>
                   </p>
                 ))}
               </Celula>

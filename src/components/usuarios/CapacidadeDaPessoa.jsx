@@ -40,8 +40,8 @@ export default function CapacidadeDaPessoa({ pessoa, aoFechar, aoSalvar, aoMudar
         <div className="grid max-w-xs gap-2">
           <Label htmlFor="capacidade-carga">Carga semanal (horas)</Label>
           <CampoNumero id="capacidade-carga" valor={carga} aoMudar={setCarga} min={0} max={99} passo={0.5} decimal unidade="h" />
-          {erro && <p role="alert" className="text-xs text-destructive">{erro}</p>}
-          <p className="text-xs text-muted-foreground">De 0 a 60. Com 0, a pessoa sai da sugestão de consultor.</p>
+          {erro && <p role="alert" className="text-rotulo text-destructive">{erro}</p>}
+          <p className="text-rotulo text-muted-foreground">De 0 a 60. Com 0, a pessoa sai da sugestão de consultor.</p>
         </div>
       </SecaoFormulario>
       <SecaoFormulario titulo="Ausências">

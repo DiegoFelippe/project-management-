@@ -129,15 +129,15 @@ export default function MeuPerfil({ aberto, aoFechar }) {
               <Input id="perfil-email" className="h-10" value={perfil.email} disabled readOnly />
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-corpo text-muted-foreground">
             {NOME_DO_PAPEL[perfil.papel]} · {perfil.consultoria?.nome ?? 'Plataforma'}
           </p>
           {(perfil.cargo || perfil.data_entrada || naConsultoria) && (
-            <dl className="grid gap-3 text-sm sm:grid-cols-3">
-              {perfil.cargo && <div><dt className="text-xs text-muted-foreground">Cargo</dt><dd>{perfil.cargo}</dd></div>}
-              {perfil.data_entrada && <div><dt className="text-xs text-muted-foreground">Data de entrada</dt><dd>{formatarDia(perfil.data_entrada)}</dd></div>}
+            <dl className="grid gap-3 text-corpo sm:grid-cols-3">
+              {perfil.cargo && <div><dt className="text-rotulo text-muted-foreground">Cargo</dt><dd>{perfil.cargo}</dd></div>}
+              {perfil.data_entrada && <div><dt className="text-rotulo text-muted-foreground">Data de entrada</dt><dd>{formatarDia(perfil.data_entrada)}</dd></div>}
               {naConsultoria && perfil.carga_semanal != null && (
-                <div><dt className="text-xs text-muted-foreground">Carga semanal</dt><dd>{formatarHoras(Number(perfil.carga_semanal))} por semana</dd></div>
+                <div><dt className="text-rotulo text-muted-foreground">Carga semanal</dt><dd>{formatarHoras(Number(perfil.carga_semanal))} por semana</dd></div>
               )}
             </dl>
           )}
@@ -172,7 +172,7 @@ export default function MeuPerfil({ aberto, aoFechar }) {
               <Input id="perfil-senha-repetida" type="password" autoComplete="new-password" className="h-10" value={repetida} onChange={(e) => setRepetida(e.target.value)} />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Só senha forte é aceita. Deixe em branco para manter a atual.</p>
+          <p className="text-rotulo text-muted-foreground">Só senha forte é aceita. Deixe em branco para manter a atual.</p>
         </SecaoFormulario>
         {erro && <Aviso>{erro}</Aviso>}
       </form>

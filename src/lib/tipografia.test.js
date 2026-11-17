@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { cn } from './utils'
 import { ALTURA_DA_LINHA, MENOR_TEXTO_DE_GRAFICO, TAMANHO } from './tipografia'
 
 const TABELA = {
@@ -44,5 +45,16 @@ describe('escala no CSS (src/index.css)', () => {
     const regra = css.slice(css.indexOf('.texto-de-campo'))
     expect(regra).toMatch(/text-base/)
     expect(regra).toMatch(/sm:text-corpo/)
+  })
+})
+
+describe('cn() (src/lib/utils.js) conhece a escala', () => {
+  it('text-<nome> é tamanho de fonte: não some junto com uma classe de cor', () => {
+    for (const nome of Object.keys(TAMANHO)) {
+      expect(cn(`text-${nome}`, 'text-primary'), nome).toBe(`text-${nome} text-primary`)
+    }
+  })
+  it('dois tamanhos da escala: vale o último', () => {
+    expect(cn('text-corpo', 'text-mini')).toBe('text-mini')
   })
 })

@@ -61,10 +61,10 @@ export default function VerificacaoDoPerfil({ perfil, aoMudar }) {
       <div data-slot="situacao-2fa" className="flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5">
         <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', cor)}><Icone className="size-4" aria-hidden="true" /></span>
         <div className="min-w-0 flex-1">
-          <p className="text-[12.5px] font-semibold">{rotulo}</p>
-          <p className="text-muted-foreground text-[11.5px]">{linha}</p>
+          <p className="text-rotulo font-semibold">{rotulo}</p>
+          <p className="text-muted-foreground text-legenda">{linha}</p>
           {ativa && perfil.exige_2fa && (
-            <p className="text-muted-foreground text-[11.5px]">A verificação é exigida para o seu acesso: não dá para desativar.</p>
+            <p className="text-muted-foreground text-legenda">A verificação é exigida para o seu acesso: não dá para desativar.</p>
           )}
         </div>
         {modo === 'parado' && !ativa && (
@@ -86,7 +86,7 @@ export default function VerificacaoDoPerfil({ perfil, aoMudar }) {
           <div className="grid gap-2">
             <Label htmlFor={`${id}-codigo-atual`}>Código atual do app</Label>
             <CampoCodigo id={`${id}-codigo-atual`} valor={codigo} aoMudar={setCodigo} invalido={!!erro} autoFocus />
-            <p className="text-muted-foreground text-xs">Para desativar, confirme com o código que aparece agora no app.</p>
+            <p className="text-muted-foreground text-rotulo">Para desativar, confirme com o código que aparece agora no app.</p>
           </div>
           {erro && <Aviso>{erro}</Aviso>}
           <div className="flex flex-wrap justify-end gap-2">

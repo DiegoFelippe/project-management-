@@ -26,7 +26,7 @@ export default function AusenciasDaPessoa({ perfilId, versao = 0, acoes }) {
     }
   }, [perfilId, pagina, versao])
 
-  if (erro) return <p role="alert" className="text-sm text-destructive">{erro}</p>
+  if (erro) return <p role="alert" className="text-corpo text-destructive">{erro}</p>
   if (!resultado) return <GraficoCarregando texto="Carregando as ausências…" className="py-6" />
   if (resultado.itens.length === 0) return <ListaVazia>Nenhuma ausência registrada.</ListaVazia>
   return (

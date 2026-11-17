@@ -3,12 +3,13 @@ import { GraficoCarregando } from '@/components/comum/Carregando'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import { checkinsPorSemana, horasPorConsultor, horasPorMes } from '@/data/clientes'
 import { formatarHoras } from '@/lib/horas'
+import { TAMANHO } from '@/lib/tipografia'
 import { mesAtual, rotuloCurto, rotuloDoMes } from '@/lib/mes'
 
 // Gráficos da aba Geral, em SVG próprio (cores do tema, sem animação): horas por mês com a previsão atual,
 // horas por consultor e check-ins por semana. Os dois últimos seguem o mês escolhido. O banco soma só o que
 // cada pessoa enxerga.
-const LARGURA = 340
+const LARGURA = 300 // menor que a coluna de um celular de 390 px: o gráfico não encolhe e o texto (11 px) fica legível
 const rotuloDaSemana = (semana) => `sem. de ${semana.slice(8, 10)}/${semana.slice(5, 7)}`
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`
 const cortar = (texto, max) => (texto.length > max ? `${texto.slice(0, max - 1)}…` : texto)
@@ -19,17 +20,17 @@ const TEXTO_SUAVE = { fill: 'var(--muted-foreground)' }
 function Cartao({ titulo, subtitulo, children }) {
   return (
     <section aria-label={titulo} className="card p-4">
-      <h2 className="text-sm font-semibold text-muted-foreground">{titulo}</h2>
-      {subtitulo && <p className="mb-2 text-xs text-muted-foreground">{subtitulo}</p>}
+      <h2 className="text-subtitulo font-semibold text-muted-foreground">{titulo}</h2>
+      {subtitulo && <p className="mb-2 text-rotulo text-muted-foreground">{subtitulo}</p>}
       <div className={subtitulo ? '' : 'mt-3'}>{children}</div>
     </section>
   )
 }
 
 function Estado({ erro, vazio, carregando, texto }) {
-  if (erro) return <p role="alert" className="text-sm text-destructive">{erro}</p>
+  if (erro) return <p role="alert" className="text-corpo text-destructive">{erro}</p>
   if (carregando) return <GraficoCarregando texto="Carregando…" className="py-6" />
-  return <p className="py-6 text-sm text-muted-foreground">{texto ?? vazio}</p>
+  return <p className="py-6 text-corpo text-muted-foreground">{texto ?? vazio}</p>
 }
 
 // Barras verticais por mês e, se houver, a linha tracejada da previsão.
@@ -52,15 +53,15 @@ function GraficoDeMeses({ meses, previsao }) {
         return (
           <g key={m.mes}>
             {m.realizado > 0 && <rect x={x} y={base - h} width={largura} height={h} rx="4" fill="var(--primary)" fillOpacity={i === meses.length - 1 ? 1 : 0.6} />}
-            <text x={x + largura / 2} y={base - h - 5} textAnchor="middle" fontSize="10" style={TEXTO}>{formatarHoras(m.realizado)}</text>
-            <text x={x + largura / 2} y={base + 15} textAnchor="middle" fontSize="10" style={TEXTO_SUAVE}>{rotuloCurto(m.mes)}</text>
+            <text x={x + largura / 2} y={base - h - 5} textAnchor="middle" fontSize={TAMANHO.legenda} style={TEXTO}>{formatarHoras(m.realizado)}</text>
+            <text x={x + largura / 2} y={base + 15} textAnchor="middle" fontSize={TAMANHO.legenda} style={TEXTO_SUAVE}>{rotuloCurto(m.mes)}</text>
           </g>
         )
       })}
       {previsao > 0 && (
         <g data-previsao="">
           <line x1="8" x2={LARGURA - 8} y1={yPrevisao} y2={yPrevisao} stroke="var(--muted-foreground)" strokeDasharray="5 4" />
-          <text x={LARGURA - 8} y={yPrevisao - 4} textAnchor="end" fontSize="10" style={{ ...TEXTO_SUAVE, stroke: 'var(--card)', strokeWidth: 3, paintOrder: 'stroke' }}>
+          <text x={LARGURA - 8} y={yPrevisao - 4} textAnchor="end" fontSize={TAMANHO.legenda} style={{ ...TEXTO_SUAVE, stroke: 'var(--card)', strokeWidth: 3, paintOrder: 'stroke' }}>
             {`Previsão: ${formatarHoras(previsao)}`}
           </text>
         </g>
@@ -80,8 +81,8 @@ function GraficoDeBarras({ itens, rotuloGeral }) {
         const y = i * linha
         return (
           <g key={item.chave}>
-            <text x="8" y={y + 13} fontSize="11" style={TEXTO}>{cortar(item.rotulo, 24)}</text>
-            <text x={LARGURA - 8} y={y + 13} textAnchor="end" fontSize="11" style={TEXTO_SUAVE}>{item.detalhe}</text>
+            <text x="8" y={y + 13} fontSize={TAMANHO.legenda} style={TEXTO}>{cortar(item.rotulo, 24)}</text>
+            <text x={LARGURA - 8} y={y + 13} textAnchor="end" fontSize={TAMANHO.legenda} style={TEXTO_SUAVE}>{item.detalhe}</text>
             <rect x="8" y={y + 19} width={LARGURA - 16} height="8" rx="4" fill="var(--input)" fillOpacity="0.5" />
             {item.valor > 0 && <rect x="8" y={y + 19} width={Math.max(8, ((LARGURA - 16) * item.valor) / maximo)} height="8" rx="4" fill="var(--primary)" />}
           </g>

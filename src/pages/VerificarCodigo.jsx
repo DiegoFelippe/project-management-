@@ -23,7 +23,7 @@ export default function VerificarCodigo() {
         await recarregarPerfil()
         navigate('/', { replace: true })
       }} />
-      <p className="mt-4 text-sm text-muted-foreground text-pretty">
+      <p className="mt-4 text-corpo text-muted-foreground text-pretty">
         Perdeu o celular? Peça a quem administra o seu acesso para zerar a verificação em duas etapas.
       </p>
       <BotaoSair />

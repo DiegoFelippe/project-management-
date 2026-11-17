@@ -23,7 +23,7 @@ export default function BarraTopo({ aoAbrirMenu }) {
         <Menu />
       </Button>
       {logo && <img src={logo} alt="" className="size-7 shrink-0 rounded-md border bg-white object-contain p-0.5" />}
-      <p className="min-w-0 truncate text-sm text-muted-foreground">
+      <p className="min-w-0 truncate text-corpo text-muted-foreground">
         {perfil.consultoria?.nome ?? 'Plataforma'} <span aria-hidden="true">›</span>{' '}
         <span className="font-semibold text-foreground">{tituloDaRota(pathname)}</span>
       </p>
@@ -34,7 +34,7 @@ export default function BarraTopo({ aoAbrirMenu }) {
         </Button>
       )}
       <BotaoTema aoTrocar={guardarNoPerfil} className={podeInstalar ? 'shrink-0' : 'ml-auto shrink-0'} />
-      <span className="shrink-0 rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
+      <span className="shrink-0 rounded-full border px-3 py-1 text-rotulo font-medium text-muted-foreground">
         {NOME_DO_PAPEL[perfil.papel]}
       </span>
     </header>

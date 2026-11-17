@@ -158,13 +158,13 @@ export default function Clientes() {
         )}
       </BarraDeFiltros>
       {aba === 'meus' && aberto && clientes?.some((c) => c.id !== aberto.cliente_id) && (
-        <p id={idDoAviso} className="mb-3 text-sm text-muted-foreground">
+        <p id={idDoAviso} className="mb-3 text-corpo text-muted-foreground">
           Você está com check-in aberto em {aberto.cliente?.nome ?? 'outro cliente'} desde {HORA.format(new Date(aberto.inicio))}.
           {' '}Faça o check-out para começar outro.
         </p>
       )}
       {emCheckins && <MeusCheckins consultorId={perfil.id} consultoriaId={perfil.consultoria_id} aoMudar={recarregar} />}
-      {!emCheckins && erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+      {!emCheckins && erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!emCheckins && !erro && clientes === null && <GraficoCarregando texto="Carregando os clientes…" className="py-12" />}
       {!emCheckins && clientes?.length === 0 && <ListaVazia>{buscaAtrasada ? 'Nenhum cliente encontrado.' : VAZIO[aba]}</ListaVazia>}
       {!emCheckins && clientes?.length > 0 && (
@@ -177,7 +177,7 @@ export default function Clientes() {
                   <Link to={`/clientes/${c.id}`} className="hover:underline">{c.nome}</Link>
                   {aba === 'aguardando' && <Badge variant="notice">Novo</Badge>}
                 </p>
-                {c.razao_social && <p className="truncate text-xs text-muted-foreground">{c.razao_social}</p>}
+                {c.razao_social && <p className="truncate text-rotulo text-muted-foreground">{c.razao_social}</p>}
               </Celula>
               <Celula className="tabular-nums text-muted-foreground">{c.cnpj ? formatarCnpj(c.cnpj) : '—'}</Celula>
               <Celula className="text-muted-foreground">{c.cidade ? `${c.cidade}${c.uf ? `/${c.uf}` : ''}` : '—'}</Celula>
@@ -187,7 +187,7 @@ export default function Clientes() {
                 {c.consultor ? (
                   <>
                     {c.consultor.nome}
-                    {c.consultor.ativo === false && <span className="ml-1 text-xs">(desativado)</span>}
+                    {c.consultor.ativo === false && <span className="ml-1 text-rotulo">(desativado)</span>}
                   </>
                 ) : '—'}
               </Celula>

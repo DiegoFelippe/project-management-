@@ -2,6 +2,7 @@
 // metas e empresas), com dados correndo pelas linhas, e cartões de gestão flutuando em volta.
 // Só transform/opacity (leve para o processador); com "reduzir movimento" fica parado.
 import { useEffect, useState } from 'react'
+import { TAMANHO } from '@/lib/tipografia'
 import { cn } from '@/lib/utils'
 
 // Número que conta de 0 até o valor (com "reduzir movimento", já mostra o valor final).
@@ -91,7 +92,7 @@ function Rede() {
             <circle r="23" fill="var(--card)" stroke="var(--primary)" strokeOpacity="0.3" strokeWidth="1.5"
               style={{ filter: 'drop-shadow(0 6px 14px rgb(15 23 42 / 0.12))' }} />
             <Icone id={no.id} />
-            <text y="40" textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--muted-foreground)">{no.rotulo}</text>
+            <text y="40" textAnchor="middle" fontSize={TAMANHO.rotulo} fontWeight="600" fill="var(--muted-foreground)">{no.rotulo}</text>
           </g>
         </g>
       ))}
@@ -147,7 +148,7 @@ function Cartao({ className, atraso, children }) {
   )
 }
 
-const rotulo = 'text-[11px] font-medium text-muted-foreground'
+const rotulo = 'text-legenda font-medium text-muted-foreground'
 
 export default function AnimacaoGestao({ className }) {
   return (
@@ -187,8 +188,8 @@ export default function AnimacaoGestao({ className }) {
               style={{ animation: 'anel 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) 1.6s both' }} />
           </svg>
           <div>
-            <p className="text-lg leading-none font-bold tabular-nums"><Contador ate={87} sufixo="%" atraso={1.6} /></p>
-            <p className="mt-1 text-[10px] font-semibold text-positive">+5 esta semana</p>
+            <p className="text-janela leading-none font-bold tabular-nums"><Contador ate={87} sufixo="%" atraso={1.6} /></p>
+            <p className="mt-1 text-mini font-semibold text-positive">+5 esta semana</p>
           </div>
         </div>
       </Cartao>
@@ -196,7 +197,7 @@ export default function AnimacaoGestao({ className }) {
       <Cartao className="top-[36%] -right-[3%]" atraso={1.5}>
         <div className="flex items-center justify-between">
           <p className={rotulo}>Crescimento</p>
-          <span className="rounded-full bg-positive-soft px-1.5 py-0.5 text-[10px] font-bold text-positive tabular-nums"><Contador ate={24} prefixo="+" sufixo="%" atraso={1.8} /></span>
+          <span className="rounded-full bg-positive-soft px-1.5 py-0.5 text-mini font-bold text-positive tabular-nums"><Contador ate={24} prefixo="+" sufixo="%" atraso={1.8} /></span>
         </div>
         <div className="mt-2 flex h-10 items-end gap-1">
           {[40, 55, 48, 70, 82, 100].map((altura, i) => (
@@ -215,7 +216,7 @@ export default function AnimacaoGestao({ className }) {
             ['Implantação', 38],
           ].map(([nome, feito], i) => (
             <div key={nome}>
-              <div className="flex justify-between text-[10px] text-muted-foreground">
+              <div className="flex justify-between text-mini text-muted-foreground">
                 <span>{nome}</span>
                 <span className="font-semibold text-foreground">{feito}%</span>
               </div>
@@ -243,14 +244,14 @@ export default function AnimacaoGestao({ className }) {
             ['CS', '#db2777'],
             ['GG', '#0891b2'],
           ].map(([sigla, cor], i) => (
-            <span key={sigla} className={cn('grid size-6 place-items-center rounded-full text-[9px] font-bold text-white ring-2 ring-card', i && '-ml-1.5')}
+            <span key={sigla} className={cn('grid size-6 place-items-center rounded-full text-mini font-bold text-white ring-2 ring-card', i && '-ml-1.5')}
               style={{ backgroundColor: cor }}>
               {sigla}
             </span>
           ))}
-          <span className="-ml-1.5 grid size-6 place-items-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground ring-2 ring-card">+2</span>
+          <span className="-ml-1.5 grid size-6 place-items-center rounded-full bg-muted text-mini font-bold text-muted-foreground ring-2 ring-card">+2</span>
         </div>
-        <p className="mt-1.5 text-[10px] text-muted-foreground">6 pessoas · 2 projetos</p>
+        <p className="mt-1.5 text-mini text-muted-foreground">6 pessoas · 2 projetos</p>
       </Cartao>
     </div>
   )

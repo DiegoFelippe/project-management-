@@ -14,7 +14,7 @@ import { itensDoMenu } from './menu'
 
 const rotulo = (aceso) =>
   cn(
-    'max-w-[64px] truncate text-[10px] leading-none font-semibold',
+    'max-w-[64px] truncate text-mini leading-none font-semibold',
     aceso ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground',
   )
 
@@ -69,7 +69,7 @@ export default function Trilho({ aoNavegar }) {
           data-item-trilho="" onClick={() => setPerfilAberto(true)}
           className="group flex w-16 flex-col items-center gap-1 py-0.5 outline-none focus-visible:[&>span:first-child]:ring-2 focus-visible:[&>span:first-child]:ring-ring">
           <span style={foto ? undefined : { backgroundColor: corDaPessoa(perfil) }}
-            className={cn('anim-pulsar grid size-8 place-items-center overflow-hidden rounded-full text-[12px] font-bold ring-1 ring-primary/25 transition-shadow group-hover:ring-2 group-hover:ring-primary/50', foto ? 'bg-primary/10 text-primary' : 'text-white')}>
+            className={cn('anim-pulsar grid size-8 place-items-center overflow-hidden rounded-full text-rotulo font-bold ring-1 ring-primary/25 transition-shadow group-hover:ring-2 group-hover:ring-primary/50', foto ? 'bg-primary/10 text-primary' : 'text-white')}>
             {foto ? <img src={foto} alt="" className="size-full object-cover" /> : iniciais(perfil.nome)}
           </span>
           <span className={rotulo(false)}>{primeiroNome(perfil.nome)}</span>
@@ -78,7 +78,7 @@ export default function Trilho({ aoNavegar }) {
           className="group flex w-16 flex-col items-center gap-1 py-0.5 outline-none focus-visible:[&>span:first-child]:ring-2 focus-visible:[&>span:first-child]:ring-ring"
           onClick={async () => { await sair(); navigate('/entrar', { replace: true }) }}>
           <Quadro icone={LogOut} animacao="sair" perigo />
-          <span className="text-[10px] leading-none font-semibold text-muted-foreground group-hover:text-destructive">Sair</span>
+          <span className="text-mini leading-none font-semibold text-muted-foreground group-hover:text-destructive">Sair</span>
         </button>
       </div>
       {perfilAberto && <MeuPerfil key={perfil.id} aberto aoFechar={() => setPerfilAberto(false)} />}

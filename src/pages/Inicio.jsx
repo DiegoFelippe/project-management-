@@ -47,13 +47,13 @@ export default function Inicio() {
     <section className="grid grid-cols-[minmax(0,1fr)] gap-5">
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Olá, {primeiroNome(perfil.nome)}.</h1>
+          <h1 className="text-titulo font-bold">Olá, {primeiroNome(perfil.nome)}.</h1>
           <p className="text-muted-foreground">{NOME_DO_PAPEL[perfil.papel]} {onde}.</p>
         </div>
         <NavegacaoDoMes mes={mes} aoMudar={(novo) => { setErro(false); setMes(novo) }} />
       </div>
 
-      {erro && <p role="alert" className="card border-destructive/40 p-4 text-sm text-destructive">Não foi possível carregar o painel. Tente novamente em instantes.</p>}
+      {erro && <p role="alert" className="card border-destructive/40 p-4 text-corpo text-destructive">Não foi possível carregar o painel. Tente novamente em instantes.</p>}
       {!painel && !erro && <GraficoCarregando texto="Carregando o painel…" className="min-h-64 justify-center" />}
 
       {painel && (

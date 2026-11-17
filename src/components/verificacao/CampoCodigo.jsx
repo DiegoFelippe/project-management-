@@ -7,7 +7,7 @@ export default function CampoCodigo({ id, valor, aoMudar, autoFocus = false, inv
   return (
     <Input id={id} type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={6} spellCheck={false}
       autoFocus={autoFocus} placeholder="000000" aria-invalid={invalido || undefined}
-      className={cn('h-11 max-w-48 text-center font-mono text-lg tracking-[0.4em] tabular-nums', className)}
+      className={cn('h-11 max-w-48 text-center font-mono text-janela tracking-[0.4em] tabular-nums', className)}
       value={valor} onChange={(e) => aoMudar(e.target.value.replace(/\D/g, '').slice(0, 6))} />
   )
 }

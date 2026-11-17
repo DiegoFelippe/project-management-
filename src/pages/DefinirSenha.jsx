@@ -22,7 +22,7 @@ export default function DefinirSenha() {
       <TelaDeAcesso>
         <Titulo titulo="Criar senha" />
         <Aviso>Esse link expirou ou já foi usado.</Aviso>
-        <p className="mt-4 text-sm text-muted-foreground">
+        <p className="mt-4 text-corpo text-muted-foreground">
           Peça um link novo em{' '}
           <Link to="/esqueci-senha" className="font-semibold text-primary hover:underline">Esqueci minha senha</Link>.
         </p>

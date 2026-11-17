@@ -42,7 +42,7 @@ export default function EsqueciSenha() {
           <Button type="submit" size="lg" disabled={enviando}>Enviar link</Button>
         </form>
       )}
-      <Link to="/entrar" className="mt-6 inline-block text-sm font-semibold text-primary hover:underline">
+      <Link to="/entrar" className="mt-6 inline-block text-corpo font-semibold text-primary hover:underline">
         Voltar para entrar
       </Link>
     </TelaDeAcesso>

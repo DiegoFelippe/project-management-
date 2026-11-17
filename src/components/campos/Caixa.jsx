@@ -11,7 +11,7 @@ export default function Caixa({ id, marcado, aoMudar, rotulo, indeterminado = fa
   const ligada = marcado || indeterminado
 
   return (
-    <label className={cn('inline-flex items-center gap-2.5 text-[13px]', desabilitado ? 'cursor-not-allowed opacity-60' : 'cursor-pointer', className)}>
+    <label className={cn('inline-flex items-center gap-2.5 text-corpo', desabilitado ? 'cursor-not-allowed opacity-60' : 'cursor-pointer', className)}>
       <span className="relative inline-flex shrink-0">
         <input ref={entrada} id={id} type="checkbox" checked={!!marcado} disabled={desabilitado} onChange={(e) => aoMudar(e.target.checked)}
           className="peer absolute inset-0 m-0 cursor-[inherit] opacity-0" />

@@ -98,6 +98,26 @@ times e consultorias.** Nada pode depender de "são poucos registros".
 - **Teste de tela da paginação** em cada lista: some com 15 ou menos, aparece com mais, e Próxima
   pede a página 2 ao banco.
 
+## Tipografia: uma fonte, uma escala
+
+Pedido do Diego (2026-11-16). Design: `docs/superpowers/specs/2026-11-16-tipografia-design.md`.
+
+- **Fonte única: Inter**, servida pelo próprio app (`@fontsource-variable/inter`), com a do sistema de reserva. Sem
+  fonte condensada.
+- **Tamanho só pela escala nomeada** (definida em `src/index.css`): `text-titulo` (título da página), `text-destaque`
+  (número grande dos indicadores), `text-janela` (título de janela ou bloco grande), `text-subtitulo` (título de
+  cartão, subtítulo da página), `text-corpo` (texto, tabelas, botões, campos), `text-rotulo` (rótulo de campo, texto de
+  apoio, abas), `text-legenda` (dicas, datas pequenas, texto de gráfico), `text-mini` (rótulo de seção, contadores,
+  nomes do trilho). Escolha pelo **papel** do texto, não pelo tamanho mais próximo. Peso e `tabular-nums`
+  (números comparados em coluna) vão na classe, ao lado.
+- **Proibido fora de `src/index.css`:** `text-[Npx]`, `text-xs/sm/base/lg/xl/2xl/3xl`, `font-stretch` e
+  `font-family`. Texto de SVG (gráficos) usa `fontSize={TAMANHO.legenda}` etc. de `src/lib/tipografia.js` e nunca
+  fica abaixo de 11 px na tela. Escala nova: token em `src/index.css`, `src/lib/tipografia.js` e `src/lib/utils.js`.
+- **Campos de digitar** (`<textarea>`, campos internos) usam a classe `.texto-de-campo`: 16 px no celular (o iPhone não
+  dá zoom) e `text-corpo` a partir de `sm`.
+- `src/components/comum/tipografiaVarredura.test.js` varre `src/` e falha com arquivo:linha; `tamanhoNoCelular.test.jsx`
+  guarda os campos.
+
 ## Layout
 
 - Telas internas ocupam a largura toda: nada de `max-w-*` + `mx-auto` no conteúdo da página.

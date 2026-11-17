@@ -71,7 +71,7 @@ export default function CadastroDoAutenticador({ aoConcluir, aoCancelar, aoEnvia
 
   if (!cadastro) {
     return (
-      <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
+      <p role="status" className="text-muted-foreground flex items-center gap-2 text-corpo">
         <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Preparando o QR code…
       </p>
     )
@@ -79,19 +79,19 @@ export default function CadastroDoAutenticador({ aoConcluir, aoCancelar, aoEnvia
 
   return (
     <form noValidate onSubmit={confirmar} aria-label="Ativar o app autenticador" className="grid gap-4">
-      <ol className="grid gap-4 text-sm">
+      <ol className="grid gap-4 text-corpo">
         <li className="grid gap-2">
           <p className="font-medium">1. Abra o app autenticador do celular e leia o QR code.</p>
-          <p className="text-muted-foreground text-xs">Serve o Google Authenticator, o Microsoft Authenticator, o 1Password e outros.</p>
+          <p className="text-muted-foreground text-rotulo">Serve o Google Authenticator, o Microsoft Authenticator, o 1Password e outros.</p>
           <img src={cadastro.qr} alt="QR code para o app autenticador" className="size-44 rounded-xl border bg-white p-2" />
-          <p className="text-muted-foreground text-xs">Não dá para ler? Digite esta chave no app:</p>
+          <p className="text-muted-foreground text-rotulo">Não dá para ler? Digite esta chave no app:</p>
           <div className="flex flex-wrap items-center gap-2">
-            <code className="bg-muted rounded-lg border px-2.5 py-1.5 font-mono text-[13px] tracking-wider break-all">{agrupar(cadastro.segredo)}</code>
+            <code className="bg-muted rounded-lg border px-2.5 py-1.5 font-mono text-corpo tracking-wider break-all">{agrupar(cadastro.segredo)}</code>
             <Button type="button" variant="outline" size="sm" aria-label="Copiar a chave" onClick={copiar}>
               {copia === 'ok' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />} Copiar
             </Button>
           </div>
-          <p role="status" className={cn('min-h-4 text-xs', copia === 'ok' ? 'text-positive' : 'text-destructive')}>
+          <p role="status" className={cn('min-h-4 text-rotulo', copia === 'ok' ? 'text-positive' : 'text-destructive')}>
             {copia === 'ok' ? 'Chave copiada.' : copia === 'falhou' ? 'Não deu para copiar: selecione a chave e copie com o teclado.' : ''}
           </p>
         </li>

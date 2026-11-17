@@ -25,7 +25,7 @@ export default function SeletorDeCor({ valor = null, aoMudar, rotulo = 'Cor do a
 
   return (
     <div className="grid gap-2">
-      <span id={`${id}-rotulo`} className="text-sm font-medium">{rotulo}</span>
+      <span id={`${id}-rotulo`} className="text-corpo font-medium">{rotulo}</span>
       <div role="radiogroup" aria-labelledby={`${id}-rotulo`} className="flex flex-wrap items-center gap-2.5">
         {CORES_DO_AVATAR.map((cor, i) => {
           const escolhida = i === indiceAtual
@@ -46,7 +46,7 @@ export default function SeletorDeCor({ valor = null, aoMudar, rotulo = 'Cor do a
             <button id={idDe(null)} type="button" role="radio" aria-checked={escolhida} tabIndex={escolhida ? 0 : -1}
               title="Cor automática: a que o sistema escolhe para a pessoa" onClick={() => aoMudar(null)}
               onKeyDown={(e) => teclar(e, opcoes.length - 1)}
-              className={cn('botao-animado h-8 rounded-xl border px-3 text-[12px] font-medium outline-none transition-[box-shadow,translate,scale,border-color] hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50',
+              className={cn('botao-animado h-8 rounded-xl border px-3 text-rotulo font-medium outline-none transition-[box-shadow,translate,scale,border-color] hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50',
                 escolhida ? 'border-primary bg-primary/5 ring-primary/15 ring-2' : 'bg-card hover:border-primary/40')}>
               Automática
             </button>

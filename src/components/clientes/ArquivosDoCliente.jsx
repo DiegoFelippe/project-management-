@@ -124,13 +124,13 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
   const itens = resultado?.itens ?? null
   return (
     <section aria-labelledby="titulo-arquivos" className="grid gap-3">
-      <h2 id="titulo-arquivos" className="text-lg font-semibold">Arquivos</h2>
+      <h2 id="titulo-arquivos" className="text-janela font-semibold">Arquivos</h2>
       {pode && (
         <div data-testid="area-de-soltar" aria-busy={!!enviando}
           onDragOver={(e) => { e.preventDefault(); if (!enviando) setArrastando(true) }}
           onDragLeave={() => setArrastando(false)} onDrop={aoSoltar}
           className={cn(
-            'flex flex-col items-center gap-2 rounded-xl border-2 border-dashed bg-card/60 p-6 text-center text-sm text-muted-foreground transition-colors',
+            'flex flex-col items-center gap-2 rounded-xl border-2 border-dashed bg-card/60 p-6 text-center text-corpo text-muted-foreground transition-colors',
             arrastando && 'border-primary bg-primary/5', enviando && 'opacity-60',
           )}>
           <Upload className="size-5" aria-hidden="true" />
@@ -146,11 +146,11 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
         </div>
       )}
       {problemas.length > 0 && (
-        <ul role="alert" className="grid gap-1 text-sm text-destructive">
+        <ul role="alert" className="grid gap-1 text-corpo text-destructive">
           {problemas.map((p, i) => <li key={`${i}-${p}`}>{p}</li>)}
         </ul>
       )}
-      {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+      {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && itens === null && <GraficoCarregando texto="Carregando os arquivos…" className="py-8" />}
       {itens?.length === 0 && <ListaVazia>Nenhum arquivo enviado ainda.</ListaVazia>}
       {itens?.length > 0 && (

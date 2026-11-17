@@ -54,7 +54,7 @@ export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
       <Label htmlFor={id}>{rotulo}</Label>
       <Input id={id} autoComplete="off" className="h-10" aria-invalid={erros[chave] ? true : undefined}
         value={dados[chave]} onChange={mudar(chave)} {...extra} />
-      {erros[chave] && <p className="text-xs text-destructive">{erros[chave]}</p>}
+      {erros[chave] && <p className="text-rotulo text-destructive">{erros[chave]}</p>}
     </div>
   )
 
@@ -81,7 +81,7 @@ export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
             <div className="grid gap-2">
               <Label htmlFor="admin-senha">Senha provisória</Label>
               <CampoSenha id="admin-senha" valor={dados.senha} invalido={!!erros.senha} aoMudar={(senha) => setDados((d) => ({ ...d, senha }))} />
-              {erros.senha && <p className="text-xs text-destructive">{erros.senha}</p>}
+              {erros.senha && <p className="text-rotulo text-destructive">{erros.senha}</p>}
             </div>
           )}
         </SecaoFormulario>

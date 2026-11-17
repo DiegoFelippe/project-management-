@@ -86,13 +86,13 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
     setFoco(alvo)
   }
   const nomeSeta = (dir) => (modo === 'dias' ? (dir < 0 ? 'Mês anterior' : 'Próximo mês') : modo === 'meses' ? (dir < 0 ? 'Ano anterior' : 'Próximo ano') : (dir < 0 ? 'Anos anteriores' : 'Próximos anos'))
-  const botaoTitulo = 'hover:bg-accent rounded-lg px-2 py-1 text-[13.5px] font-semibold tabular-nums'
+  const botaoTitulo = 'hover:bg-accent rounded-lg px-2 py-1 text-corpo font-semibold tabular-nums'
   const limpar = !obrigatorio && escolhida && !desabilitado
 
   return (
     <>
       <button ref={gatilho} id={id} type="button" disabled={desabilitado} onClick={alternar} aria-label={rotulo} aria-describedby={valorId} aria-haspopup="dialog" aria-expanded={aberto}
-        className={cn('input botao-animado flex cursor-pointer items-center gap-2 text-left', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
+        className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center gap-2 text-left', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
         <CalendarDays className={cn('size-3.5 shrink-0', escolhida ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
         <span id={valorId} className={cn('min-w-0 flex-1 truncate', !escolhida && 'text-muted-foreground')}>
           {escolhida ? format(escolhida, comHora ? "d 'de' MMM 'de' yyyy', ' HH:mm" : "d 'de' MMM 'de' yyyy", { locale: ptBR }) : placeholder}
@@ -113,7 +113,7 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
             <div className="flex flex-1 items-center justify-center gap-1">
               {modo === 'dias' && <BotaoCampo onClick={() => setModo('meses')} title="Escolher mês" className={botaoTitulo}>{maiuscula(format(visao, 'MMMM', { locale: ptBR }))}</BotaoCampo>}
               {modo === 'anos'
-                ? <span className="px-2 py-1 text-[13.5px] font-semibold tabular-nums">{inicioAnos} a {inicioAnos + 11}</span>
+                ? <span className="px-2 py-1 text-corpo font-semibold tabular-nums">{inicioAnos} a {inicioAnos + 11}</span>
                 : <BotaoCampo onClick={() => setModo('anos')} title="Escolher ano" className={botaoTitulo}>{format(visao, 'yyyy')}</BotaoCampo>}
             </div>
             <BotaoCampo onClick={() => mover(1)} aria-label={nomeSeta(1)} className="text-muted-foreground hover:bg-accent grid size-8 place-items-center rounded-lg"><ChevronRight className="size-4" aria-hidden="true" /></BotaoCampo>
@@ -126,7 +126,7 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
                 const off = (minimo && format(d, 'yyyy-MM') < format(minimo, 'yyyy-MM')) || (maximo && format(d, 'yyyy-MM') > format(maximo, 'yyyy-MM'))
                 return (
                   <BotaoCampo key={i} disabled={off} onClick={() => { focar.current = true; setVisao(d); setFoco(d); setModo('dias') }}
-                    className={cn('h-11 text-[12.5px] font-medium', celula(escolhida && isSameMonth(escolhida, d), off, isSameMonth(hoje, d)))}>
+                    className={cn('h-11 text-rotulo font-medium', celula(escolhida && isSameMonth(escolhida, d), off, isSameMonth(hoje, d)))}>
                     {maiuscula(format(d, 'MMM', { locale: ptBR }).replace('.', ''))}
                   </BotaoCampo>
                 )
@@ -141,7 +141,7 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
                 const off = (minimo && ano < minimo.getFullYear()) || (maximo && ano > maximo.getFullYear())
                 return (
                   <BotaoCampo key={ano} disabled={off} onClick={() => { setVisao((v) => setYear(v, ano)); setModo('meses') }}
-                    className={cn('h-11 text-[12.5px] font-medium', celula(escolhida?.getFullYear() === ano, off, hoje.getFullYear() === ano))}>
+                    className={cn('h-11 text-rotulo font-medium', celula(escolhida?.getFullYear() === ano, off, hoje.getFullYear() === ano))}>
                     {ano}
                   </BotaoCampo>
                 )
@@ -152,13 +152,13 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
           {modo === 'dias' && (
             <>
               <div className="mb-1 grid grid-cols-7">
-                {SEMANA.map((s, i) => <span key={i} className="text-muted-foreground py-1 text-center text-[10.5px] font-semibold">{s}</span>)}
+                {SEMANA.map((s, i) => <span key={i} className="text-muted-foreground py-1 text-center text-mini font-semibold">{s}</span>)}
               </div>
               <div ref={grade} onKeyDown={setas} className="grid grid-cols-7 gap-0.5">
                 {dias.map((d) => (
                   <BotaoCampo key={chave(d)} data-dia={chave(d)} disabled={fora(d)} tabIndex={foco && isSameDay(d, foco) ? 0 : -1}
                     onClick={() => escolher(d)} aria-pressed={!!escolhida && isSameDay(d, escolhida)} aria-label={format(d, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                    className={cn('h-9 text-[12.5px]', celula(escolhida && isSameDay(d, escolhida), fora(d), isToday(d), isSameMonth(d, visao)))}>
+                    className={cn('h-9 text-rotulo', celula(escolhida && isSameDay(d, escolhida), fora(d), isToday(d), isSameMonth(d, visao)))}>
                     {format(d, 'd')}
                   </BotaoCampo>
                 ))}
@@ -168,7 +168,7 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
 
           {comHora && (
             <div className="mt-3 flex items-center gap-2 border-t pt-3">
-              <span className="text-foreground/80 text-[12px] font-medium">Horário</span>
+              <span className="text-foreground/80 text-rotulo font-medium">Horário</span>
               <div className="ml-auto w-[120px]">
                 <CampoHora id={id && `${id}-hora`} rotulo="Horário" valor={escolhida ? format(escolhida, 'HH:mm') : ''} desabilitado={!escolhida} obrigatorio compacto
                   aoMudar={(h) => escolhida && h && emitir(`${chave(escolhida)}T${h}`)} />
@@ -177,16 +177,16 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
           )}
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-1.5 border-t pt-3">
-            {limpar ? <BotaoCampo onClick={() => { emitir(''); setAberto(false) }} className="text-muted-foreground hover:text-destructive rounded text-[12px] font-medium">Limpar</BotaoCampo> : <span />}
+            {limpar ? <BotaoCampo onClick={() => { emitir(''); setAberto(false) }} className="text-muted-foreground hover:text-destructive rounded text-rotulo font-medium">Limpar</BotaoCampo> : <span />}
             <div className="flex flex-wrap items-center gap-1.5">
               {atalhos.map((a) => (
                 <BotaoCampo key={a.rotulo} disabled={fora(ler(a.valor, false) ?? hoje)} onClick={() => { emitir(a.valor); if (!comHora) setAberto(false) }}
-                  className="bg-muted text-foreground hover:bg-accent rounded-lg px-2.5 py-1 text-[12px] font-medium disabled:opacity-40">{a.rotulo}</BotaoCampo>
+                  className="bg-muted text-foreground hover:bg-accent rounded-lg px-2.5 py-1 text-rotulo font-medium disabled:opacity-40">{a.rotulo}</BotaoCampo>
               ))}
               {!fora(hoje) && (
-                <BotaoCampo onClick={() => { setVisao(hoje); setFoco(hoje); escolher(hoje) }} className="bg-primary/10 text-primary hover:bg-primary/20 rounded-lg px-2.5 py-1 text-[12px] font-semibold">Hoje</BotaoCampo>
+                <BotaoCampo onClick={() => { setVisao(hoje); setFoco(hoje); escolher(hoje) }} className="bg-primary/10 text-primary hover:bg-primary/20 rounded-lg px-2.5 py-1 text-rotulo font-semibold">Hoje</BotaoCampo>
               )}
-              {comHora && <BotaoCampo onClick={() => setAberto(false)} className="bg-primary text-primary-foreground rounded-lg px-2.5 py-1 text-[12px] font-semibold">Pronto</BotaoCampo>}
+              {comHora && <BotaoCampo onClick={() => setAberto(false)} className="bg-primary text-primary-foreground rounded-lg px-2.5 py-1 text-rotulo font-semibold">Pronto</BotaoCampo>}
             </div>
           </div>
         </Flutuante>

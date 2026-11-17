@@ -68,7 +68,7 @@ export default function MeusCheckins({ consultorId, consultoriaId, aoMudar }) {
 
   return (
     <>
-      {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+      {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && itens === null && <GraficoCarregando texto="Carregando os check-ins…" className="py-12" />}
       {itens?.length === 0 && <ListaVazia>Você ainda não registrou nenhum check-in.</ListaVazia>}
       {itens?.length > 0 && (

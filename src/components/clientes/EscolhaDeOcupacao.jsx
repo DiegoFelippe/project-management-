@@ -50,14 +50,14 @@ export default function EscolhaDeOcupacao({
           value={busca} onChange={(e) => setBusca(e.target.value)} />
       </div>
       {erroDaLista && <Aviso>{erroDaLista}</Aviso>}
-      {itens === null && <p className="text-sm text-muted-foreground">Carregando…</p>}
-      {itens?.length === 0 && !erroDaLista && <p className="text-sm text-muted-foreground">Nenhuma opção encontrada.</p>}
+      {itens === null && <p className="text-corpo text-muted-foreground">Carregando…</p>}
+      {itens?.length === 0 && !erroDaLista && <p className="text-corpo text-muted-foreground">Nenhuma opção encontrada.</p>}
       {itens?.length > 0 && (
         <ListaDeOcupacao itens={itens} total={total} escolhido={escolhido?.id} atualId={atualId} rotuloDoValor={rotuloDoValor}
           carregandoMais={carregandoMais} aoEscolher={setManual} aoMostrarMais={mostrarMais} />
       )}
       {escolhido && (
-        <p aria-live="polite" className="rounded-md bg-muted px-3 py-2 text-sm">
+        <p aria-live="polite" className="rounded-md bg-muted px-3 py-2 text-corpo">
           {previa
             ? frasePrevia(escolhido.nome, formatarOcupacao(previa.antes), formatarOcupacao(previa.depois))
             : fraseSemCapacidade(escolhido.nome)}

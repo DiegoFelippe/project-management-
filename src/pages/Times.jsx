@@ -29,7 +29,7 @@ function Rostos({ time }) {
           <Avatar key={p.id} pessoa={p} className={i ? '-ml-1.5' : ''} />
         ))}
         {resto > 0 && (
-          <span className="-ml-1.5 grid size-7 place-items-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground ring-2 ring-card">
+          <span className="-ml-1.5 grid size-7 place-items-center rounded-full bg-muted text-mini font-bold text-muted-foreground ring-2 ring-card">
             +{resto > 99 ? '99' : resto}
           </span>
         )}
@@ -125,7 +125,7 @@ export default function Times() {
           <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />
         </BarraDeFiltros>
       )}
-      {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+      {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && times === null && <GraficoCarregando texto="Carregando os times…" className="py-12" />}
       {times?.length === 0 && (
         <ListaVazia>{ehDono ? 'Nenhum time por aqui.' : 'Nenhum time ainda. Crie o primeiro em "Novo time".'}</ListaVazia>
@@ -136,7 +136,7 @@ export default function Times() {
             <Linha key={t.id}>
               <Celula>
                 <Link to={`/times/${t.id}`} className="font-semibold hover:text-primary hover:underline">{t.nome}</Link>
-                {t.descricao && <p className="truncate text-xs text-muted-foreground">{t.descricao}</p>}
+                {t.descricao && <p className="truncate text-rotulo text-muted-foreground">{t.descricao}</p>}
               </Celula>
               <Celula className="text-muted-foreground">{t.gestor?.nome ?? '—'}</Celula>
               <Celula><Rostos time={t} /></Celula>

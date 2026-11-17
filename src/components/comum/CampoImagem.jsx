@@ -37,7 +37,7 @@ export default function CampoImagem({ rotulo, atual, reserva, reservaCor, aparen
     return (
       <div className="flex shrink-0 flex-col items-center gap-2">
         <div className="relative">
-          <div className="bg-muted text-muted-foreground grid size-24 place-items-center overflow-hidden rounded-2xl text-[26px] font-bold">
+          <div className="bg-muted text-muted-foreground grid size-24 place-items-center overflow-hidden rounded-2xl text-destaque font-bold">
             {mostrada
               ? <img src={mostrada} alt={`Prévia da ${rotulo}`} className="size-full object-cover" />
               : <span className="grid size-full place-items-center text-white" style={reservaCor ? { backgroundColor: reservaCor } : undefined}>{reserva}</span>}
@@ -50,11 +50,11 @@ export default function CampoImagem({ rotulo, atual, reserva, reservaCor, aparen
         </div>
         {mostrada && (
           <Button type="button" variant="ghost" size="sm" onClick={tirar}
-            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-7 px-2 text-xs">
+            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-7 px-2 text-rotulo">
             <Trash2 /> Tirar {rotulo}
           </Button>
         )}
-        {erro && <p role="alert" className="text-destructive max-w-24 text-center text-xs">{erro}</p>}
+        {erro && <p role="alert" className="text-destructive max-w-24 text-center text-rotulo">{erro}</p>}
       </div>
     )
   }
@@ -62,7 +62,7 @@ export default function CampoImagem({ rotulo, atual, reserva, reservaCor, aparen
   return (
     <div className="flex items-center gap-4">
       <div style={!mostrada && reservaCor ? { backgroundColor: reservaCor } : undefined}
-        className={cn('grid size-16 shrink-0 place-items-center overflow-hidden text-lg font-bold',
+        className={cn('grid size-16 shrink-0 place-items-center overflow-hidden text-janela font-bold',
           !mostrada && reservaCor ? 'text-white' : 'text-muted-foreground',
           redondo ? 'rounded-full bg-muted' : 'rounded-lg border bg-white')}>
         {mostrada
@@ -84,8 +84,8 @@ export default function CampoImagem({ rotulo, atual, reserva, reservaCor, aparen
             </Button>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">PNG, JPG ou WebP, até 10 MB.</p>
-        {erro && <p role="alert" className="text-xs text-destructive">{erro}</p>}
+        <p className="text-rotulo text-muted-foreground">PNG, JPG ou WebP, até 10 MB.</p>
+        {erro && <p role="alert" className="text-rotulo text-destructive">{erro}</p>}
       </div>
     </div>
   )

@@ -138,7 +138,7 @@ export default function Integracoes() {
         </BarraDeFiltros>
       )}
       {aviso && <div className="mb-4"><Aviso>{aviso}</Aviso></div>}
-      {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+      {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {ehDono && !consultoriaId && <ListaVazia>Escolha uma consultoria para ver as integrações dela.</ListaVazia>}
       {consultoriaId && !erro && integracoes === null && <GraficoCarregando texto="Carregando as integrações…" className="py-12" />}
       {consultoriaId && integracoes && (
@@ -156,13 +156,13 @@ export default function Integracoes() {
                     </span>
                     <div className="min-w-0">
                       <p className="font-semibold">{item.nome}</p>
-                      <p className="truncate text-xs text-muted-foreground">{item.descricao}</p>
+                      <p className="truncate text-rotulo text-muted-foreground">{item.descricao}</p>
                     </div>
                   </div>
                 </Celula>
                 <Celula>
                   <Badge variant={situacao.variante}>{situacao.rotulo}</Badge>
-                  {integracao?.ultimo_erro && <p className="mt-1 max-w-64 text-xs text-muted-foreground">{integracao.ultimo_erro}</p>}
+                  {integracao?.ultimo_erro && <p className="mt-1 max-w-64 text-rotulo text-muted-foreground">{integracao.ultimo_erro}</p>}
                 </Celula>
                 <Celula className="text-muted-foreground">{detalhes(item.tipo, integracao?.config)}</Celula>
                 <Celula className="text-muted-foreground tabular-nums">{quando(integracao?.ultimo_teste_em)}</Celula>

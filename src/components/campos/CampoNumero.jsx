@@ -30,8 +30,8 @@ export default function CampoNumero({ id, valor, aoMudar, min = 0, max = 9999, p
           <input id={id} value={valor ?? ''} inputMode={decimal ? 'decimal' : 'numeric'} disabled={desabilitado} placeholder="0"
             onChange={(e) => aoMudar(decimal ? e.target.value.replace('.', ',').replace(/[^\d,]/g, '').replace(/,(?=.*,)/g, '').slice(0, 12) : e.target.value.replace(/\D/g, '').slice(0, String(max).length))}
             onKeyDown={(e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); somar(e.key === 'ArrowUp' ? 1 : -1) } }}
-            className="text-foreground placeholder:text-muted-foreground/50 w-12 bg-transparent py-2 text-center text-base font-semibold tabular-nums outline-none sm:text-[14px]" />
-          {unidade && <span className="text-muted-foreground text-[12.5px] select-none">{unidade}</span>}
+            className="text-foreground placeholder:text-muted-foreground/50 w-12 bg-transparent py-2 texto-de-campo text-center font-semibold tabular-nums outline-none" />
+          {unidade && <span className="text-muted-foreground text-rotulo select-none">{unidade}</span>}
         </span>
         <BotaoCampo onClick={() => somar(1)} disabled={desabilitado || (n != null && n >= max)} aria-label="Aumentar" title="Aumentar" className={lado}>
           <Plus className="size-3.5" aria-hidden="true" />
@@ -41,7 +41,7 @@ export default function CampoNumero({ id, valor, aoMudar, min = 0, max = 9999, p
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Atalhos">
           {atalhos.map((a) => (
             <BotaoCampo key={a} onClick={() => aoMudar(escrever(a))} disabled={desabilitado} aria-pressed={n === a} title={unidade ? `${a} ${unidade}` : String(a)}
-              className={cn('min-w-9 rounded-md px-2 py-1 text-[12px] font-medium tabular-nums', n === a ? 'bg-primary/10 text-primary ring-primary/30 ring-1' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground')}>
+              className={cn('min-w-9 rounded-md px-2 py-1 text-rotulo font-medium tabular-nums', n === a ? 'bg-primary/10 text-primary ring-primary/30 ring-1' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground')}>
               {a}
             </BotaoCampo>
           ))}

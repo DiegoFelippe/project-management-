@@ -62,12 +62,12 @@ export default function NovoTime({ aberto, aoFechar, papelDeQuemCria, buscarGest
           <Label htmlFor="nome-time">Nome do time</Label>
           <Input id="nome-time" maxLength={80} aria-invalid={erroNome ? true : undefined} className="h-10"
             value={nome} onChange={(e) => setNome(e.target.value)} />
-          {erroNome && <p className="text-xs text-destructive">{erroNome}</p>}
+          {erroNome && <p className="text-rotulo text-destructive">{erroNome}</p>}
         </div>
         <div className="grid gap-2">
           <Label htmlFor="descricao-time">Descrição (opcional)</Label>
           <textarea id="descricao-time" maxLength={500} rows={2}
-            className="w-full rounded-md border border-input bg-card px-3 py-2 text-base sm:text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/30"
+            className="w-full rounded-md border border-input bg-card px-3 py-2 texto-de-campo shadow-xs outline-none focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/30"
             value={descricao} onChange={(e) => setDescricao(e.target.value)} />
         </div>
         {escolheGestor && (

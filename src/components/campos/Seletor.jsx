@@ -82,7 +82,7 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
   }
 
   const total = remoto?.total ?? 0
-  const campo = tamanho === 'sm' ? 'py-1.5 text-[12.5px]' : ''
+  const campo = tamanho === 'sm' ? 'py-1.5 text-rotulo' : ''
   const idOpcao = (i) => `${listaId}-${i}`
 
   return (
@@ -90,7 +90,7 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
       <button ref={gatilho} id={id} type="button" role="combobox" disabled={desabilitado} aria-haspopup="listbox" aria-expanded={aberto} aria-controls={aberto ? listaId : undefined}
         onClick={() => (aberto ? setAberto(false) : abrir())}
         onKeyDown={(e) => { if (e.key === 'ArrowDown' && !aberto) { e.preventDefault(); abrir() } }}
-        className={cn('input botao-animado flex cursor-pointer items-center gap-2 text-left', campo, (aberto || (selecionada && rotuloTodos != null && selecionada.valor !== '')) && 'border-primary/60', aberto && 'ring-primary/15 ring-2')}>
+        className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center gap-2 text-left', campo, (aberto || (selecionada && rotuloTodos != null && selecionada.valor !== '')) && 'border-primary/60', aberto && 'ring-primary/15 ring-2')}>
         {selecionada && <Marca opcao={selecionada} />}
         <span className={cn('min-w-0 flex-1 truncate', selecionada ? 'text-foreground font-medium' : 'text-muted-foreground')}>{selecionada ? selecionada.rotulo : placeholder}</span>
         <ChevronDown className={cn('text-muted-foreground size-3.5 shrink-0 transition-transform', aberto && 'rotate-180')} aria-hidden="true" />
@@ -103,7 +103,7 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
             <div className="relative mb-1">
               <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2" aria-hidden="true" />
               <input autoFocus role="combobox" aria-expanded="true" aria-controls={listaId} aria-activedescendant={ativoNaLista >= 0 ? idOpcao(ativoNaLista) : undefined} aria-label="Buscar"
-                value={termo} onChange={(e) => { setTermo(e.target.value); setAtivo(-1) }} placeholder="Buscar..." className="input py-1.5 pl-8 text-base sm:text-[12.5px]" />
+                value={termo} onChange={(e) => { setTermo(e.target.value); setAtivo(-1) }} placeholder="Buscar..." className="input py-1.5 pl-8 texto-de-campo" />
             </div>
           )}
           <div id={listaId} role="listbox" tabIndex={comBusca ? -1 : 0} ref={(el) => { if (el && !comBusca) el.focus() }} aria-activedescendant={!comBusca && ativoNaLista >= 0 ? idOpcao(ativoNaLista) : undefined} className="outline-none">
@@ -115,19 +115,19 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
                   className={cn('flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5', marcada && 'bg-primary/10', i === ativoNaLista && 'bg-accent')}>
                   <Marca opcao={o} />
                   <span className="min-w-0 flex-1">
-                    <span className={cn('block truncate text-[12.5px]', marcada ? 'text-primary font-medium' : 'text-foreground')}>{o.rotulo}</span>
-                    {o.detalhe && <span className="text-muted-foreground block truncate text-[11px]">{o.detalhe}</span>}
+                    <span className={cn('block truncate text-rotulo', marcada ? 'text-primary font-medium' : 'text-foreground')}>{o.rotulo}</span>
+                    {o.detalhe && <span className="text-muted-foreground block truncate text-legenda">{o.detalhe}</span>}
                   </span>
                   {marcada && <Check className="text-primary size-3.5 shrink-0" aria-hidden="true" />}
                 </div>
               )
             })}
           </div>
-          {buscar && !fresco && <p className="text-muted-foreground py-3 text-center text-[12px]">Buscando…</p>}
-          {remoto?.erro && <p role="alert" className="text-muted-foreground py-3 text-center text-[12px]">Não foi possível carregar as opções.</p>}
-          {!remoto?.erro && fresco && (buscar ? remoto : true) && mostradas.length === (todos && !termo.trim() ? 1 : 0) && <p className="text-muted-foreground py-3 text-center text-[12px]">Nada encontrado</p>}
+          {buscar && !fresco && <p className="text-muted-foreground py-3 text-center text-rotulo">Buscando…</p>}
+          {remoto?.erro && <p role="alert" className="text-muted-foreground py-3 text-center text-rotulo">Não foi possível carregar as opções.</p>}
+          {!remoto?.erro && fresco && (buscar ? remoto : true) && mostradas.length === (todos && !termo.trim() ? 1 : 0) && <p className="text-muted-foreground py-3 text-center text-rotulo">Nada encontrado</p>}
           {buscar && fresco && remoto && !remoto.erro && (
-            <p className="text-muted-foreground mt-1 border-t px-2.5 pt-1.5 text-[10.5px]">
+            <p className="text-muted-foreground mt-1 border-t px-2.5 pt-1.5 text-mini">
               {total > remoto.itens.length ? `${remoto.itens.length} de ${total.toLocaleString('pt-BR')}. Refine a busca.` : `${total.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')}`}
             </p>
           )}

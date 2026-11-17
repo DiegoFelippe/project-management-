@@ -44,14 +44,14 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
     setDigitado('')
   }
 
-  const celula = (marcada) => cn('h-8 w-full rounded-lg text-[12.5px] tabular-nums', marcada ? 'bg-primary text-primary-foreground font-semibold' : 'text-foreground hover:bg-primary/10')
+  const celula = (marcada) => cn('h-8 w-full rounded-lg text-rotulo tabular-nums', marcada ? 'bg-primary text-primary-foreground font-semibold' : 'text-foreground hover:bg-primary/10')
   const limpar = !obrigatorio && atual && !desabilitado
 
   return (
     <>
       <button ref={gatilho} id={id} type="button" disabled={desabilitado} aria-label={rotulo} aria-describedby={valorId} aria-haspopup="dialog" aria-expanded={aberto}
         onClick={() => { setDigitado(''); setAberto((a) => !a) }}
-        className={cn('input botao-animado flex cursor-pointer items-center text-left', compacto ? 'gap-1.5 py-1.5 text-[12.5px]' : 'gap-2', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
+        className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center text-left', compacto ? 'gap-1.5 py-1.5 text-rotulo' : 'gap-2', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
         <Clock className={cn('shrink-0', compacto ? 'size-3' : 'size-3.5', atual ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
         <span id={valorId} className={cn('min-w-0 flex-1 truncate tabular-nums', !atual && 'text-muted-foreground')}>{atual ? `${atual.h}:${atual.m}` : placeholder}</span>
         {limpar && !compacto && (
@@ -67,7 +67,7 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
         <Flutuante ancora={gatilho} aoFechar={() => setAberto(false)} aoAbrir={centralizar} largura={LARGURA} altura={330} rotulo="Escolher horário" className="p-3">
           <input value={digitado} onChange={(e) => setDigitado(e.target.value.replace(/[^\d:]/g, '').slice(0, 5))} inputMode="numeric" aria-label="Digitar horário"
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmarDigitado() } }} onBlur={confirmarDigitado}
-            placeholder={atual ? `${atual.h}:${atual.m}` : 'Digite, ex.: 1330'} className="input mb-2.5 py-1.5 text-base tabular-nums sm:text-[12.5px]" />
+            placeholder={atual ? `${atual.h}:${atual.m}` : 'Digite, ex.: 1330'} className="input mb-2.5 py-1.5 texto-de-campo tabular-nums" />
           <div ref={colunas} className="grid grid-cols-2 gap-2">
             {[['Hora', HORAS, atual?.h, (h) => aoMudar(`${h}:${atual?.m ?? '00'}`)], ['Minuto', minutos, atual?.m, (m) => aoMudar(`${atual?.h ?? '08'}:${m}`)]].map(([titulo, itens, marcado, escolher]) => (
               <div key={titulo}>
@@ -79,8 +79,8 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
             ))}
           </div>
           <div className="mt-2.5 flex items-center justify-between border-t pt-2.5">
-            {limpar ? <BotaoCampo onClick={() => { aoMudar(''); setAberto(false) }} className="text-muted-foreground hover:text-destructive rounded text-[12px] font-medium">Limpar</BotaoCampo> : <span />}
-            <BotaoCampo onClick={() => setAberto(false)} className="bg-primary text-primary-foreground rounded-lg px-2.5 py-1 text-[12px] font-semibold">Pronto</BotaoCampo>
+            {limpar ? <BotaoCampo onClick={() => { aoMudar(''); setAberto(false) }} className="text-muted-foreground hover:text-destructive rounded text-rotulo font-medium">Limpar</BotaoCampo> : <span />}
+            <BotaoCampo onClick={() => setAberto(false)} className="bg-primary text-primary-foreground rounded-lg px-2.5 py-1 text-rotulo font-semibold">Pronto</BotaoCampo>
           </div>
         </Flutuante>
       )}

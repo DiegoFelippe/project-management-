@@ -37,13 +37,13 @@ export default function ListaDeOcupacao({
                 <Badge variant="default"><Sparkles /> Sugestão: menor ocupação</Badge>
               )}
               {item.id === atualId && <Badge variant="secondary">Atual</Badge>}
-              <span className="text-sm tabular-nums text-muted-foreground">{rotulo(item)}</span>
+              <span className="text-corpo tabular-nums text-muted-foreground">{rotulo(item)}</span>
             </span>
             <Barra ocupacao={item.ocupacao} />
           </label>
         ))}
       </div>
-      <div className="mt-3 flex items-center justify-between gap-3 text-sm text-muted-foreground">
+      <div className="mt-3 flex items-center justify-between gap-3 text-corpo text-muted-foreground">
         <span>Mostrando {itens.length.toLocaleString('pt-BR')} de {total.toLocaleString('pt-BR')}</span>
         {itens.length < total && (
           <Button type="button" variant="outline" size="sm" disabled={carregandoMais} onClick={aoMostrarMais}>Mostrar mais</Button>

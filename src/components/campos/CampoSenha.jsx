@@ -54,12 +54,12 @@ export default function CampoSenha({ id, valor, aoMudar, gerador = true, invalid
             <span key={i} className={cn('h-full flex-1 transition-colors', i < analise.cumpridas ? COR_DA_FORCA[analise.forca] : 'bg-transparent')} />
           ))}
         </div>
-        <span className={cn('w-12 text-right text-xs font-semibold', COR_DO_TEXTO[analise.forca])}>{NOME_DAS_FORCAS[analise.forca]}</span>
+        <span className={cn('w-12 text-right text-rotulo font-semibold', COR_DO_TEXTO[analise.forca])}>{NOME_DAS_FORCAS[analise.forca]}</span>
       </div>
 
       <ul aria-label="Regras da senha" className="grid gap-1 sm:grid-cols-2">
         {analise.regras.map((r) => (
-          <li key={r.id} data-ok={r.ok} className={cn('flex items-center gap-1.5 text-xs', r.ok ? 'text-positive' : 'text-muted-foreground')}>
+          <li key={r.id} data-ok={r.ok} className={cn('flex items-center gap-1.5 text-rotulo', r.ok ? 'text-positive' : 'text-muted-foreground')}>
             {r.ok ? <Check className="size-3.5 shrink-0" aria-hidden="true" /> : <X className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />}
             <span>{r.texto}</span>
           </li>
@@ -82,7 +82,7 @@ export default function CampoSenha({ id, valor, aoMudar, gerador = true, invalid
         )}
       </div>
 
-      <p role="status" className={cn('min-h-4 text-xs', validacao && (analise.forte && !validacao.startsWith('Não deu') ? 'text-positive' : 'text-destructive'))}>{validacao}</p>
+      <p role="status" className={cn('min-h-4 text-rotulo', validacao && (analise.forte && !validacao.startsWith('Não deu') ? 'text-positive' : 'text-destructive'))}>{validacao}</p>
     </div>
   )
 }

@@ -18,8 +18,8 @@ export default function CartaoChave({ id, ligada, aoMudar, titulo, dica, icone: 
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span id={`${base}-titulo`} className="block text-[12.5px] font-semibold">{titulo}</span>
-        {dica && <span id={`${base}-dica`} className="text-muted-foreground block text-[11.5px]">{dica}</span>}
+        <span id={`${base}-titulo`} className="block text-rotulo font-semibold">{titulo}</span>
+        {dica && <span id={`${base}-dica`} className="text-muted-foreground block text-legenda">{dica}</span>}
       </span>
       <span aria-hidden="true" className={cn('relative mt-1.5 h-[18px] w-8 shrink-0 rounded-full transition-colors duration-150', ligada ? 'bg-primary' : 'bg-input')}>
         <span className={cn('absolute top-0.5 left-0.5 size-3.5 rounded-full bg-white shadow transition-transform duration-150', ligada && 'translate-x-3.5')} />

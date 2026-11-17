@@ -9,19 +9,18 @@ import CampoNumero from './CampoNumero'
 import Seletor from './Seletor'
 
 // O iPhone dá zoom ao focar um campo de texto com menos de 16px: no celular os campos de digitar usam 16px
-// (text-base) e só a partir de `sm` o tamanho compacto do Hub.
+// e só a partir de `sm` o text-corpo da escala. A regra mora no CSS (.texto-de-campo), uma vez só.
 describe('campos de digitar no celular', () => {
-  it('.input usa 16px no celular e 13,5px a partir de sm', () => {
+  it('.texto-de-campo usa 16px no celular e text-corpo a partir de sm; .input não repete o tamanho', () => {
     const css = readFileSync('src/index.css', 'utf8')
-    const regra = css.slice(css.indexOf('.input {'), css.indexOf('}', css.indexOf('.input {')))
-    expect(regra).toMatch(/\btext-base\b/)
-    expect(regra).toMatch(/sm:text-\[13\.5px\]/)
-    expect(regra).not.toMatch(/(^|\s)text-\[13\.5px\]/)
+    expect(css).toMatch(/\.texto-de-campo \{ @apply text-base sm:text-corpo; \}/)
+    const regra = css.slice(css.indexOf('.input {'), css.indexOf('\n  }', css.indexOf('.input {')))
+    expect(regra).not.toMatch(/(^|\s)(sm:)?text-(base|corpo|\[)/)
   })
 
   it('CampoNumero, busca da barra, busca do Seletor e "Digitar horário"', async () => {
     const { unmount } = render(<CampoNumero id="n" valor="1" aoMudar={() => {}} />)
-    expect(screen.getByRole('textbox')).toHaveClass('text-base')
+    expect(screen.getByRole('textbox')).toHaveClass('texto-de-campo')
     unmount()
     render(<CampoBusca rotulo="Buscar x" valor="" aoMudar={() => {}} />)
     expect(screen.getByRole('searchbox')).toHaveClass('input')
@@ -30,16 +29,16 @@ describe('campos de digitar no celular', () => {
   it('campos dentro das listas', async () => {
     render(<><CampoHora id="h" valor="" aoMudar={() => {}} /><Seletor id="s" valor="" aoMudar={() => {}} buscar={async () => ({ itens: [], total: 0 })} /></>)
     await userEvent.click(document.getElementById('h'))
-    expect(screen.getByLabelText('Digitar horário')).toHaveClass('text-base')
+    expect(screen.getByLabelText('Digitar horário')).toHaveClass('texto-de-campo')
     await userEvent.keyboard('{Escape}')
     await userEvent.click(document.getElementById('s'))
-    expect(screen.getByLabelText('Buscar')).toHaveClass('text-base')
+    expect(screen.getByLabelText('Buscar')).toHaveClass('texto-de-campo')
   })
 })
 
-// Textarea escrito à mão também dá zoom no iPhone se tiver 14px: 16px no celular, 14px a partir de sm.
+// Textarea escrito à mão também dá zoom no iPhone se tiver menos de 16px: todos usam .texto-de-campo.
 describe('textareas no celular', () => {
-  it('todo <textarea> do código usa text-base e sm:text-sm', () => {
+  it('todo <textarea> do código usa texto-de-campo', () => {
     const arquivos = execSync("grep -rl '<textarea' src --include='*.jsx'", { encoding: 'utf8' })
       .split('\n').filter((a) => a && !/\.test\.jsx$/.test(a))
     expect(arquivos.length).toBeGreaterThan(0)
@@ -49,9 +48,8 @@ describe('textareas no celular', () => {
       for (const tag of tags) {
         const trecho = usaConstante && /className=\{CAMPO_TEXTO\}/.test(tag)
           ? readFileSync(arquivo, 'utf8').match(/const CAMPO_TEXTO = '([^']*)'/)[1] : tag
-        expect(trecho, arquivo).toMatch(/(^|\s)text-base\b/)
-        expect(trecho, arquivo).toMatch(/sm:text-sm/)
-        expect(trecho, arquivo).not.toMatch(/(^|\s)text-sm\b/)
+        expect(trecho, arquivo).toMatch(/(^|\s)texto-de-campo\b/)
+        expect(trecho, arquivo).not.toMatch(/(^|\s)(sm:)?text-(base|sm|corpo)\b/)
       }
     }
   })

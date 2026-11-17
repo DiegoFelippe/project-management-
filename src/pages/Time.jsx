@@ -97,7 +97,7 @@ export default function Time() {
   }
 
   const voltar = (
-    <Link to="/times" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+    <Link to="/times" className="mb-3 inline-flex items-center gap-1 text-corpo font-medium text-muted-foreground hover:text-foreground">
       <ArrowLeft className="size-4" /> Times
     </Link>
   )
@@ -107,7 +107,7 @@ export default function Time() {
     return (
       <>
         {voltar}
-        <p className="text-sm text-muted-foreground">Esse time não existe ou você não tem acesso a ele.</p>
+        <p className="text-corpo text-muted-foreground">Esse time não existe ou você não tem acesso a ele.</p>
       </>
     )
   }
@@ -152,7 +152,7 @@ export default function Time() {
           }
           return resposta
         }} />
-      {time.descricao && <p className="-mt-3 mb-5 text-sm text-muted-foreground">{time.descricao}</p>}
+      {time.descricao && <p className="-mt-3 mb-5 text-corpo text-muted-foreground">{time.descricao}</p>}
 
       {gerencio && (
         <div className="mb-5 card flex flex-wrap items-end gap-2 p-3">
@@ -175,10 +175,10 @@ export default function Time() {
             <Linha key={p.id}>
               <Celula>
                 <div className="flex items-center gap-3">
-                  <Avatar pessoa={p} className="size-8 text-[11px]" />
+                  <Avatar pessoa={p} className="size-8 text-legenda" />
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{p.nome}</p>
-                    <p className="truncate text-xs text-muted-foreground">{p.email}</p>
+                    <p className="truncate text-rotulo text-muted-foreground">{p.email}</p>
                   </div>
                 </div>
               </Celula>

@@ -39,7 +39,7 @@ function abaDoCliente(c, central) {
 function Campo({ rotulo, children }) {
   return (
     <div>
-      <dt className="text-xs text-muted-foreground">{rotulo}</dt>
+      <dt className="text-rotulo text-muted-foreground">{rotulo}</dt>
       <dd className="font-medium">{children || '—'}</dd>
     </div>
   )
@@ -48,7 +48,7 @@ function Campo({ rotulo, children }) {
 function Bloco({ titulo, children }) {
   return (
     <section aria-label={titulo} className="card p-4">
-      <h2 className="mb-3 text-sm font-semibold text-muted-foreground">{titulo}</h2>
+      <h2 className="mb-3 text-subtitulo font-semibold text-muted-foreground">{titulo}</h2>
       <dl className="grid gap-3">{children}</dl>
     </section>
   )
@@ -95,13 +95,13 @@ export default function Cliente() {
   }, [central, perfil.id, versao])
 
   const voltar = (
-    <Link to="/clientes" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+    <Link to="/clientes" className="mb-3 inline-flex items-center gap-1 text-corpo text-muted-foreground hover:text-foreground">
       <ArrowLeft className="size-4" /> Clientes
     </Link>
   )
-  if (erro) return <>{voltar}<p role="alert" className="text-sm text-destructive">{erro}</p></>
+  if (erro) return <>{voltar}<p role="alert" className="text-corpo text-destructive">{erro}</p></>
   if (cliente === undefined) return <>{voltar}<GraficoCarregando texto="Carregando o cliente…" className="py-12" /></>
-  if (cliente === null) return <>{voltar}<p className="text-sm text-muted-foreground">Cliente não encontrado.</p></>
+  if (cliente === null) return <>{voltar}<p className="text-corpo text-muted-foreground">Cliente não encontrado.</p></>
 
   const souConsultor = !central && cliente.consultor_id === perfil.id && !cliente.arquivado
   const aba = abaDoCliente(cliente, central)
@@ -123,7 +123,7 @@ export default function Cliente() {
               {cliente.consultor && (
                 <>
                   {cliente.consultor.nome}
-                  {cliente.consultor.ativo === false && <span className="ml-1 text-xs">(desativado)</span>}
+                  {cliente.consultor.ativo === false && <span className="ml-1 text-rotulo">(desativado)</span>}
                 </>
               )}
             </Campo>
@@ -167,7 +167,7 @@ export default function Cliente() {
         {(central || (gestao && !cliente.arquivado)) && <AcoesDaLinha {...acoes} aba={aba} noCabecalho />}
       </Cabecalho>
       {aberto && souConsultor && aberto.cliente_id !== cliente.id && (
-        <p id={idDoAviso} className="mb-3 text-sm text-muted-foreground">
+        <p id={idDoAviso} className="mb-3 text-corpo text-muted-foreground">
           Você está com check-in aberto em {aberto.cliente?.nome ?? 'outro cliente'} desde {HORA.format(new Date(aberto.inicio))}.
           {' '}Faça o check-out para começar outro.
         </p>
