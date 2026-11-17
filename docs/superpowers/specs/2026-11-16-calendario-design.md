@@ -1,183 +1,142 @@
 # Calendário integrado ao Google — design
 
-Data: 2026-11-16. Projeto: `~/Documents/consultoria`. Branch: `feat/clientes` (PR #2).
-Constrói-se depois do padrão Hub (usa `JanelaFormulario`, campos de data/hora, `AbasSegmentadas`).
+Data: 2026-11-16 (revisto à noite). Projeto: `~/Documents/consultoria`. Branch: `feat/clientes` (PR #2).
+Constrói-se com o padrão Hub e a tipografia nova (janela de formulário, campos de data/hora, abas segmentadas).
 
 ## Pedido do Diego
 
 - "Crie um menu de calendário, ele vai ser integrado com Google e vai gerar a possibilidade de gerar Meet, a gravação
   e a transcrição. Quero que seja criada uma nova pasta dentro do cliente com a documentação tanto da call quanto do
   arquivo de transcrição."
-- "Quero um calendário que será compartilhado de forma idêntica ao calendário do Mac."
 - "A agenda vai ter uma visão privada para cada consultor e uma visão para a gestora ver a agenda de todos os
-  consultores." (16/11)
-- Delegou as decisões ("pode fazer tudo o que depende de mim"). As escolhas abaixo marcadas **(minha)** são minhas.
+  consultores."
+- "O Calendário também pode levar o do Hub" e "o layout igual" (16/11, noite). Levantamento do Hub em
+  `.superpowers/sdd/avulsos/calendario-hub-inventario.md` (cópia local, fora do git).
+- Escolheu **"Conta de cada consultor"** para o Google (16/11, noite), como no Hub.
+- O pedido anterior de "compartilhado de forma idêntica ao calendário do Mac" sai com essa escolha: cada consultor vê
+  os eventos na própria agenda do Google (é organizador ou convidado); a gestora vê todos no app.
+- Decisões delegadas marcadas **(minha)**.
 
 ## Objetivo, e o que seria falhar
 
 - Objetivo: marcar reunião com o cliente pelo app, com Meet gravado e transcrito, e no fim ter, dentro do cliente,
-  uma pasta da reunião com a transcrição e a documentação da call. Cada pessoa vê a agenda que lhe cabe, no app e
-  no Calendário do Mac/iPhone/Google, igual nos dois lugares.
-- Falhar seria: consultor vendo a agenda de colega; uma consultoria vendo eventos de outra; evento mudado no Mac e o
-  app mostrando outro horário; reunião acabar e a transcrição não chegar sem ninguém saber por quê.
+  uma pasta da reunião com a transcrição e a documentação da call. Cada pessoa vê a agenda que lhe cabe.
+- Falhar seria: consultor vendo a agenda de colega; uma consultoria vendo eventos de outra; reunião acabar e a
+  transcrição não chegar sem ninguém saber por quê; token do Google de alguém legível por outra pessoa.
 
 ## Quem vê o quê (a hierarquia de sempre)
 
-| Papel | No app (menu Calendário) | No Google / Calendário do Mac |
-|---|---|---|
-| Consultor (`pessoa`) | só a própria agenda (visão privada) | só o calendário dele, com permissão de editar |
-| Gestor e administrador da consultoria | a agenda de todos os consultores da consultoria, um calendário por pessoa, liga/desliga | todos os calendários da consultoria, com permissão de editar |
-| Central e dono | todas as consultorias (escolhe a consultoria, depois as pessoas) | — (vê pelo app) |
+| Papel | No menu Calendário |
+|---|---|
+| Consultor (`pessoa`) | os próprios eventos e os eventos em que foi convidado (visão privada) |
+| Gestor e administrador da consultoria | os eventos de todos os consultores da consultoria (filtro por consultor) |
+| Central e dono | de todas as consultorias (filtro por consultoria e por consultor) |
 
-Recorte no banco (RLS), como clientes e check-ins. Uma consultoria nunca vê eventos de outra.
+Recorte no banco (RLS). Uma consultoria nunca vê eventos de outra. Na visão de mais de uma pessoa, a cor do chip é a do
+consultor **(minha)**; na visão privada, a cor escolhida no evento.
 
-## Conta Google: a da consultoria **(minha)**
+## Tela — igual à do Hub
 
-Muda o que estava no rascunho ("cada consultor conecta a própria conta"). Motivo: o app já tem **Integrações →
-Google** por consultoria (um token guardado no Vault, escopos `calendar` e `drive.file`), e com uma conta só:
+- Item no trilho: **Calendário** (ícone `CalendarDays`, animação nova `folhear`), para todos os papéis.
+- Barra de filtros (padrão `BarraDeFiltros`): "Mostrar" (Reuniões com cliente, Compromissos, Ausências, Feriados —
+  caixas com bolinha de cor), consultor (`Seletor` com busca no banco; só para gestor/admin/central), consultoria (só
+  central/dono), cliente (busca), "Limpar filtros"; à direita **"Conectar Google"** (ou selo "Google conectado ✕") e o
+  principal **"Novo evento"**.
+- 4 indicadores: Reuniões na semana, Reuniões no mês, Aguardando transcrição, Pastas criadas no mês **(minha;
+  equivalentes aos do Hub para este app)**.
+- Alternador `AbasSegmentadas` Mês / Semana / Agenda; "Hoje", ‹ › e o rótulo do período.
+  - Mês: grade de 7 colunas começando no domingo (como o Hub), até 3 chips por dia e "+N", hoje em destaque, clique
+    seleciona o dia e duplo clique cria evento.
+  - Semana: 7 cartões, um por dia, com os chips e o horário ao lado e "+ adicionar" (lista por dia, como no Hub).
+  - Agenda: próximos 60 dias com eventos, bloco por dia.
+  - No celular a visão inicial é a Agenda (o mês do Hub não cabe) **(minha)**.
+- Abaixo: "Detalhe do dia" (dia clicado) e "Próximos 7 dias", lado a lado no computador.
+- Chip: cor do evento, texto branco, ícone de vídeo quando tem Meet, ícone de pasta quando a pasta já existe.
 
-- a consultoria é organizadora das reuniões, então gravação e transcrição ficam num lugar só (o Drive da conta da
-  consultoria) e o app lê tudo com um token;
-- só a conta da consultoria precisa de Google Workspace com gravação do Meet;
-- consultor não precisa conectar nada; recebe o convite e vê os calendários compartilhados.
+## Janela de evento — igual à do Hub, com o que é deste app
 
-**Compartilhar "igual ao Mac"**: na conta da consultoria o app cria **um calendário por consultor** ("IXC · Simone") e
-compartilha (ACL do Google Calendar) com o e-mail do consultor (editar) e com os gestores e administradores da
-consultoria (editar). Quem adiciona a conta Google no Calendário do Mac vê exatamente esses calendários, com as
-cores, liga/desliga, como qualquer calendário compartilhado. Quando o papel muda, a pessoa sai ou muda de
-consultoria, o app ajusta o compartilhamento na próxima sincronização (regra "quando alguém sai").
+`JanelaFormulario` larga (2 colunas):
+- **Principal:** Título; Cliente (opcional; `Seletor` com busca entre os clientes que a pessoa vê; cliente arquivado
+  não aceita evento novo); Descrição; Quando (atalhos Hoje/Amanhã/Semana que vem, data, "Das" e "Até", "Termina em
+  outro dia"; sem horário = dia inteiro); Participantes (consultores da consultoria por busca, com a resposta de cada
+  um); **Convidados de fora** — confirmado pelo Diego (16/11): qualquer e-mail (o contato do cliente aparece como
+  sugestão; até 20; e-mail validado), que recebe o convite do Google com o link do Meet e entra na reunião como
+  convidado do evento; a lista mostra quem é de fora e, quando o Google informa, a resposta; para
+  gestor/admin/central, **Consultor** (de quem é a agenda; padrão: quem cria).
+- **Lateral:** prévia de como aparece; cor (as 8 do Hub, em tons do tema); **Google Meet** (chave; padrão ligada quando
+  há cliente) e **Gravar e transcrever** (chave; padrão ligada com Meet; aviso "a gravação começa quando o organizador
+  entra; precisa de Google Workspace com gravação"); aviso do Google ("vai para o seu Google Agenda, com os
+  convidados" ou "Conectar Google").
+- Rodapé: Apagar (confirmação diz o que acontece no Google e que a pasta da reunião fica), Cancelar, "Criar evento" /
+  "Salvar alterações".
+- Quem não pode editar abre só leitura ("Só quem organiza e a gestão da consultoria editam"). Detalhe mostra "Entrar
+  no Meet", "Abrir gravação", "Pasta da reunião" e a situação da reunião.
 
-Escopos a mais no "Conectar com Google": `meetings.space.settings` (liga gravação e transcrição automáticas numa
-reunião criada pelo Calendar; não sensível) e `meetings.space.readonly` (lê gravação e transcrição da reunião). Quem
-já conectou precisa reconectar uma vez (a tela de Integrações avisa "faltam permissões").
+CRUD do evento: criar, consultar, editar e apagar — consultor nos próprios; gestor/admin nos da consultoria; central e
+dono em todos. Participante convidado só responde (Confirmar/Recusar).
 
-Avisos para o Diego (README): conta da consultoria com Workspace que grave Meet; o app do Google como "Interno" no
-Workspace da IXCSoft dispensa a verificação do Google; consultorias com outro domínio (ex.: STI) precisam do app
-"Externo" verificado pelo Google por causa dos escopos do Meet. Consultor sem conta Google no e-mail do login recebe
-o convite por e-mail, mas não vê o calendário compartilhado.
+## Google — conta de cada consultor
 
-## O menu Calendário (como o Calendário do Mac)
-
-- Item novo no trilho: **Calendário** (ícone `CalendarDays`), para todos os papéis; animação nova `folhear`
-  (a regra do trilho pede uma que ainda não esteja em uso).
-- Tela em largura total:
-  - **Topo:** "Hoje", ‹ ›, título do período ("Novembro de 2026"), `AbasSegmentadas` Dia · Semana · Mês · Ano,
-    botão principal "Novo evento" no fim.
-  - **Lateral esquerda:** mini mês (clicar num dia vai até ele); "Minha agenda"; para gestor/admin, "Consultores"
-    com um calendário por pessoa (bolinha na cor da pessoa + caixa de marcar, busca quando passar de 15 pessoas,
-    "Mostrar todos/nenhum"); para a central, um `Seletor` de consultoria acima. Escolhas guardadas no navegador
-    (conveniência).
-  - **Dia/Semana:** grade de horas (fuso de São Paulo), linha da hora atual, eventos posicionados pela hora, eventos
-    do dia inteiro no alto, sobrepostos lado a lado. **Mês:** grade com até 3 eventos por dia e "+N".
-    **Ano:** 12 mini meses com marca nos dias com evento.
-  - Cor de cada evento = cor do consultor (paleta fixa de 8 cores, a próxima livre na consultoria). No Google a cor
-    é de quem vê: no Mac cada pessoa escolhe a cor de cada calendário compartilhado.
-  - Clicar num horário vazio abre "Novo evento" já com dia e hora; clicar num evento abre o detalhe (popover no
-    computador, janela no celular) com Editar, Apagar, "Entrar no Meet", "Abrir gravação" e "Pasta da reunião".
-  - Celular (390 px): lateral vira gaveta; visão padrão Dia.
-- Sem Google conectado na consultoria: o calendário funciona só no app (sem Meet e sem compartilhar), com aviso
-  "Conecte o Google em Integrações para criar Meet e ver no Calendário do Mac".
-- Arrastar evento para mudar de horário: fora desta entrega.
-
-## Evento — o que guarda e quem faz o quê (CRUD)
-
-Campos: consultor (dono da agenda), cliente (opcional; só clientes que a pessoa vê), título, descrição, início e fim
-ou dia inteiro, local, "Criar Meet" (padrão ligado quando há cliente), "Gravar e transcrever" (padrão ligado com Meet),
-convidados (e-mail do contato do cliente sugerido; outros e-mails livres, até 20).
-
-| Operação | Consultor | Gestor/admin | Central/dono |
-|---|---|---|---|
-| Criar | na própria agenda | na de qualquer consultor da consultoria | na de qualquer consultor |
-| Consultar (lista no calendário e detalhe) | os seus | os da consultoria | todos |
-| Editar | os seus | os da consultoria | todos |
-| Apagar | os seus | os da consultoria | todos |
-
-- Apagar pede confirmação e diz o que acontece: o evento sai do app e do Google, os convidados recebem o
-  cancelamento; a pasta da reunião (se já existir) **fica** no cliente. Não há "desativar" para evento.
-- Mudar o consultor de um evento move o evento para o calendário do novo consultor no Google.
-- Cliente arquivado: eventos futuros dele continuam (aviso no detalhe); não aceita evento novo.
-- Gravação depende da organizadora (conta da consultoria) ou de alguém da organização entrar; o app avisa isso no
-  formulário.
-
-## Sincronização com o Google
-
-- **App → Google, na hora:** criar, editar, apagar e mudar de consultor passam pela Edge Function `agenda`, que grava
-  no Google primeiro e depois no banco (se o Google recusar, nada muda e a tela mostra o motivo). Com Meet: o evento
-  é criado com Meet pelo Calendar; em seguida o app liga gravação e transcrição automáticas no espaço do Meet
-  (`spaces.patch`, `artifactConfig`).
-- **Google → app, a cada 5 minutos** (pg_cron chamando a Edge Function `agenda-sincronizar`; botão "Sincronizar agora"
-  na tela): por calendário de consultor, leitura incremental (`syncToken`) — evento movido, renomeado, apagado ou
-  criado direto no Google/Mac aparece igual no app. Conflito: vale a última mudança do Google; o vínculo com o
-  cliente é do app.
-- **Compartilhamentos:** a mesma rotina cria o calendário de consultor novo e ajusta as permissões quando alguém
-  entra, muda de papel, sai ou muda de consultoria.
-- Uma chamada por calendário por rodada (nada de uma por evento); falhas ficam registradas por calendário e
-  aparecem para gestor/admin ("Não foi possível sincronizar a agenda da Simone: ...").
+- **Cada pessoa conecta o próprio Google** no Calendário ("Conectar Google"); a conexão é da pessoa, não da
+  consultoria. Escopos: `openid`, `email`, `calendar.events`, `meetings.space.settings` (ligar gravação e transcrição
+  automáticas numa reunião criada pelo Calendar), `meetings.space.readonly` (ler gravação e transcrição depois).
+  Tokens só no Vault (nunca legíveis pelo navegador — corrige o ponto fraco do Hub); troca e renovação numa Edge
+  Function (`google-pessoa`, nos moldes de `integracoes-google`). Desconectar apaga o token e revoga no Google.
+- **Do app para o Google (mão única, como no Hub):** criar/editar/apagar evento grava no Google do **organizador**
+  (o consultor dono da agenda), com convidados (`sendUpdates=all`), fuso de São Paulo, Meet (`conferenceData`) e, com
+  "Gravar e transcrever", a configuração automática no espaço do Meet. Se o Google recusar, nada muda no app e a tela
+  diz o motivo. O que é criado direto no Google não entra no app.
+- Gestor/admin/central criando evento na agenda de um consultor: o evento é criado com o Google **daquele consultor**
+  (se ele conectou); se não conectou, o evento fica só no app, sem Meet, com aviso.
+- Convidado que aceitou e tem Google conectado: o app não duplica — ele já recebe o convite do Google.
+- Avisos para o Diego (README): app do Google como "Interno" no Workspace da IXCSoft dispensa verificação para quem é
+  do mesmo domínio; consultores de outro domínio (ex.: STI) exigem o app "Externo" verificado pelo Google (escopos do
+  Meet); gravação e transcrição exigem Google Workspace com esses recursos na conta de cada consultor.
 
 ## Depois da reunião: a pasta no cliente
 
-- A mesma rotina procura reuniões com Meet já terminadas e ainda sem pasta. Para cada uma: lê a gravação e a
-  transcrição do Meet. Quando a transcrição fica pronta (pode levar alguns minutos ou horas), cria a pasta.
-- **Pasta da reunião** em Arquivos do cliente: "Reunião 20/11/2026 14:00 — <título>", com:
-  - `transcricao.txt` — a fala de cada pessoa com a hora ("14:03 Simone: ...");
-  - `documentacao.md` — a documentação da call: título, data e hora, duração, consultor, participantes, link da
-    gravação e do evento, e, quando a consultoria tem IA conectada em Integrações, resumo, decisões e próximos passos
-    gerados pela IA a partir da transcrição. Sem IA, vai a ficha sem o resumo.
-  - A gravação em vídeo fica no Drive da consultoria (arquivo grande); a pasta guarda o link ("Abrir gravação").
-- Situação da reunião no detalhe do evento: "Aguardando a transcrição", "Pasta criada", "Sem gravação/transcrição"
-  (ninguém gravou, ou passou 48 horas sem ficar pronta), "Erro" com o motivo e "Tentar de novo".
-- A reunião também aparece na aba **Agenda** do cliente e no **Histórico** ("Reunião realizada", "Pasta criada").
+- Uma rotina (pg_cron a cada 10 minutos chamando a Edge Function `reunioes-depois`, com segredo no Vault; e botão
+  "Buscar agora" no detalhe) procura reuniões com Meet já terminadas e ainda sem pasta e, **com o token do
+  organizador**, lê a gravação e a transcrição da conferência. Quando a transcrição fica pronta (minutos a horas),
+  cria a pasta.
+- **Pasta da reunião** nos Arquivos do cliente: "Reunião 20/11/2026 14:00 — <título>", com `transcricao.txt` (fala de
+  cada pessoa com a hora) e `documentacao.md` (título, data/hora, duração, organizador, participantes, links da
+  gravação e do evento e, com a IA da consultoria conectada em Integrações, resumo, decisões e próximos passos).
+  A gravação em vídeo fica no Drive do organizador; a pasta guarda o link.
+- Situação da reunião: "Aguardando a transcrição", "Pasta criada", "Sem gravação/transcrição" (ninguém gravou ou 48 h
+  sem ficar pronta), "Erro" com o motivo e "Tentar de novo"; organizador sem Google conectado → "Conecte o Google para
+  buscar a gravação".
+- A reunião aparece na aba Agenda do cliente e no Histórico ("Reunião realizada", "Pasta criada").
 
 ## Pastas nos Arquivos do cliente
 
-A aba Arquivos ganha pastas (servem para as reuniões e para quem quiser organizar):
-
-| Operação | Quem |
-|---|---|
-| Criar pasta | quem pode enviar arquivo no cliente |
-| Consultar (lista de pastas e arquivos dentro, paginada) | quem vê o cliente |
-| Renomear | quem criou, gestor/admin da consultoria, central |
-| Apagar | os mesmos; a confirmação diz quantos arquivos vão junto; pasta de reunião avisa que a documentação some |
-
-Enviar arquivo de dentro de uma pasta já o coloca nela; mover arquivo entre pastas: fora desta entrega.
+Como no design anterior: criar pasta (quem envia arquivo no cliente), consultar (quem vê o cliente; paginado),
+renomear e apagar (quem criou, gestor/admin da consultoria, central; a confirmação diz quantos arquivos vão junto).
+Enviar arquivo de dentro da pasta já o coloca nela; mover arquivo entre pastas fica fora.
 
 ## Banco (resumo)
 
-- `agenda_calendarios`: um por consultor com Google (consultoria, pessoa, id do calendário no Google, cor,
-  `sync_token`, última sincronização e erro). Só a Edge Function grava.
-- `agenda_eventos`: consultoria, consultor, cliente, título, descrição, início, fim, dia inteiro, local, convidados,
-  Meet (link, código), gravar, ids do Google, origem (app/google), situação da reunião, link da gravação, pasta,
-  criado por, datas. RLS: consultor vê os seus; gestor/admin, os da consultoria; central, todos. Índices em
-  (consultoria, início), (consultor, início), cliente e situação da reunião.
-- `cliente_pastas` (cliente, nome, reunião opcional, criada por) e `cliente_arquivos.pasta_id`.
-- Eventos e calendários só mudam pelas Edge Functions (`agenda`, `agenda-sincronizar`), porque mexem no Google;
-  pastas seguem o caminho dos arquivos de hoje (navegador com RLS; a pasta da reunião é criada pela rotina). Leitura
-  pelo navegador com RLS e paginação no banco (só o intervalo visível do calendário e só os calendários marcados).
+- `google_pessoas`: uma por perfil (e-mail da conta, escopos, quando conectou, segredo no Vault). O navegador lê só
+  "conectado ou não"; só Edge Function grava e lê o segredo.
+- `agenda_eventos`: consultoria, consultor (dono da agenda), cliente, título, descrição, data/hora de início e fim,
+  dia inteiro, cor, Meet (link, código), gravar, id do evento no Google, situação da reunião, link da gravação, pasta,
+  criado por, datas. Índices em (consultoria, início), (consultor, início), cliente e situação.
+- `agenda_participantes`: evento, pessoa (perfil) ou e-mail de fora, resposta (pendente/confirmou/recusou).
+- `cliente_pastas` e `cliente_arquivos.pasta_id`.
+- RLS pelo papel (tabela "Quem vê o quê") + participantes veem o evento em que foram convidados; escrita de eventos
+  pelas Edge Functions (mexem no Google), leitura pelo navegador só do intervalo visível.
 
 ## Testes
 
-- pgTAP: quem vê e quem grava cada tabela (consultor, gestor, outra consultoria, central).
-- Integração: Edge Functions com o Google trocado por um servidor falso local (mesmas respostas do Google), incluindo
-  sincronização incremental, compartilhamento e a criação da pasta com transcrição e documentação.
-- Tela: visões Dia/Semana/Mês/Ano, lateral por papel, criar/editar/apagar evento, pastas nos Arquivos.
-- Conferência no navegador sem Google real; o teste ponta a ponta com Google real fica para quando o Diego
-  configurar o app do Google (README explica).
-
-## Detalhes que decidi **(minha)**
-
-- Fuso: tudo em `America/Sao_Paulo` (eventos no Google com esse fuso), como o resto do app.
-- O consultor entra como convidado das reuniões (recebe o aviso e entra no Meet sem pedir para entrar); no Mac a
-  reunião pode aparecer no calendário dele e no compartilhado — é o preço de entrar direto no Meet.
-- Consultoria que conecta o Google depois: a primeira sincronização cria os calendários e manda para o Google os
-  eventos futuros que já estavam no app (com Meet se estava marcado). Desconectar o Google: o app para de
-  sincronizar, os eventos ficam no app e os calendários ficam na conta Google.
-- Evento recorrente criado no Google aparece no app (cada ocorrência), só para ver; editar no Google.
-- Evento criado direto no Google/Mac entra no app sem cliente; dá para ligar a um cliente editando no app.
-- Testes sem Google de verdade: o núcleo da agenda (`supabase/functions/_shared/agenda/`) não importa nada do Deno e
-  recebe o banco e o "Google" por parâmetro; os testes de integração usam o banco local e um Google falso em memória.
-- A rotina de 5 minutos: `pg_cron` + `pg_net` chamando `agenda-sincronizar` com um segredo próprio guardado no Vault.
+- pgTAP: quem vê e quem grava cada tabela (consultor, colega, gestor, outra consultoria, central); token nunca
+  legível pelo navegador.
+- Integração: Edge Functions com o Google trocado por um Google falso (núcleo em `supabase/functions/_shared/agenda/`
+  sem imports do Deno, recebendo banco e Google por parâmetro), incluindo criar com Meet, apagar, e a pasta com
+  transcrição e documentação.
+- Tela: as 3 visões, filtros por papel, janela de evento (criar/editar/só leitura/apagar), pastas nos Arquivos.
+- Conferência no navegador sem Google real; ponta a ponta com Google real quando o Diego configurar o app do Google.
 
 ## Fora desta entrega
 
-Arrastar eventos, eventos recorrentes criados pelo app (os que vierem do Google aparecem), salas e recursos,
-disponibilidade/"marcar horário" pelo cliente, mover arquivo entre pastas, painéis da central.
+Trazer para o app o que é criado direto no Google, arrastar eventos, recorrência, salas, disponibilidade para o
+cliente marcar, mover arquivo entre pastas.
