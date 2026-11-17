@@ -11,7 +11,7 @@ export default function RankingDeOcupacao({ recorte, passado, ranking, mes }) {
     <section aria-label={titulo} className="card p-4">
       <div className="mb-3 flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-muted-foreground">{titulo}</h2>
-        <Link to={porConsultoria ? ocupacaoDoMes : '/usuarios'} className="text-xs font-medium text-primary hover:underline">{porConsultoria ? 'Ver todas' : 'Ver todos'}</Link>
+        <Link to={porConsultoria ? ocupacaoDoMes : `/usuarios?mes=${mes}`} className="text-xs font-medium text-primary hover:underline">{porConsultoria ? 'Ver todas' : 'Ver todos'}</Link>
       </div>
       {ranking.length === 0 ? (
         <p className="py-4 text-sm text-muted-foreground">{porConsultoria ? 'Nenhuma consultoria com capacidade neste mês.' : 'Nenhum consultor com capacidade neste mês.'}</p>

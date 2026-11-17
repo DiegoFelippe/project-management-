@@ -27,9 +27,9 @@ describe('RankingDeOcupacao', () => {
     expect(screen.queryByRole('link', { name: 'Beta' })).not.toBeInTheDocument()
     expect(screen.getByText('Beta')).toBeInTheDocument()
   })
-  it('administrador: vai a Usuários', () => {
-    ver({ recorte: 'consultoria', ranking: RANK })
-    expect(screen.getByRole('link', { name: 'Ver todos' })).toHaveAttribute('href', '/usuarios')
+  it('administrador: vai a Usuários no mês mostrado', () => {
+    ver({ recorte: 'consultoria', ranking: RANK, mes: '2026-09-01' })
+    expect(screen.getByRole('link', { name: 'Ver todos' })).toHaveAttribute('href', '/usuarios?mes=2026-09-01')
   })
   it('vazio: frase curta', () => {
     ver({ recorte: 'consultoria', ranking: [] })
