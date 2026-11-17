@@ -7,6 +7,7 @@ import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/com
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -318,7 +319,24 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
       {formulario && (
         <FormularioDePasta pasta={formulario === 'nova' ? null : formulario} aoFechar={() => setFormulario(null)} aoSalvar={salvarPasta} />
       )}
-      {apagandoPasta && (
+      {apagandoPasta?.bloqueados > 0 && (
+        <Dialog open onOpenChange={(abrir) => !abrir && setApagandoPasta(null)}>
+          <DialogContent role="alertdialog" className="sm:max-w-md">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-janela">Não dá para apagar a pasta {apagandoPasta.nome}</DialogTitle>
+              <DialogDescription className="text-rotulo">
+                {apagandoPasta.bloqueados === 1
+                  ? 'Esta pasta tem 1 arquivo que só quem enviou (ou a gestão/central) pode apagar. Apague-o antes ou peça a quem pode.'
+                  : `Esta pasta tem ${apagandoPasta.bloqueados} arquivos que só quem enviou (ou a gestão/central) pode apagar. Apague-os antes ou peça a quem pode.`}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setApagandoPasta(null)}>Entendi</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      {apagandoPasta && !(apagandoPasta.bloqueados > 0) && (
         <ConfirmarAcao aberto aoFechar={() => setApagandoPasta(null)} titulo={`Apagar a pasta ${apagandoPasta.nome}?`}
           descricao={apagandoPasta.arquivos > 0 ? quantosArquivos(apagandoPasta.arquivos) : 'A pasta está vazia; só ela some.'}
           rotuloConfirmar="Apagar pasta" aoConfirmar={() => apagarAPasta(apagandoPasta)} />

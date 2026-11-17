@@ -335,4 +335,22 @@ describe('pastas do cliente', () => {
     expect(tirados).toHaveLength(1)
     expect(await existe(linhas[0].caminho)).toBe(false)
   })
+
+  it('pasta com arquivo da central: a consultora não a apaga (e o banco conta); a central apaga', async () => {
+    const { data: pasta } = await comoPessoa.from('cliente_pastas').insert({ cliente_id: clienteId, nome: 'Da central' }).select('id').single()
+    const arquivo = new Blob(['c'], { type: 'text/plain' })
+    const caminho = caminhoDoArquivo(clienteId, 'Contrato.txt')
+    expect((await comoCentral.storage.from(BUCKET).upload(caminho, arquivo, { contentType: 'text/plain' })).error).toBeNull()
+    const { error } = await comoCentral.from('cliente_arquivos')
+      .insert({ cliente_id: clienteId, caminho, nome: 'Contrato.txt', tamanho: arquivo.size, tipo: 'text/plain', pasta_id: pasta.id })
+    expect(error).toBeNull()
+
+    const { data: contagem } = await comoPessoa.rpc('arquivos_que_nao_apago', { p_pastas: [pasta.id] })
+    expect(contagem).toEqual([{ pasta_id: pasta.id, quantos: 1 }])
+    expect((await comoPessoa.from('cliente_pastas').delete().eq('id', pasta.id).select('id')).data).toEqual([])
+    expect((await admin.from('cliente_arquivos').select('id').eq('pasta_id', pasta.id)).data).toHaveLength(1)
+
+    expect((await comoCentral.from('cliente_pastas').delete().eq('id', pasta.id).select('id')).data).toHaveLength(1)
+    expect((await comoCentral.storage.from(BUCKET).remove([caminho])).data).toHaveLength(1)
+  })
 })

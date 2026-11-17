@@ -66,7 +66,7 @@ export async function enviarArquivo(clienteId, arquivo, { pastaId = null } = {})
 }
 
 // Pastas do cliente, da mais nova para a mais antiga, 15 por página: { itens, total }. Cada item traz
-// `arquivos` (quantos arquivos tem).
+// `arquivos` (quantos arquivos tem) e `bloqueados` (quantos deles a pessoa não apagaria).
 export async function listarPastas(clienteId, { pagina = 1 } = {}) {
   const consulta = supabase
     .from('cliente_pastas')
@@ -75,7 +75,20 @@ export async function listarPastas(clienteId, { pagina = 1 } = {}) {
     .order('criada_em', { ascending: false })
     .order('id')
   const resultado = await buscarPagina(consulta, pagina)
-  return { ...resultado, itens: resultado.itens.map(({ arquivos, ...pasta }) => ({ ...pasta, arquivos: arquivos?.[0]?.count ?? 0 })) }
+  // Quantos arquivos de cada pasta a pessoa não apagaria (o banco recusa apagar a pasta com eles): uma chamada
+  // para a página inteira.
+  const bloqueados = new Map()
+  if (resultado.itens.length) {
+    const { data, error } = await supabase.rpc('arquivos_que_nao_apago', { p_pastas: resultado.itens.map((p) => p.id) })
+    if (error) throw error
+    for (const linha of data ?? []) bloqueados.set(linha.pasta_id, Number(linha.quantos))
+  }
+  return {
+    ...resultado,
+    itens: resultado.itens.map(({ arquivos, ...pasta }) => ({
+      ...pasta, arquivos: arquivos?.[0]?.count ?? 0, bloqueados: bloqueados.get(pasta.id) ?? 0,
+    })),
+  }
 }
 
 export async function criarPasta(clienteId, nome) {

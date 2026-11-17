@@ -2,7 +2,7 @@
 -- arquivos dentro dela. Segue as regras de cliente_arquivos. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(39);
+select plan(55);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -130,7 +130,7 @@ select testes.cliente('c_central', null, null);
 select testes.cliente('c_b', 'B', 'admin_b');
 insert into testes.fx
 select n, gen_random_uuid()
-from unnest(array['p_central', 'p_pessoa', 'p_gestor', 'p_b', 'p_vazia', 'f_dentro', 'f_dentro2', 'f_fora']) n;
+from unnest(array['p_central', 'p_pessoa', 'p_gestor', 'p_b', 'p_vazia', 'f_dentro', 'f_dentro2', 'f_fora', 'p_c', 'p_col', 'p_sis', 'p_sis_b', 'f_cen', 'f_col', 'f_sis']) n;
 
 -- ── Tabela ───────────────────────────────────────────────────────────────────
 
@@ -266,6 +266,61 @@ select testes.como('central');
 with d as (delete from public.cliente_pastas where id = testes.id('p_central') returning 1)
 select is(count(*), 1::bigint, 'a central apaga qualquer pasta') from d;
 select is(testes.linhas(array['f_dentro2']), 0::bigint, 'e os arquivos dela saem junto');
+reset role;
+
+-- ── Apagar a pasta só vale se a pessoa apagaria todos os arquivos dela ───────
+
+select testes.como('pessoa_a');
+select lives_ok($$select testes.pasta('p_c', 'c1', 'Com arquivo da central')$$, 'a consultora cria outra pasta');
+select lives_ok($$select testes.pasta('p_col', 'c1', 'Com arquivo do gestor')$$, 'e mais uma');
+reset role;
+
+select testes.como('central');
+select lives_ok($$select testes.enviar_na_pasta('f_cen', 'c1', 'p_c')$$, 'a central envia arquivo para dentro da pasta da consultora');
+reset role;
+
+select testes.como('gestor_a');
+select lives_ok($$select testes.enviar_na_pasta('f_col', 'c1', 'p_col')$$, 'o gestor envia arquivo para dentro da pasta da consultora');
+reset role;
+
+select testes.como('pessoa_a');
+with d as (delete from public.cliente_pastas where id = testes.id('p_c') returning 1)
+select is(count(*), 0::bigint, 'quem criou a pasta não a apaga se há arquivo da central dentro') from d;
+with d as (delete from public.cliente_pastas where id = testes.id('p_col') returning 1)
+select is(count(*), 0::bigint, 'nem se há arquivo de um colega dentro') from d;
+select is((select quantos from public.arquivos_que_nao_apago(array[testes.id('p_c'), testes.id('p_col')])
+    where pasta_id = testes.id('p_c')), 1::bigint, 'o banco conta os arquivos que ela não apagaria');
+select is(testes.linhas(array['f_cen', 'f_col']), 2::bigint, 'e os arquivos continuam lá');
+reset role;
+
+select testes.como('gestor_a');
+with d as (delete from public.cliente_pastas where id = testes.id('p_c') returning 1)
+select is(count(*), 0::bigint, 'o gestor não apaga a pasta com arquivo da central') from d;
+with d as (delete from public.cliente_pastas where id = testes.id('p_col') returning 1)
+select is(count(*), 1::bigint, 'o gestor apaga a pasta quando apagaria todos os arquivos dela') from d;
+reset role;
+
+select testes.como('central');
+with d as (delete from public.cliente_pastas where id = testes.id('p_c') returning 1)
+select is(count(*), 1::bigint, 'a central apaga a pasta com qualquer arquivo') from d;
+reset role;
+
+-- ── Rotina do sistema (service role, sem usuário logado) ─────────────────────
+
+grant usage on schema testes to service_role;
+grant select on testes.fx to service_role;
+set local role service_role;
+select set_config('request.jwt.claims', '', true);
+select lives_ok($$insert into public.cliente_pastas (id, cliente_id, nome, evento_id)
+    values (testes.id('p_sis'), testes.id('c1'), 'Reunião 20/11', gen_random_uuid())$$,
+  'o sistema cria pasta com evento_id');
+select ok((select evento_id is not null and consultoria_id = testes.id('A') from public.cliente_pastas
+    where id = testes.id('p_sis')), 'o evento_id fica e a consultoria é a do cliente');
+select lives_ok($$select testes.enviar_na_pasta('f_sis', 'c1', 'p_sis')$$, 'o sistema grava arquivo em pasta do mesmo cliente');
+select lives_ok($$insert into public.cliente_pastas (id, cliente_id, nome) values (testes.id('p_sis_b'), testes.id('c_b'), 'Outra')$$,
+  'o sistema cria pasta em outro cliente');
+select throws_ok($$select testes.enviar_na_pasta('f_fora', 'c1', 'p_sis_b')$$, '42501', null,
+  'mas arquivo não entra em pasta de outro cliente, nem para o sistema');
 reset role;
 
 select * from finish();

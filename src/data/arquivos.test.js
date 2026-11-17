@@ -6,7 +6,7 @@ import {
   renomearPasta,
 } from './arquivos'
 
-vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), storage: { from: vi.fn() } } }))
+vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn(), storage: { from: vi.fn() } } }))
 
 let banco, bucket
 beforeEach(() => {
@@ -19,6 +19,7 @@ beforeEach(() => {
     list: vi.fn().mockResolvedValue({ data: [], error: null }),
   }
   vi.mocked(supabase.storage.from).mockReturnValue(bucket)
+  vi.mocked(supabase.rpc).mockResolvedValue({ data: [], error: null })
 })
 
 const chamada = (metodo) => banco.chamadas.find(([m]) => m === metodo)
@@ -81,6 +82,15 @@ describe('pastas', () => {
     expect(banco.chamou('range', 15, 29)).toBe(true)
     expect(total).toBe(17)
     expect(itens.map((p) => p.arquivos)).toEqual([3, 0])
+  })
+
+  it('listarPastas traz, numa só chamada, quantos arquivos de cada pasta a pessoa não apagaria', async () => {
+    banco.resposta = { data: [{ id: 'd1', arquivos: [{ count: 3 }] }, { id: 'd2', arquivos: [] }], error: null, count: 2 }
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: [{ pasta_id: 'd1', quantos: '2' }], error: null })
+    const { itens } = await listarPastas('c1')
+    expect(supabase.rpc).toHaveBeenCalledTimes(1)
+    expect(supabase.rpc).toHaveBeenCalledWith('arquivos_que_nao_apago', { p_pastas: ['d1', 'd2'] })
+    expect(itens.map((p) => p.bloqueados)).toEqual([2, 0])
   })
 
   it('criarPasta grava o nome sem espaços nas pontas; nome repetido tem mensagem própria', async () => {

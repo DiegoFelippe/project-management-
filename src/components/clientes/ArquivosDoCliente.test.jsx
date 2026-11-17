@@ -351,6 +351,18 @@ describe('ArquivosDoCliente', () => {
       await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancelar' }))
     })
 
+    it('pasta com arquivos que a pessoa não apagaria: sem confirmação, só a mensagem', async () => {
+      vi.mocked(listarPastas).mockResolvedValue({ itens: [{ ...PASTAS[0], bloqueados: 2 }], total: 1 })
+      tela()
+      await userEvent.click(within(await linhaDaPasta('Contratos')).getByRole('button', { name: 'Apagar' }))
+      const janela = screen.getByRole('alertdialog')
+      expect(within(janela).getByText('Esta pasta tem 2 arquivos que só quem enviou (ou a gestão/central) pode apagar. Apague-os antes ou peça a quem pode.')).toBeInTheDocument()
+      expect(within(janela).queryByRole('button', { name: 'Apagar pasta' })).not.toBeInTheDocument()
+      expect(apagarPasta).not.toHaveBeenCalled()
+      await userEvent.click(within(janela).getByRole('button', { name: 'Entendi' }))
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    })
+
     it('Apagar pasta com 1 arquivo fala no singular', async () => {
       vi.mocked(listarPastas).mockResolvedValue({ itens: [{ ...PASTAS[0], arquivos: 1 }], total: 1 })
       tela()
