@@ -1,4 +1,6 @@
 // Mensagens que a pessoa vê quando algo dá errado (sempre em português).
+import { REGRA_DA_SENHA } from './senha'
+
 const PADRAO = 'Algo deu errado. Tente de novo.'
 const GOOGLE_DESLIGADO = 'O login com Google ainda não foi configurado.'
 const MUITAS_TENTATIVAS = 'Muitas tentativas seguidas. Espere um pouco e tente de novo.'
@@ -13,7 +15,7 @@ const ERROS_AUTH = {
   provider_disabled: GOOGLE_DESLIGADO,
   over_request_rate_limit: MUITAS_TENTATIVAS,
   over_email_send_rate_limit: MUITAS_TENTATIVAS,
-  weak_password: 'A senha precisa ter pelo menos 8 caracteres.',
+  weak_password: `A senha precisa ter ${REGRA_DA_SENHA}.`,
   same_password: 'A senha nova precisa ser diferente da atual.',
   user_banned: 'Seu acesso está desativado. Fale com o administrador da sua consultoria.',
   // Verificação em duas etapas (app autenticador)
@@ -21,7 +23,7 @@ const ERROS_AUTH = {
   mfa_challenge_expired: 'O código venceu. Digite o código novo que aparece no app.',
   insufficient_aal: 'Digite antes o código do seu app autenticador.',
   mfa_factor_not_found: 'Não achamos o app autenticador desta conta. Peça a quem administra o seu acesso para zerar a verificação.',
-  too_many_enrolled_mfa_factors: 'Muitos cadastros do app começados. Peça a quem administra o seu acesso para zerar a verificação.',
+  too_many_enrolled_mfa_factors: 'Há muitos cadastros do app começados e não confirmados. Tente de novo: os começados são apagados antes de começar outro.',
   mfa_totp_enroll_not_enabled: 'A verificação em duas etapas não está ligada no Supabase (veja o README).',
   mfa_totp_verify_not_enabled: 'A verificação em duas etapas não está ligada no Supabase (veja o README).',
 }

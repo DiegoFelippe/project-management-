@@ -6,6 +6,7 @@ import TelaDeAcesso, { Aviso, Titulo } from '@/components/auth/TelaDeAcesso'
 import Carregando from '@/components/comum/Carregando'
 import FormularioCodigo from '@/components/verificacao/FormularioCodigo'
 import { codigoDeErroNoEndereco } from '@/lib/endereco'
+import { REGRA_DA_SENHA } from '@/lib/senha'
 
 // Destino do link do convite e do "esqueci minha senha": o link já traz a sessão.
 // Quem tem o app autenticador ativo digita o código antes: o Auth só troca a senha de uma sessão aal2.
@@ -40,7 +41,7 @@ export default function DefinirSenha() {
 
   return (
     <TelaDeAcesso>
-      <Titulo titulo="Crie sua senha">Escolha uma senha com pelo menos 8 caracteres.</Titulo>
+      <Titulo titulo="Crie sua senha">Escolha uma senha com {REGRA_DA_SENHA}.</Titulo>
       <FormularioNovaSenha />
     </TelaDeAcesso>
   )

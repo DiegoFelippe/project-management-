@@ -37,9 +37,17 @@ describe('CampoSenha', () => {
     render(<><Label htmlFor="s">Senha</Label><Controlado /></>)
     await userEvent.type(screen.getByLabelText('Senha'), 'abc')
     const regras = screen.getByRole('list', { name: 'Regras da senha' })
-    expect(regras).toHaveTextContent('Pelo menos 10 caracteres')
+    expect(regras).toHaveTextContent('De 10 a 72 caracteres')
     expect(screen.getByText('Uma letra minúscula').closest('li')).toHaveAttribute('data-ok', 'true')
     expect(screen.getByText('Uma letra maiúscula').closest('li')).toHaveAttribute('data-ok', 'false')
+  })
+
+  it('senha acima do limite do Auth (72 bytes) não é Forte: a regra de tamanho aparece sem o check e o Validar explica', async () => {
+    render(<><Label htmlFor="s">Senha</Label><Controlado inicial={'Abcdefghi1!' + 'a'.repeat(62)} /></>)
+    expect(screen.queryByText('Forte')).not.toBeInTheDocument()
+    expect(screen.getByText('De 10 a 72 caracteres').closest('li')).toHaveAttribute('data-ok', 'false')
+    await userEvent.click(screen.getByRole('button', { name: 'Validar' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Senha longa demais: passa de 72 caracteres')
   })
 
   it('Validar diz em uma frase o que falta, ou que está forte', async () => {

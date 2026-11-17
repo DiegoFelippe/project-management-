@@ -30,13 +30,15 @@ export async function confirmarCodigo(codigo) {
   }
 }
 
-// Começa o cadastro do app: tira cadastros começados e não confirmados (o Auth não aceita dois com o mesmo nome)
-// e devolve o QR code (imagem SVG pronta para <img>), a chave para digitar no app e o endereço otpauth://.
+// Começa o cadastro do app: tira cadastros começados e não confirmados (o Auth não aceita dois com o mesmo nome e
+// limita quantos ficam abertos) e devolve o QR code (imagem SVG pronta para <img>), a chave para digitar no app e o
+// endereço otpauth://. Se um começado não sair, para aqui com o motivo (a pessoa tenta de novo).
 export async function iniciarCadastro() {
   try {
     const { all = [] } = await listar()
     for (const fator of all.filter((f) => f.factor_type === 'totp' && f.status !== 'verified')) {
-      await supabase.auth.mfa.unenroll({ factorId: fator.id })
+      const { error: erroTirar } = await supabase.auth.mfa.unenroll({ factorId: fator.id })
+      if (erroTirar) return comErro(erroTirar)
     }
     const { data, error } = await supabase.auth.mfa.enroll({
       factorType: 'totp',

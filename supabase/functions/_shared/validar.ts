@@ -61,9 +61,12 @@ export function senhaForte(valor: string): boolean {
     [...valor].some((c) => SIMBOLOS.includes(c))
 }
 
+// Limite do Auth (bcrypt): 72 bytes em UTF-8 (letra com acento ocupa dois), como TAMANHO_MAXIMO em src/lib/senha.js.
+const passaDoLimite = (valor: string) => new TextEncoder().encode(valor).length > 72
+
 export function validarSenha(forma: Forma, valor: unknown, campo = 'senha'): string | undefined {
   if (forma !== 'senha') return undefined
-  if (typeof valor !== 'string' || valor.length > 72 || !senhaForte(valor)) invalido(campo)
+  if (typeof valor !== 'string' || passaDoLimite(valor) || !senhaForte(valor)) invalido(campo)
   return valor
 }
 

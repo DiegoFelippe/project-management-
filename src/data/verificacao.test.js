@@ -48,6 +48,12 @@ describe('iniciarCadastro', () => {
     expect(mfa.enroll).toHaveBeenCalledWith(expect.objectContaining({ factorType: 'totp', issuer: 'IXC Consult' }))
     expect(r).toEqual({ erro: null, fatorId: 'f2', qr: 'data:image/svg+xml;utf-8,<svg/>', segredo: 'ABC123', uri: 'otpauth://totp/x' })
   })
+  it('se não der para tirar um cadastro começado, avisa e não começa outro', async () => {
+    mfa.unenroll.mockResolvedValue({ data: null, error: { code: 'unexpected_failure', status: 500 } })
+    expect(await iniciarCadastro()).toEqual({ erro: 'Algo deu errado. Tente de novo.' })
+    expect(mfa.enroll).not.toHaveBeenCalled()
+  })
+
   it('falha do Auth vira mensagem', async () => {
     mfa.enroll.mockResolvedValue({ data: null, error: { code: 'too_many_enrolled_mfa_factors' } })
     expect((await iniciarCadastro()).erro).toBeTruthy()

@@ -36,6 +36,26 @@ describe('avaliarSenha', () => {
   })
 })
 
+describe('limite de 72 bytes do Auth (bcrypt)', () => {
+  const base = 'Abcdefghi1!'
+
+  it('até 72 bytes é Forte; 73 não; letra com acento conta como duas', () => {
+    expect(avaliarSenha(base + 'a'.repeat(61)).forte).toBe(true)
+    const longa = avaliarSenha(base + 'a'.repeat(62))
+    expect(longa.forte).toBe(false)
+    expect(longa.longaDemais).toBe(true)
+    expect(longa.regras.find((x) => x.id === 'tamanho').ok).toBe(false)
+    expect(avaliarSenha(base + 'a'.repeat(60) + 'é')).toMatchObject({ forte: false, longaDemais: true })
+  })
+
+  it('a regra de tamanho mostra o limite e o Validar explica o que fazer', () => {
+    expect(avaliarSenha('').regras.find((x) => x.id === 'tamanho').texto).toBe('De 10 a 72 caracteres')
+    expect(mensagemDeValidacao(base + 'a'.repeat(62))).toBe(
+      'Senha longa demais: passa de 72 caracteres (letra com acento conta como duas).',
+    )
+  })
+})
+
 describe('vetores compartilhados com o servidor', () => {
   it.each(vetores.map((v) => [JSON.stringify(v.senha), v]))('%s', (_n, v) => {
     expect(avaliarSenha(v.senha).forte).toBe(v.forte)

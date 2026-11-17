@@ -10,7 +10,9 @@ describe('traduzirErroAuth', () => {
     expect(traduzirErroAuth({ code: 'email_not_confirmed' })).toBe(
       'Esse acesso ainda não foi ativado. Abra o convite que chegou no seu e-mail.',
     )
-    expect(traduzirErroAuth({ code: 'weak_password' })).toBe('A senha precisa ter pelo menos 8 caracteres.')
+    expect(traduzirErroAuth({ code: 'weak_password' })).toBe(
+      'A senha precisa ter pelo menos 10 caracteres, uma letra maiúscula, uma letra minúscula, um número e um símbolo.',
+    )
     expect(traduzirErroAuth({ code: 'same_password' })).toBe('A senha nova precisa ser diferente da atual.')
     expect(traduzirErroAuth({ code: 'over_email_send_rate_limit' })).toBe(
       'Muitas tentativas seguidas. Espere um pouco e tente de novo.',
@@ -22,6 +24,12 @@ describe('traduzirErroAuth', () => {
       traduzirErroAuth({ code: 'validation_failed', message: 'Unsupported provider: provider is not enabled' }),
     ).toBe('O login com Google ainda não foi configurado.')
     expect(traduzirErroAuth({ code: 'provider_disabled' })).toBe('O login com Google ainda não foi configurado.')
+  })
+
+  it('muitos cadastros do app começados: diz o que a própria pessoa pode fazer (o Zerar só existe com o app ativo)', () => {
+    const texto = traduzirErroAuth({ code: 'too_many_enrolled_mfa_factors' })
+    expect(texto).toBe('Há muitos cadastros do app começados e não confirmados. Tente de novo: os começados são apagados antes de começar outro.')
+    expect(texto).not.toMatch(/zerar/i)
   })
 
   it('qualquer outro erro vira a mensagem padrão', () => {

@@ -62,5 +62,17 @@
  {
   "senha": "Abcdefghij!",
   "forte": false
+ },
+ {
+  "senha": "Abcdefghi1!aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "forte": true
+ },
+ {
+  "senha": "Abcdefghi1!aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "forte": false
+ },
+ {
+  "senha": "Abcdefghi1!aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaé",
+  "forte": false
  }
 ]

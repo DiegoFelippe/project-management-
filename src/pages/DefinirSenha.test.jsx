@@ -34,8 +34,9 @@ describe('DefinirSenha', () => {
     expect(screen.getByRole('link', { name: 'Esqueci minha senha' })).toHaveAttribute('href', '/esqueci-senha')
   })
 
-  it('com sessão mostra os campos da senha', () => {
+  it('com sessão mostra os campos da senha e a regra atual (mínimo 10, com todos os tipos)', () => {
     montar({ sessao: { user: { id: 'u1' } } })
+    expect(screen.getByText('Escolha uma senha com pelo menos 10 caracteres, uma letra maiúscula, uma letra minúscula, um número e um símbolo.')).toBeInTheDocument()
     expect(screen.getByLabelText('Senha nova')).toBeInTheDocument()
     expect(screen.getByLabelText('Repita a senha')).toBeInTheDocument()
   })
