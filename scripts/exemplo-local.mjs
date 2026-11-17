@@ -172,15 +172,17 @@ async function eventosDeExemplo() {
 
 // Quadro (Kanban) de exemplo: só na Consultoria Exemplo, no cliente "Provedor Teste Navegador" (ou o primeiro dela).
 // Reaproveita o quadro se já existir (criado ao abrir a aba) e pula o cartão cujo título já está no quadro:
-// rodar de novo não muda nada. Com a chave secreta (sem pessoa logada) o banco aceita a escrita direta; posição,
-// autor e datas vêm dos gatilhos.
+// rodar de novo não muda nada. Com a chave secreta (sem pessoa logada) o banco aceita a escrita direta; posição e
+// datas vêm dos gatilhos. Autor e responsável são o consultor do cliente (o banco só aceita como responsável quem
+// enxerga o cliente; a Ana só é consultora do "Provedor Teste Navegador"); sem consultor ativo, a Ana escreve e os
+// cartões ficam sem responsável.
 async function quadroDeExemplo() {
   const { data: ana } = await admin.from('perfis').select('id').eq('email', 'ana@exemplo.test').maybeSingle()
   if (!ana) return
-  let { data: cliente } = await admin.from('clientes').select('id, nome')
+  let { data: cliente } = await admin.from('clientes').select('id, nome, consultor_id')
     .eq('consultoria_id', consultoria.id).eq('nome', 'Provedor Teste Navegador').maybeSingle()
   if (!cliente) {
-    const { data } = await admin.from('clientes').select('id, nome').eq('consultoria_id', consultoria.id)
+    const { data } = await admin.from('clientes').select('id, nome, consultor_id').eq('consultoria_id', consultoria.id)
       .order('criado_em').limit(1)
     cliente = data?.[0]
   }
@@ -188,6 +190,10 @@ async function quadroDeExemplo() {
     console.log('Quadro de exemplo: a consultoria de exemplo não tem cliente; nada criado.')
     return
   }
+  const { data: consultor } = cliente.consultor_id
+    ? await admin.from('perfis').select('id').eq('id', cliente.consultor_id).eq('ativo', true).maybeSingle()
+    : { data: null }
+  const autor = consultor?.id ?? ana.id
 
   let { data: quadro } = await admin.from('quadros').select('id').eq('cliente_id', cliente.id).eq('consultoria_id', consultoria.id).maybeSingle()
   if (!quadro) {
@@ -227,17 +233,19 @@ async function quadroDeExemplo() {
     const { data: ja } = await admin.from('cartoes').select('id').eq('quadro_id', quadro.id).eq('titulo', c.titulo).limit(1)
     if (ja?.length) continue
     const { data: novo, error } = await admin.from('cartoes')
-      .insert({ quadro_id: quadro.id, coluna_id: coluna(c.col), titulo: c.titulo, prioridade: c.prioridade, prazo: c.prazo, criado_por: ana.id })
+      .insert({ quadro_id: quadro.id, coluna_id: coluna(c.col), titulo: c.titulo, prioridade: c.prioridade, prazo: c.prazo, criado_por: autor })
       .select('id').single()
     if (error) parar(`Não consegui criar o cartão "${c.titulo}": ${error.message}`)
-    const { error: erroResp } = await admin.from('cartao_responsaveis').insert({ cartao_id: novo.id, perfil_id: ana.id })
-    if (erroResp) parar(`Não consegui pôr a Ana no cartão "${c.titulo}": ${erroResp.message}`)
+    if (consultor) {
+      const { error: erroResp } = await admin.from('cartao_responsaveis').insert({ cartao_id: novo.id, perfil_id: consultor.id })
+      if (erroResp) parar(`Não consegui pôr o consultor do cliente no cartão "${c.titulo}": ${erroResp.message}`)
+    }
     for (const [texto, feito] of c.checklist ?? []) {
       const { error: erroItem } = await admin.from('cartao_checklist').insert({ cartao_id: novo.id, texto, feito })
       if (erroItem) parar(`Não consegui criar o item "${texto}": ${erroItem.message}`)
     }
     if (c.comentario) {
-      const { error: erroCom } = await admin.from('cartao_comentarios').insert({ cartao_id: novo.id, autor_id: ana.id, texto: c.comentario })
+      const { error: erroCom } = await admin.from('cartao_comentarios').insert({ cartao_id: novo.id, autor_id: autor, texto: c.comentario })
       if (erroCom) parar(`Não consegui criar o comentário: ${erroCom.message}`)
     }
     criados += 1

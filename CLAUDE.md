@@ -81,6 +81,19 @@ Design: `docs/superpowers/specs/2026-11-17-kanban-do-cliente-design.md` (inclui 
   enquanto o canal não está de pé.
 - **Os 4 números do topo seguem só o filtro Responsável** (busca, prioridade e prazo não mudam os números).
 - **Cartões lidos por coluna** (50 por vez, "ver mais"): nunca o quadro inteiro de uma vez.
+- **Apagar cartão só por `apagar_cartao`** (sem delete direto na tabela): a função devolve os caminhos no Storage e o
+  app os tira do balde em seguida. **Cartões seguram o cliente:** apagar cliente com cartões dá 23503 e a tela manda
+  arquivar. **Cliente arquivado:** o quadro fica só para ler (o banco recusa a escrita).
+- **Comentários:** cada um edita e apaga os seus; a gestão apaga qualquer um. **Anexos:** apaga quem enviou ou a
+  gestão; anexo não se edita.
+- **Quem vê é uma regra só, `private.vejo_quadro`:** RLS, funções, Storage (balde `quadros`) e o canal do Realtime
+  (tópico `quadro:<id>`) passam por ela. Mudou quem vê, muda lá.
+- **Travas em ordem de id:** quem trava duas colunas (`mover_cartao`, `apagar_coluna`) trava as duas numa consulta só,
+  ordenadas por id, antes dos cartões (senão duas pessoas trocando cartões entre as mesmas colunas travam, 40P01).
+- **O quadro ocupa o resto da tela e cada coluna rola sozinha** (decisão do Diego, 17/11, como no Trello): a lista de
+  cartões da coluna é a área de rolagem do arrasto, então arrastar perto da borda rola a coluna e o cartão cai onde
+  aparece. Durante o arrasto a página e a faixa das colunas não rolam (`src/components/quadro/travaDaRolagem.js`); a
+  altura vem de `alturaDoQuadro.js` (tela baixa ou celular: a faixa fica com a altura da tela e a página rola até ela).
 
 ## Padrão Hub: botões, formulários, campos e abas
 
