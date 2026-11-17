@@ -471,6 +471,28 @@ describe('rolagem (decisão do Diego: o quadro ocupa o resto da tela e cada colu
     expect(moverColuna).toHaveBeenCalledWith({ colunaId: 'col1', antesId: 'col2', depoisId: 'col3' })
     expect(fireEvent.wheel(pagina, { deltaY: 120 })).toBe(true)
   })
+
+  it('o quadro some no meio do arrasto (perdeu o acesso): a trava da rolagem sai junto e a página volta a rolar', async () => {
+    simularGeometria()
+    renderizarTela(<main><QuadroDoCliente cliente={CLIENTE} perfil={consultor} /></main>, { perfil: consultor })
+    await pronto()
+    const pagina = rolavel(document.querySelector('main'))
+    // Uma releitura do quadro sai antes do arrasto e só volta no meio dele, dizendo que a pessoa não vê mais o quadro.
+    let responder
+    vi.mocked(quadroDoCliente).mockImplementationOnce(() => new Promise((r) => { responder = r }))
+    await act(async () => avisar({ eventos: [{ motivo: 'reconectou' }], tudo: true, acesso: false, tabelas: [], colunas: [], cartoes: [] }))
+    await waitFor(() => expect(responder).toBeTypeOf('function'))
+    await levantarComMouse(screen.getByRole('button', { name: 'Cartão Mapear boletos' }))
+    expect(fireEvent.wheel(pagina, { deltaY: 120 })).toBe(false)
+
+    await act(async () => responder(null))
+    expect(await screen.findByText('Você não tem mais acesso a este quadro.')).toBeInTheDocument()
+    // A biblioteca desmonta sem chamar onDragEnd: sem soltar a trava aqui, a roda da página inteira ficaria presa.
+    expect(fireEvent.wheel(pagina, { deltaY: 120 })).toBe(true)
+    pagina.scrollTop = 300
+    fireEvent.scroll(pagina)
+    expect(pagina.scrollTop).toBe(300)
+  })
 })
 
 describe('arrastar cartões', () => {

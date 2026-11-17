@@ -48,6 +48,11 @@ export default function QuadroDoCliente({ cliente, perfil }) {
     destravar.current = null
   }, [])
   useEffect(() => soltarRolagem, [soltarRolagem])
+  // O quadro sumiu no meio do arrasto (perdeu o acesso, releitura sem quadro): as colunas desmontam e a trava sai junto.
+  // A biblioteca também chama onDragEnd (cancelado) ao desmontar; isto não depende dela.
+  useEffect(() => {
+    if (!quadro || erro || semAcesso) soltarRolagem()
+  }, [quadro, erro, semAcesso, soltarRolagem])
 
   if (semAcesso) return <ListaVazia>Você não tem mais acesso a este quadro.</ListaVazia>
   if (erro) {
