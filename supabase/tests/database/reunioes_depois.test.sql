@@ -1,10 +1,11 @@
 -- Depois da reunião (só a Edge Function reunioes-depois e o pg_cron chamam): histórico com os tipos novos, uma rotina
--- por vez, uma busca por reunião (reservas), a pasta da reunião (uma por reunião, nome repetido com " (2)"), a troca
--- para "pasta_criada" com o histórico uma vez só, o segredo no Vault e o pg_cron a cada 10 minutos.
+-- por vez, uma busca por reunião (reservas, com o recorte por consultorias dos testes, o espaçamento das buscas e a
+-- janela de 48 h; reunião sem cliente fica fora), a pasta da reunião (uma por reunião, nome repetido com " (2)"), a
+-- troca para "pasta_criada" com o histórico uma vez só, o segredo no Vault e o pg_cron a cada 10 minutos.
 -- Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(45);
+select plan(56);
 
 create schema testes;
 create table testes.fx (nome text primary key, id uuid not null);
@@ -61,12 +62,34 @@ select testes.reuniao('sem_meet', interval '-1 hour', p_meet => false);
 select testes.reuniao('fechada', interval '-1 hour', p_reuniao => 'sem_artefatos');
 select testes.reuniao('sem_cliente', interval '-1 hour', p_cliente => false);
 select testes.reuniao('outra', interval '-3 hours');
+select testes.reuniao('velha', interval '-50 hours');
+select testes.reuniao('velha_aguardando', interval '-50 hours', p_reuniao => 'aguardando');
+
+-- Outra consultoria, com uma reunião terminada que espera.
+select testes.consultoria('B');
+select testes.perfil('bia', 'pessoa', 'B');
+insert into public.clientes (nome, horas_mes, consultoria_id, consultor_id)
+values ('Cliente kb', 10, testes.id('B'), testes.id('bia'));
+insert into testes.fx select 'kb', id from public.clientes where nome = 'Cliente kb' and consultoria_id = testes.id('B');
+with e as (
+  insert into public.agenda_eventos (consultoria_id, consultor_id, cliente_id, titulo, inicio, fim, com_meet, meet_codigo)
+  values (testes.id('B'), testes.id('bia'), testes.id('kb'), 'Reunião da B', now() - interval '2 hours',
+    now() - interval '1 hour', true, 'bbb-cccc-ddd')
+  returning id)
+insert into testes.fx select 'deB', id from e;
+
+-- Há reunião de verdade (fora deste teste) terminada, com Meet e cliente, esperando no banco local?
+create function testes.ha_reuniao_de_fora() returns boolean language sql stable as $$
+  select exists (select 1 from public.agenda_eventos e
+    where e.reuniao in ('agendada', 'aguardando') and e.meet_codigo is not null and e.cliente_id is not null
+      and e.fim <= now() and e.id not in (select id from testes.fx))
+$$;
 
 -- ── Quem chama ───────────────────────────────────────────────────────────────
 select ok(not exists (
   select 1 from unnest(array[
     'public.reunioes_comecar_rotina(int)', 'public.reunioes_terminar_rotina(uuid)',
-    'public.reunioes_reservar(uuid, uuid, int, int)', 'public.reunioes_liberar(uuid, uuid)',
+    'public.reunioes_reservar(uuid, uuid, int, int, uuid[])', 'public.reunioes_liberar(uuid, uuid, timestamptz)',
     'public.pasta_da_reuniao(uuid, text)', 'public.concluir_reuniao(uuid, uuid, text)',
     'public.segredo_da_rotina_das_reunioes()', 'private.chamar_reunioes_depois()']::regprocedure[]) f
   where has_function_privilege('authenticated', f, 'execute') or has_function_privilege('anon', f, 'execute')
@@ -74,7 +97,7 @@ select ok(not exists (
 select ok((
   select bool_and(has_function_privilege('service_role', f, 'execute')) from unnest(array[
     'public.reunioes_comecar_rotina(int)', 'public.reunioes_terminar_rotina(uuid)',
-    'public.reunioes_reservar(uuid, uuid, int, int)', 'public.reunioes_liberar(uuid, uuid)',
+    'public.reunioes_reservar(uuid, uuid, int, int, uuid[])', 'public.reunioes_liberar(uuid, uuid, timestamptz)',
     'public.pasta_da_reuniao(uuid, text)', 'public.concluir_reuniao(uuid, uuid, text)',
     'public.segredo_da_rotina_das_reunioes()']::regprocedure[]) f
 ), 'a Edge Function (service_role) chama');
@@ -108,34 +131,59 @@ update private.rotina_das_reunioes set rodando_ate = now() - interval '1 minute'
 select isnt(public.reunioes_comecar_rotina(9), null, 'a vez de uma rotina que parou no meio vence sozinha');
 
 -- ── Reservas ─────────────────────────────────────────────────────────────────
+-- Os donos: d1, d2... são rotinas (ou cliques em "Buscar agora") diferentes.
+create function testes.dono(p_n int) returns uuid language sql immutable as $$
+  select ('00000000-0000-0000-0000-0000000000' || lpad(p_n::text, 2, '0'))::uuid
+$$;
+create function testes.reservar(p_dono int) returns uuid[] language sql as $$
+  select public.reunioes_reservar(testes.dono(p_dono), null, 50, 5, array[testes.id('A')])
+$$;
 create table testes.lote (nome text primary key, ids uuid[]);
-insert into testes.lote values ('r1', public.reunioes_reservar('00000000-0000-0000-0000-0000000000d1', null, 50, 5));
+insert into testes.lote values ('r1', testes.reservar(1));
 select ok(testes.id('terminada') = any (ids) and testes.id('aguardando') = any (ids) and testes.id('outra') = any (ids)
-    and testes.id('sem_cliente') = any (ids),
-  'a rotina pega as reuniões terminadas com Meet que esperam (com ou sem cliente)')
+    and testes.id('velha_aguardando') = any (ids),
+  'a rotina pega as reuniões terminadas, com Meet e cliente, que esperam (a aguardando passa das 48 h)')
 from testes.lote where nome = 'r1';
 select ok(not (testes.id('futura') = any (ids)) and not (testes.id('sem_meet') = any (ids))
     and not (testes.id('fechada') = any (ids)),
   'e não pega a que não terminou, a sem Meet nem a que já fechou')
 from testes.lote where nome = 'r1';
-select ok(not (testes.id('terminada') = any (public.reunioes_reservar('00000000-0000-0000-0000-0000000000d2', null, 50, 5))),
-  'outra rotina ao mesmo tempo não pega as reservadas');
-select is(public.reunioes_reservar('00000000-0000-0000-0000-0000000000d2', testes.id('terminada')), '{}'::uuid[],
+select ok(not (testes.id('sem_cliente') = any (ids)), 'reunião sem cliente fica fora da rotina')
+from testes.lote where nome = 'r1';
+select ok(not (testes.id('velha') = any (ids)),
+  'agendada que terminou há mais de 48 h e a rotina nunca olhou fica fora (só "Buscar agora")')
+from testes.lote where nome = 'r1';
+select ok(not (testes.id('deB') = any (ids)), 'o recorte dos testes deixa de fora as outras consultorias')
+from testes.lote where nome = 'r1';
+select ok(testes.id('deB') = any (public.reunioes_reservar(testes.dono(9), null, 50, 5)),
+  'sem o recorte (o pg_cron), a rotina pega as reuniões de todas as consultorias');
+select ok(not (testes.id('terminada') = any (testes.reservar(2))), 'outra rotina ao mesmo tempo não pega as reservadas');
+select is(public.reunioes_reservar(testes.dono(2), testes.id('terminada')), '{}'::uuid[],
   '"Buscar agora" numa reunião que a rotina está buscando: não reserva');
-select public.reunioes_liberar(testes.id('terminada'), '00000000-0000-0000-0000-0000000000d2');
-select is(public.reunioes_reservar('00000000-0000-0000-0000-0000000000d2', testes.id('terminada')), '{}'::uuid[],
+select public.reunioes_liberar(testes.id('terminada'), testes.dono(2));
+select is(public.reunioes_reservar(testes.dono(2), testes.id('terminada')), '{}'::uuid[],
   'só quem reservou solta a reunião');
-select public.reunioes_liberar(testes.id('terminada'), '00000000-0000-0000-0000-0000000000d1');
-select ok(not (testes.id('terminada') = any (public.reunioes_reservar('00000000-0000-0000-0000-0000000000d3', null, 50, 5))),
-  'olhada há menos de 5 minutos, fica para a próxima rotina');
-select is(public.reunioes_reservar('00000000-0000-0000-0000-0000000000d3', testes.id('terminada')),
-  array[testes.id('terminada')], 'mas "Buscar agora" pega na hora');
-update private.reunioes_na_rotina set reservada_ate = now() - interval '1 minute', buscada_em = now() - interval '6 minutes'
-where evento_id = testes.id('aguardando');
-select ok(testes.id('aguardando') = any (public.reunioes_reservar('00000000-0000-0000-0000-0000000000d4', null, 50, 5)),
-  'a reserva de quem parou no meio vence sozinha');
+select public.reunioes_liberar(testes.id('terminada'), testes.dono(1));
+select ok(not (testes.id('terminada') = any (testes.reservar(3))),
+  'olhada agora, só volta na hora marcada (sem hora, daqui a 5 minutos)');
+select is(public.reunioes_reservar(testes.dono(3), testes.id('terminada')), array[testes.id('terminada')],
+  'mas "Buscar agora" pega na hora');
+select public.reunioes_liberar(testes.id('terminada'), testes.dono(3), now() - interval '1 minute');
+select ok(not (testes.id('terminada') = any (testes.reservar(3))), 'deu a hora, mas na mesma rotina não volta');
+select ok(testes.id('terminada') = any (testes.reservar(5)), 'na rotina seguinte, volta');
+select public.reunioes_liberar(testes.id('terminada'), testes.dono(5), now() + interval '1 hour');
+select is((select proxima_em from private.reunioes_na_rotina where evento_id = testes.id('terminada')),
+  now() + interval '1 hour', 'a hora de olhar de novo é a que a Edge Function mandou');
+select ok(not (testes.id('terminada') = any (testes.reservar(6))), 'e antes dela a rotina não pega');
+update private.reunioes_na_rotina set reservada_ate = now() - interval '1 minute' where evento_id = testes.id('aguardando');
+select ok(testes.id('aguardando') = any (testes.reservar(4)),
+  'a reserva de quem parou no meio (nunca soltou) vence sozinha e a reunião volta');
 select is((select dono from private.reunioes_na_rotina where evento_id = testes.id('aguardando')),
-  '00000000-0000-0000-0000-0000000000d4'::uuid, 'e passa para quem pegou agora');
+  testes.dono(4), 'e passa para quem pegou agora');
+update public.agenda_eventos set reuniao = 'sem_artefatos' where id = testes.id('velha_aguardando');
+select public.reunioes_liberar(testes.id('velha_aguardando'), testes.dono(1), now() - interval '1 minute');
+select is((select proxima_em from private.reunioes_na_rotina where evento_id = testes.id('velha_aguardando')), null,
+  'reunião que não espera mais sai da rotina');
 select throws_ok($$ select public.reunioes_reservar(null) $$, '22023', null, 'reserva sem dono é recusada');
 
 -- ── Pasta da reunião ─────────────────────────────────────────────────────────
@@ -202,21 +250,24 @@ select results_eq(
        (select decrypted_secret collate "default" from vault.decrypted_secrets where name = 'reunioes_depois_segredo'),
        'POST' $$,
   'pelo pg_net, no endereço do Vault e com o segredo no cabeçalho');
+-- Ficam esperando só a sem cliente e a agendada de mais de 48 h: a rotina não tem o que fazer com elas.
 update public.agenda_eventos set reuniao = 'sem_artefatos'
-where id in (testes.id('aguardando'), testes.id('outra'), testes.id('sem_cliente'));
+where id in (testes.id('aguardando'), testes.id('outra'), testes.id('deB'));
 select ok(
-  case when exists (select 1 from public.agenda_eventos e where e.reuniao in ('agendada', 'aguardando')
-                    and e.meet_codigo is not null and e.fim <= now())
+  case when testes.ha_reuniao_de_fora()
     then true  -- há reunião de verdade esperando no banco local: não dá para conferir o "não chama"
     else private.chamar_reunioes_depois() is null end,
-  'sem reunião esperando, nem chama');
+  'sem reunião que a rotina pegaria (a sem cliente e a agendada de mais de 48 h não contam), nem chama');
 
 -- ── Índices ──────────────────────────────────────────────────────────────────
 select ok((select indisunique from pg_index where indexrelid = 'public.cliente_pastas_uma_por_evento_idx'::regclass),
   'uma pasta por reunião, pelo índice único');
 select ok(to_regclass('public.cliente_pastas_evento_idx') is null, 'o índice comum de evento_id saiu (o único serve à FK)');
-select is((select pg_get_indexdef('public.agenda_eventos_reuniao_a_buscar_idx'::regclass) like '%(fim)%WHERE%'), true,
-  'a rotina acha as reuniões que esperam por índice');
+select is((select pg_get_indexdef('public.agenda_eventos_reuniao_nova_idx'::regclass) like '%(fim)%WHERE%cliente_id%'), true,
+  'a rotina acha as reuniões que ainda não olhou por índice');
+select is((select pg_get_indexdef('private.reunioes_na_rotina_proxima_idx'::regclass) like '%(proxima_em)%WHERE%'), true,
+  'e as que deram a hora de olhar de novo também');
+select ok(to_regclass('public.agenda_eventos_reuniao_a_buscar_idx') is null, 'o índice antigo da rotina saiu');
 
 select * from finish();
 rollback;

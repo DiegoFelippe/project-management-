@@ -2,13 +2,20 @@
 // (desenho: docs/superpowers/specs/2026-11-16-calendario-design.md, "Depois da reunião: a pasta no cliente"). O núcleo
 // fica em _shared/agenda/rotina.ts e _shared/agenda/reuniao.ts.
 // - Rotina (pg_cron a cada 10 minutos, pelo pg_net): cabeçalho x-rotina-segredo com o segredo do Vault
-//   (reunioes_depois_segredo) → { ocupada, processadas }. Segredo errado: 401.
+//   (reunioes_depois_segredo) → { ocupada, processadas }. Segredo errado: 401. O corpo pode trazer
+//   { consultorias: [id] } (só os testes: a rotina olha só essas consultorias); o pg_cron manda {} (todas).
 // - Pela tela (com o login de quem edita o evento):
 //   { acao: 'buscarAgora', id } e { acao: 'tentarDeNovo', id } → { reuniao: { reuniao, reuniao_erro, pasta_id,
 //   gravacao_url } }.
 // Erros: { codigo, erro } — erro já em português para a tela.
 import { iaDaConsultoria } from '../_shared/agenda/ia.ts'
-import { buscarAgora, rodarRotina, segredoDaRotinaConfere, tentarDeNovo } from '../_shared/agenda/rotina.ts'
+import {
+  buscarAgora,
+  recorteDaRotina,
+  rodarRotina,
+  segredoDaRotinaConfere,
+  tentarDeNovo,
+} from '../_shared/agenda/rotina.ts'
 import { criarGoogleDe } from '../_shared/agenda/tokens.ts'
 import { clienteAdmin, quemChama } from '../_shared/clientes.ts'
 import { appDoGoogle } from '../_shared/google-oauth.ts'
@@ -23,7 +30,8 @@ servir(async (req) => {
   const segredo = req.headers.get('x-rotina-segredo')
   if (segredo !== null) {
     if (!(await segredoDaRotinaConfere(admin, segredo))) throw new Falha(401, 'nao_autenticado')
-    return responder(200, await rodarRotina({ db: admin, googleDe, iaDa }))
+    const consultorias = recorteDaRotina((await lerJson(req)).consultorias)
+    return responder(200, await rodarRotina({ db: admin, googleDe, iaDa, consultorias }))
   }
 
   const quem = await quemChama(req, admin)

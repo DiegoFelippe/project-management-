@@ -86,7 +86,10 @@ export function tokensDaPessoa({ banco, perfilId, app, fetch: buscar, agora = Da
       }, buscar)
     } catch (erro) {
       if (erro instanceof RecusaDoGoogle && erro.erro === 'invalid_grant') return reconectar()
-      throw new ErroDoGoogle('recusado', 'Não foi possível falar com o Google. Tente de novo em alguns minutos.')
+      // Com o status do Google (5xx e 429 passam com o tempo; 400 de app errado, não) ou sem resposta (rede, tempo).
+      const recusa = erro instanceof RecusaDoGoogle
+      throw new ErroDoGoogle('recusado', 'Não foi possível falar com o Google. Tente de novo em alguns minutos.',
+        recusa ? erro.status : null, !recusa)
     }
     atual = {
       refresh_token: tokens.refresh_token ?? guardado.refresh_token,

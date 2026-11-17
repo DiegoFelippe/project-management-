@@ -3,13 +3,16 @@
 // Sem imports do Deno: recebe o banco (service_role), o Google do organizador (ou null) e a IA da consultoria (ou null);
 // os testes passam o banco local, o Google falso e uma IA falsa.
 //
-// fecharReuniao, para uma reunião com Meet que já terminou e ainda espera ("agendada" ou "aguardando"):
+// fecharReuniao, para uma reunião com Meet e com cliente que já terminou e ainda espera ("agendada" ou "aguardando"):
+// - sem cliente no evento: nada (não há onde criar a pasta; nem pergunta ao Google);
 // - organizador sem Google → "erro": "Conecte o Google para buscar a gravação";
-// - lê, com o token do organizador, a gravação e a transcrição da conferência; o Google recusa → "erro" com o motivo;
+// - lê, com o token do organizador, a gravação e a transcrição da conferência. O Google recusa: se tentar de novo
+//   resolve (fora do ar, limite de pedidos, resposta que não veio), fica "aguardando" com o motivo e a rotina tenta de
+//   novo; se não (reconectar, sem permissão, não achou), "erro" com o motivo;
 // - transcrição pronta → cria a pasta "Reunião dd/MM/yyyy HH:mm — <título>" no cliente, com transcricao.txt e
 //   documentacao.md (o resumo, as decisões e os próximos passos vêm da IA da consultoria, quando conectada; sem ela, ou
-//   se ela falhar, a documentação sai sem essa parte), e marca "pasta_criada" com o histórico do cliente;
-//   sem cliente no evento → "erro" pedindo o cliente (não há onde criar a pasta);
+//   se ela falhar, a documentação sai sem essa parte), e marca "pasta_criada" com o histórico do cliente; se guardar
+//   falha (banco, Storage), fica "aguardando" com o motivo e a próxima tentativa completa a mesma pasta;
 // - sem transcrição pronta → "aguardando"; 48 horas depois do fim → "sem_artefatos" (a rotina para de perguntar).
 // Cada passo pode ser repetido: a pasta é uma só por reunião (o banco garante), o arquivo que já está nela não é
 // gravado de novo e o histórico só entra junto com a troca para "pasta_criada".
@@ -20,11 +23,26 @@ import type { Banco } from './tokens.ts'
 export type BancoDaReuniao = Banco & { storage: { from: (bucket: string) => any } }
 
 export const SEM_GOOGLE = 'Conecte o Google para buscar a gravação'
-export const SEM_CLIENTE =
-  'Reunião sem cliente: a pasta não foi criada. Escolha o cliente no evento e clique em Tentar de novo.'
-export const FALHOU = 'Não foi possível criar a pasta da reunião agora. Clique em Tentar de novo.'
-export const ESPERA_MAXIMA_MS = 48 * 3_600_000
+export const GOOGLE_SEM_RESPOSTA = 'O Google não respondeu agora; tentamos de novo em seguida.'
+export const FALHOU = 'Não foi possível guardar a pasta da reunião agora; tentamos de novo em seguida.'
+const HORA_MS = 3_600_000
+export const ESPERA_MAXIMA_MS = 48 * HORA_MS
 export const ESPERANDO = ['agendada', 'aguardando']
+
+// Quando olhar de novo uma reunião que ainda espera: até 2 horas depois do fim, na rotina seguinte (daqui a 5 minutos;
+// a rotina roda a cada 10); depois, uma vez por hora, até a rotina fechar nas 48 horas.
+export function proximaBusca(fim: string, agora: number): Date {
+  const desdeOFim = agora - Date.parse(fim)
+  return new Date(agora + (desdeOFim < 2 * HORA_MS ? 5 * 60_000 : HORA_MS))
+}
+
+// Erro do Google que tentar de novo pode resolver: Google fora do ar (5xx), limite de pedidos (429, ou o 403 de limite,
+// que vira "recusado"), resposta que não veio. Reconectar, sem permissão, não achou e o app do Google sem configurar,
+// não.
+export function erroPassageiro(erro: ErroDoGoogle): boolean {
+  if (erro.codigo !== 'recusado') return false
+  return erro.semResposta || erro.status === 429 || erro.status === 403 || (erro.status ?? 0) >= 500
+}
 
 const MAXIMO_DO_NOME = 120
 const NOME_DA_TRANSCRICAO = 'transcricao.txt'
@@ -267,9 +285,26 @@ async function marcar(db: Banco, evento: Situacao & { id: string }, campos: Part
   return linha ? situacaoDe(linha) : situacaoAtual(db, evento)
 }
 
-// A reunião não pôde ser fechada por um erro do app (banco, Storage): "erro", e o "Tentar de novo" volta a buscar.
-export async function marcarFalha(db: Banco, evento: Situacao & { id: string }): Promise<Situacao> {
-  return marcar(db, evento, { reuniao: 'erro', reuniao_erro: FALHOU })
+// Fica para a próxima busca, com o motivo; 48 horas depois do fim, "sem_artefatos" (a rotina para).
+function aguardar(
+  db: Banco,
+  evento: Situacao & { id: string; fim: string },
+  motivo: string | null,
+  gravacao_url: string | null,
+  agora: () => number,
+): Promise<Situacao> {
+  const esgotou = agora() - Date.parse(evento.fim) >= ESPERA_MAXIMA_MS
+  return marcar(db, evento, { reuniao: esgotou ? 'sem_artefatos' : 'aguardando', reuniao_erro: motivo, gravacao_url })
+}
+
+// A reunião não pôde ser fechada por um erro do app (banco, Storage): fica aguardando, com o motivo, e a próxima busca
+// tenta de novo.
+export function marcarFalha(
+  db: Banco,
+  evento: Situacao & { id: string; fim: string },
+  agora: () => number = Date.now,
+): Promise<Situacao> {
+  return aguardar(db, evento, FALHOU, evento.gravacao_url ?? null, agora)
 }
 
 // Os arquivos na pasta da reunião (bucket "arquivos", caminho <cliente_id>/<uuid>-<nome>). O que já está na pasta (de
@@ -351,8 +386,8 @@ async function criarPasta(
   return situacaoAtual(db, evento)
 }
 
-// Fecha (ou avança) uma reunião; devolve a situação dela. Reunião que não espera mais, sem Meet ou que ainda não
-// terminou fica como está. Só um erro inesperado ao ler o Google sobe (quem chama marca a falha).
+// Fecha (ou avança) uma reunião; devolve a situação dela. Reunião que não espera mais, sem Meet, sem cliente ou que
+// ainda não terminou fica como está. Só um erro inesperado ao ler o Google sobe (quem chama marca a falha).
 export async function fecharReuniao(
   db: BancoDaReuniao,
   google: GoogleDaPessoa | null,
@@ -360,30 +395,27 @@ export async function fecharReuniao(
   evento: ReuniaoNoBanco,
   { agora = Date.now }: { agora?: () => number } = {},
 ): Promise<Situacao> {
-  if (!ESPERANDO.includes(evento.reuniao) || !evento.meet_codigo || Date.parse(evento.fim) > agora()) {
-    return situacaoDe(evento)
-  }
+  const espera = ESPERANDO.includes(evento.reuniao)
+  if (!espera || !evento.meet_codigo || !evento.cliente_id || Date.parse(evento.fim) > agora()) return situacaoDe(evento)
   if (!google) return marcar(db, evento, { reuniao: 'erro', reuniao_erro: SEM_GOOGLE })
 
   let artefatos: ArtefatosDaReuniao
   try {
     artefatos = await google.artefatosDaReuniao(evento.meet_codigo)
   } catch (erro) {
-    if (erro instanceof ErroDoGoogle) return marcar(db, evento, { reuniao: 'erro', reuniao_erro: erro.message })
-    throw erro
+    if (!(erro instanceof ErroDoGoogle)) throw erro
+    if (erroPassageiro(erro)) return aguardar(db, evento, GOOGLE_SEM_RESPOSTA, evento.gravacao_url, agora)
+    return marcar(db, evento, { reuniao: 'erro', reuniao_erro: erro.message })
   }
   const gravacao_url = artefatos.gravacaoUrl ?? evento.gravacao_url
 
   if (artefatos.transcricao === 'pronta') {
-    if (!evento.cliente_id) return marcar(db, evento, { reuniao: 'erro', reuniao_erro: SEM_CLIENTE, gravacao_url })
     try {
       return await criarPasta(db, google, ia, evento, artefatos)
     } catch (erro) {
-      console.error(`reunioes-depois: não foi possível criar a pasta da reunião ${evento.id}`, erro)
-      return marcar(db, evento, { reuniao: 'erro', reuniao_erro: FALHOU, gravacao_url })
+      console.error(`reunioes-depois: não foi possível guardar a pasta da reunião ${evento.id}`, erro)
+      return aguardar(db, evento, FALHOU, gravacao_url, agora)
     }
   }
-
-  const esgotou = agora() - Date.parse(evento.fim) >= ESPERA_MAXIMA_MS
-  return marcar(db, evento, { reuniao: esgotou ? 'sem_artefatos' : 'aguardando', reuniao_erro: null, gravacao_url })
+  return aguardar(db, evento, null, gravacao_url, agora)
 }

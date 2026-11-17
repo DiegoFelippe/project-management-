@@ -2,7 +2,15 @@
 // Roda no `npm test` (projeto unidade). Horários no fuso de São Paulo (UTC-3 em novembro de 2026).
 import { describe, expect, it } from 'vitest'
 import { lerResumo, cortarParaAIa } from './ia.ts'
-import { documentacaoDaReuniao, duracaoEmTexto, nomeDaPasta, transcricaoEmTexto } from './reuniao.ts'
+import { ErroDoGoogle } from './google.ts'
+import {
+  documentacaoDaReuniao,
+  duracaoEmTexto,
+  erroPassageiro,
+  nomeDaPasta,
+  proximaBusca,
+  transcricaoEmTexto,
+} from './reuniao.ts'
 
 const falas = [
   { hora: '2026-11-20T17:00:05Z', nome: 'Ana Souza', texto: 'Bom dia a todos.' },
@@ -197,5 +205,40 @@ describe('resposta da IA', () => {
     const longa = cortarParaAIa('a'.repeat(250_000))
     expect(longa.length).toBeLessThan(101_000)
     expect(longa.endsWith('[A transcrição foi cortada aqui: só o começo dela foi enviado.]')).toBe(true)
+  })
+})
+
+describe('quando olhar a reunião de novo (proximaBusca)', () => {
+  const agora = Date.parse('2026-11-20T20:00:00Z')
+  const fimHa = (minutos) => new Date(agora - minutos * 60_000).toISOString()
+
+  it('até 2 horas depois do fim, na rotina seguinte (daqui a 5 minutos; a rotina roda a cada 10)', () => {
+    expect(proximaBusca(fimHa(1), agora)).toEqual(new Date(agora + 5 * 60_000))
+    expect(proximaBusca(fimHa(119), agora)).toEqual(new Date(agora + 5 * 60_000))
+  })
+
+  it('depois disso, uma vez por hora (até a rotina fechar nas 48 horas)', () => {
+    expect(proximaBusca(fimHa(120), agora)).toEqual(new Date(agora + 60 * 60_000))
+    expect(proximaBusca(fimHa(47 * 60), agora)).toEqual(new Date(agora + 60 * 60_000))
+  })
+})
+
+describe('erro passageiro do Google (a rotina tenta de novo sozinha)', () => {
+  it('Google fora do ar, limite de pedidos e resposta que não veio', () => {
+    expect(erroPassageiro(new ErroDoGoogle('recusado', 'x', 503))).toBe(true)
+    expect(erroPassageiro(new ErroDoGoogle('recusado', 'x', 500))).toBe(true)
+    expect(erroPassageiro(new ErroDoGoogle('recusado', 'x', 429))).toBe(true)
+    // 403 com motivo de limite de pedidos vira "recusado" (o 403 de permissão vira "sem_permissao").
+    expect(erroPassageiro(new ErroDoGoogle('recusado', 'x', 403))).toBe(true)
+    expect(erroPassageiro(new ErroDoGoogle('recusado', 'x', null, true))).toBe(true)
+  })
+
+  it('o que tentar de novo não resolve: reconectar, sem permissão, não achou, app do Google sem configurar', () => {
+    expect(erroPassageiro(new ErroDoGoogle('reconectar', 'x', 401))).toBe(false)
+    expect(erroPassageiro(new ErroDoGoogle('sem_permissao', 'x', 403))).toBe(false)
+    expect(erroPassageiro(new ErroDoGoogle('recusado', 'x', 404))).toBe(false)
+    expect(erroPassageiro(new ErroDoGoogle('recusado', 'x', 400))).toBe(false)
+    expect(erroPassageiro(new ErroDoGoogle('recusado', 'Falta configurar o app do Google na plataforma (veja o README).')))
+      .toBe(false)
   })
 })

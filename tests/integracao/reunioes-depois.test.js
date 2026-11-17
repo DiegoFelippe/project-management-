@@ -2,11 +2,14 @@
 // Storage), com o Google falso e uma IA falsa (nenhum pedido sai para o Google nem para a IA de verdade).
 // - Pela tela ("Buscar agora" e "Tentar de novo"): o núcleo da Edge Function reunioes-depois, com as permissões de
 //   editar o evento.
-// - A rotina (pg_cron a cada 10 minutos): todas as reuniões terminadas que ainda esperam, uma rotina por vez, sem
-//   criar duas pastas para a mesma reunião, e o erro de uma reunião não para as outras.
+// - A rotina (pg_cron a cada 10 minutos): as reuniões terminadas, com cliente, que ainda esperam, uma rotina por vez,
+//   sem criar duas pastas para a mesma reunião; erro passageiro (Google fora do ar, falha ao guardar) fica para a
+//   próxima rotina, e o erro de uma reunião não para as outras. Aqui ela roda SEMPRE com o recorte das consultorias
+//   criadas pelos testes (o banco que os testes passam ao núcleo recusa alto a rotina sem recorte): sem ele, pegaria as
+//   reuniões de verdade do banco local.
 // - A função no ar: segredo da rotina e as ações pela tela, chamadas pelas funções de src/data/agenda.js.
-// Enquanto os testes do núcleo rodam, eles seguram a vez da rotina: o pg_cron do Supabase local (que chama a função de
-// verdade, sem o app do Google) fica de fora e não mexe nas reuniões dos testes.
+// Enquanto os testes do núcleo rodam, eles seguram a vez de verdade da rotina: o pg_cron do Supabase local (que chama
+// a função de verdade, sem o app do Google) fica de fora e não mexe nas reuniões dos testes.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { salvarEvento as salvarNoNucleo } from '../../supabase/functions/_shared/agenda/eventos.ts'
 import { criarGoogleFalso } from '../../supabase/functions/_shared/agenda/google-falso.ts'
@@ -45,7 +48,9 @@ const { buscarAgora, tentarDeNovo } = await import('../../src/data/agenda.js')
 const admin = clienteAdmin()
 const HORA = 3_600_000
 const SEM_GOOGLE = 'Conecte o Google para buscar a gravação'
-const SEM_CLIENTE = 'Reunião sem cliente: a pasta não foi criada. Escolha o cliente no evento e clique em Tentar de novo.'
+const GOOGLE_SEM_RESPOSTA = 'O Google não respondeu agora; tentamos de novo em seguida.'
+const FALHOU = 'Não foi possível guardar a pasta da reunião agora; tentamos de novo em seguida.'
+const SEM_PERMISSAO = 'O Google não deu permissão para ler a gravação e a transcrição do Meet nesta conta.'
 const GRAVACAO = 'https://drive.google.com/file/d/gravacao-1/view'
 
 // IA falsa no formato da Messages API da Anthropic: guarda cada pedido e pode ser mandada falhar.
@@ -80,13 +85,76 @@ function criarIaFalsa() {
 
 const google = criarGoogleFalso()
 const APP = { id: google.cliente.id, segredo: google.cliente.segredo, volta: 'http://localhost:5173/calendario' }
-const googleDe = criarGoogleDe({ banco: admin, app: APP, fetch: google.fetch, agora: google.agora })
+const googleDeDeVerdade = criarGoogleDe({ banco: admin, app: APP, fetch: google.fetch, agora: google.agora })
+// Cada pedido do Google de um organizador (a rotina usa um por organizador em cada rodada).
+const googlesPedidos = []
+const googleDe = (perfilId) => {
+  googlesPedidos.push(perfilId)
+  return googleDeDeVerdade(perfilId)
+}
 const ia = criarIaFalsa()
 const iaDa = (consultoriaId) => iaDaConsultoria(admin, consultoriaId, ia.fetch)
 
-const buscar = (quem, id) => buscarNoNucleo(admin, googleDe, iaDa, quem, id)
-const tentar = (quem, id) => tentarNoNucleo(admin, googleDe, iaDa, quem, id)
-const rotina = () => rodarRotina({ db: admin, googleDe, iaDa })
+// A vez de verdade da rotina, segura pelos testes do começo ao fim do núcleo (só o teste de duas rotinas ao mesmo tempo
+// a solta por um instante).
+const vez = { dono: null }
+async function segurarVez() {
+  vez.dono = conferir(await admin.rpc('reunioes_comecar_rotina', { p_minutos: 10 }))
+  if (!vez.dono) throw new Error('A rotina das reuniões está rodando agora; rode os testes de novo em alguns minutos.')
+}
+async function soltarVez() {
+  if (vez.dono) conferir(await admin.rpc('reunioes_terminar_rotina', { p_dono: vez.dono }))
+  vez.dono = null
+}
+
+// O banco que os testes passam ao núcleo: o do Supabase local, com três travas.
+// - A rotina sem o recorte das consultorias de teste falha alto (não chega ao banco).
+// - Com a vez de verdade segura pelos testes, cada rotina dos testes ganha uma vez só dela (outro dono).
+// - O envio ao Storage pode ser mandado falhar (`falhasNoEnvio`: uma função do caminho por falha, uma vez cada).
+const SEM_RECORTE = 'Teste chamou a rotina sem o recorte das consultorias de teste: ela mexeria nas reuniões de ' +
+  'verdade do banco local.'
+const falhasNoEnvio = []
+function bucketComFalhas(bucket) {
+  return new Proxy(bucket, {
+    get(alvo, nome) {
+      if (nome === 'upload') {
+        return async (caminho, ...resto) => {
+          const i = falhasNoEnvio.findIndex((falha) => falha(caminho))
+          if (i < 0) return alvo.upload(caminho, ...resto)
+          falhasNoEnvio.splice(i, 1)
+          return { data: null, error: new Error('Storage fora do ar (falha simulada)') }
+        }
+      }
+      const valor = alvo[nome]
+      return typeof valor === 'function' ? valor.bind(alvo) : valor
+    },
+  })
+}
+const banco = new Proxy(admin, {
+  get(alvo, nome) {
+    if (nome === 'rpc') {
+      return (funcao, argumentos = {}) => {
+        const recorte = argumentos.p_consultorias
+        if (funcao === 'reunioes_reservar' && argumentos.p_evento == null && !(Array.isArray(recorte) && recorte.length)) {
+          throw new Error(SEM_RECORTE)
+        }
+        if (vez.dono && funcao === 'reunioes_comecar_rotina') return Promise.resolve({ data: crypto.randomUUID(), error: null })
+        if (vez.dono && funcao === 'reunioes_terminar_rotina') return Promise.resolve({ data: null, error: null })
+        return alvo.rpc(funcao, argumentos)
+      }
+    }
+    if (nome === 'storage') return { from: (nomeDoBucket) => bucketComFalhas(alvo.storage.from(nomeDoBucket)) }
+    const valor = alvo[nome]
+    return typeof valor === 'function' ? valor.bind(alvo) : valor
+  },
+})
+
+const buscar = (quem, id) => buscarNoNucleo(banco, googleDe, iaDa, quem, id)
+const tentar = (quem, id) => tentarNoNucleo(banco, googleDe, iaDa, quem, id)
+// A rotina dos testes: só as consultorias criadas aqui. `imediata`: a reunião olhada já pode ser olhada de novo na
+// rotina seguinte (no app, ela espera 5 minutos ou 1 hora, conforme o tempo desde o fim).
+const imediata = () => new Date(Date.now() - 60_000)
+const rotina = (opcoes = {}) => rodarRotina({ db: banco, googleDe, iaDa, consultorias: [C, D], ...opcoes })
 
 const p = {}
 const cli = {}
@@ -203,22 +271,15 @@ beforeAll(async () => {
     p_quem: null,
   }))
   conferir(await admin.from('integracoes').update({ situacao: 'conectada' }).eq('id', integracao))
+  await segurarVez()
 })
 
-afterAll(limparTudo)
+afterAll(async () => {
+  await soltarVez()
+  await limparTudo()
+})
 
 describe('pela tela: Buscar agora e Tentar de novo (núcleo, Google falso, IA falsa)', () => {
-  let vez
-
-  // A vez da rotina fica com os testes: a rotina do pg_cron local não mexe nas reuniões daqui.
-  beforeAll(async () => {
-    vez = conferir(await admin.rpc('reunioes_comecar_rotina', { p_minutos: 10 }))
-    if (!vez) throw new Error('A rotina das reuniões está rodando agora; rode os testes de novo em alguns minutos.')
-  })
-  afterAll(async () => {
-    if (vez) conferir(await admin.rpc('reunioes_terminar_rotina', { p_dono: vez }))
-  })
-
   it('transcrição pronta: pasta no cliente com transcricao.txt e documentacao.md, "pasta criada" e histórico', async () => {
     const e = await reuniao(p.ana, {
       cliente_id: cli.daAna,
@@ -366,17 +427,22 @@ describe('pela tela: Buscar agora e Tentar de novo (núcleo, Google falso, IA fa
     expect(await pastasDoEvento(e.id)).toHaveLength(1)
   })
 
-  it('o Google recusa: "erro" com o motivo e a conexão marcada; Tentar de novo depois funciona', async () => {
+  it('o Google recusa: passageiro (503) fica aguardando com o motivo; sem permissão e token revogado viram erro', async () => {
     const e = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Google instável' })
     conferencia(p.ana, e)
     google.falhar({ url: e.meet_codigo, status: 503 })
     expect((await buscar(p.ana, e.id)).reuniao).toMatchObject({
-      reuniao: 'erro',
-      reuniao_erro: 'O Google está com problemas para ler a gravação e a transcrição do Meet. ' +
-        'Tente de novo em alguns minutos.',
+      reuniao: 'aguardando',
+      reuniao_erro: GOOGLE_SEM_RESPOSTA,
       pasta_id: null,
     })
-    expect((await tentar(p.ana, e.id)).reuniao).toMatchObject({ reuniao: 'pasta_criada', reuniao_erro: null })
+    // O Google voltou: a próxima busca cria a pasta e o motivo some.
+    expect((await buscar(p.ana, e.id)).reuniao).toMatchObject({ reuniao: 'pasta_criada', reuniao_erro: null })
+
+    // Sem permissão na conta (403 do Meet): tentar de novo sozinho não resolve, vira erro.
+    const semPermissao = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Sem permissão no Meet' })
+    google.falhar({ url: semPermissao.meet_codigo, status: 403 })
+    expect((await buscar(p.ana, semPermissao.id)).reuniao).toMatchObject({ reuniao: 'erro', reuniao_erro: SEM_PERMISSAO })
 
     // Token revogado no Google: "Reconecte o Google" e a conexão da organizadora fica marcada.
     const caio = await pessoa('pessoa', C, 'Caio Reis', { comGoogle: true })
@@ -414,15 +480,16 @@ describe('pela tela: Buscar agora e Tentar de novo (núcleo, Google falso, IA fa
     expect(docSemIa).not.toContain('## Resumo')
   })
 
-  it('sem cliente no evento: não cria pasta, marca a situação e guarda a gravação', async () => {
+  it('sem cliente no evento: não pergunta ao Google nem muda a situação', async () => {
     const e = await reuniao(p.ana, { titulo: 'Reunião interna' })
     conferencia(p.ana, e)
-    expect((await buscar(p.ana, e.id)).reuniao).toEqual({
-      reuniao: 'erro',
-      reuniao_erro: SEM_CLIENTE,
-      pasta_id: null,
-      gravacao_url: GRAVACAO,
-    })
+    const antes = google.pedidosPara(e.meet_codigo).length
+    const erro = await recusa(buscar(p.ana, e.id))
+    expect(erro).toMatchObject({ status: 409, codigo: 'sem_cliente' })
+    expect(erro.extra.erro).toBe('Escolha o cliente do evento: a pasta da reunião fica nos arquivos dele.')
+    expect(await recusa(tentar(p.ana, e.id))).toMatchObject({ status: 409, codigo: 'sem_cliente' })
+    expect(google.pedidosPara(e.meet_codigo)).toHaveLength(antes)
+    expect(await linha(e.id)).toMatchObject({ reuniao: 'agendada', reuniao_erro: null, gravacao_url: null })
     expect(await pastasDoEvento(e.id)).toEqual([])
   })
 
@@ -479,52 +546,120 @@ async function pessoaComGoogle(perfil) {
 }
 
 describe('a rotina (pg_cron a cada 10 minutos)', () => {
-  it('fecha todas as reuniões terminadas; o erro de uma não para as outras; duas vezes não cria duas pastas', async () => {
-    // Prepara com a vez da rotina segura (o pg_cron local fica de fora) e solta logo antes de rodar.
-    const vez = conferir(await admin.rpc('reunioes_comecar_rotina', { p_minutos: 5 }))
-    expect(vez).toBeTruthy()
+  it('nos testes, a rotina sem o recorte das consultorias de teste nem chega ao banco', async () => {
+    await expect(rodarRotina({ db: banco, googleDe, iaDa })).rejects.toThrow(SEM_RECORTE)
+  })
+
+  it('fecha as reuniões terminadas; o erro de uma não para as outras; um Google por organizador; duas vezes, uma pasta', async () => {
     const pronta = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Rotina pronta' })
-    const quebrada = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Rotina com erro' })
+    const quebrada = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Rotina sem permissão' })
     const daD = await reuniao(p.dani, { cliente_id: cli.daDani, titulo: 'Rotina da D' })
     const futura = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Rotina futura', inicio: new Date(Date.now() + HORA) })
     for (const [quem, e] of [[p.ana, pronta], [p.ana, quebrada], [p.dani, daD]]) conferencia(quem, e)
-    google.falhar({ url: quebrada.meet_codigo, status: 500, vezes: 5 })
+    google.falhar({ url: quebrada.meet_codigo, status: 403, vezes: 5 })
     const pedidosDaFutura = google.pedidosPara(futura.meet_codigo).length
-    conferir(await admin.rpc('reunioes_terminar_rotina', { p_dono: vez }))
+    googlesPedidos.length = 0
 
-    // Duas rotinas ao mesmo tempo: uma roda, a outra fica de fora.
-    const [r1, r2] = await Promise.all([rotina(), rotina()])
-    expect([r1.ocupada, r2.ocupada].sort()).toEqual([false, true])
+    // Duas rotinas ao mesmo tempo, com a vez de verdade: uma roda, a outra fica de fora.
+    await soltarVez()
+    let resultados
+    try {
+      resultados = await Promise.all([rotina(), rotina()])
+    } finally {
+      await segurarVez()
+    }
+    expect(resultados.map((r) => r.ocupada).sort()).toEqual([false, true])
 
     expect(await linha(pronta.id)).toMatchObject({ reuniao: 'pasta_criada' })
     expect(await linha(daD.id)).toMatchObject({ reuniao: 'pasta_criada' })
-    expect(await linha(quebrada.id)).toMatchObject({
-      reuniao: 'erro',
-      reuniao_erro: 'O Google está com problemas para ler a gravação e a transcrição do Meet. Tente de novo em alguns minutos.',
-    })
+    expect(await linha(quebrada.id)).toMatchObject({ reuniao: 'erro', reuniao_erro: SEM_PERMISSAO })
     expect(await linha(futura.id)).toMatchObject({ reuniao: 'agendada' })
     expect(google.pedidosPara(futura.meet_codigo)).toHaveLength(pedidosDaFutura)
+    // Um Google por organizador na rodada (a Ana tinha duas reuniões).
+    expect(googlesPedidos.filter((id) => id === p.ana.id)).toHaveLength(1)
+    expect(googlesPedidos.filter((id) => id === p.dani.id)).toHaveLength(1)
 
     // A rotina de novo: nada muda (a reunião com erro espera o "Tentar de novo").
     const pedidosAntes = google.pedidosPara(quebrada.meet_codigo).length
-    expect((await rotina()).ocupada).toBe(false)
+    expect((await rotina({ proximaBusca: imediata })).ocupada).toBe(false)
     expect(google.pedidosPara(quebrada.meet_codigo)).toHaveLength(pedidosAntes)
     for (const e of [pronta, daD]) expect(await pastasDoEvento(e.id)).toHaveLength(1)
   })
 
-  it('48 horas sem transcrição: "sem gravação/transcrição" e a rotina para de perguntar ao Google', async () => {
-    const vez = conferir(await admin.rpc('reunioes_comecar_rotina', { p_minutos: 5 }))
-    expect(vez).toBeTruthy()
-    const velha = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Rotina 48 h', horas: 50 })
-    conferencia(p.ana, velha, { transcricao: 'STARTED' })
-    conferir(await admin.rpc('reunioes_terminar_rotina', { p_dono: vez }))
+  it('erro passageiro (503, 429) e falha ao guardar: aguardando com o motivo; a rotina seguinte termina a mesma pasta', async () => {
+    const m503 = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Rotina 503' })
+    const m429 = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Rotina 429' })
+    const doStorage = await reuniao(p.dani, { cliente_id: cli.daDani, titulo: 'Rotina Storage' })
+    for (const [quem, e] of [[p.ana, m503], [p.ana, m429], [p.dani, doStorage]]) conferencia(quem, e)
+    google.falhar({ url: m503.meet_codigo, status: 503 })
+    google.falhar({ url: m429.meet_codigo, status: 429, vezes: 10 })
+    // O Storage cai na hora de guardar a documentação: a pasta fica só com a transcrição.
+    falhasNoEnvio.push((caminho) => caminho.startsWith(`${cli.daDani}/`) && caminho.endsWith('-documentacao.md'))
+    const historicoAntes = (await historico(cli.daDani)).length
 
+    await rotina({ proximaBusca: imediata })
+    expect(await linha(m503.id)).toMatchObject({ reuniao: 'aguardando', reuniao_erro: GOOGLE_SEM_RESPOSTA, pasta_id: null })
+    expect(await linha(m429.id)).toMatchObject({ reuniao: 'aguardando', reuniao_erro: GOOGLE_SEM_RESPOSTA })
+    expect(await linha(doStorage.id)).toMatchObject({ reuniao: 'aguardando', reuniao_erro: FALHOU, pasta_id: null })
+    const [pasta] = await pastasDoEvento(doStorage.id)
+    expect((await arquivosDaPasta(pasta.id)).map((a) => a.nome)).toEqual(['transcricao.txt'])
+    expect(falhasNoEnvio).toEqual([])
+
+    await rotina({ proximaBusca: imediata })
+    expect(await linha(m503.id)).toMatchObject({ reuniao: 'pasta_criada', reuniao_erro: null })
+    expect(await linha(m429.id)).toMatchObject({ reuniao: 'aguardando', reuniao_erro: GOOGLE_SEM_RESPOSTA })
+    expect(await linha(doStorage.id)).toMatchObject({ reuniao: 'pasta_criada', reuniao_erro: null, pasta_id: pasta.id })
+    expect(await pastasDoEvento(doStorage.id)).toHaveLength(1)
+    expect((await arquivosDaPasta(pasta.id)).map((a) => a.nome)).toEqual(['documentacao.md', 'transcricao.txt'])
+    expect(await historico(cli.daDani)).toHaveLength(historicoAntes + 2)
+  })
+
+  it('reunião sem cliente fica fora da rotina; com o cliente escolhido depois, a rotina a pega sozinha', async () => {
+    const e = await reuniao(p.ana, { titulo: 'Interna, depois com cliente' })
+    conferencia(p.ana, e)
+    const antes = google.pedidosPara(e.meet_codigo).length
+    await rotina({ proximaBusca: imediata })
+    expect(google.pedidosPara(e.meet_codigo)).toHaveLength(antes)
+    expect(await linha(e.id)).toMatchObject({ reuniao: 'agendada', reuniao_erro: null })
+
+    conferir(await admin.from('agenda_eventos').update({ cliente_id: cli.daAna }).eq('id', e.id))
     await rotina()
+    expect(await linha(e.id)).toMatchObject({ reuniao: 'pasta_criada' })
+    expect(await pastasDoEvento(e.id)).toHaveLength(1)
+  })
+
+  it('com mais de 2 horas do fim, a reunião olhada só volta daqui a 1 hora (não na rotina seguinte)', async () => {
+    const e = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Rotina 3 h', horas: 3 })
+    conferencia(p.ana, e, { transcricao: 'STARTED' })
+    await rotina()
+    expect(await linha(e.id)).toMatchObject({ reuniao: 'aguardando' })
+    const pedidos = google.pedidosPara(e.meet_codigo).length
+    await rotina()
+    expect(google.pedidosPara(e.meet_codigo)).toHaveLength(pedidos)
+  })
+
+  it('48 horas sem transcrição: "sem gravação/transcrição" e a rotina para de perguntar ao Google', async () => {
+    const velha = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Rotina 48 h', horas: 47 })
+    conferencia(p.ana, velha, { transcricao: 'STARTED' })
+    await rotina({ proximaBusca: imediata })
+    expect(await linha(velha.id)).toMatchObject({ reuniao: 'aguardando', gravacao_url: GRAVACAO })
+
+    // Duas horas depois (o relógio da rotina anda), passou das 48 horas.
+    await rotina({ proximaBusca: imediata, agora: () => Date.now() + 2 * HORA })
     expect(await linha(velha.id)).toMatchObject({ reuniao: 'sem_artefatos', gravacao_url: GRAVACAO })
     const pedidos = google.pedidosPara(velha.meet_codigo).length
-    expect(pedidos).toBeGreaterThan(0)
-    await rotina()
+    await rotina({ proximaBusca: imediata })
     expect(google.pedidosPara(velha.meet_codigo)).toHaveLength(pedidos)
+  })
+
+  it('agendada que terminou há mais de 48 horas: a rotina não pega; "Buscar agora" ainda funciona', async () => {
+    const velha = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Nunca olhada', horas: 50 })
+    conferencia(p.ana, velha)
+    const antes = google.pedidosPara(velha.meet_codigo).length
+    await rotina({ proximaBusca: imediata })
+    expect(google.pedidosPara(velha.meet_codigo)).toHaveLength(antes)
+    expect(await linha(velha.id)).toMatchObject({ reuniao: 'agendada' })
+    expect((await buscar(p.ana, velha.id)).reuniao.reuniao).toBe('pasta_criada')
   })
 
   it('o segredo da rotina: só o que está no Vault vale', async () => {
@@ -543,14 +678,18 @@ describe('Edge Function reunioes-depois (no ar)', () => {
   const sessoes = {}
 
   beforeAll(async () => {
+    // A função no ar pega a vez de verdade da rotina sozinha.
+    await soltarVez()
     const E = await criarConsultoriaDeTeste()
+    v.E = E
     v.luiza = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: E })
     v.marcos = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: E })
-    for (const nome of Object.keys(v)) sessoes[nome] = await entrarComo(v[nome])
+    for (const nome of ['luiza', 'marcos']) sessoes[nome] = await entrarComo(v[nome])
     const comeco = Date.now() - 2 * HORA
     v.reuniao = conferir(await admin.from('agenda_eventos').insert({
       consultoria_id: E,
       consultor_id: v.luiza.id,
+      cliente_id: await novoCliente(E, v.luiza.id, 'Cliente no ar'),
       titulo: 'Reunião no ar',
       inicio: new Date(comeco).toISOString(),
       fim: new Date(comeco + HORA).toISOString(),
@@ -566,15 +705,20 @@ describe('Edge Function reunioes-depois (no ar)', () => {
       body: JSON.stringify(corpo),
     })
 
-  it('sem login e sem segredo: 401; segredo errado: 401; o segredo do Vault roda a rotina', async () => {
+  it('sem login e sem segredo: 401; segredo errado: 401; o segredo do Vault roda a rotina (nos testes, com recorte)', async () => {
     expect((await chamar({})).status).toBe(401)
     expect((await chamar({ 'x-rotina-segredo': 'errado' })).status).toBe(401)
     const segredo = conferir(await admin.rpc('segredo_da_rotina_das_reunioes'))
-    const certo = await chamar({ 'x-rotina-segredo': segredo })
+    const recorteInvalido = await chamar({ 'x-rotina-segredo': segredo }, { consultorias: ['nao-e-uuid'] })
+    expect(recorteInvalido.status).toBe(400)
+    expect(await recorteInvalido.json()).toMatchObject({ codigo: 'dados_invalidos', campo: 'consultorias' })
+    const certo = await chamar({ 'x-rotina-segredo': segredo }, { consultorias: [v.E] })
     expect(certo.status).toBe(200)
     const corpo = await certo.json()
     expect(typeof corpo.ocupada).toBe('boolean')
     expect(typeof corpo.processadas).toBe('number')
+    // A organizadora não conectou o Google: esta rotina (ou a do pg_cron, se ela estava rodando) marcou a reunião.
+    if (!corpo.ocupada) expect(await linha(v.reuniao.id)).toMatchObject({ reuniao: 'erro', reuniao_erro: SEM_GOOGLE })
   })
 
   it('Buscar agora e Tentar de novo pela tela: organizadora sem Google vê o motivo; colega nem fica sabendo', async () => {
