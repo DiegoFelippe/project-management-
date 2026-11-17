@@ -70,7 +70,7 @@
 }
 
 @theme inline {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -179,7 +179,27 @@
   to { opacity: 1; transform: none; }
 }
 
+/* Escala única de tamanhos (design 2026-11-16-tipografia): cada passo vira a classe text-<nome>
+   (tamanho + altura da linha). Nada de text-xs/sm/base/lg... nem px avulso nas telas.
+   Os mesmos valores, em número, estão em src/lib/tipografia.js (texto de SVG). */
 @theme {
+  --text-titulo: 20px;
+  --text-titulo--line-height: 28px;
+  --text-titulo--letter-spacing: -0.015em;
+  --text-destaque: 26px;
+  --text-destaque--line-height: 32px;
+  --text-janela: 15px;
+  --text-janela--line-height: 20px;
+  --text-subtitulo: 14px;
+  --text-subtitulo--line-height: 20px;
+  --text-corpo: 13.5px;
+  --text-corpo--line-height: 20px;
+  --text-rotulo: 12.5px;
+  --text-rotulo--line-height: 18px;
+  --text-legenda: 11px;
+  --text-legenda--line-height: 16px;
+  --text-mini: 10.5px;
+  --text-mini--line-height: 14px;
   --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.06);
   --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 4px 12px -4px rgb(15 23 42 / 0.08);
   --shadow-md: 0 2px 4px -1px rgb(15 23 42 / 0.06), 0 12px 28px -10px rgb(15 23 42 / 0.18);
@@ -217,8 +237,11 @@
 /* Camada de componentes do padrão Hub (cores da consultoria: onde o Hub usa índigo, aqui é o --primary). */
 @layer components {
   .card { @apply bg-card rounded-2xl border; box-shadow: var(--shadow-card); }
-  .section-label { @apply text-muted-foreground text-[10.5px] font-semibold tracking-[0.08em] uppercase; }
-  .form-label { @apply text-foreground/80 mb-1.5 block text-[12.5px] font-medium; }
+  .section-label { @apply text-muted-foreground text-mini font-semibold tracking-[0.08em] uppercase; }
+  .form-label { @apply text-foreground/80 mb-1.5 block text-rotulo font-medium; }
+  /* Campos de digitar: 16 px no celular (o iPhone dá zoom abaixo disso) e text-corpo a partir de sm.
+     Vale para o .input e para todo campo escrito à mão (<textarea>, campos internos). */
+  .texto-de-campo { @apply text-base sm:text-corpo; }
   .input {
     @apply bg-card border-input text-foreground placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 text-base transition-[color,box-shadow,border-color] outline-none sm:text-[13.5px];
     @apply hover:border-primary/40 focus:border-primary/60 focus:ring-primary/15 focus:ring-2 disabled:bg-muted disabled:cursor-not-allowed disabled:opacity-60;

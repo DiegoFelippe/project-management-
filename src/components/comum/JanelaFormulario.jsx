@@ -55,8 +55,8 @@ export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, 
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <DialogTitle className="text-[15px] leading-tight font-bold tracking-normal [font-stretch:100%]">{titulo}</DialogTitle>
-              {descricao && <DialogDescription className="mt-0.5 text-[12.5px]">{descricao}</DialogDescription>}
+              <DialogTitle className="text-janela font-bold">{titulo}</DialogTitle>
+              {descricao && <DialogDescription className="mt-0.5 text-rotulo">{descricao}</DialogDescription>}
             </div>
             <DialogPrimitive.Close disabled={enviando} className="botao-animado text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/50 grid size-8 shrink-0 place-items-center rounded-lg transition-[color,background-color,translate,scale] duration-150 outline-none hover:-translate-y-px focus-visible:ring-[3px] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4">
               <XIcon />

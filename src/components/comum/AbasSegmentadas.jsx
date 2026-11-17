@@ -18,7 +18,7 @@ export default function AbasSegmentadas({ rotulo, abas, valor, aoMudar, comoAbas
 
   return (
     <div role={comoAbas ? 'tablist' : 'group'} aria-label={rotulo}
-      className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-muted p-1 text-[13px] font-semibold">
+      className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-muted p-1 text-rotulo font-semibold">
       {abas.map((aba, i) => {
         const ativa = aba.valor === valor
         const propriedades = comoAbas
@@ -43,7 +43,7 @@ export default function AbasSegmentadas({ rotulo, abas, valor, aoMudar, comoAbas
             )}
             {aba.contador != null && (
               <span data-contador className={cn(
-                'rounded-full px-1.5 text-[11px] font-semibold tabular-nums',
+                'rounded-full px-1.5 text-legenda font-semibold tabular-nums',
                 aba.pendente ? 'bg-notice-soft text-notice' : 'bg-foreground/10 text-muted-foreground',
               )}>
                 {aba.contador}

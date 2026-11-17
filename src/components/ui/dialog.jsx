@@ -31,7 +31,7 @@ function DialogContent({ className, children, showCloseButton = true, ...props }
 }
 function DialogHeader({ className, ...props }) { return <div data-slot="dialog-header" className={cn("flex flex-col gap-2 text-center sm:text-left", className)} {...props} />; }
 function DialogFooter({ className, ...props }) { return <div data-slot="dialog-footer" className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)} {...props} />; }
-function DialogTitle({ className, ...props }) { return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-xl leading-none font-bold tracking-tight [font-stretch:88%]", className)} {...props} />; }
-function DialogDescription({ className, ...props }) { return <DialogPrimitive.Description data-slot="dialog-description" className={cn("text-muted-foreground text-sm", className)} {...props} />; }
+function DialogTitle({ className, ...props }) { return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-janela font-bold", className)} {...props} />; }
+function DialogDescription({ className, ...props }) { return <DialogPrimitive.Description data-slot="dialog-description" className={cn("text-muted-foreground text-corpo", className)} {...props} />; }
 
 export { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogPortal, DialogTitle, DialogTrigger };

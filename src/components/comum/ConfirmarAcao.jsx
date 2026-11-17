@@ -32,8 +32,8 @@ export default function ConfirmarAcao({ aberto, aoFechar, titulo, descricao, rot
             <TriangleAlert className="size-5" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1 space-y-1">
-            <DialogTitle className="text-[15px] leading-tight tracking-normal [font-stretch:100%]">{titulo}</DialogTitle>
-            <DialogDescription className="text-[12.5px]">{descricao}</DialogDescription>
+            <DialogTitle className="text-janela">{titulo}</DialogTitle>
+            <DialogDescription className="text-rotulo">{descricao}</DialogDescription>
           </div>
         </DialogHeader>
         {erro && <Aviso>{erro}</Aviso>}

@@ -14,7 +14,7 @@ export function Paginacao({ pagina, total, porPagina = POR_PAGINA, aoMudar }) {
   const de = (pagina - 1) * porPagina + 1
   const ate = Math.min(total, pagina * porPagina)
   return (
-    <nav aria-label="Paginação" className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-sm text-muted-foreground">
+    <nav aria-label="Paginação" className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-corpo text-muted-foreground">
       <p className="tabular-nums">{numero(de)}–{numero(ate)} de {numero(total)}</p>
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="sm" disabled={pagina <= 1} onClick={() => aoMudar(pagina - 1)}>
@@ -33,10 +33,10 @@ export function Paginacao({ pagina, total, porPagina = POR_PAGINA, aoMudar }) {
 export function Tabela({ rotulo, titulo, colunas, larguraMinima = 720, paginacao, semAcoes = false, children }) {
   return (
     <div className="card overflow-hidden">
-      {titulo && <h2 className="px-4 pt-4 pb-2 text-sm font-semibold text-muted-foreground">{titulo}</h2>}
+      {titulo && <h2 className="px-4 pt-4 pb-2 text-subtitulo font-semibold text-muted-foreground">{titulo}</h2>}
       <div className="overflow-x-auto">
-        <table aria-label={rotulo} className="w-full text-left text-sm" style={{ minWidth: larguraMinima }}>
-          <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
+        <table aria-label={rotulo} className="w-full text-left text-corpo" style={{ minWidth: larguraMinima }}>
+          <thead className="border-b bg-muted/50 text-rotulo text-muted-foreground">
             <tr>
               {colunas.map((coluna) => (
                 <th key={coluna} className="px-4 py-2.5 font-medium">{coluna}</th>
@@ -66,7 +66,7 @@ export function CelulaAcoes({ children }) {
 
 export function ListaVazia({ children }) {
   return (
-    <div className="rounded-xl border border-dashed bg-card/60 p-8 text-center text-sm text-muted-foreground">
+    <div className="rounded-xl border border-dashed bg-card/60 p-8 text-center text-corpo text-muted-foreground">
       {children}
     </div>
   )
