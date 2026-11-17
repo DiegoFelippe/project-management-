@@ -1,8 +1,8 @@
-import { Building2, House, PlugZap, RadioTower, UserPlus, Users } from 'lucide-react'
+import { Building2, CalendarDays, House, PlugZap, RadioTower, UserPlus, Users } from 'lucide-react'
 
 // Regra do projeto (CLAUDE.md): todo ícone do trilho anima ao passar o mouse.
 // Item novo: escolha uma destas (keyframes "icone-<nome>" em src/index.css).
-export const ANIMACOES_DO_MENU = ['subir', 'balancar', 'pulsar', 'abrir', 'erguer', 'conectar', 'transmitir', 'sair']
+export const ANIMACOES_DO_MENU = ['subir', 'balancar', 'pulsar', 'abrir', 'erguer', 'conectar', 'transmitir', 'folhear', 'sair']
 
 const TODOS = ['dono', 'central', 'admin', 'gestor', 'pessoa']
 const QUEM_ADMINISTRA = ['dono', 'central', 'admin', 'gestor']
@@ -11,6 +11,7 @@ const QUEM_ADMINISTRA = ['dono', 'central', 'admin', 'gestor']
 const ITENS = [
   { id: 'inicio', rotulo: 'Início', rota: '/', icone: House, animacao: 'subir', papeis: TODOS },
   { id: 'clientes', rotulo: 'Clientes', rota: '/clientes', icone: RadioTower, animacao: 'transmitir', papeis: TODOS },
+  { id: 'calendario', rotulo: 'Calendário', rota: '/calendario', icone: CalendarDays, animacao: 'folhear', papeis: TODOS },
   { id: 'times', rotulo: 'Times', rota: '/times', icone: Users, animacao: 'pulsar', papeis: QUEM_ADMINISTRA },
   { id: 'usuarios', rotulo: 'Usuários', rota: '/usuarios', icone: UserPlus, animacao: 'balancar', papeis: QUEM_ADMINISTRA },
   { id: 'consultorias', rotulo: 'Consultorias', rota: '/consultorias', icone: Building2, animacao: 'erguer', papeis: ['dono', 'central'] },

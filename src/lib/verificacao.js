@@ -30,6 +30,18 @@ export function destinoObrigatorio(perfil, verificacao) {
   return null
 }
 
+// Telas obrigatórias (código, senha provisória, configurar o app): não servem de volta depois da verificação.
+const OBRIGATORIAS = ['/verificar', '/trocar-senha', '/configurar-verificacao']
+
+// Para onde a tela de verificação manda a pessoa depois do código: o endereço do app que ela tinha pedido (a
+// RotaProtegida guarda em state.de, com a busca; ex.: a volta do Google em /calendario?code=…&state=…), ou o Início.
+// Só caminho deste app ("/…", nunca "//…" nem "/\…", que o navegador leva para outro site).
+export function voltaDepoisDaVerificacao(estado) {
+  const de = typeof estado?.de === 'string' ? estado.de : ''
+  if (!/^\/(?![/\\])/.test(de)) return '/'
+  return OBRIGATORIAS.includes(new URL(de, 'http://app').pathname) ? '/' : de
+}
+
 const DIA_EM_SP = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' })
 
 // Situação na ficha da pessoa (aba Acesso) e em Meu perfil.

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { Navigate, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
+import { voltaDepoisDaVerificacao } from '@/lib/verificacao'
 import TelaDeAcesso, { Titulo } from '@/components/auth/TelaDeAcesso'
 import BotaoSair from '@/components/auth/BotaoSair'
 import CadastroDoAutenticador from '@/components/verificacao/CadastroDoAutenticador'
@@ -9,9 +10,10 @@ import CadastroDoAutenticador from '@/components/verificacao/CadastroDoAutentica
 export default function ConfigurarVerificacao() {
   const { verificacao, recarregarPerfil } = useAuth()
   const navigate = useNavigate()
+  const volta = voltaDepoisDaVerificacao(useLocation().state)
   // Com o primeiro código a sessão vira aal2 na hora; o Início só abre depois do perfil recarregado.
   const [entrando, setEntrando] = useState(false)
-  if (verificacao !== 'configurar' && !entrando) return <Navigate to="/" replace />
+  if (verificacao !== 'configurar' && !entrando) return <Navigate to={volta} replace />
 
   return (
     <TelaDeAcesso>
@@ -22,7 +24,7 @@ export default function ConfigurarVerificacao() {
       <CadastroDoAutenticador rotuloConfirmar="Confirmar e entrar" idCodigo="codigo-configurar" focar aoEnviando={setEntrando}
         aoConcluir={async () => {
           await recarregarPerfil()
-          navigate('/', { replace: true })
+          navigate(volta, { replace: true })
         }} />
       <BotaoSair />
     </TelaDeAcesso>

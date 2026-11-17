@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useState } from 'react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '@/auth/useAuth'
 import { concluirCadastro, iniciarCadastro } from '@/data/verificacao'
@@ -76,6 +76,25 @@ describe('Entrar: configurar a verificação exigida', () => {
     expect(screen.queryByText('tela início')).not.toBeInTheDocument()
     await act(async () => terminar())
     expect(await screen.findByText('tela início')).toBeInTheDocument()
+  })
+
+  it('depois do primeiro código, volta para o endereço que a pessoa pediu (ex.: a volta do Google no Calendário)', async () => {
+    function Calendario() {
+      return <p>tela calendário {useLocation().search}</p>
+    }
+    render(
+      <AuthContext.Provider value={{ verificacao: 'configurar', recarregarPerfil: vi.fn().mockResolvedValue(undefined), sair: vi.fn() }}>
+        <MemoryRouter initialEntries={[{ pathname: '/configurar-verificacao', state: { de: '/calendario?code=abc&state=xyz' } }]}>
+          <Routes>
+            <Route path="/configurar-verificacao" element={<ConfigurarVerificacao />} />
+            <Route path="/calendario" element={<Calendario />} />
+            <Route path="/" element={<p>tela início</p>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
+    await userEvent.type(await screen.findByLabelText('Código do app'), '123456{Enter}')
+    expect(await screen.findByText('tela calendário ?code=abc&state=xyz')).toBeInTheDocument()
   })
 
   it('não tem como pular: só Sair', async () => {

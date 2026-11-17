@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { contarClientesAtivos, eventosDoMes, listarClientes } from './clientes'
+import { buscarClientes, contarClientesAtivos, eventosDoMes, listarClientes } from './clientes'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 
@@ -70,5 +70,26 @@ describe('eventosDoMes', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('historico_do_cliente', expect.objectContaining({
       p_cliente: 'k1', p_de: '2018-12-01T00:00:00-02:00', p_ate: '2019-01-01T00:00:00-02:00',
     }))
+  })
+})
+
+describe('buscarClientes (seletores)', () => {
+  it('busca no banco pelo nome, só os ativos da consultoria pedida, poucos por vez', async () => {
+    banco.resposta = { data: [{ id: 'k1', nome: 'Provedor Alfa' }], error: null, count: 42 }
+    const r = await buscarClientes({ termo: 'Alfá', consultoriaId: 's1', ativos: true })
+    expect(r).toEqual({ itens: [{ id: 'k1', nome: 'Provedor Alfa' }], total: 42 })
+    expect(banco.chamou('eq', 'arquivado', false)).toBe(true)
+    expect(banco.chamou('eq', 'consultoria_id', 's1')).toBe(true)
+    expect(banco.chamou('ilike', 'busca', '%alfa%')).toBe(true)
+    expect(banco.chamou('limit', 8)).toBe(true)
+    const select = banco.chamadas.find(([m]) => m === 'select')
+    expect(select[1]).toContain('contato_email')
+  })
+
+  it('sem termo nem filtros: a primeira leva, com arquivados (filtro do calendário)', async () => {
+    banco.resposta = { data: [], error: null, count: 0 }
+    await buscarClientes({})
+    expect(banco.chamadas.some(([m, c]) => m === 'eq' && c === 'arquivado')).toBe(false)
+    expect(banco.chamadas.some(([m]) => m === 'ilike')).toBe(false)
   })
 })

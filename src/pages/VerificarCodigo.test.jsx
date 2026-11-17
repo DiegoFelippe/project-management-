@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useState } from 'react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '@/auth/useAuth'
 import { confirmarCodigo } from '@/data/verificacao'
@@ -103,6 +103,41 @@ describe('Entrar: tela do código do app autenticador', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sair' }))
     expect(auth.sair).toHaveBeenCalled()
     await waitFor(() => expect(screen.getByText('tela entrar')).toBeInTheDocument())
+  })
+
+  it('volta para o endereço que a pessoa pediu antes do código (ex.: a volta do Google no Calendário)', async () => {
+    function Calendario() {
+      return <p>tela calendário {useLocation().search}</p>
+    }
+    const de = '/calendario?code=abc&state=xyz'
+    render(
+      <AuthContext.Provider value={{ verificacao: 'codigo', recarregarPerfil: vi.fn().mockResolvedValue(undefined), sair: vi.fn() }}>
+        <MemoryRouter initialEntries={[{ pathname: '/verificar', state: { de } }]}>
+          <Routes>
+            <Route path="/verificar" element={<VerificarCodigo />} />
+            <Route path="/calendario" element={<Calendario />} />
+            <Route path="/" element={<p>tela início</p>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
+    await userEvent.type(screen.getByLabelText('Código de 6 dígitos'), '123456{Enter}')
+    expect(await screen.findByText('tela calendário ?code=abc&state=xyz')).toBeInTheDocument()
+  })
+
+  it('endereço de fora do app não vale como volta: vai para o início', async () => {
+    render(
+      <AuthContext.Provider value={{ verificacao: 'codigo', recarregarPerfil: vi.fn().mockResolvedValue(undefined), sair: vi.fn() }}>
+        <MemoryRouter initialEntries={[{ pathname: '/verificar', state: { de: '//golpe.test/x' } }]}>
+          <Routes>
+            <Route path="/verificar" element={<VerificarCodigo />} />
+            <Route path="/" element={<p>tela início</p>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
+    await userEvent.type(screen.getByLabelText('Código de 6 dígitos'), '123456{Enter}')
+    expect(await screen.findByText('tela início')).toBeInTheDocument()
   })
 
   it('sem código a pedir, vai para o início', () => {

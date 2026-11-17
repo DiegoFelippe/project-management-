@@ -61,6 +61,22 @@ export async function listarClientes({ aba, consultoriaId, consultorId, busca, p
   return buscarPagina(consulta, pagina)
 }
 
+// Clientes que a pessoa vê (o banco recorta), pelo nome, para os seletores com busca: { itens, total }. Nunca a lista
+// inteira: `limite` por vez, com o total para o "N de TOTAL". `ativos`: só os não arquivados (evento novo não aceita
+// cliente arquivado). `consultoriaId`: só os daquela consultoria. Cada item traz o contato (sugestão de convidado).
+export async function buscarClientes({ termo = '', consultoriaId, ativos = false, limite = 8 } = {}) {
+  let consulta = supabase.from('clientes')
+    .select('id, nome, consultoria_id, contato_nome, contato_email', { count: 'exact' })
+    .order('nome').order('id').limit(limite)
+  if (ativos) consulta = consulta.eq('arquivado', false)
+  if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
+  const padrao = padraoDeBusca(termo)
+  if (padrao) consulta = consulta.ilike('busca', padrao)
+  const { data, error, count } = await consulta
+  if (error) throw error
+  return { itens: data ?? [], total: count ?? 0 }
+}
+
 // Quantos clientes ativos (não arquivados) uma consultoria ou um consultor tem: contados no banco, sem
 // trazer linhas. Serve às confirmações que dizem o que acontece com os clientes.
 export async function contarClientesAtivos({ consultoriaId, consultorId }) {

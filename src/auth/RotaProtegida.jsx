@@ -10,7 +10,7 @@ import { useAuth } from './useAuth'
 // código vai para a tela do código, não para listas vazias.
 export default function RotaProtegida({ papeis }) {
   const { sessao, perfil, carregando, verificacao, conferirVerificacao } = useAuth()
-  const { pathname } = useLocation()
+  const { pathname, search, state } = useLocation()
   const temPerfil = Boolean(perfil)
 
   useEffect(() => {
@@ -20,7 +20,9 @@ export default function RotaProtegida({ papeis }) {
   if (carregando) return <Carregando />
   if (!sessao || !perfil) return <Navigate to="/entrar" replace />
   const destino = destinoObrigatorio(perfil, verificacao)
-  if (destino && pathname !== destino) return <Navigate to={destino} replace />
+  // O endereço pedido vai junto (state.de) e a tela de verificação volta para ele: assim a volta do Google no
+  // Calendário (/calendario?code=…&state=…) sobrevive à tela do código.
+  if (destino && pathname !== destino) return <Navigate to={destino} replace state={{ de: state?.de ?? `${pathname}${search}` }} />
   if (papeis && !papeis.includes(perfil.papel)) return <Navigate to="/" replace />
   return <Outlet />
 }

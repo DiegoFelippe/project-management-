@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { EVENTO_CONFERIR_ACESSO, chamarFuncao, supabase } from './supabase'
+import { EVENTO_CONFERIR_ACESSO, chamarFuncao, ehVoltaDoLogin, supabase } from './supabase'
 
 // Recusa (401/403, ou 400 de uma função do banco que levantou erro, P0001) avisa o AuthProvider para conferir a
 // verificação em duas etapas (sessão antiga sem o código).
@@ -55,5 +55,28 @@ describe('aviso de recusa', () => {
     await supabase.from('times').select('id')
     expect(ouvinte).toHaveBeenCalledTimes(1)
     window.removeEventListener(EVENTO_CONFERIR_ACESSO, ouvinte)
+  })
+})
+
+// A volta do "Conectar Google" do Calendário traz ?code=…&state=… (ou ?error=…) em /calendario: é do Google da pessoa,
+// não do login. O supabase-js não pode tomar isso como volta do login (o erro do Google pararia a sessão).
+describe('volta do login na URL', () => {
+  const parametros = (url) => Object.fromEntries([...new URL(url).searchParams, ...new URLSearchParams(new URL(url).hash.slice(1))])
+  const volta = (url) => ehVoltaDoLogin(new URL(url), parametros(url))
+
+  it('a volta do Google do Calendário não é login', () => {
+    expect(volta('http://app.test/calendario?code=abc&state=xyz')).toBe(false)
+    expect(volta('http://app.test/calendario?error=access_denied&state=xyz')).toBe(false)
+  })
+
+  it('a volta do login (Google, SSO, convite) continua sendo lida', () => {
+    expect(volta('http://app.test/entrar#access_token=a&refresh_token=b&expires_in=3600&token_type=bearer')).toBe(true)
+    expect(volta('http://app.test/entrar?error=server_error&error_description=x')).toBe(true)
+    expect(volta('http://app.test/definir-senha#access_token=a&type=recovery')).toBe(true)
+    expect(volta('http://app.test/clientes')).toBe(false)
+  })
+
+  it('o cliente do Supabase usa esta regra', () => {
+    expect(supabase.auth.detectSessionInUrl).toBe(ehVoltaDoLogin)
   })
 })

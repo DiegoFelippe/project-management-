@@ -17,7 +17,7 @@ export function deslocarMes(mes, quantidade) {
 // Intl: acompanha o horário de verão (o de 2018/2019 era -02:00) e qualquer mudança futura da regra.
 const DESLOCAMENTO = new Intl.DateTimeFormat('en-US', { timeZone: FUSO, timeZoneName: 'longOffset' })
 
-function deslocamentoEmSP(instante) {
+export function deslocamentoEmSP(instante) {
   const nome = DESLOCAMENTO.formatToParts(instante).find((p) => p.type === 'timeZoneName').value
   const [, sinal, horas, minutos] = nome.match(/^GMT(?:([+-])(\d{2}):?(\d{2})?)?$/) ?? []
   if (!sinal) return 0
@@ -28,7 +28,7 @@ const doisDigitos = (n) => String(n).padStart(2, '0')
 
 // Meia-noite de "YYYY-MM-DD" em São Paulo, como "YYYY-MM-DDT00:00:00-03:00". O deslocamento é o do instante da
 // meia-noite local: tenta o da meia-noite em UTC e confere de novo (na virada do horário de verão eles diferem).
-function meiaNoiteEmSP(dia) {
+export function meiaNoiteEmSP(dia) {
   const meiaNoiteUtc = Date.parse(`${dia}T00:00:00Z`)
   let deslocamento = deslocamentoEmSP(new Date(meiaNoiteUtc))
   deslocamento = deslocamentoEmSP(new Date(meiaNoiteUtc - deslocamento * 60000))

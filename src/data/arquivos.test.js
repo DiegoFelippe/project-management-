@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
 import {
-  apagarArquivo, apagarPasta, criarPasta, enviarArquivo, limparPastaDoCliente, linkParaBaixar, listarArquivos, listarPastas,
-  renomearPasta,
+  apagarArquivo, apagarPasta, buscarPasta, criarPasta, enviarArquivo, limparPastaDoCliente, linkParaBaixar, listarArquivos,
+  listarPastas, renomearPasta,
 } from './arquivos'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn(), storage: { from: vi.fn() } } }))
@@ -236,5 +236,16 @@ describe('limparPastaDoCliente', () => {
     expect(bucket.list).toHaveBeenCalledWith('c1', { limit: 1000, offset: 0 })
     expect(bucket.remove).toHaveBeenCalledWith(['c1/u-a.pdf', 'c1/u-b.pdf'])
     expect(banco.chamadas).toEqual([])
+  })
+})
+
+describe('buscarPasta (abrir a pasta da reunião pelo endereço)', () => {
+  it('lê id, nome e cliente de uma pasta; null quando a pessoa não a vê', async () => {
+    banco.resposta = { data: { id: 'd1', nome: 'Reunião 20/11/2026 14:00 — Kickoff', cliente_id: 'k1' }, error: null }
+    expect(await buscarPasta('d1')).toEqual({ id: 'd1', nome: 'Reunião 20/11/2026 14:00 — Kickoff', cliente_id: 'k1' })
+    expect(banco.chamou('from', 'cliente_pastas')).toBe(true)
+    expect(banco.chamou('eq', 'id', 'd1')).toBe(true)
+    banco.resposta = { data: null, error: null }
+    expect(await buscarPasta('d9')).toBeNull()
   })
 })

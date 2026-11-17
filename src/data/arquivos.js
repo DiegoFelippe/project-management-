@@ -91,6 +91,14 @@ export async function listarPastas(clienteId, { pagina = 1 } = {}) {
   }
 }
 
+// Uma pasta pelo id (a pasta da reunião, aberta pelo link do Calendário): { id, nome, cliente_id } ou null quando a
+// pessoa não a vê.
+export async function buscarPasta(id) {
+  const { data, error } = await supabase.from('cliente_pastas').select('id, nome, cliente_id').eq('id', id).maybeSingle()
+  if (error) throw error
+  return data ?? null
+}
+
 export async function criarPasta(clienteId, nome) {
   const { error } = await supabase.from('cliente_pastas').insert({ cliente_id: clienteId, nome: nome.trim() })
   return { erro: error ? traduzirPasta(error) : null }

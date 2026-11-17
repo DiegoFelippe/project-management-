@@ -1,5 +1,6 @@
 import { ArrowLeft, Download, Folder, FolderOpen, FolderPlus, Pencil, Trash2, Upload } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
@@ -11,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  apagarArquivo, apagarPasta, criarPasta, enviarArquivo, linkParaBaixar, listarArquivos, listarPastas, renomearPasta,
+  apagarArquivo, apagarPasta, buscarPasta, criarPasta, enviarArquivo, linkParaBaixar, listarArquivos, listarPastas, renomearPasta,
 } from '@/data/arquivos'
 import { ARQUIVO_GRANDE_DEMAIS } from '@/lib/erros'
 import { TAMANHO_MAXIMO_ARQUIVO } from '@/lib/arquivos'
@@ -94,8 +95,11 @@ function FormularioDePasta({ pasta, aoFechar, aoSalvar }) {
 }
 
 // Aba Arquivos do cliente: pastas e arquivos soltos (tabelas paginadas no banco), baixar, apagar e, dentro de
-// uma pasta, só os arquivos dela.
+// uma pasta, só os arquivos dela. Com ?pasta=<id> no endereço (o link "Pasta da reunião" do Calendário), abre já
+// naquela pasta, se ela for deste cliente e a pessoa a vir.
 export default function ArquivosDoCliente({ cliente, perfil }) {
+  const [parametros, setParametros] = useSearchParams()
+  const pastaDoEndereco = parametros.get('pasta')
   const [pasta, setPasta] = useState(null) // pasta aberta ({ id, nome }) ou null: a raiz
   const [paginaPastas, setPaginaPastas] = useState(1)
   const [pastas, setPastas] = useState(null)
@@ -115,6 +119,26 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
   const pode = podeEnviar(perfil, cliente)
 
   const pastaId = pasta?.id ?? null
+
+  // A pasta do endereço abre uma vez; depois o ?pasta= sai do endereço (Voltar leva à raiz, como sempre).
+  useEffect(() => {
+    if (!pastaDoEndereco) return undefined
+    let ativo = true
+    buscarPasta(pastaDoEndereco)
+      .then((p) => { if (ativo && p?.cliente_id === cliente.id) setPasta({ id: p.id, nome: p.nome }) })
+      .catch(() => {})
+      .finally(() => {
+        if (!ativo) return
+        setParametros((anteriores) => {
+          const novos = new URLSearchParams(anteriores)
+          novos.delete('pasta')
+          return novos
+        }, { replace: true })
+      })
+    return () => {
+      ativo = false
+    }
+  }, [pastaDoEndereco, cliente.id, setParametros])
 
   useEffect(() => {
     if (pastaId) return undefined

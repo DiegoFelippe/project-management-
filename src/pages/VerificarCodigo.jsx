@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { Navigate, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
+import { voltaDepoisDaVerificacao } from '@/lib/verificacao'
 import TelaDeAcesso, { Titulo } from '@/components/auth/TelaDeAcesso'
 import BotaoSair from '@/components/auth/BotaoSair'
 import FormularioCodigo from '@/components/verificacao/FormularioCodigo'
@@ -10,10 +11,11 @@ import FormularioCodigo from '@/components/verificacao/FormularioCodigo'
 export default function VerificarCodigo() {
   const { verificacao, recarregarPerfil } = useAuth()
   const navigate = useNavigate()
+  const volta = voltaDepoisDaVerificacao(useLocation().state)
   // Com o código certo a sessão vira aal2 na hora (verificacao 'ok'), mas o Início só abre depois do perfil
   // recarregado: antes disso ele apareceria um instante sem o nome da consultoria.
   const [entrando, setEntrando] = useState(false)
-  if (verificacao !== 'codigo' && !entrando) return <Navigate to="/" replace />
+  if (verificacao !== 'codigo' && !entrando) return <Navigate to={volta} replace />
 
   return (
     <TelaDeAcesso>
@@ -21,7 +23,7 @@ export default function VerificarCodigo() {
       <FormularioCodigo aoEnviando={setEntrando} aoConfirmar={async () => {
         // Com o código, o banco libera o resto do perfil (a consultoria, a logo).
         await recarregarPerfil()
-        navigate('/', { replace: true })
+        navigate(volta, { replace: true })
       }} />
       <p className="mt-4 text-corpo text-muted-foreground text-pretty">
         Perdeu o celular? Peça a quem administra o seu acesso para zerar a verificação em duas etapas.

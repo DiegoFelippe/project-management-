@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  apagarArquivo, apagarPasta, criarPasta, enviarArquivo, linkParaBaixar, listarArquivos, listarPastas, renomearPasta,
+  apagarArquivo, apagarPasta, buscarPasta, criarPasta, enviarArquivo, linkParaBaixar, listarArquivos, listarPastas, renomearPasta,
 } from '@/data/arquivos'
 import { renderizarTela } from '@/test/renderizar'
 import ArquivosDoCliente from './ArquivosDoCliente'
@@ -22,7 +22,7 @@ afterAll(() => {
 
 vi.mock('@/data/arquivos', () => ({
   listarArquivos: vi.fn(), enviarArquivo: vi.fn(), linkParaBaixar: vi.fn(), apagarArquivo: vi.fn(),
-  listarPastas: vi.fn(), criarPasta: vi.fn(), renomearPasta: vi.fn(), apagarPasta: vi.fn(),
+  listarPastas: vi.fn(), criarPasta: vi.fn(), renomearPasta: vi.fn(), apagarPasta: vi.fn(), buscarPasta: vi.fn(),
 }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
 
@@ -418,5 +418,25 @@ describe('ArquivosDoCliente', () => {
       await userEvent.click(within(await linhaDaPasta('Contratos')).getByRole('button', { name: 'Abrir' }))
       expect(await screen.findByText('Nenhum arquivo nesta pasta.')).toBeInTheDocument()
     })
+  })
+})
+
+// O Calendário leva à pasta da reunião: /clientes/<id>?aba=arquivos&pasta=<id da pasta>.
+describe('ArquivosDoCliente aberto numa pasta pelo endereço', () => {
+  it('abre a pasta do endereço (lida no banco) e mostra só os arquivos dela', async () => {
+    vi.mocked(buscarPasta).mockResolvedValue({ id: 'd2', nome: 'Reunião 12/11', cliente_id: 'k1' })
+    renderizarTela(<ArquivosDoCliente cliente={CLIENTE} perfil={central} />, { perfil: central, endereco: '/clientes/k1?aba=arquivos&pasta=d2' })
+    expect(await screen.findByRole('heading', { name: 'Reunião 12/11' })).toBeInTheDocument()
+    expect(buscarPasta).toHaveBeenCalledWith('d2')
+    await waitFor(() => expect(listarArquivos).toHaveBeenLastCalledWith('k1', { pastaId: 'd2', pagina: 1 }))
+    expect(screen.getByRole('button', { name: 'Voltar' })).toBeInTheDocument()
+  })
+
+  it('pasta de outro cliente (ou que a pessoa não vê) fica na raiz', async () => {
+    vi.mocked(buscarPasta).mockResolvedValue({ id: 'd9', nome: 'De outro', cliente_id: 'k2' })
+    renderizarTela(<ArquivosDoCliente cliente={CLIENTE} perfil={central} />, { perfil: central, endereco: '/clientes/k1?aba=arquivos&pasta=d9' })
+    await waitFor(() => expect(buscarPasta).toHaveBeenCalledWith('d9'))
+    expect(await screen.findByRole('heading', { name: 'Arquivos' })).toBeInTheDocument()
+    expect(screen.queryByText('De outro')).not.toBeInTheDocument()
   })
 })

@@ -30,7 +30,20 @@ async function buscarAvisando(...argumentos) {
   return resposta
 }
 
-export const supabase = createClient(supabaseUrl, supabasePublishableKey, { global: { fetch: buscarAvisando } })
+// Volta do login na URL (Google, SSO, convite e recuperação, no fluxo implícito: #access_token=… ou ?error=…), a mesma
+// regra do supabase-js, menos em /calendario: lá o ?code=…&state=… (ou ?error=…) é a volta do "Conectar Google" do
+// Calendário, que a própria tela conclui. Sem isto, o ?error= de quem recusou no Google seria lido como falha de login.
+// O ?code= do Google nunca é trocado pelo supabase-js: no fluxo implícito (o padrão, mantido) ele não guarda o
+// code-verifier de PKCE, e só troca código quando há um.
+export function ehVoltaDoLogin(url, parametros) {
+  if (url.pathname === '/calendario') return false
+  return Boolean(parametros.access_token || parametros.error || parametros.error_description || parametros.error_code)
+}
+
+export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
+  auth: { detectSessionInUrl: ehVoltaDoLogin },
+  global: { fetch: buscarAvisando },
+})
 
 // O Supabase responde com uma página de erro crua quando o provedor está desligado;
 // por isso a tela pergunta antes de mandar a pessoa para o Google.

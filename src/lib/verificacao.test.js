@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { codigoCompleto, destinoObrigatorio, nivelDaSessao, situacaoDaVerificacao, situacaoNaFicha } from './verificacao'
+import { codigoCompleto, destinoObrigatorio, nivelDaSessao, situacaoDaVerificacao, situacaoNaFicha, voltaDepoisDaVerificacao } from './verificacao'
 
 // Token com só a parte do meio que importa (o app nunca confia nele para segurança: quem barra é o banco).
 const token = (carga) => `x.${btoa(JSON.stringify(carga)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}.y`
@@ -66,5 +66,16 @@ describe('codigoCompleto', () => {
     expect(codigoCompleto('12345')).toBe(false)
     expect(codigoCompleto('12345a')).toBe(false)
     expect(codigoCompleto('1234567')).toBe(false)
+  })
+})
+
+describe('voltaDepoisDaVerificacao', () => {
+  it('volta para o endereço do app que a pessoa pediu (com a busca), nunca para fora dele', () => {
+    expect(voltaDepoisDaVerificacao({ de: '/calendario?code=abc&state=xyz' })).toBe('/calendario?code=abc&state=xyz')
+    expect(voltaDepoisDaVerificacao({ de: '//golpe.test/x' })).toBe('/')
+    expect(voltaDepoisDaVerificacao({ de: 'https://golpe.test' })).toBe('/')
+    expect(voltaDepoisDaVerificacao({ de: '/\\golpe.test' })).toBe('/')
+    expect(voltaDepoisDaVerificacao({ de: '/verificar' })).toBe('/')
+    expect(voltaDepoisDaVerificacao(null)).toBe('/')
   })
 })
