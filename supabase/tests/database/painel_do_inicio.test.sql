@@ -3,7 +3,7 @@
 -- consultores_por_ocupacao e consultorias_por_ocupacao. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(150);
+select plan(156);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -641,6 +641,12 @@ reset role;
 update public.checkins_horas_mes set segundos = segundos + 999 where consultoria_id = testes.id('A') and mes = '2025-09-01';
 delete from public.checkins_horas_mes where consultoria_id = testes.id('B') and mes = '2025-09-01';
 insert into public.checkins_horas_mes (consultoria_id, mes, segundos) values (testes.id('Z'), '2020-01-01', 5);
+-- O resumo por consultor também, estragado do mesmo jeito.
+update private.checkins_horas_consultor_mes set segundos = segundos + 999
+  where consultor_id = testes.id('pessoa_a') and consultoria_id = testes.id('A') and mes = '2025-09-01';
+delete from private.checkins_horas_consultor_mes where consultoria_id = testes.id('B') and mes = '2025-09-01';
+insert into private.checkins_horas_consultor_mes (consultor_id, consultoria_id, mes, segundos)
+  values (testes.id('pessoa_a'), testes.id('Z'), '2020-01-01', 5);
 select private.recalcular_horas_mes();
 select ok((select not exists (
     select 1 from (
@@ -650,6 +656,15 @@ select ok((select not exists (
     full join public.checkins_horas_mes r on r.consultoria_id = d.consultoria_id and r.mes = d.mes
     where d.segundos is distinct from r.segundos)),
   'resumo: o recálculo da migração bate com a recontagem direta');
+select ok((select not exists (
+    select 1 from (
+      select k.consultor_id, k.consultoria_id, date_trunc('month', k.inicio at time zone 'America/Sao_Paulo')::date as mes,
+        sum(extract(epoch from k.fim - k.inicio)) as segundos
+      from public.checkins k where k.fim is not null group by 1, 2, 3) d
+    full join private.checkins_horas_consultor_mes r
+      on r.consultor_id = d.consultor_id and r.consultoria_id = d.consultoria_id and r.mes = d.mes
+    where d.segundos is distinct from r.segundos)),
+  'resumo por consultor: o recálculo (private.recalcular_horas_mes) também o refaz igual à recontagem direta');
 select ok((select exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'checkins_horas_mes'
     and indexdef like '%(mes)%')), 'resumo: índice por mês');
 
@@ -709,6 +724,38 @@ select testes.como('pessoa_a');
 select throws_ok($$ select * from private.checkins_horas_consultor_mes $$, '42501', null,
   'resumo por consultor: sem acesso direto para quem está logado');
 reset role;
+
+-- Apagar uma pessoa com check-ins (um fechado e um aberto, que o gatilho do cliente fecha quando o consultor sai)
+-- funciona e não deixa resumo dela; os dois resumos continuam batendo com os check-ins.
+create function testes.resumo_por_consultoria_confere() returns boolean language sql stable as $$
+  select not exists (
+    select 1 from (
+      select k.consultoria_id, date_trunc('month', k.inicio at time zone 'America/Sao_Paulo')::date as mes,
+        sum(extract(epoch from k.fim - k.inicio)) as segundos
+      from public.checkins k where k.fim is not null group by 1, 2) d
+    full join public.checkins_horas_mes r on r.consultoria_id = d.consultoria_id and r.mes = d.mes
+    where coalesce(d.segundos, 0) is distinct from coalesce(r.segundos, 0))
+$$;
+select testes.perfil('apagar_a', 'pessoa', 'A');
+select testes.cliente('cli_apagar', 10, 'A', 'apagar_a');
+select testes.como('apagar_a');
+insert into public.checkins (cliente_id, inicio, fim, descricao) values
+  (testes.id('cli_apagar'), '2026-06-03 08:00-03', '2026-06-03 10:00-03', 'Junho');
+insert into public.checkins (cliente_id, inicio, descricao) values (testes.id('cli_apagar'), '2026-06-04 08:00-03', 'Aberto');
+reset role;
+select set_config('request.jwt.claims', '', true);
+select is((select sum(segundos) from private.checkins_horas_consultor_mes where consultor_id = testes.id('apagar_a')), 7200::numeric,
+  'antes de apagar: o resumo da pessoa tem as 2 h do check-in fechado');
+select lives_ok($$ delete from auth.users where id = testes.id('apagar_a') $$,
+  'apagar a pessoa (usuário e perfil) com check-in fechado e aberto funciona');
+select is((select count(*)::int from private.checkins_horas_consultor_mes where consultor_id = testes.id('apagar_a')), 0,
+  'não sobra resumo da pessoa apagada');
+select ok(testes.resumo_por_consultor_confere() and testes.resumo_por_consultoria_confere(),
+  'depois de apagar a pessoa: os dois resumos batem com os check-ins');
+-- Apagar os check-ins de uma consultoria (o caminho para apagar os dados dela) mantém os dois resumos.
+delete from public.checkins where consultoria_id = testes.id('B');
+select ok(testes.resumo_por_consultor_confere() and testes.resumo_por_consultoria_confere(),
+  'apagar os check-ins de uma consultoria: os dois resumos batem com os check-ins');
 
 -- ── Sem recorte ──────────────────────────────────────────────────────────────
 select testes.como('inativo_a');

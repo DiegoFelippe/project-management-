@@ -3,13 +3,9 @@ import { MENSAGEM_SSO, erroDeRecuperacao, traduzirErroAuth } from '@/lib/erros'
 import { EVENTO_CONFERIR_ACESSO, provedorLigado, supabase } from '@/lib/supabase'
 import { nivelDaSessao, situacaoDaVerificacao } from '@/lib/verificacao'
 import { adotarTemaDoPerfil } from '@/tema/tema'
+import { CAMPOS_DA_VERIFICACAO, CAMPOS_PERFIL } from './camposDoPerfil'
 import { AuthContext } from './useAuth'
 
-const CAMPOS_PERFIL =
-  'id, nome, email, foto, cor, papel, consultoria_id, precisa_trocar_senha, exige_2fa, verificacao_desde, telefone, cidade, uf, cargo, data_entrada, tipos_de_consultoria, carga_semanal, consultoria:consultorias(nome, logo), preferencias(tema)'
-// O que pode mudar com a sessão aberta (quem administra exige a verificação ou zera o app): conferido de novo a cada
-// tela, ao voltar para a aba e quando algo é recusado. A própria pessoa sempre lê o próprio perfil, mesmo com aal1.
-const CAMPOS_DA_VERIFICACAO = 'exige_2fa, verificacao_desde'
 const INTERVALO_ENTRE_CONFERENCIAS = 2000
 
 const resultado = (error) => ({ erro: error ? traduzirErroAuth(error) : null })

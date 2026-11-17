@@ -2,12 +2,13 @@
 -- atual mais 2.300.000 nos 23 meses anteriores (100.000 por mês: o período vai até 2 anos), criados aqui e desfeitos
 -- no fim (rollback: nada fica no banco). Média de 5 execuções, com 50% de folga:
 -- - Mês: 500 ms para a central (tudo), 150 ms para uma consultoria e 100 ms para um consultor;
--- - "Este ano" no pior caso (12 meses até hoje, o "Este ano" de dezembro) e o Personalizado mais longo (2 anos até
---   hoje): 600 ms para a central, 150 ms para a consultoria e 100 ms para o consultor (os meses inteiros vêm dos
---   resumos por mês; só as bordas leem check-ins). Roda com: npm run test:db
+-- - "Este ano" no pior caso (12 meses até hoje, o "Este ano" de dezembro) e o Personalizado mais longo (quase 2 anos,
+--   do meio do mês mais antigo até hoje, com as duas bordas cheias): 600 ms para a central, 150 ms para a consultoria
+--   e 100 ms para o consultor (os meses inteiros vêm dos resumos por mês; só as bordas leem check-ins).
+--   Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(16);
+select plan(17);
 
 create schema testes;
 grant usage on schema testes to authenticated;
@@ -29,7 +30,9 @@ end $$;
 grant execute on function testes.media_ms() to authenticated;
 
 -- "Este ano" no pior caso: 12 meses até hoje (o "Este ano" de dezembro). Fixo assim, a medida não muda com o mês em
--- que o teste roda. E o Personalizado mais longo: 2 anos até hoje (o banco aceita até < de + 2 anos).
+-- que o teste roda. E o Personalizado mais longo com as duas bordas cheias: do dia 5 do mês mais antigo do volume (23
+-- meses atrás; os check-ins de cada mês antigo vão do dia 1 ao 13, então a borda de 5 em diante tem ~70.000) até hoje
+-- (a borda do mês atual tem os 200.000). Fica abaixo de 2 anos (o banco aceita até < de + 2 anos) e toca 24 meses.
 create function testes.ano_de() returns date language sql stable as $$
   select (date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '11 months')::date
 $$;
@@ -37,7 +40,7 @@ create function testes.hoje() returns date language sql stable as $$
   select (now() at time zone 'America/Sao_Paulo')::date
 $$;
 create function testes.dois_anos_de() returns date language sql stable as $$
-  select ((now() at time zone 'America/Sao_Paulo')::date - interval '2 years' + interval '1 day')::date
+  select (date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '23 months' + interval '4 days')::date
 $$;
 grant execute on function testes.ano_de(), testes.hoje(), testes.dois_anos_de() to authenticated;
 
@@ -121,20 +124,10 @@ left join v_pessoas p on v.n <= 48000 and ((v.n - 1) / 200) % 16 < 15
 alter table public.checkins disable trigger checkins_validar;
 alter table public.checkins disable trigger checkins_resumir_horas;
 
-insert into public.checkins (cliente_id, consultor_id, consultoria_id, inicio, fim, descricao)
-select cl.id, p.id, c.id, m.de + x.i * m.passo, m.de + x.i * m.passo + m.passo / 2, 'Atendimento'
-from generate_series(1, 200000) k
-cross join lateral (select (k - 1) % 3000 + 1 as n, (k - 1) / 3000 as i) x
-cross join (
-  select de, greatest((now() - de) / 70, interval '2 seconds') as passo
-  from (select date_trunc('month', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo' as de) d
-) m
-join v_pessoas p on p.n = x.n
-join v_consultorias c on c.n = (x.n - 1) % 200 + 1
-join v_clientes cl on cl.n = x.n + 3200 * (x.i % 15);
-
 -- Histórico: 100.000 check-ins em cada um dos 23 meses anteriores (o período vai até 2 anos). O i-ésimo do consultor
--- no mês começa em início do mês + i x 9 h e dura 4 h (34 por consultor: cabem no mês, sem sobreposição).
+-- no mês começa em início do mês + i x 9 h e dura 4 h (34 por consultor: cabem no mês, sem sobreposição). Gravados
+-- em ordem de início, do mais antigo ao mais novo, e só depois o mês atual: no banco de verdade os check-ins entram
+-- na ordem do tempo, e o planejador conta com isso (ordem física ≈ ordem de início) para ler um mês pelo índice.
 insert into public.checkins (cliente_id, consultor_id, consultoria_id, inicio, fim, descricao)
 select cl.id, p.id, c.id, m.de + x.i * interval '9 hours', m.de + x.i * interval '9 hours' + interval '4 hours', 'Histórico'
 from generate_series(1, 23) atras
@@ -145,7 +138,21 @@ cross join lateral (
 ) m
 join v_pessoas p on p.n = x.n
 join v_consultorias c on c.n = (x.n - 1) % 200 + 1
-join v_clientes cl on cl.n = x.n + 3200 * (x.i % 15);
+join v_clientes cl on cl.n = x.n + 3200 * (x.i % 15)
+order by 4;
+
+insert into public.checkins (cliente_id, consultor_id, consultoria_id, inicio, fim, descricao)
+select cl.id, p.id, c.id, m.de + x.i * m.passo, m.de + x.i * m.passo + m.passo / 2, 'Atendimento'
+from generate_series(1, 200000) k
+cross join lateral (select (k - 1) % 3000 + 1 as n, (k - 1) / 3000 as i) x
+cross join (
+  select de, greatest((now() - de) / 70, interval '2 seconds') as passo
+  from (select date_trunc('month', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo' as de) d
+) m
+join v_pessoas p on p.n = x.n
+join v_consultorias c on c.n = (x.n - 1) % 200 + 1
+join v_clientes cl on cl.n = x.n + 3200 * (x.i % 15)
+order by 4;
 
 alter table public.checkins enable trigger checkins_validar;
 alter table public.checkins enable trigger checkins_resumir_horas;
@@ -165,6 +172,13 @@ where k.fim is not null and k.consultoria_id in (select id from v_consultorias)
 group by 1, 2, 3
 on conflict (consultor_id, consultoria_id, mes)
   do update set segundos = private.checkins_horas_consultor_mes.segundos + excluded.segundos;
+
+-- Estatísticas do volume, como o autovacuum deixaria no banco de verdade. Sem isso o planejador usa as do banco local
+-- (quase vazio, e mudando conforme os outros testes): na mesma carga, o consultor já mediu de 5 ms a 22 s no "Este
+-- ano", escolhendo o índice por data em vez do índice do cliente ou do consultor. O ANALYZE vê as linhas desta
+-- transação; as estatísticas voltam com o rollback.
+analyze public.checkins, public.clientes, public.perfis, public.consultorias, public.ausencias,
+  public.checkins_horas_mes, private.checkins_horas_consultor_mes;
 
 -- ── Tempos ───────────────────────────────────────────────────────────────────
 -- O consultor n = 401 é o primeiro 'pessoa' (consultoria 1); o administrador n = 1 (consultoria 1).
@@ -201,6 +215,10 @@ select ok((select bool_and((e ->> 'ocupacao')::numeric = round(round(f.segundos 
   '2 anos: a utilização de cada consultor nos extremos = soma direta dos check-ins / capacidade (resumo por consultor + borda)');
 select is(jsonb_array_length(public.painel_do_inicio(p_de => testes.dois_anos_de(), p_ate => testes.hoje()) -> 'horas_por_mes'), 24,
   '2 anos: o gráfico mostra 24 meses');
+select ok((select count(*) > 50000 from public.checkins k
+    where k.inicio >= testes.dois_anos_de()::timestamp at time zone 'America/Sao_Paulo'
+      and k.inicio < (date_trunc('month', testes.dois_anos_de()) + interval '1 month') at time zone 'America/Sao_Paulo'),
+  '2 anos: a borda do mês mais antigo tem check-ins (as duas bordas são lidas, o pior caso)');
 select performs_within('select public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje())', 450, 450, 5,
   'central, Este ano (12 meses, 3.000 consultores, 1,3 milhão de check-ins): em até 600 ms na média (+50%)');
 select performs_within('select public.painel_do_inicio(p_de => testes.dois_anos_de(), p_ate => testes.hoje())', 450, 450, 5,
