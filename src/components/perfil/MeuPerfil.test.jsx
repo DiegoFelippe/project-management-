@@ -3,14 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '@/auth/useAuth'
 import { listarAusencias } from '@/data/capacidade'
-import { trocarFoto } from '@/data/imagens'
+import { mudarCor, trocarFoto } from '@/data/imagens'
 import { atualizarMeuContato, gerenciarAcesso } from '@/data/usuarios'
 import { escolherNoSeletor } from '@/test/campos'
 import MeuPerfil from './MeuPerfil'
 
 vi.mock('@/data/usuarios', () => ({ gerenciarAcesso: vi.fn(), atualizarMeuContato: vi.fn() }))
 vi.mock('@/data/capacidade', () => ({ listarAusencias: vi.fn() }))
-vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn(), tirarFoto: vi.fn() }))
+vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn(), tirarFoto: vi.fn(), mudarCor: vi.fn() }))
 
 const perfil = {
   id: 'me', nome: 'Diego Felippe', email: 'diego@exemplo.test', papel: 'admin', consultoria: { nome: 'Acme' },
@@ -27,6 +27,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(gerenciarAcesso).mockResolvedValue({ erro: null })
   vi.mocked(trocarFoto).mockResolvedValue({ erro: null })
+  vi.mocked(mudarCor).mockResolvedValue({ erro: null })
   vi.mocked(atualizarMeuContato).mockResolvedValue({ erro: null })
   vi.mocked(listarAusencias).mockResolvedValue({ itens: [{ id: 'a1', perfil_id: 'me', de: '2026-12-20', ate: '2027-01-05', motivo: 'Férias' }], total: 1 })
   recarregarPerfil = vi.fn().mockResolvedValue(undefined)
@@ -57,6 +58,21 @@ describe('Meu perfil', () => {
     expect(trocarFoto).toHaveBeenCalledWith('me', arquivo, undefined)
     expect(recarregarPerfil).toHaveBeenCalled()
     expect(aoFechar).toHaveBeenCalled()
+  })
+
+  it('escolhe a própria cor do avatar: a prévia muda na hora e a cor é gravada ao salvar', async () => {
+    const grupo = screen.getByRole('radiogroup', { name: 'Cor do avatar' })
+    await userEvent.click(within(grupo).getByRole('radio', { name: 'Rosa' }))
+    expect(within(grupo).getByRole('radio', { name: 'Rosa' })).toBeChecked()
+    expect(screen.getByText('DF')).toHaveStyle({ backgroundColor: '#db2777' })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(mudarCor).toHaveBeenCalledWith('me', '#db2777')
+    expect(recarregarPerfil).toHaveBeenCalled()
+  })
+
+  it('sem mexer na cor, não grava cor', async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(mudarCor).not.toHaveBeenCalled()
   })
 
   it('troca a senha quando as duas são iguais', async () => {

@@ -1,5 +1,5 @@
-import { CheckCircle2, KeyRound, MailCheck, Pencil, Power, RotateCcw, Send, ShieldCheck, UserPlus, UserX, User, Users, Gauge } from 'lucide-react'
-import { useCallback, useId, useState } from 'react'
+import { CheckCircle2, KeyRound, MailCheck, Pencil, Power, RotateCcw, Send, ShieldCheck, UserPlus, UserX, User } from 'lucide-react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import Caixa from '@/components/campos/Caixa'
 import CampoData from '@/components/campos/CampoData'
@@ -10,6 +10,7 @@ import { lerHoras } from '@/components/clientes/rotulos'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import CampoImagem from '@/components/comum/CampoImagem'
 import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import SeletorDeCor from '@/components/comum/SeletorDeCor'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,8 +27,9 @@ import { cn } from '@/lib/utils'
 const CARGA_PADRAO = 44
 const CAMPOS_DE_TEXTO = ['cargo', 'telefone', 'cidade', 'uf', 'data_entrada']
 
-// Em que aba aparece o erro de cada campo (ponto vermelho na aba).
-const ABA_DO_ERRO = { nome: 'dados', email: 'dados', data_entrada: 'dados', consultoria: 'papel', carga: 'capacidade', senha: 'acesso' }
+// Em que aba aparece o erro de cada campo (ponto vermelho na aba) e qual campo recebe o foco ao pular para ela.
+const ABA_DO_ERRO = { nome: 'dados', email: 'dados', data_entrada: 'dados', consultoria: 'dados', carga: 'dados', senha: 'acesso' }
+const CAMPO_DO_ERRO = { nome: 'ficha-nome', email: 'ficha-email', data_entrada: 'ficha-entrada', consultoria: 'ficha-consultoria', carga: 'ficha-carga', senha: 'ficha-senha' }
 
 const OPCOES_DE_UF = UFS.map((uf) => ({ valor: uf, rotulo: uf }))
 const comoTexto = (valor) => String(valor ?? '')
@@ -123,13 +125,14 @@ function CartaoDoAcesso({ pessoa, aoReenviar, podeReenviar }) {
 }
 
 // A ficha do consultor: a mesma janela para criar (Novo acesso) e para editar (pessoa preenchida).
-// Layout do Hub (PersonWindow): abas no cabeçalho, na ordem Dados pessoais, Papel e times, Capacidade, Acesso (as três
-// últimas só quando a pessoa tem o que mostrar), Desativar/Reativar no rodapé à esquerda. Quem pode o quê vem de `perfilDeQuem`
+// Layout do Hub (PersonWindow): duas abas no cabeçalho, Dados pessoais e Acesso (esta só quando há o que mostrar).
+// Papel e times e Capacidade são seções de Dados pessoais, nas mesmas condições de antes. Desativar/Reativar no
+// rodapé à esquerda. Quem pode o quê vem de `perfilDeQuem`
 // (papéis em src/lib/papeis.js); o banco e as Edge Functions conferem de novo.
 //
-// Novo: aoCriar(pedido, { carga }) e aoColocarNosTimes(pessoaId, timesIds). `buscarConsultorias(termo)` (só para
+// Novo: aoCriar(pedido, { carga, foto, cor }) (a tela envia a foto e grava a cor depois de criar) e aoColocarNosTimes(pessoaId, timesIds). `buscarConsultorias(termo)` (só para
 // quem vê tudo criando um administrador) devolve { itens: [{ id, nome }], total } do banco: a lista nunca vem inteira.
-// Editar: aoSalvar({ mudancas, carga, timesAdicionar, timesRemover, foto }), mais aoReenviar() e
+// Editar: aoSalvar({ mudancas, carga, timesAdicionar, timesRemover, foto, cor }), mais aoReenviar() e
 // aoPedirAtivo('desativar' | 'reativar') quando podeReenviar / podeDesativar.
 export default function FichaDoConsultor({
   aberto, aoFechar, perfilDeQuem, pessoa = null, times = [], consultoriaId = '', buscarConsultorias,
@@ -152,12 +155,16 @@ export default function FichaDoConsultor({
   const timesIniciais = (pessoa?.times ?? []).map((t) => t.id).filter((id) => times.some((t) => t.id === id))
   const [marcados, setMarcados] = useState(timesIniciais)
   const [foto, setFoto] = useState(null)
+  const [corEscolhida, setCorEscolhida] = useState(null)
+  const focar = useRef(null)
   const [erros, setErros] = useState({})
   const [erro, setErro] = useState(null)
   const [jaExiste, setJaExiste] = useState(null)
   const [enviando, setEnviando] = useState(false)
   const [abaEscolhida, setAbaEscolhida] = useState('dados')
   const idBase = `ficha${useId()}`
+  const corPadrao = pessoa?.cor ?? corDe(pessoa ? pessoa.id : 'nova-pessoa')
+  const reservaCor = corEscolhida ?? corPadrao
 
   const mudar = (campo) => (evento) => setDados((d) => ({ ...d, [campo]: evento.target.value }))
   const definir = (campo) => (valor) => setDados((d) => ({ ...d, [campo]: valor }))
@@ -182,12 +189,23 @@ export default function FichaDoConsultor({
   const mostraAcesso = novo || (podeReenviar && pessoa.convite_pendente) || podeDesativar
   const abas = [
     { valor: 'dados', rotulo: 'Dados pessoais', icone: User },
-    ...(mostraPapel ? [{ valor: 'papel', rotulo: 'Papel e times', icone: Users }] : []),
-    ...(mostraCapacidade ? [{ valor: 'capacidade', rotulo: 'Capacidade', icone: Gauge }] : []),
     ...(mostraAcesso ? [{ valor: 'acesso', rotulo: 'Acesso', icone: ShieldCheck }] : []),
   ].map((a) => ({ ...a, erro: Object.keys(erros).some((campo) => ABA_DO_ERRO[campo] === a.valor) }))
-  // Se a aba escolhida some (ex.: o papel mudou para um sem Capacidade), volta para a primeira.
   const aba = abas.some((a) => a.valor === abaEscolhida) ? abaEscolhida : 'dados'
+
+  // Depois de pular de aba por causa de um erro, o foco vai para o primeiro campo com erro (o painel já está montado).
+  useEffect(() => {
+    if (!focar.current) return
+    document.getElementById(focar.current)?.focus()
+    focar.current = null
+  }, [aba])
+
+  // Vai para a aba do campo e o foca (se a aba já é a atual, o painel está montado e foca na hora).
+  function irParaOCampo(abaDoCampo, idDoCampo) {
+    if (abaDoCampo === aba) return document.getElementById(idDoCampo)?.focus()
+    focar.current = idDoCampo
+    setAbaEscolhida(abaDoCampo)
+  }
 
   function fechar() {
     setErro(null)
@@ -211,8 +229,10 @@ export default function FichaDoConsultor({
 
   // Cada erro pertence a uma aba; ao salvar com erro a ficha vai para a primeira aba (na ordem) que tem um.
   function irParaPrimeiraAbaComErro(achados) {
-    const aba = abas.find((a) => Object.keys(achados).some((campo) => ABA_DO_ERRO[campo] === a.valor))
-    if (aba) setAbaEscolhida(aba.valor)
+    const destino = abas.find((a) => Object.keys(achados).some((campo) => ABA_DO_ERRO[campo] === a.valor))
+    if (!destino) return
+    const campo = Object.keys(achados).find((c) => ABA_DO_ERRO[c] === destino.valor)
+    irParaOCampo(destino.valor, CAMPO_DO_ERRO[campo])
   }
 
   // Carga a gravar: no Novo, só se for diferente da padrão; no Editar, só se mudou.
@@ -223,9 +243,14 @@ export default function FichaDoConsultor({
     return horas === antes ? undefined : horas
   }
 
+  // Cor a gravar: só se a pessoa escolheu uma e ela é diferente da que já vale (a salva ou a automática).
+  function corNova() {
+    return corEscolhida && corEscolhida !== corPadrao ? corEscolhida : undefined
+  }
+
   function avisarConsultoria(mensagem) {
     setErros({ consultoria: true })
-    setAbaEscolhida('papel')
+    irParaOCampo('dados', 'ficha-consultoria')
     setErro(mensagem)
   }
 
@@ -248,12 +273,11 @@ export default function FichaDoConsultor({
     if (dados.forma === 'senha') pedido.senha = dados.senha
     for (const campo of CAMPOS_DE_TEXTO) if (dados[campo].trim()) pedido[campo] = dados[campo].trim()
     if (papelAtual === 'admin') pedido.consultoria_id = consultoria
-    const resposta = await aoCriar(pedido, { carga: cargaNova() })
+    const resposta = await aoCriar(pedido, { carga: cargaNova(), foto: foto ?? undefined, cor: corNova() })
     setEnviando(false)
     if (resposta?.codigo === 'ja_na_consultoria') {
       setErro(resposta.erro)
       setJaExiste(resposta.pessoa)
-      if (mostraTimes) setAbaEscolhida('papel')
       return
     }
     if (resposta?.erro) return setErro(resposta.erro)
@@ -275,6 +299,7 @@ export default function FichaDoConsultor({
       timesAdicionar: marcados.filter((id) => !timesIniciais.includes(id)),
       timesRemover: timesIniciais.filter((id) => !marcados.includes(id)),
       foto,
+      cor: corNova(),
     })
     setEnviando(false)
     if (resposta?.erro) return setErro(resposta.erro)
@@ -307,7 +332,8 @@ export default function FichaDoConsultor({
   }
 
   const estado = novo ? null : situacao(pessoa)
-  const reservaCor = corDe(novo ? 'nova-pessoa' : pessoa.id)
+  // Com foto (a atual ou a escolhida agora) a cor não aparece; ela só vale para as iniciais.
+  const semFoto = foto?.arquivo ? false : foto?.tirar ? true : !pessoa?.foto
   const ativa = (valor) => aba === valor
   const painel = (valor, children) => ativa(valor) && (
     <div role="tabpanel" id={`${idBase}-painel-${valor}`} aria-labelledby={`${idBase}-aba-${valor}`} className="space-y-5">{children}</div>
@@ -352,18 +378,11 @@ export default function FichaDoConsultor({
         {painel('dados', (
           <>
             <div role="group" aria-label="Identificação" className="bg-muted/40 flex flex-col gap-4 rounded-2xl border p-4 sm:flex-row sm:items-center sm:gap-6">
-              {novo
-                ? (
-                  <span className="grid size-24 shrink-0 place-items-center self-center rounded-2xl text-[26px] font-bold text-white" style={{ backgroundColor: reservaCor }}>
-                    {iniciais(dados.nome) || <User className="size-9" aria-hidden="true" />}
-                  </span>
-                )
-                : (
-                  <div className="self-center">
-                    <CampoImagem aparencia="cartao" rotulo="foto" atual={urlPublica('fotos', pessoa.foto)} reserva={iniciais(dados.nome || pessoa.nome)}
-                      reservaCor={reservaCor} valor={foto} aoMudar={setFoto} />
-                  </div>
-                )}
+              <div className="self-center">
+                <CampoImagem aparencia="cartao" rotulo="foto" atual={novo ? null : urlPublica('fotos', pessoa.foto)}
+                  reserva={iniciais(dados.nome || pessoa?.nome) || <User className="size-9" aria-hidden="true" />}
+                  reservaCor={reservaCor} valor={foto} aoMudar={setFoto} />
+              </div>
               <div className="grid min-w-0 flex-1 gap-3">
                 <Campo id="ficha-nome" rotulo="Nome" erro={erros.nome}>
                   <Input id="ficha-nome" autoComplete="off" maxLength={120} className="h-10"
@@ -373,6 +392,7 @@ export default function FichaDoConsultor({
                   {estado && estado !== 'Ativo' && <Badge variant={estado === 'Desativado' ? 'outline' : estado === 'Senha provisória' ? 'secondary' : 'notice'}>{estado}</Badge>}
                   {dados.papel && <Badge variant="outline">{rotuloDoPapel(dados.papel)}</Badge>}
                 </div>
+                {semFoto && <SeletorDeCor valor={reservaCor} aoMudar={setCorEscolhida} />}
               </div>
             </div>
             <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
@@ -404,45 +424,45 @@ export default function FichaDoConsultor({
                 <CampoData id="ficha-entrada" valor={dados.data_entrada} aoMudar={definir('data_entrada')} max={hoje()} />
               </Campo>
             </div>
+
+            {mostraPapel && (
+              <Bloco titulo="Papel e times">
+                <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                  {(novo || mudaPapel) && (
+                    <Campo id="ficha-papel" rotulo="Papel">
+                      <Seletor id="ficha-papel" valor={dados.papel} aoMudar={definir('papel')} opcoes={opcoesDePapel} />
+                    </Campo>
+                  )}
+                  {escolheConsultoria && (
+                    <Campo id="ficha-consultoria" rotulo="Consultoria">
+                      <Seletor id="ficha-consultoria" valor={dados.consultoria} aoMudar={definir('consultoria')} buscar={buscarOpcoesDeConsultoria} placeholder="Escolha…" />
+                    </Campo>
+                  )}
+                </div>
+                {mostraTimes && (
+                  <EscolhaDeTimes times={times} marcados={marcados} aoAlternar={alternarTime}
+                    aviso={novo ? 'Nenhum time ainda. Dá para colocar a pessoa depois.' : null} />
+                )}
+              </Bloco>
+            )}
+
+            {mostraCapacidade && (
+              <Bloco titulo="Capacidade">
+                <div className="max-w-xs">
+                  <Campo id="ficha-carga" rotulo="Carga semanal (horas)" erro={erros.carga}>
+                    <CampoNumero id="ficha-carga" valor={dados.carga} aoMudar={definir('carga')} min={0} max={99} passo={0.5} decimal unidade="h" />
+                  </Campo>
+                  <p className="mt-2 text-xs text-muted-foreground">De 0 a 60. Com 0, a pessoa sai da sugestão de consultor.</p>
+                </div>
+                {!novo && (
+                  <div className="grid gap-2">
+                    <h4 className="text-sm font-medium">Ausências</h4>
+                    <GerirAusencias pessoa={pessoa} aoMudar={aoMudarAusencias} />
+                  </div>
+                )}
+              </Bloco>
+            )}
           </>
-        ))}
-
-        {painel('papel', (
-          <Bloco>
-            <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
-              {(novo || mudaPapel) && (
-                <Campo id="ficha-papel" rotulo="Papel">
-                  <Seletor id="ficha-papel" valor={dados.papel} aoMudar={definir('papel')} opcoes={opcoesDePapel} />
-                </Campo>
-              )}
-              {escolheConsultoria && (
-                <Campo id="ficha-consultoria" rotulo="Consultoria">
-                  <Seletor id="ficha-consultoria" valor={dados.consultoria} aoMudar={definir('consultoria')} buscar={buscarOpcoesDeConsultoria} placeholder="Escolha…" />
-                </Campo>
-              )}
-            </div>
-            {mostraTimes && (
-              <EscolhaDeTimes times={times} marcados={marcados} aoAlternar={alternarTime}
-                aviso={novo ? 'Nenhum time ainda. Dá para colocar a pessoa depois.' : null} />
-            )}
-          </Bloco>
-        ))}
-
-        {painel('capacidade', (
-          <Bloco>
-            <div className="max-w-xs">
-              <Campo id="ficha-carga" rotulo="Carga semanal (horas)" erro={erros.carga}>
-                <CampoNumero id="ficha-carga" valor={dados.carga} aoMudar={definir('carga')} min={0} max={99} passo={0.5} decimal unidade="h" />
-              </Campo>
-              <p className="mt-2 text-xs text-muted-foreground">De 0 a 60. Com 0, a pessoa sai da sugestão de consultor.</p>
-            </div>
-            {!novo && (
-              <div className="grid gap-2">
-                <h4 className="text-sm font-medium">Ausências</h4>
-                <GerirAusencias pessoa={pessoa} aoMudar={aoMudarAusencias} />
-              </div>
-            )}
-          </Bloco>
         ))}
 
         {painel('acesso', novo ? (

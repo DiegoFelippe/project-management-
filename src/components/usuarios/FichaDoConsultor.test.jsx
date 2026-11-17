@@ -44,14 +44,13 @@ async function opcoesDo(nome) {
   await userEvent.keyboard('{Escape}')
   return textos
 }
-const opcoesDoPapel = async () => { await irPara('Papel e times'); return opcoesDo('Papel') }
+const opcoesDoPapel = () => opcoesDo('Papel')
 const nomesDasAbas = () => screen.getAllByRole('tab').map((a) => a.textContent.replace(/, tem erro$/, ''))
 const irPara = (nome) => userEvent.click(screen.getByRole('tab', { name: new RegExp(`^${nome}`) }))
 
 async function preencher({ senha } = {}) {
   await userEvent.type(screen.getByLabelText('Nome'), 'João Pereira')
   await userEvent.type(screen.getByLabelText('E-mail'), 'joao@empresa.com.br')
-  await irPara('Papel e times')
   await userEvent.click(screen.getByRole('checkbox', { name: 'Implantação' }))
   if (senha) {
     await irPara('Acesso')
@@ -61,11 +60,11 @@ async function preencher({ senha } = {}) {
 }
 
 describe('FichaDoConsultor: Novo acesso', () => {
-  it('tem o título e as abas na ordem Dados pessoais, Papel e times, Capacidade, Acesso', () => {
+  it('tem o título e só duas abas: Dados pessoais e Acesso', () => {
     montarNovo()
     expect(screen.getByRole('dialog', { name: 'Nova pessoa' })).toBeInTheDocument()
     expect(screen.getByRole('tablist')).toBeInTheDocument()
-    expect(nomesDasAbas()).toEqual(['Dados pessoais', 'Papel e times', 'Capacidade', 'Acesso'])
+    expect(nomesDasAbas()).toEqual(['Dados pessoais', 'Acesso'])
     expect(screen.getByRole('tab', { name: 'Dados pessoais' })).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -116,9 +115,26 @@ describe('FichaDoConsultor: Novo acesso', () => {
     expect(screen.getByText(/O acesso é criado quando você clica em/)).toBeInTheDocument()
   })
 
-  it('o Novo não tem o botão de foto (a foto precisa do cadastro feito)', () => {
+  it('Dados pessoais traz, depois dos campos, as seções Papel e times e Capacidade (nada de abas para elas)', () => {
     montarNovo()
-    expect(screen.queryByRole('button', { name: 'Trocar a foto' })).not.toBeInTheDocument()
+    const painel = screen.getByRole('tabpanel', { name: 'Dados pessoais' })
+    expect(within(painel).getByRole('heading', { name: 'Papel e times' })).toBeInTheDocument()
+    expect(within(painel).getByRole('heading', { name: 'Capacidade' })).toBeInTheDocument()
+    expect(within(painel).getByLabelText('Carga semanal (horas)')).toBeInTheDocument()
+    expect(within(painel).getByRole('checkbox', { name: 'Implantação' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /Papel e times|Capacidade/ })).not.toBeInTheDocument()
+  })
+
+  it('o Novo tem o botão de foto: a prévia aparece e o arquivo vai junto no pedido de criar', async () => {
+    const { aoCriar } = montarNovo()
+    const arquivo = new File(['x'], 'rosto.png', { type: 'image/png' })
+    await userEvent.upload(screen.getByLabelText('Escolher foto'), arquivo)
+    expect(screen.getByRole('img', { name: 'Prévia da foto' })).toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup', { name: 'Cor do avatar' })).not.toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('Nome'), 'João Pereira')
+    await userEvent.type(screen.getByLabelText('E-mail'), 'joao@empresa.com.br')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
+    expect(aoCriar).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ foto: { arquivo } }))
   })
 
   it('e-mail inválido: ponto de erro na aba Dados pessoais e a ficha volta para ela', async () => {
@@ -133,7 +149,7 @@ describe('FichaDoConsultor: Novo acesso', () => {
     expect(screen.getByText('Digite um e-mail válido.')).toBeInTheDocument()
   })
 
-  it('erro só na senha leva para a aba Acesso', async () => {
+  it('erro só na senha leva para a aba Acesso e foca a senha', async () => {
     const { aoCriar } = montarNovo()
     await userEvent.type(screen.getByLabelText('Nome'), 'João Pereira')
     await userEvent.type(screen.getByLabelText('E-mail'), 'joao@empresa.com.br')
@@ -143,18 +159,19 @@ describe('FichaDoConsultor: Novo acesso', () => {
     expect(aoCriar).not.toHaveBeenCalled()
     expect(screen.getByRole('tab', { name: 'Acesso, tem erro' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('A senha precisa ter pelo menos 8 caracteres.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Senha provisória')).toHaveFocus()
     expect(screen.queryByRole('tab', { name: /Dados pessoais, tem erro/ })).not.toBeInTheDocument()
   })
 
-  it('carga inválida leva para a aba Capacidade', async () => {
+  it('carga inválida mostra o erro na seção Capacidade e foca o campo', async () => {
     montarNovo()
     await preencher()
-    await irPara('Capacidade')
     await userEvent.clear(screen.getByLabelText('Carga semanal (horas)'))
     await userEvent.type(screen.getByLabelText('Carga semanal (horas)'), '70')
-    await irPara('Dados pessoais')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
-    expect(screen.getByRole('tab', { name: 'Capacidade, tem erro' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Dados pessoais, tem erro' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('Use de 0 a 60 horas.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Carga semanal (horas)')).toHaveFocus()
   })
 
   it('gestor só cria consultor (papel pessoa no banco)', async () => {
@@ -183,10 +200,9 @@ describe('FichaDoConsultor: Novo acesso', () => {
 
   it('dono criando central não manda consultoria e não vê Capacidade', async () => {
     const { aoCriar } = montarNovo({ perfilDeQuem: { id: 'd1', papel: 'dono' }, consultoriaId: 'c1', times: [] })
-    await irPara('Papel e times')
     await escolherNoSeletor(userEvent, 'Papel', 'Central')
     expect(screen.queryByLabelText('Carga semanal (horas)')).not.toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: 'Capacidade' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Capacidade' })).not.toBeInTheDocument()
     await irPara('Dados pessoais')
     await userEvent.type(screen.getByLabelText('Nome'), 'Rita Alves')
     await userEvent.type(screen.getByLabelText('E-mail'), 'rita@acme.com.br')
@@ -216,7 +232,7 @@ describe('FichaDoConsultor: Novo acesso', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
     expect(aoCriar).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent(/Escolha uma consultoria/)
-    expect(screen.getByRole('tab', { name: 'Papel e times, tem erro' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Dados pessoais, tem erro' })).toHaveAttribute('aria-selected', 'true')
     await escolherNoSeletor(userEvent, 'Consultoria', 'Beta')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
     expect(aoCriar).toHaveBeenCalledWith(expect.objectContaining({ consultoria_id: 'c2' }), expect.anything())
@@ -255,7 +271,6 @@ describe('FichaDoConsultor: Novo acesso', () => {
     await userEvent.type(screen.getByLabelText('Cidade'), 'Campinas')
     await escolherNoSeletor(userEvent, 'UF', 'SP')
     await escolherData(userEvent, 'Data de entrada', '2026-03-02')
-    await irPara('Capacidade')
     await userEvent.clear(screen.getByLabelText('Carga semanal (horas)'))
     await userEvent.type(screen.getByLabelText('Carga semanal (horas)'), '30,5')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
@@ -266,7 +281,6 @@ describe('FichaDoConsultor: Novo acesso', () => {
 
   it('a carga 44, a padrão, não é enviada', async () => {
     const { aoCriar } = montarNovo()
-    await irPara('Capacidade')
     expect(screen.getByLabelText('Carga semanal (horas)')).toHaveValue('44')
     await irPara('Dados pessoais')
     await preencher()
@@ -277,7 +291,6 @@ describe('FichaDoConsultor: Novo acesso', () => {
   it('carga fora de 0 a 60 não envia', async () => {
     const { aoCriar } = montarNovo()
     await preencher()
-    await irPara('Capacidade')
     await userEvent.clear(screen.getByLabelText('Carga semanal (horas)'))
     await userEvent.type(screen.getByLabelText('Carga semanal (horas)'), '70')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
@@ -290,7 +303,6 @@ describe('FichaDoConsultor: Novo acesso', () => {
 
   it('o Novo não mostra ausências', async () => {
     montarNovo()
-    await irPara('Capacidade')
     expect(screen.queryByRole('table', { name: 'Ausências' })).not.toBeInTheDocument()
     expect(listarAusencias).not.toHaveBeenCalled()
   })
@@ -345,7 +357,6 @@ describe('FichaDoConsultor: Editar', () => {
     expect(screen.getByLabelText('Telefone')).toHaveValue('(11) 98888-1111')
     expect(screen.getByLabelText('Cidade')).toHaveValue('Santos')
     expect(screen.getByLabelText('UF')).toHaveTextContent('SP')
-    await irPara('Capacidade')
     expect(screen.getByLabelText('Carga semanal (horas)')).toHaveValue('40')
   })
 
@@ -377,7 +388,6 @@ describe('FichaDoConsultor: Editar', () => {
     const { aoSalvar } = montarEditar()
     await userEvent.clear(screen.getByLabelText('Nome'))
     await userEvent.type(screen.getByLabelText('Nome'), 'Ana Souza')
-    await irPara('Papel e times')
     await escolherNoSeletor(userEvent, 'Papel', 'Gestor')
     await userEvent.click(screen.getByRole('checkbox', { name: /Implantação/ }))
     await userEvent.click(screen.getByRole('checkbox', { name: /Suporte/ }))
@@ -389,7 +399,6 @@ describe('FichaDoConsultor: Editar', () => {
 
   it('sem mudar nada, não manda campo nenhum', async () => {
     const { aoSalvar } = montarEditar({ perfilDeQuem: GESTOR })
-    await irPara('Papel e times')
     expect(screen.queryByLabelText('Papel')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
     expect(aoSalvar).toHaveBeenCalledWith({ mudancas: {}, carga: undefined, timesAdicionar: [], timesRemover: [], foto: null })
@@ -401,7 +410,6 @@ describe('FichaDoConsultor: Editar', () => {
     await userEvent.clear(screen.getByLabelText('Telefone'))
     await userEvent.clear(screen.getByLabelText('Cidade'))
     await escolherNoSeletor(userEvent, 'UF', 'RJ')
-    await irPara('Capacidade')
     await userEvent.clear(screen.getByLabelText('Carga semanal (horas)'))
     await userEvent.type(screen.getByLabelText('Carga semanal (horas)'), '35,5')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
@@ -412,12 +420,12 @@ describe('FichaDoConsultor: Editar', () => {
 
   it('gestor da consultoria edita a carga; outra consultoria não vê Capacidade', () => {
     montarEditar({ perfilDeQuem: GESTOR })
-    expect(screen.getByRole('tab', { name: 'Capacidade' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Capacidade' })).toBeInTheDocument()
   })
 
   it('quem é de outra consultoria não vê a aba Capacidade', () => {
     montarEditar({ perfilDeQuem: { id: 'g2', papel: 'gestor', consultoria_id: 'c2' } })
-    expect(screen.queryByRole('tab', { name: 'Capacidade' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Capacidade' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Carga semanal (horas)')).not.toBeInTheDocument()
   })
 
@@ -426,7 +434,7 @@ describe('FichaDoConsultor: Editar', () => {
       perfilDeQuem: { id: 'd1', papel: 'dono' }, times: [],
       pessoa: { ...PESSOA, papel: 'central', consultoria_id: null, times: [] },
     })
-    expect(screen.queryByRole('tab', { name: 'Capacidade' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Capacidade' })).not.toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'Times' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Papel')).not.toBeInTheDocument()
     expect(nomesDasAbas()).toEqual(['Dados pessoais'])
@@ -436,8 +444,8 @@ describe('FichaDoConsultor: Editar', () => {
     montarEditar({
       perfilDeQuem: { id: 'c9', papel: 'central' }, times: [], pessoa: { ...PESSOA, papel: 'admin' },
     })
-    expect(nomesDasAbas()).toEqual(['Dados pessoais', 'Capacidade'])
-    await irPara('Capacidade')
+    expect(nomesDasAbas()).toEqual(['Dados pessoais'])
+    expect(screen.getByRole('heading', { name: 'Capacidade' })).toBeInTheDocument()
     expect(screen.getByLabelText('Carga semanal (horas)')).toBeInTheDocument()
     expect(screen.queryByLabelText('Papel')).not.toBeInTheDocument()
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
@@ -448,13 +456,57 @@ describe('FichaDoConsultor: Editar', () => {
       itens: [{ id: 'a1', perfil_id: 'p1', de: '2026-12-20', ate: '2027-01-05', motivo: 'Férias' }], total: 1,
     })
     montarEditar()
-    await irPara('Capacidade')
     const tabela = await screen.findByRole('table', { name: 'Ausências' })
     expect(listarAusencias).toHaveBeenCalledWith('p1', { pagina: 1 })
     expect(within(tabela).getByRole('button', { name: /Editar/ })).toBeInTheDocument()
     expect(within(tabela).getByRole('button', { name: /Apagar/ })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Nova ausência/ }))
     expect(screen.getByRole('form', { name: 'Nova ausência' })).toBeInTheDocument()
+  })
+
+  it('a cor do avatar: sem foto, escolhe uma amostra, a prévia das iniciais muda na hora e a cor vai ao salvar', async () => {
+    const { aoSalvar } = montarEditar()
+    const grupo = screen.getByRole('radiogroup', { name: 'Cor do avatar' })
+    expect(within(grupo).getAllByRole('radio')).toHaveLength(8)
+    expect(within(grupo).getAllByRole('radio').filter((r) => r.getAttribute('aria-checked') === 'true')).toHaveLength(1)
+    await userEvent.click(within(grupo).getByRole('radio', { name: 'Violeta' }))
+    expect(within(grupo).getByRole('radio', { name: 'Violeta' })).toBeChecked()
+    expect(screen.getByText('AL')).toHaveStyle({ backgroundColor: '#7c3aed' })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar).toHaveBeenCalledWith(expect.objectContaining({ cor: '#7c3aed' }))
+  })
+
+  it('a cor guardada da pessoa já vem marcada, e sem mexer nada não é enviada', async () => {
+    const { aoSalvar } = montarEditar({ pessoa: { ...PESSOA, cor: '#16a34a' } })
+    expect(screen.getByRole('radio', { name: 'Verde' })).toBeChecked()
+    expect(screen.getByText('AL')).toHaveStyle({ backgroundColor: '#16a34a' })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar.mock.calls[0][0].cor).toBeUndefined()
+  })
+
+  it('as setas mudam a cor escolhida', async () => {
+    montarEditar({ pessoa: { ...PESSOA, cor: '#2563eb' } })
+    screen.getByRole('radio', { name: 'Azul' }).focus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByRole('radio', { name: 'Turquesa' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Turquesa' })).toHaveFocus()
+  })
+
+  it('com foto, a cor não aparece; ao tirar a foto, ela volta', async () => {
+    montarEditar({ pessoa: { ...PESSOA, foto: 'p1/abc.webp' } })
+    expect(screen.queryByRole('radiogroup', { name: 'Cor do avatar' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Tirar foto' }))
+    expect(screen.getByRole('radiogroup', { name: 'Cor do avatar' })).toBeInTheDocument()
+  })
+
+  it('no Novo, escolher a cor vai junto no pedido de criar', async () => {
+    const { aoCriar } = montarNovo()
+    await userEvent.click(screen.getByRole('radio', { name: 'Laranja' }))
+    expect(screen.getByRole('radio', { name: 'Laranja' })).toBeChecked()
+    await userEvent.type(screen.getByLabelText('Nome'), 'João Pereira')
+    await userEvent.type(screen.getByLabelText('E-mail'), 'joao@empresa.com.br')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
+    expect(aoCriar).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ cor: '#ea580c' }))
   })
 
   it('a foto escolhida vai junto', async () => {

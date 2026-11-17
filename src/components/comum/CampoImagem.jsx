@@ -61,8 +61,10 @@ export default function CampoImagem({ rotulo, atual, reserva, reservaCor, aparen
 
   return (
     <div className="flex items-center gap-4">
-      <div className={cn('grid size-16 shrink-0 place-items-center overflow-hidden text-lg font-bold text-muted-foreground',
-        redondo ? 'rounded-full bg-muted' : 'rounded-lg border bg-white')}>
+      <div style={!mostrada && reservaCor ? { backgroundColor: reservaCor } : undefined}
+        className={cn('grid size-16 shrink-0 place-items-center overflow-hidden text-lg font-bold',
+          !mostrada && reservaCor ? 'text-white' : 'text-muted-foreground',
+          redondo ? 'rounded-full bg-muted' : 'rounded-lg border bg-white')}>
         {mostrada
           ? <img src={mostrada} alt={`Prévia da ${rotulo}`} className={redondo ? 'size-full object-cover' : 'size-full object-contain p-1.5'} />
           : reserva}

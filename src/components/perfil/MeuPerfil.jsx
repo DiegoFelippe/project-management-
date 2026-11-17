@@ -9,12 +9,14 @@ import { Aviso } from '@/components/auth/TelaDeAcesso'
 import Seletor from '@/components/campos/Seletor'
 import CampoImagem from '@/components/comum/CampoImagem'
 import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import SeletorDeCor from '@/components/comum/SeletorDeCor'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { tirarFoto, trocarFoto } from '@/data/imagens'
+import { mudarCor, tirarFoto, trocarFoto } from '@/data/imagens'
 import { atualizarMeuContato, gerenciarAcesso } from '@/data/usuarios'
+import { corDaPessoa } from '@/lib/cores'
 import { formatarHoras } from '@/lib/horas'
 import { urlPublica } from '@/lib/imagem'
 import { formatarDia } from '@/lib/mes'
@@ -27,6 +29,7 @@ export default function MeuPerfil({ aberto, aoFechar }) {
   const { perfil, recarregarPerfil, definirSenha } = useAuth()
   const [nome, setNome] = useState(perfil.nome)
   const [foto, setFoto] = useState(null)
+  const [corEscolhida, setCorEscolhida] = useState(null)
   const [telefone, setTelefone] = useState(perfil.telefone ?? '')
   const [cidade, setCidade] = useState(perfil.cidade ?? '')
   const [uf, setUf] = useState(perfil.uf ?? '')
@@ -35,6 +38,9 @@ export default function MeuPerfil({ aberto, aoFechar }) {
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
 
+  const corAtual = corDaPessoa(perfil)
+  const corMostrada = corEscolhida ?? corAtual
+  const semFoto = foto?.arquivo ? false : foto?.tirar ? true : !perfil.foto
   const naConsultoria = ['admin', 'gestor', 'pessoa'].includes(perfil.papel)
 
   const contatoMudou = telefone.trim() !== (perfil.telefone ?? '') || cidade.trim() !== (perfil.cidade ?? '') || uf !== (perfil.uf ?? '')
@@ -65,6 +71,10 @@ export default function MeuPerfil({ aberto, aoFechar }) {
     }
     if (foto?.arquivo || foto?.tirar) {
       const { erro: falha } = foto.arquivo ? await trocarFoto(perfil.id, foto.arquivo, perfil.foto) : await tirarFoto(perfil.id, perfil.foto)
+      if (falha) return falha
+    }
+    if (corEscolhida && corEscolhida !== corAtual) {
+      const { erro: falha } = await mudarCor(perfil.id, corEscolhida)
       if (falha) return falha
     }
     if (senha) {
@@ -103,7 +113,8 @@ export default function MeuPerfil({ aberto, aoFechar }) {
       <form id="form-perfil" noValidate onSubmit={salvar} className="space-y-5">
         <SecaoFormulario titulo="Dados">
           <CampoImagem rotulo="foto" atual={urlPublica('fotos', perfil.foto)} reserva={iniciais(nome || perfil.nome)}
-            valor={foto} aoMudar={setFoto} />
+            reservaCor={corMostrada} valor={foto} aoMudar={setFoto} />
+          {semFoto && <SeletorDeCor valor={corMostrada} aoMudar={setCorEscolhida} />}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="perfil-nome">Nome</Label>

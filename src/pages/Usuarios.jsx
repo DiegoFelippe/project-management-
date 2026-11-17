@@ -20,7 +20,7 @@ import CapacidadeDaPessoa from '@/components/usuarios/CapacidadeDaPessoa'
 import FichaDoConsultor from '@/components/usuarios/FichaDoConsultor'
 import { definirCarga, ocupacaoDasPessoas } from '@/data/capacidade'
 import { buscarConsultoriasAtivas } from '@/data/consultorias'
-import { tirarFoto, trocarFoto } from '@/data/imagens'
+import { mudarCor, tirarFoto, trocarFoto } from '@/data/imagens'
 import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
 import { buscarUsuario, criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { formatarHoras, formatarOcupacao } from '@/lib/horas'
@@ -196,7 +196,7 @@ export default function Usuarios() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pessoaPedida])
 
-  async function salvarEdicao(pessoa, { mudancas, carga, timesAdicionar, timesRemover, foto }) {
+  async function salvarEdicao(pessoa, { mudancas, carga, timesAdicionar, timesRemover, foto, cor }) {
     if (Object.keys(mudancas).length) {
       const { erro: falha } = await gerenciarAcesso('editar', pessoa.id, mudancas)
       if (falha) return { erro: falha }
@@ -215,6 +215,10 @@ export default function Usuarios() {
     }
     if (foto?.arquivo || foto?.tirar) {
       const { erro: falha } = foto.arquivo ? await trocarFoto(pessoa.id, foto.arquivo, pessoa.foto) : await tirarFoto(pessoa.id, pessoa.foto)
+      if (falha) return { erro: falha }
+    }
+    if (cor) {
+      const { erro: falha } = await mudarCor(pessoa.id, cor)
       if (falha) return { erro: falha }
     }
     toast.success(`${mudancas.nome ?? pessoa.nome} atualizado.`)
@@ -241,11 +245,20 @@ export default function Usuarios() {
     return resposta
   }
 
-  async function criar(dados, { carga } = {}) {
+  async function criar(dados, { carga, foto, cor } = {}) {
     const resposta = await criarAcesso(dados)
     if (resposta.pessoaId && carga !== undefined) {
       const { erro: falha } = await definirCarga(resposta.pessoaId, carga)
       if (falha) toast.error(`O acesso foi criado, mas a carga semanal não foi salva: ${falha}`)
+    }
+    // Foto e cor só podem ir depois de criar (o arquivo mora na pasta do id novo). Se falharem, a pessoa continua criada.
+    if (resposta.pessoaId && foto?.arquivo) {
+      const { erro: falha } = await trocarFoto(resposta.pessoaId, foto.arquivo, null)
+      if (falha) toast.error(`Pessoa criada, mas a foto não foi enviada: ${falha}`)
+    }
+    if (resposta.pessoaId && cor) {
+      const { erro: falha } = await mudarCor(resposta.pessoaId, cor)
+      if (falha) toast.error(`Pessoa criada, mas a cor não foi salva: ${falha}`)
     }
     if (resposta.pessoaId) {
       toast.success(dados.forma === 'convite'
