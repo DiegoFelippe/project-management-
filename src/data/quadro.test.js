@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
 import {
   adicionarResponsavel,
+  anexosDoCartao,
+  apagarAnexo,
   apagarCartao,
   apagarColuna,
   apagarComentario,
@@ -20,24 +22,38 @@ import {
   editarColuna,
   editarComentario,
   editarItemDoChecklist,
+  enviarAnexo,
+  enviarImagemDaDescricao,
   indicadoresDoQuadro,
+  limparQuadroDoCliente,
   moverCartao,
   moverColuna,
   pessoasDoQuadro,
   quadroDoCliente,
   restaurarCartao,
   tirarResponsavel,
+  urlAssinada,
+  urlsAssinadas,
 } from './quadro'
 
-vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
+vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn(), storage: { from: vi.fn() } } }))
 
 const SEM_PERMISSAO = 'Você não tem permissão para isso.'
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 
 let banco
+let balde
 beforeEach(() => {
   vi.clearAllMocks()
   banco = criarBancoFalso()
   vi.mocked(supabase.from).mockImplementation(banco.from)
+  balde = {
+    upload: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    remove: vi.fn(async (caminhos) => ({ data: caminhos.map((name) => ({ name })), error: null })),
+    createSignedUrl: vi.fn(),
+    createSignedUrls: vi.fn(),
+  }
+  vi.mocked(supabase.storage.from).mockReturnValue(balde)
 })
 
 const rpcResponde = (data, error = null) => vi.mocked(supabase.rpc).mockResolvedValue({ data, error })
@@ -154,6 +170,28 @@ describe('mover e apagar coluna', () => {
       erro: 'Esta coluna tem cartões. Escolha para qual coluna eles vão ou apague junto.',
     })
   })
+
+  it('apagar junto tira do balde quadros os anexos e as imagens dos cartões apagados (depois das linhas)', async () => {
+    rpcResponde({ movidos: 0, apagados: 1, ids_apagados: ['c1'], caminhos: ['k1/c1/a-x.pdf', 'k1/c1/imagens/b.png'] })
+    expect(await apagarColuna('col1', { apagarCartoes: true })).toEqual({ erro: null, movidos: 0, apagados: 1, idsApagados: ['c1'] })
+    expect(supabase.storage.from).toHaveBeenCalledWith('quadros')
+    expect(balde.remove).toHaveBeenCalledWith(['k1/c1/a-x.pdf', 'k1/c1/imagens/b.png'])
+  })
+
+  it('se os objetos não saem, a coluna continua apagada e vem um aviso', async () => {
+    rpcResponde({ movidos: 0, apagados: 1, ids_apagados: ['c1'], caminhos: ['k1/c1/a-x.pdf'] })
+    balde.remove.mockResolvedValue({ data: null, error: { statusCode: '500' } })
+    expect(await apagarColuna('col1', { apagarCartoes: true })).toEqual({
+      erro: null, movidos: 0, apagados: 1, idsApagados: ['c1'],
+      aviso: 'Alguns anexos ou imagens não saíram do armazenamento. Avise o suporte.',
+    })
+  })
+
+  it('coluna movida (sem objetos para tirar) não chama o Storage', async () => {
+    rpcResponde({ movidos: 2, apagados: 0, ids_apagados: [], caminhos: [] })
+    await apagarColuna('col1', { destinoId: 'col2' })
+    expect(balde.remove).not.toHaveBeenCalled()
+  })
 })
 
 describe('cartões', () => {
@@ -182,10 +220,24 @@ describe('cartões', () => {
     expect(banco.chamou('eq', 'id', 'c1')).toBe(true)
   })
 
+  it('editarCartao: campo opcional esvaziado vai como nulo (prazo, prioridade, descrição); o título vazio o banco recusa', async () => {
+    banco.resposta = { data: [{ id: 'c1' }], error: null }
+    expect(await editarCartao('c1', { prazo: '', prioridade: '  ', descricao: '' })).toEqual({ erro: null })
+    expect(banco.chamou('update', { prazo: null, prioridade: null, descricao: null })).toBe(true)
+    await editarCartao('c1', { titulo: '   ' })
+    expect(banco.chamou('update', { titulo: '' })).toBe(true)
+  })
+
+  it('editarCartao sem nenhum campo do cartão não manda update vazio', async () => {
+    expect(await editarCartao('c1', { coluna_id: 'col9', ignorado: 1 })).toEqual({ erro: null })
+    expect(await editarCartao('c1', {})).toEqual({ erro: null })
+    expect(await editarCartao('c1')).toEqual({ erro: null })
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
   it('nenhuma linha de volta = o banco recusou', async () => {
     banco.resposta = { data: [], error: null }
     expect(await editarCartao('c1', { titulo: 'X' })).toEqual({ erro: SEM_PERMISSAO })
-    expect(await apagarCartao('c1')).toEqual({ erro: SEM_PERMISSAO })
   })
 
   it('arquivar marca a data (o banco grava a dele); restaurar limpa', async () => {
@@ -197,10 +249,41 @@ describe('cartões', () => {
     expect(banco.chamou('update', { arquivado_em: null })).toBe(true)
   })
 
-  it('apagarCartao e responsáveis', async () => {
-    banco.resposta = { data: [{ id: 'c1' }], error: null }
+  it('apagarCartao apaga pelo banco (quem criou ou a gestão) e depois tira do balde os anexos e as imagens dele', async () => {
+    rpcResponde({ caminhos: ['k1/c1/a-x.pdf', 'k1/c1/imagens/b.png'] })
     expect(await apagarCartao('c1')).toEqual({ erro: null })
-    expect(banco.chamou('delete')).toBe(true)
+    expect(supabase.rpc).toHaveBeenCalledWith('apagar_cartao', { p_cartao: 'c1' })
+    expect(supabase.storage.from).toHaveBeenCalledWith('quadros')
+    expect(balde.remove).toHaveBeenCalledWith(['k1/c1/a-x.pdf', 'k1/c1/imagens/b.png'])
+  })
+
+  it('apagarCartao recusado não toca no Storage; cartão sem objetos também não', async () => {
+    rpcResponde(null, { code: 'P0001', message: 'sem_permissao' })
+    expect(await apagarCartao('c1')).toEqual({ erro: SEM_PERMISSAO })
+    rpcResponde({ caminhos: [] })
+    expect(await apagarCartao('c1')).toEqual({ erro: null })
+    expect(balde.remove).not.toHaveBeenCalled()
+  })
+
+  it('apagarCartao: se os objetos não saem, o cartão continua apagado e vem um aviso', async () => {
+    rpcResponde({ caminhos: ['k1/c1/a-x.pdf', 'k1/c1/imagens/b.png'] })
+    balde.remove.mockResolvedValue({ data: [{ name: 'k1/c1/a-x.pdf' }], error: null })
+    expect(await apagarCartao('c1')).toEqual({
+      erro: null, aviso: 'Alguns anexos ou imagens não saíram do armazenamento. Avise o suporte.',
+    })
+  })
+
+  it('apagarCartao tira os objetos em lotes de 1000 (o limite do Storage por pedido)', async () => {
+    const caminhos = Array.from({ length: 1001 }, (_, i) => `k1/c1/${i}-x.pdf`)
+    rpcResponde({ caminhos })
+    expect(await apagarCartao('c1')).toEqual({ erro: null })
+    expect(balde.remove).toHaveBeenCalledTimes(2)
+    expect(balde.remove.mock.calls[0][0]).toHaveLength(1000)
+    expect(balde.remove.mock.calls[1][0]).toEqual(['k1/c1/1000-x.pdf'])
+  })
+
+  it('responsáveis', async () => {
+    banco.resposta = { data: [{ id: 'c1' }], error: null }
     expect(await tirarResponsavel('c1', 'p1')).toEqual({ erro: null })
     expect(banco.chamou('eq', 'perfil_id', 'p1')).toBe(true)
     banco.resposta = { data: null, error: { code: 'P0001', message: 'responsavel_invalido' } }
@@ -221,6 +304,16 @@ describe('colunas, checklist e comentários', () => {
     banco.resposta = { data: [{ id: 'col1' }], error: null }
     expect(await editarColuna('col1', { concluidos: true, posicao: 1 })).toEqual({ erro: null })
     expect(banco.chamou('update', { concluidos: true })).toBe(true)
+  })
+
+  it('editarColuna: cor esvaziada volta a ser automática (nulo); sem campo da coluna não manda update vazio', async () => {
+    banco.resposta = { data: [{ id: 'col1' }], error: null }
+    expect(await editarColuna('col1', { cor: '' })).toEqual({ erro: null })
+    expect(banco.chamou('update', { cor: null })).toBe(true)
+    vi.mocked(supabase.from).mockClear()
+    expect(await editarColuna('col1', { posicao: 1 })).toEqual({ erro: null })
+    expect(await editarColuna('col1', {})).toEqual({ erro: null })
+    expect(supabase.from).not.toHaveBeenCalled()
   })
 
   it('checklist: criar, marcar e apagar', async () => {
@@ -249,5 +342,163 @@ describe('colunas, checklist e comentários', () => {
     expect(await apagarComentario('m1')).toEqual({ erro: null })
     banco.resposta = { data: null, error: { code: '23514' } }
     expect(await comentar('c1', 'x'.repeat(2001))).toEqual({ erro: 'Confira os campos destacados.' })
+  })
+})
+
+describe('anexos do cartão (balde quadros)', () => {
+  const cartao = { clienteId: 'k1', cartaoId: 'c1' }
+  const arquivo = (nome, tamanho = 10, tipo = 'application/pdf') => ({ name: nome, size: tamanho, type: tipo })
+
+  it('enviarAnexo sobe o objeto na pasta do cartão e depois grava a linha', async () => {
+    const linha = { id: 'x1', nome: 'Relatório final.pdf', tamanho: 10, tipo: 'application/pdf', caminho: 'k1/c1/u-x.pdf' }
+    banco.resposta = { data: linha, error: null }
+    expect(await enviarAnexo(cartao, arquivo(' Relatório final.pdf '))).toEqual({ erro: null, anexo: linha })
+    const [caminho, enviado, opcoes] = balde.upload.mock.calls[0]
+    expect(caminho).toMatch(new RegExp(`^k1/c1/${UUID}-Relatorio_final\\.pdf$`))
+    expect(enviado.name).toBe(' Relatório final.pdf ')
+    expect(opcoes).toEqual({ contentType: 'application/pdf' })
+    expect(banco.chamou('from', 'cartao_anexos')).toBe(true)
+    expect(banco.chamou('insert', { cartao_id: 'c1', caminho, nome: 'Relatório final.pdf', tamanho: 10, tipo: 'application/pdf' }))
+      .toBe(true)
+  })
+
+  it('arquivo vazio ou acima de 25 MB nem sobe', async () => {
+    expect(await enviarAnexo(cartao, arquivo('vazio.txt', 0))).toEqual({ erro: 'O arquivo está vazio.' })
+    expect(await enviarAnexo(cartao, arquivo('grande.zip', 26214401))).toEqual({ erro: 'O arquivo passa de 25 MB.' })
+    expect(balde.upload).not.toHaveBeenCalled()
+  })
+
+  it('sem tipo, sobe como application/octet-stream e a linha fica sem tipo', async () => {
+    banco.resposta = { data: { id: 'x1' }, error: null }
+    await enviarAnexo(cartao, arquivo('dados', 5, ''))
+    expect(balde.upload.mock.calls[0][2]).toEqual({ contentType: 'application/octet-stream' })
+    expect(banco.chamadas.find(([m]) => m === 'insert')[1].tipo).toBeNull()
+  })
+
+  it('se o Storage recusa, não grava a linha; se a linha não grava, tira o objeto que subiu', async () => {
+    balde.upload.mockResolvedValueOnce({ data: null, error: { statusCode: '413' } })
+    expect(await enviarAnexo(cartao, arquivo('a.pdf'))).toEqual({ erro: 'O arquivo passa de 25 MB.' })
+    expect(banco.chamou('from', 'cartao_anexos')).toBe(false)
+
+    banco.resposta = { data: null, error: { code: '42501', message: 'sem_permissao' } }
+    expect(await enviarAnexo(cartao, arquivo('b.pdf'))).toEqual({ erro: SEM_PERMISSAO })
+    const caminho = balde.upload.mock.calls[1][0]
+    expect(balde.remove).toHaveBeenCalledWith([caminho])
+  })
+
+  it('anexosDoCartao pagina no banco (15 por página): { itens, total }', async () => {
+    rpcResponde({ itens: [{ id: 'x1' }], total: 16 })
+    expect(await anexosDoCartao({ cartaoId: 'c1', pagina: 2 })).toEqual({ itens: [{ id: 'x1' }], total: 16 })
+    expect(supabase.rpc).toHaveBeenCalledWith('anexos_do_cartao', { p_cartao: 'c1', p_pagina: 2 })
+    rpcResponde(null)
+    expect(await anexosDoCartao({ cartaoId: 'c1' })).toEqual({ itens: [], total: 0 })
+  })
+
+  it('apagarAnexo apaga a linha (quem enviou ou a gestão) e depois o objeto', async () => {
+    banco.resposta = { data: [{ caminho: 'k1/c1/u-x.pdf' }], error: null }
+    expect(await apagarAnexo({ id: 'x1' })).toEqual({ erro: null })
+    expect(banco.chamou('delete')).toBe(true)
+    expect(banco.chamou('eq', 'id', 'x1')).toBe(true)
+    expect(balde.remove).toHaveBeenCalledWith(['k1/c1/u-x.pdf'])
+  })
+
+  it('apagarAnexo: nenhuma linha = sem permissão (nada sai do Storage); objeto que fica vira aviso', async () => {
+    banco.resposta = { data: [], error: null }
+    expect(await apagarAnexo({ id: 'x1' })).toEqual({ erro: SEM_PERMISSAO })
+    expect(balde.remove).not.toHaveBeenCalled()
+    banco.resposta = { data: [{ caminho: 'k1/c1/u-x.pdf' }], error: null }
+    balde.remove.mockResolvedValue({ data: [], error: null })
+    expect(await apagarAnexo({ id: 'x1' })).toEqual({
+      erro: null, aviso: 'O anexo saiu do cartão, mas a cópia guardada não foi apagada. Avise o suporte.',
+    })
+  })
+})
+
+describe('imagens da descrição e links assinados', () => {
+  const cartao = { clienteId: 'k1', cartaoId: 'c1' }
+
+  it('enviarImagemDaDescricao sobe na pasta de imagens do cartão e devolve o caminho para o nó', async () => {
+    const r = await enviarImagemDaDescricao(cartao, { name: 'print.png', size: 100, type: 'image/png' })
+    expect(r.erro).toBeNull()
+    expect(r.caminho).toMatch(new RegExp(`^k1/c1/imagens/${UUID}\\.png$`))
+    expect(balde.upload).toHaveBeenCalledWith(r.caminho, expect.anything(), { contentType: 'image/png' })
+    const jpg = await enviarImagemDaDescricao(cartao, { name: 'foto.JPEG', size: 100, type: 'image/jpeg' })
+    expect(jpg.caminho).toMatch(/\.jpg$/)
+  })
+
+  it('só PNG, JPG, GIF e WEBP de até 25 MB; recusa do Storage vira mensagem', async () => {
+    const tipo = 'Envie uma imagem PNG, JPG, GIF ou WEBP.'
+    expect(await enviarImagemDaDescricao(cartao, { name: 'x.svg', size: 10, type: 'image/svg+xml' })).toEqual({ erro: tipo })
+    expect(await enviarImagemDaDescricao(cartao, { name: 'x.html', size: 10, type: 'text/html' })).toEqual({ erro: tipo })
+    expect(await enviarImagemDaDescricao(cartao, { name: 'x.png', size: 26214401, type: 'image/png' })).toEqual({
+      erro: 'O arquivo passa de 25 MB.',
+    })
+    expect(balde.upload).not.toHaveBeenCalled()
+    balde.upload.mockResolvedValueOnce({ data: null, error: { statusCode: '403' } })
+    expect(await enviarImagemDaDescricao(cartao, { name: 'x.png', size: 10, type: 'image/png' })).toEqual({ erro: SEM_PERMISSAO })
+  })
+
+  it('urlAssinada: com nome baixa o anexo (60 s); sem nome mostra a imagem (1 h)', async () => {
+    balde.createSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://assinado' }, error: null })
+    expect(await urlAssinada('k1/c1/u-x.pdf', { nome: 'Relatório.pdf' })).toEqual({ url: 'https://assinado' })
+    expect(balde.createSignedUrl).toHaveBeenCalledWith('k1/c1/u-x.pdf', 60, { download: 'Relatório.pdf' })
+    await urlAssinada('k1/c1/imagens/u.png')
+    expect(balde.createSignedUrl).toHaveBeenLastCalledWith('k1/c1/imagens/u.png', 3600)
+    balde.createSignedUrl.mockResolvedValue({ data: null, error: { statusCode: '404' } })
+    expect(await urlAssinada('k1/c1/u-x.pdf')).toEqual({ erro: 'Esse arquivo não foi encontrado.' })
+  })
+
+  it('urlsAssinadas: as imagens de uma descrição num pedido só', async () => {
+    balde.createSignedUrls.mockResolvedValue({
+      data: [
+        { path: 'k1/c1/imagens/a.png', signedUrl: 'https://a', error: null },
+        { path: 'k1/c1/imagens/b.png', signedUrl: null, error: 'Not found' },
+      ],
+      error: null,
+    })
+    expect(await urlsAssinadas(['k1/c1/imagens/a.png', 'k1/c1/imagens/b.png'])).toEqual({
+      urls: { 'k1/c1/imagens/a.png': 'https://a' },
+    })
+    expect(balde.createSignedUrls).toHaveBeenCalledTimes(1)
+    expect(balde.createSignedUrls).toHaveBeenCalledWith(['k1/c1/imagens/a.png', 'k1/c1/imagens/b.png'], 3600)
+    expect(await urlsAssinadas([])).toEqual({ urls: {} })
+    expect(balde.createSignedUrls).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('limparQuadroDoCliente (depois de apagar o cliente)', () => {
+  it('pede ao banco o que sobrou na pasta do cliente e tira do balde', async () => {
+    rpcResponde(['k1/c1/a-x.pdf', 'k1/c1/imagens/b.png'])
+    expect(await limparQuadroDoCliente('k1')).toEqual({ erro: null })
+    expect(supabase.rpc).toHaveBeenCalledWith('objetos_para_tirar_do_quadro', { p_cliente: 'k1' })
+    expect(balde.remove).toHaveBeenCalledWith(['k1/c1/a-x.pdf', 'k1/c1/imagens/b.png'])
+  })
+
+  it('nada para tirar: não chama o Storage; sem cliente, nem o banco', async () => {
+    rpcResponde([])
+    expect(await limparQuadroDoCliente('k1')).toEqual({ erro: null })
+    expect(balde.remove).not.toHaveBeenCalled()
+    vi.mocked(supabase.rpc).mockClear()
+    expect(await limparQuadroDoCliente(null)).toEqual({ erro: null })
+    expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+
+  it('1000 de uma vez: pede de novo até acabar', async () => {
+    const mil = Array.from({ length: 1000 }, (_, i) => `k1/c1/${i}-x.pdf`)
+    vi.mocked(supabase.rpc)
+      .mockResolvedValueOnce({ data: mil, error: null })
+      .mockResolvedValueOnce({ data: ['k1/c1/ultimo-x.pdf'], error: null })
+    expect(await limparQuadroDoCliente('k1')).toEqual({ erro: null })
+    expect(supabase.rpc).toHaveBeenCalledTimes(2)
+    expect(balde.remove).toHaveBeenCalledTimes(2)
+  })
+
+  it('erro do banco ou do Storage vira aviso', async () => {
+    const aviso = 'Alguns anexos ou imagens não saíram do armazenamento. Avise o suporte.'
+    rpcResponde(null, { code: 'P0001', message: 'sem_permissao' })
+    expect(await limparQuadroDoCliente('k1')).toEqual({ erro: aviso })
+    rpcResponde(['k1/c1/a-x.pdf'])
+    balde.remove.mockResolvedValue({ data: null, error: { statusCode: '500' } })
+    expect(await limparQuadroDoCliente('k1')).toEqual({ erro: aviso })
   })
 })

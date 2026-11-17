@@ -80,12 +80,17 @@ const ERROS_MENSAGEM_BANCO = {
   colunas_demais: 'O quadro chegou ao limite de 50 colunas.',
   checklist_cheio: 'O checklist chegou ao limite de 200 itens.',
   filtro_invalido: 'Esse filtro não existe. Limpe os filtros e tente de novo.',
+  // Descrição do cartão (o banco confere o JSON do editor)
+  descricao_invalida: 'A descrição tem uma formatação que o quadro não aceita. Cole o texto de novo, sem a formatação.',
+  link_invalido: 'Os links da descrição precisam começar com http://, https:// ou mailto:.',
+  imagem_invalida:
+    'A imagem da descrição precisa ser enviada por aqui, para este cartão (imagem de outro endereço não entra).',
 }
 
 // O Storage recusa (413) arquivo acima do limite do bucket "arquivos"; a tela confere o mesmo antes de enviar.
 export const ARQUIVO_GRANDE_DEMAIS = 'O arquivo passa de 25 MB.'
 
-// Erros do Storage (bucket "arquivos"): a resposta vem com HTTP 400 e o código em `statusCode` ("403" sem
+// Erros do Storage (baldes "arquivos" e "quadros"): a resposta vem com HTTP 400 e o código em `statusCode` ("403" sem
 // permissão, "404" para o objeto que a pessoa não vê, sem dizer se ele existe, "413" acima do limite); `status`
 // é o HTTP, que conta quando a resposta não traz corpo.
 function traduzirErroDoStorage(erro) {

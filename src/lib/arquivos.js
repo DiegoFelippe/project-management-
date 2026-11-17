@@ -25,6 +25,21 @@ export function caminhoDoArquivo(clienteId, nome, id = crypto.randomUUID()) {
   return `${clienteId}/${id}-${nomeNoStorage(nome)}`
 }
 
+// Quadro do cliente (bucket "quadros", o mesmo limite de 25 MB): o anexo do cartão em <cliente>/<cartao>/<uuid>-<nome>
+// e a imagem da descrição em <cliente>/<cartao>/imagens/<uuid>.<ext>. O banco confere as duas formas.
+export function caminhoDoAnexo(clienteId, cartaoId, nome, id = crypto.randomUUID()) {
+  return `${clienteId}/${cartaoId}/${id}-${nomeNoStorage(nome)}`
+}
+
+// Imagens que a descrição aceita (o banco também recusa outra extensão; SVG fica de fora).
+export const TIPOS_DE_IMAGEM = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }
+
+// null quando o tipo não é uma das imagens aceitas.
+export function caminhoDaImagem(clienteId, cartaoId, tipo, id = crypto.randomUUID()) {
+  const extensao = TIPOS_DE_IMAGEM[tipo]
+  return extensao ? `${clienteId}/${cartaoId}/imagens/${id}.${extensao}` : null
+}
+
 // Nome que aparece na lista: o original, sem espaços nas pontas, com até 200 caracteres (contados como o banco).
 export function nomeParaMostrar(nome) {
   const limpo = String(nome ?? '').trim()

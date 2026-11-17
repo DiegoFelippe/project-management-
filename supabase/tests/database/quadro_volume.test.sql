@@ -1,13 +1,13 @@
 -- Volume do quadro: 50 consultorias, 550 pessoas, 1.000 clientes com quadro e 50.000 cartões (2.000 num quadro só),
--- com 33.000 responsáveis, 37.500 itens de checklist e 20.000 comentários, criados aqui e desfeitos no fim (rollback:
--- nada fica no banco). Abrir o quadro grande (o quadro, a primeira página das 3 colunas e os 4 números) e buscar nele
+-- com 33.000 responsáveis, 37.500 itens de checklist, 20.000 comentários e 10.000 anexos, criados aqui e desfeitos no
+-- fim (rollback: nada fica no banco). Abrir o quadro grande (o quadro, a primeira página das 3 colunas e os 4 números) e buscar nele
 -- precisam responder em até 50 ms para o consultor, a gestão e a central, e ler um cartão sozinho (o que a janela do
 -- cartão faz) em até 15 ms (média de 5 execuções, com 50% de folga; medido: ~8 a 11 ms e ~3 ms). Além do tempo, o plano das consultas que essas funções rodam não pode varrer
 -- a tabela de cartões inteira (Seq Scan): é o que garante que o tempo não cresce com o número de quadros.
 -- Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(15);
+select plan(16);
 
 create schema testes;
 grant usage on schema testes to authenticated;
@@ -42,11 +42,13 @@ begin
 end $$;
 grant execute on function testes.abrir(text) to authenticated;
 
--- A janela do cartão: o cartão, os 30 comentários mais recentes e o checklist e os comentários lidos pela API.
+-- A janela do cartão: o cartão, os 30 comentários mais recentes, a primeira página dos anexos e o checklist e os
+-- comentários lidos pela API.
 create function testes.cartao() returns int language plpgsql as $$
 begin
   perform public.cartao_do_quadro(testes.id('cartao1'));
   perform public.comentarios_do_cartao(testes.id('cartao1'));
+  perform public.anexos_do_cartao(testes.id('cartao1'));
   perform count(*) from public.cartao_checklist where cartao_id = testes.id('cartao1');
   perform count(*) from public.cartao_comentarios where cartao_id = testes.id('cartao1');
   return 1;
@@ -141,6 +143,12 @@ insert into public.cartao_comentarios (cartao_id, autor_id, texto)
 select v.id, p.id, 'Comentário ' || i from v_cartoes v join v_pessoas p on p.n = 51 + (v.m - 1) % 500,
   generate_series(1, 2) i
 where v.k % 5 = 0;
+-- Um anexo em um quinto dos cartões (só a linha: o objeto no Storage não entra na conta).
+insert into public.cartao_anexos (cartao_id, caminho, nome, tamanho, tipo, enviado_por)
+select v.id, c.id::text || '/' || v.id::text || '/' || gen_random_uuid()::text || '-anexo.pdf', 'anexo.pdf', 2048,
+  'application/pdf', p.id
+from v_cartoes v join v_clientes c on c.m = v.m join v_pessoas p on p.n = 51 + (v.m - 1) % 500
+where v.k % 5 = 0;
 
 -- Estatísticas de agora (dentro desta transação, desfeitas no fim) também para clientes e pessoas: sem elas o plano
 -- varia com o que sobrou de execuções anteriores.
@@ -152,6 +160,7 @@ analyze public.cartoes;
 analyze public.cartao_responsaveis;
 analyze public.cartao_checklist;
 analyze public.cartao_comentarios;
+analyze public.cartao_anexos;
 
 insert into testes.fx select 'central', id from v_pessoas where n = 0;
 insert into testes.fx select 'adm1', id from v_pessoas where n = 1;
@@ -230,6 +239,15 @@ select ok(not testes.varre('cartao_comentarios', format($$
   select count(*) from public.cartoes where id = %L $$, testes.id('cartao1'))),
   'administrador: os comentários e o cartão pela API usam índice (cartoes e cartao_comentarios)');
 reset role;
+
+-- Anexos: quantos cada cartão da página tem (cartoes_do_quadro) e a página da lista do cartão (anexos_do_cartao).
+select set_config('request.jwt.claims', '', true);
+select ok(not testes.varre('cartao_anexos', format($$
+  select count(*) from public.cartao_anexos a where a.cartao_id = %L $$, testes.id('cartao1')))
+  and not testes.varre('cartao_anexos', format($$
+  select a.id from public.cartao_anexos a where a.cartao_id = %L order by a.enviado_em desc, a.id desc limit 15 $$,
+  testes.id('cartao1'))),
+  'os anexos de um cartão (contagem e página) saem por índice (sem Seq Scan em cartao_anexos)');
 
 -- Os quadros que cada papel vê (o corpo de private.meus_quadros, que as regras de leitura usam): a gestão pelos quadros
 -- da consultoria, o consultor pelos clientes dele.

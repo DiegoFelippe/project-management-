@@ -7,6 +7,7 @@ import {
 } from '@/data/clientes'
 import { limparPastaDoCliente } from '@/data/arquivos'
 import { lancarHoras } from '@/data/checkins'
+import { limparQuadroDoCliente } from '@/data/quadro'
 import FormularioCliente from './FormularioCliente'
 import JanelaCheckin from './JanelaCheckin'
 import JanelaConsultor from './JanelaConsultor'
@@ -47,10 +48,12 @@ export function useAcoesDoCliente({ aoMudar, aoApagar }) {
     const resposta = await apagarCliente(cliente.id)
     if (!resposta.erro) {
       toast.success(`Cliente ${cliente.nome} apagado.`)
-      // O cliente já era (só sai sem arquivos): a limpeza tira da pasta dele os objetos que ficaram sem linha. Se
-      // não limpar, só avisa (a central pode tentar de novo).
+      // O cliente já era (só sai sem arquivos nem cartões): a limpeza tira da pasta dele os objetos que ficaram sem
+      // linha, nos arquivos e no quadro (anexos e imagens de cartões apagados antes). Se não limpar, só avisa (a central
+      // pode tentar de novo).
       const limpeza = await limparPastaDoCliente(cliente.id).catch(() => ({ erro: true }))
-      if (limpeza.erro) {
+      const limpezaDoQuadro = await limparQuadroDoCliente(cliente.id).catch(() => ({ erro: true }))
+      if (limpeza.erro || limpezaDoQuadro.erro) {
         toast.warning('O cliente foi apagado, mas alguns arquivos não saíram do armazenamento. Avise o suporte.')
       }
       if (aoApagar) aoApagar(cliente)

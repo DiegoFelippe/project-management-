@@ -152,5 +152,16 @@ describe('traduzirErroBanco com contexto', () => {
     expect(msg('checklist_cheio')).toBe('O checklist chegou ao limite de 200 itens.')
     expect(msg('filtro_invalido', '22023')).toBe('Esse filtro não existe. Limpe os filtros e tente de novo.')
   })
+
+  it('traduz as recusas da descrição do cartão', () => {
+    const msg = (message) => traduzirErroBanco({ code: '23514', message })
+    expect(msg('descricao_invalida')).toBe(
+      'A descrição tem uma formatação que o quadro não aceita. Cole o texto de novo, sem a formatação.',
+    )
+    expect(msg('link_invalido')).toBe('Os links da descrição precisam começar com http://, https:// ou mailto:.')
+    expect(msg('imagem_invalida')).toBe(
+      'A imagem da descrição precisa ser enviada por aqui, para este cartão (imagem de outro endereço não entra).',
+    )
+  })
 })
 

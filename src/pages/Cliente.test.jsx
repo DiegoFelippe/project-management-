@@ -6,6 +6,7 @@ import { apagarCheckin, editarCheckin, listarCheckins, meuCheckinAberto } from '
 import { eventosDoPeriodo, feriadosDoPeriodo, indicadoresDaAgenda, meuGoogle } from '@/data/agenda'
 import { limparPastaDoCliente, listarArquivos, listarPastas } from '@/data/arquivos'
 import { apagarCliente, buscarCliente, checkinsPorSemana, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
+import { limparQuadroDoCliente } from '@/data/quadro'
 import { renderizarTela } from '@/test/renderizar'
 import Cliente from './Cliente'
 
@@ -33,6 +34,7 @@ vi.mock('@/data/arquivos', () => ({
   listarArquivos: vi.fn(), enviarArquivo: vi.fn(), linkParaBaixar: vi.fn(), apagarArquivo: vi.fn(), limparPastaDoCliente: vi.fn(),
   listarPastas: vi.fn(), criarPasta: vi.fn(), renomearPasta: vi.fn(), apagarPasta: vi.fn(),
 }))
+vi.mock('@/data/quadro', () => ({ limparQuadroDoCliente: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
 vi.mock('@/data/capacidade', () => ({ consultoriasPorOcupacao: vi.fn(), consultoresPorOcupacao: vi.fn() }))
 
@@ -302,6 +304,7 @@ describe('Cliente (página)', () => {
   it('apagar o cliente avisa que só dá sem horas, arquivos nem cartões (senão, arquivar) e limpa a pasta dele', async () => {
     vi.mocked(apagarCliente).mockResolvedValue({ erro: null })
     vi.mocked(limparPastaDoCliente).mockResolvedValue({ erro: null })
+    vi.mocked(limparQuadroDoCliente).mockResolvedValue({ erro: null })
     tela()
     await screen.findByRole('heading', { name: 'Provedor Alfa' })
     await userEvent.click(screen.getByRole('button', { name: 'Apagar' }))
@@ -311,12 +314,27 @@ describe('Cliente (página)', () => {
     )).toBeInTheDocument()
     await userEvent.click(within(janela).getByRole('button', { name: 'Apagar cliente' }))
     await waitFor(() => expect(limparPastaDoCliente).toHaveBeenCalledWith('k1'))
+    // O que sobrou do quadro no balde "quadros" (anexos e imagens de cartões já apagados) também sai.
+    await waitFor(() => expect(limparQuadroDoCliente).toHaveBeenCalledWith('k1'))
     expect(toast.warning).not.toHaveBeenCalled()
   })
 
   it('se a pasta não limpar, avisa mas o cliente continua apagado', async () => {
     vi.mocked(apagarCliente).mockResolvedValue({ erro: null })
     vi.mocked(limparPastaDoCliente).mockResolvedValue({ erro: 'ficou' })
+    vi.mocked(limparQuadroDoCliente).mockResolvedValue({ erro: null })
+    tela()
+    await screen.findByRole('heading', { name: 'Provedor Alfa' })
+    await userEvent.click(screen.getByRole('button', { name: 'Apagar' }))
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar cliente' }))
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledWith(
+      'O cliente foi apagado, mas alguns arquivos não saíram do armazenamento. Avise o suporte.'))
+  })
+
+  it('se o que sobrou do quadro não sair, avisa do mesmo jeito', async () => {
+    vi.mocked(apagarCliente).mockResolvedValue({ erro: null })
+    vi.mocked(limparPastaDoCliente).mockResolvedValue({ erro: null })
+    vi.mocked(limparQuadroDoCliente).mockResolvedValue({ erro: 'ficou' })
     tela()
     await screen.findByRole('heading', { name: 'Provedor Alfa' })
     await userEvent.click(screen.getByRole('button', { name: 'Apagar' }))

@@ -262,12 +262,14 @@ select throws_ok(format($$update public.cartoes set coluna_id = %L where id = %L
   '42501', null, 'trocar de coluna só pela função de mover');
 select throws_ok(format($$update public.cartoes set posicao = 1 where id = %L$$, testes.id('k1')),
   '42501', null, 'a posição só muda pela função de mover');
-update public.cartoes set descricao = '{"type": "doc", "content": [
+-- A imagem é um caminho do balde quadros na pasta deste cartão (o banco recusa outro; quadro_anexos.test.sql).
+update public.cartoes set descricao = replace('{"type": "doc", "content": [
   {"type": "paragraph", "content": [{"type": "text", "text": "Integração "},
     {"type": "text", "marks": [{"type": "bold"}], "text": "Fis"}, {"type": "text", "text": "cal"}]},
   {"type": "bulletList", "content": [{"type": "listItem", "content": [{"type": "paragraph", "content": [
     {"type": "text", "text": "Configurar"}, {"type": "hardBreak"}, {"type": "text", "text": "ação"}]}]}]},
-  {"type": "image", "attrs": {"src": "cliente/cartao/imagens/a.png"}}]}'
+  {"type": "image", "attrs": {"src": "IMAGEM"}}]}',
+  'IMAGEM', testes.id('cA')::text || '/' || testes.id('k2')::text || '/imagens/' || gen_random_uuid()::text || '.png')::jsonb
 where id = testes.id('k2');
 select is((select descricao_texto from public.cartoes where id = testes.id('k2')), 'Integração Fiscal Configurar ação',
   'o texto para a busca sai do JSON da descrição (pedaços com marca juntos, blocos separados)');
@@ -632,7 +634,8 @@ select is((select count(*) from public.cartoes where coluna_id = testes.id('revi
   'recusado, nada sumiu');
 select testes.como('gestor_a');
 select is(public.apagar_coluna(testes.id('revisao'), testes.id('fazendo')) - 'ids_apagados',
-  '{"movidos": 2, "apagados": 0}'::jsonb, 'com destino: os cartões (arquivados também) vão para a outra coluna');
+  '{"movidos": 2, "apagados": 0, "caminhos": []}'::jsonb,
+  'com destino: os cartões (arquivados também) vão para a outra coluna (nada a tirar do Storage)');
 reset role;
 select is(testes.ordem('fazendo'), 'kf1,kr1', 'no fim do destino, na mesma ordem');
 select is((select coluna_id from public.cartoes where id = testes.id('kr2')), testes.id('fazendo'),

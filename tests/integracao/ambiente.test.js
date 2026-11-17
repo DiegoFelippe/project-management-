@@ -113,4 +113,44 @@ describe('limparTudo', () => {
     expect((await admin.from('clientes').select('id').eq('id', cliente.id)).data).toEqual([])
     expect((await admin.from('consultorias').select('id').eq('id', consultoria)).data).toEqual([])
   })
+
+  it('apaga o quadro, os cartões e os objetos do balde quadros (anexos, imagens e o que ficou sem linha)', async () => {
+    const consultoria = await criarConsultoriaDeTeste()
+    const pessoa = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: consultoria })
+    const { data: cliente, error } = await admin
+      .from('clientes')
+      .insert({ nome: 'Limpeza do quadro', horas_mes: 1, consultoria_id: consultoria, consultor_id: pessoa.id })
+      .select('id')
+      .single()
+    expect(error).toBeNull()
+    registrarCliente(cliente.id)
+    const comoPessoa = await entrarComo(pessoa)
+    const { data: quadro, error: erroQuadro } = await comoPessoa.rpc('quadro_do_cliente', { p_cliente: cliente.id })
+    expect(erroQuadro).toBeNull()
+    const { data: cartao, error: erroCartao } = await comoPessoa
+      .from('cartoes')
+      .insert({ coluna_id: quadro.colunas[0].id, titulo: 'Limpeza' })
+      .select('id')
+      .single()
+    expect(erroCartao).toBeNull()
+    const pasta = `${cliente.id}/${cartao.id}`
+    const comLinha = `${pasta}/${randomUUID()}-com_linha.txt`
+    const semLinha = `${pasta}/${randomUUID()}-sem_linha.txt`
+    const imagem = `${pasta}/imagens/${randomUUID()}.png`
+    for (const caminho of [comLinha, semLinha, imagem]) {
+      const { error: erroEnvio } = await comoPessoa.storage.from('quadros').upload(caminho, new Blob(['x']))
+      expect(erroEnvio).toBeNull()
+    }
+    const { error: erroLinha } = await comoPessoa
+      .from('cartao_anexos')
+      .insert({ cartao_id: cartao.id, caminho: comLinha, nome: 'com linha.txt', tamanho: 1 })
+    expect(erroLinha).toBeNull()
+
+    await limparTudo()
+
+    expect((await admin.from('cartoes').select('id').eq('id', cartao.id)).data).toEqual([])
+    expect((await admin.from('quadros').select('id').eq('cliente_id', cliente.id)).data).toEqual([])
+    expect((await admin.storage.from('quadros').list(cliente.id)).data).toEqual([])
+    expect((await admin.from('clientes').select('id').eq('id', cliente.id)).data).toEqual([])
+  })
 })

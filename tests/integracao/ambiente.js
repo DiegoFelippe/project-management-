@@ -151,9 +151,35 @@ async function limparArquivos(clientes, consultorias) {
   }
 }
 
+// Objetos do balde "quadros" numa pasta e nas subpastas (cartões e imagens): a pasta de um cliente de teste.
+async function objetosDoQuadro(pasta) {
+  const caminhos = []
+  for (let inicio = 0; ; inicio += 1000) {
+    const resposta = await admin.storage.from('quadros').list(pasta, { limit: 1000, offset: inicio })
+    conferirLimpeza(`listar os objetos do quadro em ${pasta}`, resposta)
+    for (const item of resposta.data) {
+      if (item.id) caminhos.push(`${pasta}/${item.name}`)
+      else caminhos.push(...await objetosDoQuadro(`${pasta}/${item.name}`))
+    }
+    if (resposta.data.length < 1000) return caminhos
+  }
+}
+
 // Quadros dos clientes e das consultorias de teste. Os cartões seguram as colunas (restrict, e por elas o cliente) e
-// saem antes; checklist, comentários e responsáveis saem com o cartão, e as colunas com o quadro.
+// saem antes; checklist, comentários, responsáveis e anexos saem com o cartão, e as colunas com o quadro. Depois das
+// linhas, os objetos do balde "quadros" na pasta de cada cliente de teste (anexos, imagens e o que ficou sem linha).
 async function limparQuadros(clientes, consultorias) {
+  await limparQuadrosDoBanco(clientes, consultorias)
+  const caminhos = []
+  // Só a pasta de cada cliente de teste (nunca a raiz do balde, que tem as pastas de todos).
+  for (const cliente of clientes) if (cliente) caminhos.push(...await objetosDoQuadro(cliente))
+  for (let inicio = 0; inicio < caminhos.length; inicio += 1000) {
+    conferirLimpeza('apagar os objetos dos quadros de teste',
+      await admin.storage.from('quadros').remove(caminhos.slice(inicio, inicio + 1000)))
+  }
+}
+
+async function limparQuadrosDoBanco(clientes, consultorias) {
   const quadros = new Set()
   if (clientes.length) {
     const resposta = await admin.from('quadros').select('id').in('cliente_id', clientes)

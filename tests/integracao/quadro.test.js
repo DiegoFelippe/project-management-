@@ -1,8 +1,11 @@
 // O quadro Kanban do cliente contra o Supabase local de verdade: roda as funções de src/data/quadro.js (as mesmas
 // chamadas que o app faz) como cada tipo de usuário. Pega o que um mock esconde: permissão por coluna que falta no
 // grant, regra de leitura errada por papel, função que a API não enxerga, e a corrida de dois arrastos na mesma coluna
-// (duas sessões, duas conexões ao banco).
+// (duas sessões, duas conexões ao banco). Os anexos e as imagens da descrição vão ao balde "quadros" de verdade: enviar,
+// baixar pelo link assinado, apagar (linha e depois objeto) e o que sai do Storage ao apagar cartão, coluna e cliente.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { caminhoDoAnexo, TAMANHO_MAXIMO_ARQUIVO } from '../../src/lib/arquivos.js'
+import { ARQUIVO_GRANDE_DEMAIS, traduzirErroBanco } from '../../src/lib/erros.js'
 import {
   clienteAdmin,
   criarConsultoriaDeTeste,
@@ -12,13 +15,21 @@ import {
   registrarCliente,
 } from './ambiente.js'
 
+// O cliente do Supabase de quem está "logado" no teste (entrar): funções (from, rpc) e o Storage (supabase.storage).
 const atual = vi.hoisted(() => ({ cliente: null }))
 vi.mock('@/lib/supabase', () => ({
-  supabase: new Proxy({}, { get: (_, nome) => (...args) => atual.cliente[nome](...args) }),
+  supabase: new Proxy({}, {
+    get: (_, nome) => {
+      const valor = atual.cliente[nome]
+      return typeof valor === 'function' ? valor.bind(atual.cliente) : valor
+    },
+  }),
 }))
 
 const {
   adicionarResponsavel,
+  anexosDoCartao,
+  apagarAnexo,
   apagarCartao,
   apagarColuna,
   apagarComentario,
@@ -35,12 +46,16 @@ const {
   editarColuna,
   editarComentario,
   editarItemDoChecklist,
+  enviarAnexo,
+  enviarImagemDaDescricao,
   indicadoresDoQuadro,
+  limparQuadroDoCliente,
   moverCartao,
   moverColuna,
   pessoasDoQuadro,
   quadroDoCliente,
   restaurarCartao,
+  urlAssinada,
 } = await import('../../src/data/quadro.js')
 
 const admin = clienteAdmin()
@@ -303,5 +318,188 @@ describe('quadro do cliente contra o banco de verdade', () => {
     entrar('central')
     expect(titulos(await cartoesDoQuadro({ quadroId: quadro.id, colunaId: coluna.fazendo })))
       .toEqual(['Integração um', 'Integração dois (editado)'])
+  })
+})
+
+describe('anexos e imagens dos cartões no balde quadros', () => {
+  const BALDE = 'quadros'
+  const IMAGEM_INVALIDA = traduzirErroBanco({ code: '23514', message: 'imagem_invalida' })
+  const LINK_INVALIDO = traduzirErroBanco({ code: '23514', message: 'link_invalido' })
+  // PNG de 1 x 1 pixel.
+  const PNG = Uint8Array.from(
+    atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='),
+    (c) => c.charCodeAt(0),
+  )
+  const png = () => new File([PNG], 'print.png', { type: 'image/png' })
+  const texto = (conteudo, nome) => new File([conteudo], nome, { type: 'text/plain' })
+  const doc = (...conteudo) => ({ type: 'doc', content: conteudo })
+  const existe = async (caminho) => (await admin.storage.from(BALDE).exists(caminho)).data
+
+  let clienteAnexos
+  let quadroAnexos
+  let colunaAnexos
+  let pasta
+
+  async function novoClienteDeTeste(nome) {
+    const { data, error } = await admin
+      .from('clientes')
+      .insert({ nome, horas_mes: 10, consultoria_id: A, consultor_id: pessoaA.id })
+      .select('id')
+      .single()
+    if (error) throw error
+    registrarCliente(data.id)
+    return data.id
+  }
+
+  beforeAll(async () => {
+    clienteAnexos = await novoClienteDeTeste('Cliente anexos integração')
+    entrar('pessoa')
+    quadroAnexos = await quadroDoCliente(clienteAnexos)
+    colunaAnexos = quadroAnexos.colunas[0].id
+    const cartaoId = await novoCartao('anexos', colunaAnexos)
+    pasta = { clienteId: clienteAnexos, cartaoId }
+  })
+
+  it('a consultora anexa; a gestão e a central baixam pelo link assinado; quem não vê o quadro, não', async () => {
+    entrar('pessoa')
+    const { erro, anexo } = await enviarAnexo(pasta, texto('Conteúdo do relatório', 'Relatório final.txt'))
+    expect(erro).toBeNull()
+    expect(anexo.caminho).toMatch(new RegExp(`^${clienteAnexos}/${pasta.cartaoId}/[0-9a-f-]{36}-Relatorio_final\\.txt$`))
+    expect(anexo).toMatchObject({ nome: 'Relatório final.txt', tipo: 'text/plain', enviado_por: pessoaA.id })
+    expect(await existe(anexo.caminho)).toBe(true)
+    expect((await cartoesDoQuadro({ quadroId: quadroAnexos.id, colunaId: colunaAnexos })).itens[0].anexos).toBe(1)
+    expect((await buscarCartao(pasta.cartaoId)).anexos).toBe(1)
+
+    entrar('gestor')
+    const { itens, total } = await anexosDoCartao({ cartaoId: pasta.cartaoId })
+    expect(total).toBe(1)
+    expect(itens[0]).toMatchObject({ id: anexo.id, nome: 'Relatório final.txt', caminho: anexo.caminho, pode_apagar: true })
+    expect(itens[0].enviado_por).toMatchObject({ id: pessoaA.id, nome: 'Teste pessoa' })
+    const { url } = await urlAssinada(itens[0].caminho, { nome: itens[0].nome })
+    const resposta = await fetch(url)
+    expect(resposta.status).toBe(200)
+    expect(await resposta.text()).toBe('Conteúdo do relatório')
+
+    entrar('central')
+    expect((await urlAssinada(anexo.caminho)).url).toBeTruthy()
+    expect((await anexosDoCartao({ cartaoId: pasta.cartaoId })).itens[0].pode_apagar).toBe(false)
+    expect((await enviarAnexo(pasta, texto('x', 'da central.txt'))).erro).toBe(SEM_PERMISSAO)
+
+    entrar('colega')
+    expect(await anexosDoCartao({ cartaoId: pasta.cartaoId })).toEqual({ itens: [], total: 0 })
+    expect((await urlAssinada(anexo.caminho)).erro).toBeTruthy()
+    expect((await enviarAnexo(pasta, texto('x', 'do colega.txt'))).erro).toBe(SEM_PERMISSAO)
+    entrar('pessoaB')
+    expect((await urlAssinada(anexo.caminho)).erro).toBeTruthy()
+  })
+
+  it('acima de 25 MB o balde recusa (a tela confere antes de enviar)', async () => {
+    const caminho = caminhoDoAnexo(clienteAnexos, pasta.cartaoId, 'grande.bin')
+    const { error } = await sessoes.pessoa.storage
+      .from(BALDE)
+      .upload(caminho, new Blob([new Uint8Array(TAMANHO_MAXIMO_ARQUIVO + 1)]))
+    expect(traduzirErroBanco(error, { sobre: 'arquivo' })).toBe(ARQUIVO_GRANDE_DEMAIS)
+    expect(await existe(caminho)).toBe(false)
+  })
+
+  it('apagar anexo: quem enviou ou a gestão; a linha sai e depois o objeto', async () => {
+    entrar('gestor')
+    const doGestor = (await enviarAnexo(pasta, texto('g', 'do gestor.txt'))).anexo
+    entrar('pessoa')
+    const daPessoa = (await enviarAnexo(pasta, texto('p', 'da pessoa.txt'))).anexo
+    expect(await apagarAnexo(doGestor)).toEqual({ erro: SEM_PERMISSAO })
+    expect(await existe(doGestor.caminho)).toBe(true)
+    expect(await apagarAnexo(daPessoa)).toEqual({ erro: null })
+    expect(await existe(daPessoa.caminho)).toBe(false)
+
+    entrar('gestor')
+    const { itens } = await anexosDoCartao({ cartaoId: pasta.cartaoId })
+    expect(itens.map((a) => a.nome).sort()).toEqual(['Relatório final.txt', 'do gestor.txt'])
+    for (const anexo of itens) {
+      expect(await apagarAnexo(anexo)).toEqual({ erro: null })
+      expect(await existe(anexo.caminho)).toBe(false)
+    }
+    expect((await anexosDoCartao({ cartaoId: pasta.cartaoId })).total).toBe(0)
+  })
+
+  it('imagem da descrição: sobe ao balde, o nó guarda o caminho e abre pelo link assinado; imagem de fora e link javascript: o banco recusa', async () => {
+    entrar('pessoa')
+    const { erro, caminho } = await enviarImagemDaDescricao(pasta, png())
+    expect(erro).toBeNull()
+    expect(caminho).toMatch(new RegExp(`^${clienteAnexos}/${pasta.cartaoId}/imagens/[0-9a-f-]{36}\\.png$`))
+    const descricao = doc(
+      { type: 'paragraph', content: [{ type: 'text', text: 'Manual', marks: [{ type: 'link', attrs: { href: 'https://cliente.test/manual' } }] }] },
+      { type: 'image', attrs: { src: caminho, alt: 'print' } },
+    )
+    expect(await editarCartao(pasta.cartaoId, { descricao })).toEqual({ erro: null })
+    expect((await buscarCartao(pasta.cartaoId)).descricao).toEqual(descricao)
+    // Enquanto o cartão existe, a imagem fica (a descrição pode voltar a usá-la): nem quem a enviou a tira.
+    expect((await sessoes.pessoa.storage.from(BALDE).remove([caminho])).data).toEqual([])
+    expect(await existe(caminho)).toBe(true)
+
+    entrar('gestor')
+    const resposta = await fetch((await urlAssinada(caminho)).url)
+    expect(resposta.status).toBe(200)
+    expect(resposta.headers.get('content-type')).toContain('image/png')
+    expect(new Uint8Array(await resposta.arrayBuffer())).toEqual(PNG)
+    entrar('colega')
+    expect((await urlAssinada(caminho)).erro).toBeTruthy()
+
+    entrar('pessoa')
+    expect(await editarCartao(pasta.cartaoId, { descricao: doc({ type: 'image', attrs: { src: 'https://exemplo.test/x.png' } }) }))
+      .toEqual({ erro: IMAGEM_INVALIDA })
+    expect(await editarCartao(pasta.cartaoId, {
+      descricao: doc({ type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }] }] }),
+    })).toEqual({ erro: LINK_INVALIDO })
+    expect((await buscarCartao(pasta.cartaoId)).descricao).toEqual(descricao)
+    expect((await enviarImagemDaDescricao(pasta, new File(['<svg/>'], 'x.svg', { type: 'image/svg+xml' }))).erro)
+      .toBe('Envie uma imagem PNG, JPG, GIF ou WEBP.')
+  })
+
+  it('apagar o cartão tira do Storage os anexos e as imagens dele', async () => {
+    entrar('pessoa')
+    const anexo = (await enviarAnexo(pasta, texto('a', 'último.txt'))).anexo
+    const { caminho: imagem } = await enviarImagemDaDescricao(pasta, png())
+    expect(await apagarCartao(pasta.cartaoId)).toEqual({ erro: null })
+    expect(await existe(anexo.caminho)).toBe(false)
+    expect(await existe(imagem)).toBe(false)
+    // A imagem do teste anterior também saiu: a pasta do cartão ficou vazia.
+    expect((await admin.storage.from(BALDE).list(`${clienteAnexos}/${pasta.cartaoId}`)).data).toEqual([])
+    expect((await admin.storage.from(BALDE).list(`${clienteAnexos}/${pasta.cartaoId}/imagens`)).data).toEqual([])
+  })
+
+  it('apagar a coluna com os cartões junto tira os objetos deles', async () => {
+    entrar('pessoa')
+    const lixo = (await criarColuna({ quadroId: quadroAnexos.id, nome: 'Lixo com anexos' })).coluna
+    const cartaoId = await novoCartao('lixo com anexos', lixo.id)
+    const anexo = (await enviarAnexo({ clienteId: clienteAnexos, cartaoId }, texto('l', 'lixo.txt'))).anexo
+    const { caminho: imagem } = await enviarImagemDaDescricao({ clienteId: clienteAnexos, cartaoId }, png())
+    entrar('gestor')
+    expect(await apagarColuna(lixo.id, { apagarCartoes: true })).toEqual({
+      erro: null, movidos: 0, apagados: 1, idsApagados: [cartaoId],
+    })
+    expect(await existe(anexo.caminho)).toBe(false)
+    expect(await existe(imagem)).toBe(false)
+  })
+
+  it('cliente apagado: a central tira o que sobrou do quadro na pasta dele', async () => {
+    const clienteSai = await novoClienteDeTeste('Cliente com sobras no quadro')
+    entrar('pessoa')
+    const quadroSai = await quadroDoCliente(clienteSai)
+    const cartaoId = await novoCartao('sobra', quadroSai.colunas[0].id)
+    const anexo = (await enviarAnexo({ clienteId: clienteSai, cartaoId }, texto('s', 'sobra.txt'))).anexo
+    const { caminho: imagem } = await enviarImagemDaDescricao({ clienteId: clienteSai, cartaoId }, png())
+    // O cartão sai pelo banco, mas tirar os objetos falha (a conexão caiu): eles ficam no Storage.
+    expect((await sessoes.pessoa.rpc('apagar_cartao', { p_cartao: cartaoId })).error).toBeNull()
+    expect(await existe(anexo.caminho)).toBe(true)
+
+    // Sem cartões, a central apaga o cliente (o quadro vazio sai junto) e tira o que sobrou.
+    const { data, error } = await sessoes.central.from('clientes').delete().eq('id', clienteSai).select('id')
+    expect(error).toBeNull()
+    expect(data).toHaveLength(1)
+    entrar('central')
+    expect(await limparQuadroDoCliente(clienteSai)).toEqual({ erro: null })
+    expect(await existe(anexo.caminho)).toBe(false)
+    expect(await existe(imagem)).toBe(false)
   })
 })

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  caminhoDaImagem,
+  caminhoDoAnexo,
   caminhoDoArquivo,
   caminhosNaPasta,
   limparPasta,
@@ -40,6 +42,22 @@ describe('arquivos do cliente', () => {
     expect(nomeParaMostrar('  Ata da reunião.pdf ')).toBe('Ata da reunião.pdf')
     expect(nomeParaMostrar('x'.repeat(250))).toHaveLength(200)
     expect(nomeParaMostrar('   ')).toBe('arquivo')
+  })
+})
+
+describe('caminhos no balde quadros (o banco confere as duas formas)', () => {
+  it('anexo do cartão: <cliente>/<cartao>/<uuid>-<nome>', () => {
+    expect(caminhoDoAnexo('k1', 'c1', 'Ata da reunião.pdf', UUID)).toBe(`k1/c1/${UUID}-Ata_da_reuniao.pdf`)
+    expect(caminhoDoAnexo('k1', 'c1', 'a.pdf')).toMatch(/^k1\/c1\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-a\.pdf$/)
+  })
+
+  it('imagem da descrição: <cliente>/<cartao>/imagens/<uuid>.<ext>, só PNG, JPG, GIF e WEBP', () => {
+    expect(caminhoDaImagem('k1', 'c1', 'image/png', UUID)).toBe(`k1/c1/imagens/${UUID}.png`)
+    expect(caminhoDaImagem('k1', 'c1', 'image/jpeg', UUID)).toBe(`k1/c1/imagens/${UUID}.jpg`)
+    expect(caminhoDaImagem('k1', 'c1', 'image/gif', UUID)).toBe(`k1/c1/imagens/${UUID}.gif`)
+    expect(caminhoDaImagem('k1', 'c1', 'image/webp', UUID)).toBe(`k1/c1/imagens/${UUID}.webp`)
+    expect(caminhoDaImagem('k1', 'c1', 'image/svg+xml')).toBeNull()
+    expect(caminhoDaImagem('k1', 'c1', '')).toBeNull()
   })
 })
 
