@@ -4,7 +4,7 @@
 -- (ordem e renumeração), filtros, números do topo e paginação. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(226);
+select plan(228);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -731,6 +731,17 @@ select is((public.mover_cartao(testes.id('o4'), testes.id('ordem'), least(testes
 select is(testes.ordem('ordem'), case when testes.id('o3') < testes.id('o1') then 'o3,o4,o1' else 'o1,o4,o3' end,
   'e o cartão fica entre os dois');
 reset role;
+
+-- Travas: mover trava as duas colunas (a de onde o cartão sai e a de destino) numa consulta só, em ordem de id, e só
+-- depois o cartão. Assim, duas pessoas trocando cartões entre as mesmas colunas esperam uma pela outra em vez de travar
+-- (40P01) quando as duas precisam renumerar. A espera de verdade precisa de duas sessões (conferida à mão, com psql, em
+-- .superpowers/sdd/2026-11-17-kanban-do-cliente/final-fix-report.md); aqui, a ordem das travas na função.
+select ok(pg_get_functiondef('public.mover_cartao(uuid, uuid, uuid, uuid)'::regprocedure)
+    ~ 'where c\.id in \(v_origem, p_coluna\).*order by c\.id\s+for no key update.*where k\.id = p_cartao\s+for update',
+  'mover trava as colunas de origem e destino em ordem de id, antes do cartão');
+select ok(pg_get_functiondef('public.apagar_coluna(uuid, uuid, boolean)'::regprocedure)
+    ~ 'where c\.id in \(p_coluna, p_destino\).*order by c\.id\s+for no key update',
+  'apagar coluna trava a que sai e a de destino na mesma ordem (quem move um cartão entre elas espera)');
 
 -- ── Mover colunas ────────────────────────────────────────────────────────────
 
