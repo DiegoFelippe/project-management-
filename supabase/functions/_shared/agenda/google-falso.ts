@@ -183,10 +183,13 @@ export function criarGoogleFalso({ cliente = { id: 'cliente-falso', segredo: 'se
     return recusa('unsupported_grant_type', 'Invalid grant_type')
   }
 
+  // Como no Google: revogar um token tira a permissão do app inteira naquela conta (todos os tokens dela caem).
   function revogar(token: string): Response {
     const concessao = renovacoes.get(token) ?? acessos.get(token)?.concessao
     if (!concessao || concessao.revogada) return json(400, { error: 'invalid_token', error_description: 'Token expired or revoked' })
-    concessao.revogada = true
+    for (const outra of [...renovacoes.values(), ...[...acessos.values()].map((a) => a.concessao)]) {
+      if (outra.email === concessao.email) outra.revogada = true
+    }
     return json(200, {})
   }
 

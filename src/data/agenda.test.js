@@ -184,6 +184,20 @@ describe('conectar e desconectar o Google', () => {
     expect((await concluirGoogle({ estado: 'a', codigo: 'b' })).erro).toMatch(/Google recusou/)
   })
 
+  it('concluirGoogle diz quais permissões a pessoa deixou de marcar no Google', async () => {
+    vi.mocked(chamarFuncao).mockResolvedValue({
+      status: 400,
+      corpo: {
+        codigo: 'google_sem_permissoes',
+        faltam: ['https://www.googleapis.com/auth/meetings.space.settings', 'https://www.googleapis.com/auth/meetings.space.readonly'],
+      },
+    })
+    const r = await concluirGoogle({ estado: 'a', codigo: 'b' })
+    expect(r.erro).toBe('Faltou autorizar no Google as configurações do Meet (gravação e transcrição) e a leitura das ' +
+      'reuniões do Meet. Clique em Conectar Google de novo e marque todas as permissões.')
+    expect(r.faltam).toHaveLength(2)
+  })
+
   it('desconectarGoogle avisa quando o Google não confirmou a revogação', async () => {
     vi.mocked(chamarFuncao).mockResolvedValue({ status: 200, corpo: { ok: true, revogado: false } })
     expect(await desconectarGoogle()).toEqual({ erro: null, revogado: false })

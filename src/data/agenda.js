@@ -86,10 +86,29 @@ export function voltaDoGoogle(busca) {
   return parametros.get('error') ? { estado, codigo: null, recusou: true } : null
 }
 
-// Termina a conexão: { erro, email } (o e-mail da conta do Google conectada).
+// Nomes, para a pessoa, das permissões que ela pode desmarcar na tela do Google.
+const PERMISSOES_DO_GOOGLE = {
+  openid: 'a identificação da conta',
+  email: 'o e-mail da conta',
+  'https://www.googleapis.com/auth/calendar.events': 'os eventos da agenda',
+  'https://www.googleapis.com/auth/meetings.space.settings': 'as configurações do Meet (gravação e transcrição)',
+  'https://www.googleapis.com/auth/meetings.space.readonly': 'a leitura das reuniões do Meet',
+}
+
+function faltouNoGoogle(faltam) {
+  const nomes = (Array.isArray(faltam) ? faltam : []).map((e) => PERMISSOES_DO_GOOGLE[e]).filter(Boolean)
+  if (!nomes.length) return traduzirErroFuncao('google_sem_permissoes')
+  const lista = nomes.length > 1 ? `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}` : nomes[0]
+  return `Faltou autorizar no Google ${lista}. Clique em Conectar Google de novo e marque todas as permissões.`
+}
+
+// Termina a conexão: { erro, email } (o e-mail da conta do Google conectada). Quando a pessoa desmarcou permissões no
+// Google, o erro diz quais e `faltam` traz os escopos.
 export async function concluirGoogle({ estado, codigo }) {
-  const { erro, email } = await googlePessoa({ acao: 'concluir', estado, codigo })
-  return erro ? { erro } : { erro: null, email }
+  const { status, corpo } = await chamarFuncao('google-pessoa', { acao: 'concluir', estado, codigo })
+  if (status === 200) return { erro: null, email: corpo.email }
+  if (corpo.codigo === 'google_sem_permissoes') return { erro: faltouNoGoogle(corpo.faltam), faltam: corpo.faltam ?? [] }
+  return { erro: traduzirErroFuncao(corpo.codigo) }
 }
 
 // Desconectar: revoga no Google e apaga a conexão. revogado false = apagou aqui, mas o Google não confirmou.

@@ -107,48 +107,26 @@ export async function concluir({ banco, app, fetch: buscar, quem, estado, codigo
     throw new Falha(502, 'google_recusou')
   }
 
-  // O que veio e não vai ser usado é revogado. Exceto se a pessoa já tem uma conexão: revogar derruba a permissão do
-  // app inteira naquela conta do Google, e a conexão que funciona (talvez da mesma conta) cairia junto.
-  // Melhor esforço: nunca troca o erro que vai para a tela.
-  const descartar = async () => {
-    const token = tokens.refresh_token ?? tokens.access_token
-    try {
-      if (!token || await lerTokenDaPessoa(banco, quem.id)) return
-      await revogarNoGoogle(token, buscar)
-    } catch {
-      // o pedido já vai falhar com o motivo certo
-    }
-  }
-
+  // Recusado aqui, o token que veio só é descartado (nunca foi guardado), sem revogar no Google: revogar derruba a
+  // permissão do app inteira naquela conta, e o app é o mesmo das Integrações — a conexão da consultoria (ou a da
+  // própria pessoa) feita com a mesma conta cairia junto.
   const escopos = escoposConcedidos(tokens.scope)
   const faltam = escoposQueFaltam(escopos)
-  if (faltam.length) {
-    await descartar()
-    throw new Falha(400, 'google_sem_permissoes', { faltam })
-  }
-  if (!tokens.refresh_token || !tokens.access_token) {
-    await descartar()
-    throw new Falha(502, 'google_recusou')
-  }
+  if (faltam.length) throw new Falha(400, 'google_sem_permissoes', { faltam })
+  if (!tokens.refresh_token || !tokens.access_token) throw new Falha(502, 'google_recusou')
 
   let email: string
   try {
     email = (await emailDoGoogle(tokens.access_token, buscar)).trim().toLowerCase()
   } catch {
-    await descartar()
     throw new Falha(502, 'google_recusou')
   }
 
-  try {
-    await gravarTokenDaPessoa(banco, quem.id, {
-      refresh_token: tokens.refresh_token,
-      access_token: tokens.access_token,
-      expira_em: agora() + (tokens.expires_in ?? 3600) * 1000,
-    }, { email, escopos: ESCOPOS_DA_PESSOA.filter((e) => escopos.includes(e)) })
-  } catch (erro) {
-    await descartar()
-    throw erro
-  }
+  await gravarTokenDaPessoa(banco, quem.id, {
+    refresh_token: tokens.refresh_token,
+    access_token: tokens.access_token,
+    expira_em: agora() + (tokens.expires_in ?? 3600) * 1000,
+  }, { email, escopos: ESCOPOS_DA_PESSOA.filter((e) => escopos.includes(e)) })
   return { email }
 }
 

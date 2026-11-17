@@ -13,7 +13,6 @@ import {
   criarPerfilDeTeste,
   entrarComo,
   limparTudo,
-  status,
 } from './ambiente.js'
 
 const admin = clienteAdmin()
@@ -148,10 +147,15 @@ describe('concluir (volta do Google)', () => {
     expect(await conexao(pessoa.id)).toBeNull()
   })
 
-  it('Google sem todas as permissões: recusa, revoga o que veio e não grava', async () => {
+  it('Google sem todas as permissões: recusa dizendo o que faltou, não grava e não revoga nada no Google', async () => {
+    // a mesma conta do Google já conectada nas Integrações da consultoria (mesmo app OAuth)
+    const email = `admin-${crypto.randomUUID()}@gmail.test`
+    const daConsultoria = google.concederRenovacao(email, ['openid', 'email', 'https://www.googleapis.com/auth/calendar'])
+    const revogacoesAntes = google.pedidosPara('oauth2.googleapis.com/revoke').length
+
     const pessoa = await novaPessoa()
     const { estado, codigo } = await conectarDoComeco(pessoa, {
-      escopos: ['openid', 'email', 'https://www.googleapis.com/auth/calendar.events'],
+      email, escopos: ['openid', 'email', 'https://www.googleapis.com/auth/calendar.events'],
     })
     const erro = await concluir({ banco: admin, app: APP, fetch: google.fetch, quem: pessoa, estado, codigo }).catch((e) => e)
     expect(erro).toMatchObject({ status: 400, codigo: 'google_sem_permissoes' })
@@ -160,16 +164,19 @@ describe('concluir (volta do Google)', () => {
       'https://www.googleapis.com/auth/meetings.space.readonly',
     ])
     expect(await conexao(pessoa.id)).toBeNull()
-    const revogacao = google.pedidosPara('oauth2.googleapis.com/revoke').at(-1)
-    expect(google.revogado(revogacao.corpo.token)).toBe(true)
+    expect(google.pedidosPara('oauth2.googleapis.com/revoke').length).toBe(revogacoesAntes)
+    // a conexão da consultoria com a mesma conta continua valendo
+    expect(google.revogado(daConsultoria)).toBe(false)
   })
 
-  it('sem token de renovação: recusa e não grava', async () => {
+  it('sem token de renovação: recusa, não grava e não revoga', async () => {
     const pessoa = await novaPessoa()
+    const revogacoesAntes = google.pedidosPara('oauth2.googleapis.com/revoke').length
     const { estado, codigo } = await conectarDoComeco(pessoa, { semRefresh: true })
     await expect(concluir({ banco: admin, app: APP, fetch: google.fetch, quem: pessoa, estado, codigo }))
       .rejects.toMatchObject({ status: 502, codigo: 'google_recusou' })
     expect(await conexao(pessoa.id)).toBeNull()
+    expect(google.pedidosPara('oauth2.googleapis.com/revoke').length).toBe(revogacoesAntes)
   })
 
   it('reconectar troca o token no mesmo segredo do Vault, limpa o erro e troca a conta', async () => {
@@ -236,12 +243,9 @@ describe('desconectar', () => {
   })
 })
 
-// O Supabase local só serve uma Edge Function nova depois de recriar o runtime (npx supabase stop && npx supabase
-// start; os dados ficam): `npm run functions:reiniciar` recarrega o código, mas não a lista de funções.
-const servida = (await fetch(`${status.API_URL}/functions/v1/google-pessoa`, { method: 'OPTIONS' })).status !== 404
-if (!servida) console.warn('google-pessoa ainda não está no runtime local: recrie-o (npx supabase stop && npx supabase start).')
-
-describe.skipIf(!servida)('Edge Function google-pessoa (no ar)', () => {
+// A função de verdade no Supabase local. Se ela não estiver no runtime ("Function not found", 404), recrie-o com
+// npx supabase stop && npx supabase start (os dados ficam): `npm run functions:reiniciar` só recarrega o código.
+describe('Edge Function google-pessoa (no ar)', () => {
   const funcao = (cliente, corpo) => chamarFuncao(cliente, 'google-pessoa', corpo)
   const novoEstado = async (pessoaId) => {
     const estado = `teste-${crypto.randomUUID()}${crypto.randomUUID()}`
