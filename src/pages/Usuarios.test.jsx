@@ -5,14 +5,14 @@ import { contarClientesAtivos } from '@/data/clientes'
 import { trocarFoto } from '@/data/imagens'
 import { apagarAusencia, definirCarga, listarAusencias, ocupacaoDasPessoas } from '@/data/capacidade'
 import { buscarConsultorias, buscarConsultoriasAtivas } from '@/data/consultorias'
-import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
+import { buscarUsuario, criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
 import { escolherNoSeletor } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
 import Usuarios from './Usuarios'
 
 vi.mock('@/data/usuarios', () => ({
-  listarUsuarios: vi.fn(), criarAcesso: vi.fn(), gerenciarAcesso: vi.fn(), reenviarConvite: vi.fn(),
+  listarUsuarios: vi.fn(), buscarUsuario: vi.fn(), criarAcesso: vi.fn(), gerenciarAcesso: vi.fn(), reenviarConvite: vi.fn(),
 }))
 vi.mock('@/data/capacidade', () => ({
   definirCarga: vi.fn(), listarAusencias: vi.fn(), ocupacaoDasPessoas: vi.fn(), criarAusencia: vi.fn(), editarAusencia: vi.fn(), apagarAusencia: vi.fn(),
@@ -437,6 +437,35 @@ describe('Usuários', () => {
     await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar' }))
     await waitFor(() => expect(apagarAusencia).toHaveBeenCalledWith('a1'))
     await waitFor(() => expect(ocupacaoDasPessoas.mock.calls.length).toBeGreaterThan(chamadas))
+  })
+
+  describe('?pessoa=<id>&mes=AAAA-MM-01 (vindo do painel do Início)', () => {
+    const ana = { id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [], consultoria_id: 'c1', carga_semanal: 40 }
+    it('gestor/admin: carrega a pessoa por id e abre a Capacidade dela, no mês pedido', async () => {
+      vi.mocked(buscarUsuario).mockResolvedValue(ana)
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' }, endereco: '/usuarios?pessoa=p1&mes=2026-03-01' })
+      expect(await screen.findByRole('dialog', { name: 'Capacidade de Ana' })).toBeInTheDocument()
+      expect(buscarUsuario).toHaveBeenCalledWith('p1')
+      await waitFor(() => expect(ocupacaoDasPessoas).toHaveBeenCalledWith(expect.objectContaining({ mes: '2026-03-01' })))
+    })
+    it('quem edita mas não tem Capacidade (pessoa de outra consultoria) abre a ficha', async () => {
+      vi.mocked(buscarUsuario).mockResolvedValue({ ...ana, papel: 'pessoa', consultoria_id: 'c2' })
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' }, endereco: '/usuarios?pessoa=p1' })
+      expect(await screen.findByRole('dialog', { name: 'Ficha de Ana' })).toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: 'Capacidade de Ana' })).not.toBeInTheDocument()
+    })
+    it('pessoa que não aparece (RLS): aviso curto e a lista segue', async () => {
+      vi.mocked(buscarUsuario).mockResolvedValue(null)
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' }, endereco: '/usuarios?pessoa=zzz' })
+      expect(await screen.findByText('Você não tem acesso a essa pessoa.')).toBeInTheDocument()
+      expect(await screen.findByRole('table', { name: 'Usuários' })).toBeInTheDocument()
+    })
+    it('mês inválido cai no atual; sem ?pessoa= nada é buscado', async () => {
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' }, endereco: '/usuarios?mes=lixo' })
+      await screen.findByRole('table', { name: 'Usuários' })
+      await waitFor(() => expect(ocupacaoDasPessoas).toHaveBeenCalledWith(expect.objectContaining({ mes: mesAtual() })))
+      expect(buscarUsuario).not.toHaveBeenCalled()
+    })
   })
 
   describe('ação "Capacidade" da linha (carga e ausências)', () => {

@@ -26,6 +26,13 @@ export async function listarUsuarios({ consultoriaId, ativos = true, pagina = 1 
   return { ...resultado, itens: resultado.itens.map((p) => ({ ...p, times: (p.times ?? []).map((m) => m.time).filter(Boolean) })) }
 }
 
+// Uma pessoa por id, com os mesmos campos da lista. Quem o RLS não deixa ver volta como null.
+export async function buscarUsuario(id) {
+  const { data, error } = await supabase.from('perfis').select(CAMPOS).eq('id', id).maybeSingle()
+  if (error) throw error
+  return data ? { ...data, times: (data.times ?? []).map((m) => m.time).filter(Boolean) } : null
+}
+
 export async function criarAcesso(dados) {
   const { status, corpo } = await chamarFuncao('criar-acesso', { ...dados, redirectTo: redirectTo() })
   if (status === 201) return { pessoaId: corpo.pessoa_id }

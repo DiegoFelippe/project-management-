@@ -3,7 +3,7 @@
 -- consultores_por_ocupacao e consultorias_por_ocupacao. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(63);
+select plan(68);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -88,6 +88,13 @@ select testes.perfil('inativo_a', 'pessoa', 'A', 44, false);
 select testes.perfil('pessoa_b', 'pessoa', 'B');
 select testes.perfil('admin_z', 'admin', 'Z', 0);
 
+-- Time do gestor_a: só pessoa_a está nele (gestor vê a si, o time e quem criou); pessoa_c e pessoa_d ficam fora.
+create temp table t_time as select gen_random_uuid() as id;
+insert into public.times (id, consultoria_id, nome, gestor_id, criado_por)
+select id, testes.id('A'), 'Time painel', testes.id('gestor_a'), testes.id('gestor_a') from t_time;
+insert into public.time_membros (time_id, pessoa_id, adicionado_por)
+select id, testes.id('pessoa_a'), testes.id('gestor_a') from t_time;
+
 select testes.cliente('a40', 40, 'A', 'pessoa_a');
 select testes.cliente('a30', 30, 'A', 'pessoa_a');
 select testes.cliente('c200', 200, 'A', 'pessoa_c');
@@ -166,6 +173,9 @@ select ok((select not exists (
   and jsonb_array_length(j -> 'extremos' -> 'acima') <= 3 and jsonb_array_length(j -> 'extremos' -> 'folga') <= 3 from p_central),
   'central: extremos têm até 3 de cada lado e quem está acima passa de 100%');
 select ok((select j -> 'meus_clientes' = '[]'::jsonb and j -> 'ranking' is not null from p_central), 'central: sem meus clientes');
+select ok((select not exists (select 1 from p_central, jsonb_array_elements(j -> 'extremos' -> 'acima' || (j -> 'extremos' -> 'folga')) e
+    where (e ->> 'visivel')::boolean is not true)),
+  'central: visivel true em todos os extremos');
 reset role;
 
 -- Ocupação do mês passado (utilização) e flag.
@@ -240,10 +250,16 @@ select is((select array_agg(e ->> 'mes' order by o) from p_admin_passado, jsonb_
   'horas por mês: seis meses terminando em outubro');
 select is((select array_agg((e ->> 'realizado')::numeric order by o) from p_admin_passado, jsonb_array_elements(j -> 'horas_por_mes') with ordinality t(e, o)),
   array[0, 0, 0, 0, 10, 46.2]::numeric[], 'horas por mês: realizado de cada mês (só da consultoria A)');
+select ok((select bool_and((r ->> 'visivel')::boolean) from p_admin, jsonb_array_elements(j -> 'ranking') r), 'administrador: visivel true em todo o ranking');
 reset role;
 
 -- ── Gestor: a consultoria inteira ────────────────────────────────────────────
 select testes.como('gestor_a');
+select is((select array_agg((r ->> 'visivel')::boolean order by r ->> 'nome') filter (where (r ->> 'id')::uuid in (testes.id('pessoa_a'), testes.id('pessoa_c'), testes.id('gestor_a')))
+    from jsonb_array_elements(public.painel_do_inicio(testes.futuro()) -> 'ranking') r),
+  array[true, true, false], 'gestor: visivel true para si e para o time dele (pessoa_a), false para pessoa_c (fora do time)');
+select is((select array_agg((e ->> 'visivel')::boolean) from jsonb_array_elements(public.painel_do_inicio(testes.futuro()) -> 'extremos' -> 'acima') e
+    where (e ->> 'id')::uuid = testes.id('pessoa_c')), array[false], 'gestor: extremos trazem visivel false para quem ele não vê');
 select is((select jsonb_array_length(public.painel_do_inicio(testes.futuro()) -> 'ranking')), 6,
   'gestor: ranking cobre todos os consultores da consultoria (decisão do Diego)');
 select is((select public.painel_do_inicio(testes.futuro()) ->> 'recorte'), 'consultoria', 'gestor: recorte consultoria');
@@ -288,6 +304,20 @@ reset role;
 select testes.como('zero_a');
 select ok((select (j -> 'indicadores' ->> 'capacidade')::numeric = 0 and j -> 'indicadores' -> 'ocupacao' = 'null'::jsonb
     from (select public.painel_do_inicio(testes.futuro()) as j) x), 'capacidade 0 no consultor: ocupação nula');
+reset role;
+
+-- ── Realizado do topo = barra do mês (arredonda uma vez, no fim) ───────────────
+-- Dois check-ins de 2 min em consultorias diferentes: cada um sozinho arredonda para 0,0 h, juntos dão 0,1 h.
+select testes.como('pessoa_a');
+insert into public.checkins (cliente_id, inicio, fim, descricao) values (testes.id('a40'), '2026-08-03 08:00-03', '2026-08-03 08:02-03', 'Ajuste');
+reset role;
+select testes.como('pessoa_b');
+insert into public.checkins (cliente_id, inicio, fim, descricao) values (testes.id('b10'), '2026-08-03 09:00-03', '2026-08-03 09:02-03', 'Ajuste');
+reset role;
+select testes.como('central');
+select ok((select (j -> 'indicadores' ->> 'realizado')::numeric = (j -> 'horas_por_mes' -> 5 ->> 'realizado')::numeric
+    from (select public.painel_do_inicio('2026-08-01') as j) x),
+  'realizado do topo = barra do mês, arredondando uma vez só no fim');
 reset role;
 
 -- ── Sem recorte ──────────────────────────────────────────────────────────────

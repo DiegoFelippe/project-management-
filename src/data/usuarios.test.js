@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { atualizarMeuContato, listarUsuarios } from './usuarios'
+import { atualizarMeuContato, buscarUsuario, listarUsuarios } from './usuarios'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() }, chamarFuncao: vi.fn() }))
 
@@ -19,6 +19,19 @@ describe('listarUsuarios', () => {
     const campos = banco.chamadas.find(([m]) => m === 'select')[1]
     for (const campo of ['cargo', 'telefone', 'cidade', 'uf', 'data_entrada', 'carga_semanal']) expect(campos).toContain(campo)
     expect(itens[0].times).toEqual([{ id: 't1', nome: 'X' }])
+  })
+})
+
+describe('buscarUsuario', () => {
+  it('carrega uma pessoa por id (o RLS decide se ela aparece) com os times achatados', async () => {
+    banco.resposta = { data: { id: 'p1', nome: 'Ana', times: [{ time: { id: 't1', nome: 'X' } }] }, error: null }
+    const p = await buscarUsuario('p1')
+    expect(banco.chamou('eq', 'id', 'p1')).toBe(true)
+    expect(p.times).toEqual([{ id: 't1', nome: 'X' }])
+  })
+  it('pessoa invisível: null', async () => {
+    banco.resposta = { data: null, error: null }
+    expect(await buscarUsuario('zzz')).toBeNull()
   })
 })
 

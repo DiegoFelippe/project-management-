@@ -1,5 +1,6 @@
 import { Gauge, Pencil, Plus, Send, UserCheck, UserX, Landmark } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
@@ -21,7 +22,7 @@ import { definirCarga, ocupacaoDasPessoas } from '@/data/capacidade'
 import { buscarConsultoriasAtivas } from '@/data/consultorias'
 import { tirarFoto, trocarFoto } from '@/data/imagens'
 import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
-import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
+import { buscarUsuario, criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { formatarHoras, formatarOcupacao } from '@/lib/horas'
 import { mesAtual } from '@/lib/mes'
 import { ehPapelDeConsultoria, veTudo } from '@/lib/papeis'
@@ -82,7 +83,14 @@ export default function Usuarios() {
   const [editando, setEditando] = useState(null)
   const [capacidade, setCapacidade] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
-  const [mes, setMes] = useState(mesAtual)
+  // ?pessoa=<id>&mes=AAAA-MM-01 (links do painel do Início): abre a pessoa no mês pedido; mês inválido cai no atual.
+  const [parametros] = useSearchParams()
+  const pessoaPedida = parametros.get('pessoa')
+  const [mes, setMes] = useState(() => {
+    const pedido = parametros.get('mes')
+    return /^\d{4}-(0[1-9]|1[0-2])-01$/.test(pedido ?? '') ? pedido : mesAtual()
+  })
+  const [aviso, setAviso] = useState(null)
   const [numeros, setNumeros] = useState({ mes: null, passado: false, porId: {} })
   const [erroNumeros, setErroNumeros] = useState(false)
   const [versao, setVersao] = useState(0)
@@ -167,6 +175,26 @@ export default function Usuarios() {
     (ehDono || (['admin', 'gestor'].includes(perfil.papel) && p.consultoria_id === perfil.consultoria_id))
   // Só o administrador geral move para a central (admin, gestor ou pessoa ativos).
   const podeMover = (p) => ehAdminGeral && p.id !== perfil.id && p.ativo !== false && ['admin', 'gestor', 'pessoa'].includes(p.papel)
+
+  // Pessoa vinda do painel: carregada por id (o RLS decide se ela aparece) e aberta na ação que faz sentido.
+  useEffect(() => {
+    if (!pessoaPedida) return
+    let ativo = true
+    buscarUsuario(pessoaPedida)
+      .then((p) => {
+        if (!ativo) return
+        if (!p) return setAviso('Você não tem acesso a essa pessoa.')
+        if (podeCapacidade(p)) setCapacidade(p)
+        else if (podeEditar(p) && p.ativo !== false) setEditando(p)
+        else setAviso('Você só consulta essa pessoa: não há o que alterar.')
+      })
+      .catch(() => ativo && setAviso('Não foi possível abrir essa pessoa.'))
+    return () => {
+      ativo = false
+    }
+    // Só uma vez por pedido: os pode* mudam de identidade a cada render, mas dependem só do perfil.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pessoaPedida])
 
   async function salvarEdicao(pessoa, { mudancas, carga, timesAdicionar, timesRemover, foto }) {
     if (Object.keys(mudancas).length) {
@@ -265,6 +293,7 @@ export default function Usuarios() {
         )}
       </BarraDeFiltros>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+      {aviso && <p role="status" className="mb-3 text-sm text-muted-foreground">{aviso}</p>}
       {comNumeros && erroNumeros && !erro && <p role="status" className="mb-3 text-sm text-muted-foreground">Não foi possível carregar a capacidade do mês.</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as pessoas…" className="py-12" />}
       {resultado && lista.length === 0 && (
