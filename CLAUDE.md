@@ -56,6 +56,12 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
 - **Listas** abrem com `BarraDeFiltros` (abas, busca, filtros e botão principal no fim). As abas são
   `AbasSegmentadas`; `comoAbas` só nas abas de página, como as do cliente. **Exceção:** em Times, administrador
   e gestor não têm barra (não há filtro) e o "Novo time" fica no cabeçalho; só o dono vê a barra, com a consultoria.
+- **Botões do cabeçalho da página** (`Cabecalho`): a ação principal do contexto é `default` (cheia, `--primary`) e as
+  demais são `outline`, tamanho padrão, com ícone. Apagar no cabeçalho é `outline` com o realce de perigo no hover.
+  `ghost sm` só dentro de linhas de tabela e listas. Ações que servem aos dois lugares (`AcoesDaLinha`,
+  `BotaoCheckin`) recebem `noCabecalho` e usam `estiloDaAcao` (`src/components/clientes/estiloDaAcao.js`).
+- **Mês sempre pela `NavegacaoDoMes`** (`maximo` trava o Próximo); nunca montar Anterior/Próximo de mês à mão.
+  `src/components/comum/navegacaoDoMesVarredura.test.js` falha se `deslocarMes` aparecer fora dela.
 - **Testes que guardam isto:** `src/components/campos/camposNativos.test.js` (varre `src/` atrás de campo nativo),
   `src/components/ui/button.test.jsx` e `src/components/comum/formulariosEnvio.test.jsx`.
 
