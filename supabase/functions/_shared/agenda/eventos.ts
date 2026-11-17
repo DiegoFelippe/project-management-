@@ -20,7 +20,7 @@ export type Quem = { id: string; nome: string; papel: string; consultoria_id: st
 export type GoogleDe = (perfilId: string) => Promise<GoogleDaPessoa | null>
 
 // Linha de agenda_eventos, como o banco devolve.
-type Linha = {
+export type Linha = {
   id: string
   consultoria_id: string
   consultor_id: string
@@ -48,7 +48,7 @@ const MAXIMO_NA_LISTA = 100
 const RESPOSTAS = ['confirmou', 'recusou']
 
 const SO_QUEM_ORGANIZA = 'Só quem organiza e a gestão da consultoria editam.'
-const NAO_EXISTE = 'Este evento não existe mais.'
+export const NAO_EXISTE = 'Este evento não existe mais.'
 const CLIENTE_INVALIDO = 'Escolha um cliente que você vê, da consultoria do consultor.'
 
 // O id do evento no Google sai do id do app (base32hex: o uuid sem os hífens). Assim, tentar de novo não duplica.
@@ -56,7 +56,7 @@ export const idNoGoogle = (id: string) => id.replaceAll('-', '').toLowerCase()
 
 // ── Erros ──
 
-const recusa = (status: number, codigo: string, erro: string) => new Falha(status, codigo, { erro })
+export const recusa = (status: number, codigo: string, erro: string) => new Falha(status, codigo, { erro })
 
 const MENSAGEM_DO_CAMPO: Record<string, string> = {
   evento: 'Confira os dados do evento.',
@@ -143,7 +143,7 @@ function objeto(valor: unknown): Record<string, unknown> {
   return valor as Record<string, unknown>
 }
 
-function uuid(valor: unknown, campo: string): string {
+export function uuid(valor: unknown, campo: string): string {
   if (typeof valor !== 'string' || !UUID.test(valor)) invalido(campo)
   return valor.toLowerCase()
 }
@@ -235,7 +235,7 @@ function conferir<T>({ data, error }: { data: T; error: unknown }): T {
   return data
 }
 
-async function lerEvento(db: Banco, id: string): Promise<Linha | null> {
+export async function lerEvento(db: Banco, id: string): Promise<Linha | null> {
   return conferir(await db.from('agenda_eventos').select('*').eq('id', id).maybeSingle())
 }
 
@@ -243,7 +243,7 @@ async function lerPessoa(db: Banco, id: string): Promise<Pessoa | null> {
   return conferir(await db.from('perfis').select('id, nome, consultoria_id, ativo').eq('id', id).maybeSingle())
 }
 
-async function lerParticipantes(db: Banco, eventoId: string): Promise<Participantes> {
+export async function lerParticipantes(db: Banco, eventoId: string): Promise<Participantes> {
   const linhas: { perfil_id: string | null; email: string | null }[] =
     conferir(await db.from('agenda_participantes').select('perfil_id, email').eq('evento_id', eventoId)) ?? []
   return {
@@ -283,15 +283,16 @@ const ehCentral = (q: Quem) => q.papel === 'dono' || q.papel === 'central'
 const ehGestao = (q: Quem) => q.papel === 'admin' || q.papel === 'gestor'
 
 // Quem é de consultoria arquivada não age (como private.liberado no banco).
-async function conferirQuem(db: Banco, quem: Quem) {
+export async function conferirQuem(db: Banco, quem: Quem) {
   if (ehCentral(quem)) return
   if (!quem.consultoria_id || await consultoriaArquivada(db, quem.consultoria_id)) {
     throw recusa(403, 'sem_permissao', 'Você não tem permissão para isso.')
   }
 }
 
-// Editar e apagar: a central; a gestão da consultoria do evento; o consultor dono da agenda.
-function cuidaDoEvento(quem: Quem, evento: Linha): boolean {
+// Editar e apagar (e, depois da reunião, buscar a gravação de novo): a central; a gestão da consultoria do evento; o
+// consultor dono da agenda.
+export function cuidaDoEvento(quem: Quem, evento: Linha): boolean {
   if (ehCentral(quem)) return true
   if (evento.consultoria_id !== quem.consultoria_id) return false
   return ehGestao(quem) || evento.consultor_id === quem.id
@@ -299,7 +300,7 @@ function cuidaDoEvento(quem: Quem, evento: Linha): boolean {
 
 // Não cuida: o participante (e o consultor que mudou de consultoria) vê o evento e recebe "só quem organiza"; os
 // outros nem ficam sabendo que o evento existe.
-function semPermissaoNoEvento(quem: Quem, evento: Linha, souConvidado: boolean): Falha {
+export function semPermissaoNoEvento(quem: Quem, evento: Linha, souConvidado: boolean): Falha {
   const vejo = evento.consultor_id === quem.id || (evento.consultoria_id === quem.consultoria_id && souConvidado)
   return vejo ? recusa(403, 'sem_permissao', SO_QUEM_ORGANIZA) : recusa(404, 'evento_nao_encontrado', NAO_EXISTE)
 }

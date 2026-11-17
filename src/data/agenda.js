@@ -97,6 +97,28 @@ export async function responderConvite(id, resposta) {
   return r.erro ? { erro: r.erro, campo: r.campo } : { erro: null, resposta: r.resposta }
 }
 
+// ── Depois da reunião (Edge Function reunioes-depois: a pasta com a transcrição e a documentação) ──
+
+async function reunioesDepois(corpo) {
+  const { status, corpo: resposta } = await chamarFuncao('reunioes-depois', corpo)
+  if (status === 200) return { erro: null, reuniao: resposta.reuniao }
+  return { erro: resposta.erro ?? traduzirErroFuncao(resposta.codigo) }
+}
+
+// "Buscar agora" no detalhe de uma reunião com Meet que já terminou (quem edita o evento): busca no Google do
+// organizador a gravação e a transcrição e, se a transcrição está pronta, cria a pasta da reunião no cliente.
+// { erro, reuniao: { reuniao, reuniao_erro, pasta_id, gravacao_url } }. reuniao: 'aguardando' (a transcrição ainda não
+// ficou pronta), 'pasta_criada', 'sem_artefatos' (48 h sem transcrição) ou 'erro' (reuniao_erro diz o motivo, ex.:
+// "Conecte o Google para buscar a gravação"). Reunião já fechada volta como está.
+export function buscarAgora(id) {
+  return reunioesDepois({ acao: 'buscarAgora', id })
+}
+
+// "Tentar de novo" numa reunião com erro ou sem gravação/transcrição: volta a buscar. Mesma resposta de buscarAgora.
+export function tentarDeNovo(id) {
+  return reunioesDepois({ acao: 'tentarDeNovo', id })
+}
+
 // ── Conectar o meu Google (Edge Function google-pessoa; o token nunca chega ao navegador) ──
 
 async function googlePessoa(corpo) {

@@ -356,6 +356,14 @@ export function criarGoogle({ fetch: buscar, obterToken, aoReconectar, limiteMs 
       })
     },
 
+    // O endereço do evento no Google Agenda (htmlLink), para a documentação da reunião. null quando o evento não está
+    // mais lá ou o Google não devolve um endereço https.
+    async linkDoEvento(id: string): Promise<string | null> {
+      const evento = await pedir('ler o evento no Google Agenda', 'GET', enderecoDoEvento(id), undefined, { faltaEhOk: true })
+      const link = evento?.htmlLink
+      return typeof link === 'string' && link.startsWith('https://') ? link : null
+    },
+
     // Liga (ou, com ligar: false, desliga) a gravação e a transcrição automáticas no espaço do Meet da reunião (o
     // espaço é achado pelo código).
     async ligarGravacao(meetCodigo: string, { ligar = true }: { ligar?: boolean } = {}): Promise<void> {

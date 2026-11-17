@@ -15,7 +15,8 @@ export default mergeConfig(
           test: {
             name: 'unidade',
             environment: 'jsdom',
-            include: ['src/**/*.test.{js,jsx}'],
+            // As funções puras das Edge Functions (núcleo sem Deno, em supabase/functions/_shared/) também.
+            include: ['src/**/*.test.{js,jsx}', 'supabase/functions/**/*.test.js'],
             setupFiles: ['./src/test/setup.js'],
           },
         },

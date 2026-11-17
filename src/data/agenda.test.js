@@ -3,6 +3,7 @@ import { chamarFuncao, supabase } from '@/lib/supabase'
 import {
   apagarEvento,
   ausenciasDoPeriodo,
+  buscarAgora,
   buscarEvento,
   concluirGoogle,
   conectarGoogle,
@@ -14,6 +15,7 @@ import {
   novoIdDeEvento,
   responderConvite,
   salvarEvento,
+  tentarDeNovo,
   voltaDoGoogle,
 } from './agenda'
 
@@ -251,5 +253,28 @@ describe('criar, editar, apagar e responder (Edge Function agenda)', () => {
     const a = novoIdDeEvento()
     expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(novoIdDeEvento()).not.toBe(a)
+  })
+})
+
+describe('depois da reunião: Buscar agora e Tentar de novo (Edge Function reunioes-depois)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chamam a função com o id e devolvem a situação da reunião', async () => {
+    const reuniao = { reuniao: 'pasta_criada', reuniao_erro: null, pasta_id: 'p1', gravacao_url: 'https://drive.test/v' }
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 200, corpo: { reuniao } })
+    expect(await buscarAgora('e1')).toEqual({ erro: null, reuniao })
+    expect(chamarFuncao).toHaveBeenLastCalledWith('reunioes-depois', { acao: 'buscarAgora', id: 'e1' })
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 200, corpo: { reuniao } })
+    expect(await tentarDeNovo('e1')).toEqual({ erro: null, reuniao })
+    expect(chamarFuncao).toHaveBeenLastCalledWith('reunioes-depois', { acao: 'tentarDeNovo', id: 'e1' })
+  })
+
+  it('o motivo em português que a função manda chega à tela; sem ele, vale a tradução do código', async () => {
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({
+      status: 409, corpo: { codigo: 'reuniao_nao_terminou', erro: 'A reunião ainda não terminou.' },
+    })
+    expect(await buscarAgora('e1')).toEqual({ erro: 'A reunião ainda não terminou.' })
+    vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 401, corpo: { codigo: 'nao_autenticado' } })
+    expect(await tentarDeNovo('e1')).toEqual({ erro: 'Sua sessão terminou. Entre de novo.' })
   })
 })

@@ -201,6 +201,15 @@ quem não conectou o Google fica com o evento só no app, sem Meet), com o núcl
 5. Desconectar apaga o token aqui e revoga a permissão no Google. A revogação vale para o app inteiro naquela conta:
    se a mesma conta do Google também estiver conectada nas Integrações da consultoria, aquela conexão pode cair junto.
 
+**Depois da reunião** (Edge Function `reunioes-depois`): o `pg_cron` chama a função a cada 10 minutos (pelo `pg_net`)
+para buscar, com o Google do organizador, a gravação e a transcrição das reuniões que terminaram e criar a pasta da
+reunião no cliente. A chamada leva o segredo `reunioes_depois_segredo` do Vault (criado aleatório pela migração, nunca
+no git); o endereço da função fica no Vault como `reunioes_depois_url` (no local, o gateway do Docker). Na nuvem, a
+migração liga o `pg_cron` e o `pg_net` e agenda a rotina; falta só trocar o endereço pelo do projeto, no SQL Editor:
+`select vault.update_secret((select id from vault.secrets where name = 'reunioes_depois_url'),
+'https://<ref-do-projeto>.supabase.co/functions/v1/reunioes-depois');`. Confira em **Integrations → Cron** que o job
+`reunioes-depois` está ativo.
+
 No Supabase local, uma Edge Function **nova** só passa a ser servida depois de recriar o runtime
 (`npx supabase stop && npx supabase start`; os dados ficam). `npm run functions:reiniciar` recarrega o código das
 funções que o runtime já conhece.
@@ -213,7 +222,8 @@ funções que o runtime já conhece.
 2. `npx supabase login` e `npx supabase link --project-ref <ref-do-projeto>`.
 3. `npx supabase db push --remote` envia as migrações. No CLI 3, sem `--remote` ele mexe no banco local.
 4. `npx supabase functions deploy` publica as Edge Functions (`criar-acesso`, `criar-consultoria`, `reenviar-convite`,
-   `gerenciar-acesso`, `gerenciar-consultoria`, `integracoes`, `integracoes-google`, `google-pessoa`, `agenda`).
+   `gerenciar-acesso`, `gerenciar-consultoria`, `integracoes`, `integracoes-google`, `google-pessoa`, `agenda`,
+   `reunioes-depois`). Depois, troque o endereço da rotina das reuniões no Vault (veja "Depois da reunião", acima).
 5. Em Authentication: Site URL e redirecionamentos com o endereço da Vercel (`https://.../**`),
    cadastro aberto desligado, a política de senha (**Authentication → Policies → Passwords**, ou no provedor
    **Email**, conforme a versão do painel: tamanho mínimo **10** e requisitos **"Lowercase, uppercase letters, digits

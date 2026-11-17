@@ -457,6 +457,11 @@ verify_jwt = false
 [functions.agenda]
 verify_jwt = false
 
+# Depois da reunião: o pg_cron chama com o segredo do Vault (x-rotina-segredo), sem token de usuário; "Buscar agora" e
+# "Tentar de novo" vêm da tela, e a função confere o token de quem chama.
+[functions.reunioes-depois]
+verify_jwt = false
+
 [functions.gerenciar-acesso]
 verify_jwt = false
 

@@ -124,8 +124,8 @@ export function criarGoogleFalso({ cliente = { id: 'cliente-falso', segredo: 'se
     return [...c.espacos.values()].find((e) => e.meetingCode === codigo)
   }
 
-  function novoEspaco(c: Conta): Espaco {
-    const meetingCode = `${letras(3)}-${letras(4)}-${letras(3)}`
+  function novoEspaco(c: Conta, codigo?: string): Espaco {
+    const meetingCode = codigo ?? `${letras(3)}-${letras(4)}-${letras(3)}`
     const espaco: Espaco = {
       name: `spaces/${base32hex(12)}`,
       meetingCode,
@@ -461,6 +461,12 @@ export function criarGoogleFalso({ cliente = { id: 'cliente-falso', segredo: 'se
     },
     espaco(email: string, codigo: string) {
       return espacoPeloCodigo(conta(email), codigo)
+    },
+    // Uma sala do Meet com o código dado na conta (como as que o Google cria junto com o evento), para reuniões que o
+    // app guardou antes de a pessoa conectar esta conta.
+    criarSala(email: string, codigo: string) {
+      const c = conta(email)
+      return espacoPeloCodigo(c, codigo) ?? novoEspaco(c, codigo)
     },
     // Uma reunião aconteceu no espaço do Meet: participantes, gravações e transcrições como o Google guarda.
     registrarConferencia(email: string, codigo: string, dados: ConferenciaFalsa) {
