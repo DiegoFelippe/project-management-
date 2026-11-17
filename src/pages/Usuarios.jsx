@@ -308,7 +308,8 @@ export default function Usuarios() {
         <FichaDoConsultor key={editando.id} aberto pessoa={editando} perfilDeQuem={perfil} times={ehDono ? [] : times}
           podeReenviar={!ehDono || podeEditar(editando)} podeDesativar={podeDesativar(editando)}
           aoReenviar={() => reenviar(editando)} aoPedirAtivo={(acao) => setConfirmando({ pessoa: editando, acao })}
-          aoFechar={() => setEditando(null)} aoSalvar={(dados) => salvarEdicao(editando, dados)} />
+          aoFechar={() => setEditando(null)} aoSalvar={(dados) => salvarEdicao(editando, dados)}
+          aoMudarAusencias={recarregarNumeros} />
       )}
       {capacidade && (
         <CapacidadeDaPessoa key={capacidade.id} pessoa={capacidade} aoFechar={() => setCapacidade(null)}

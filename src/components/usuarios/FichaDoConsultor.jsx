@@ -61,7 +61,7 @@ function EscolhaDeTimes({ times, marcados, aoAlternar, aviso }) {
 // aoPedirAtivo('desativar' | 'reativar') quando podeReenviar / podeDesativar.
 export default function FichaDoConsultor({
   aberto, aoFechar, perfilDeQuem, pessoa = null, times = [], consultoriaId = '', buscarConsultorias,
-  titulo, aoCriar, aoColocarNosTimes, aoSalvar, podeReenviar, podeDesativar, aoReenviar, aoPedirAtivo,
+  titulo, aoCriar, aoColocarNosTimes, aoSalvar, podeReenviar, podeDesativar, aoReenviar, aoPedirAtivo, aoMudarAusencias,
 }) {
   const novo = !pessoa
   const opcoesDePapel = papeisQuePodeDar(perfilDeQuem)
@@ -282,7 +282,7 @@ export default function FichaDoConsultor({
             {!novo && (
               <div className="grid gap-2">
                 <h4 className="text-sm font-medium">Ausências</h4>
-                <GerirAusencias pessoa={pessoa} />
+                <GerirAusencias pessoa={pessoa} aoMudar={aoMudarAusencias} />
               </div>
             )}
           </Bloco>

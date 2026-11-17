@@ -364,6 +364,19 @@ describe('Usuários', () => {
     })
   })
 
+  it('mexer nas ausências pela ficha busca os números do mês de novo', async () => {
+    vi.mocked(listarAusencias).mockResolvedValue({ itens: [{ id: 'a1', perfil_id: 'p1', de: '2026-12-20', ate: '2027-01-05', motivo: 'Férias' }], total: 1 })
+    vi.mocked(apagarAusencia).mockResolvedValue({ erro: null })
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Editar' }))
+    const janela = screen.getByRole('dialog', { name: 'Editar Ana' })
+    await userEvent.click(await within(janela).findByRole('button', { name: 'Apagar' }))
+    const chamadas = vi.mocked(ocupacaoDasPessoas).mock.calls.length
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar' }))
+    await waitFor(() => expect(apagarAusencia).toHaveBeenCalledWith('a1'))
+    await waitFor(() => expect(ocupacaoDasPessoas.mock.calls.length).toBeGreaterThan(chamadas))
+  })
+
   describe('ação "Capacidade" da linha (carga e ausências)', () => {
     const linha = (id, nome, papel, extra = {}) => ({
       id, nome, email: `${nome.toLowerCase()}@x.test`, papel, ativo: true, times: [], consultoria_id: 'c1', carga_semanal: 40, ...extra,
