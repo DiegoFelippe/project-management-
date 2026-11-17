@@ -77,6 +77,14 @@ describe('DetalheDoEvento', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('já está sendo buscada')
   })
 
+  it('gravou mas não transcreveu: "Sem transcrição", com Abrir gravação e Tentar de novo', () => {
+    detalhe({ ...REUNIAO, reuniao: 'sem_artefatos', gravacao_url: 'https://drive.google.com/x' })
+    expect(screen.getByText('Sem transcrição')).toBeInTheDocument()
+    expect(screen.queryByText('Sem gravação/transcrição')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Abrir gravação' })).toHaveAttribute('href', 'https://drive.google.com/x')
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument()
+  })
+
   it('pasta criada leva à aba Arquivos do cliente, na pasta', () => {
     detalhe({ ...REUNIAO, reuniao: 'pasta_criada', pasta_id: 'pa1', gravacao_url: 'https://drive.google.com/x' })
     expect(screen.getByText('Pasta criada')).toBeInTheDocument()

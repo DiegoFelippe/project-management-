@@ -374,6 +374,37 @@ describe('pela tela: Buscar agora e Tentar de novo (núcleo, Google falso, IA fa
     expect(await historico(cli.daAna)).toHaveLength(historicoAntes + 2)
   })
 
+  it('reunião com queda: a pasta junta as falas dos dois registros; a reunião de outro dia no mesmo Meet fica de fora', async () => {
+    const e = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Reunião com queda', horas: 2 })
+    const inicio = Date.parse(e.inicio)
+    const em = (minutos) => new Date(inicio + minutos * 60_000).toISOString()
+    const pessoas = [{ id: 'p1', nome: 'Ana Souza' }, { id: 'p2', nome: 'Contato do Cliente', tipo: 'anonymousUser' }]
+    // Uma semana antes, no mesmo espaço do Meet (como numa reunião recorrente): outra reunião, já transcrita.
+    google.registrarConferencia(p.ana.googleEmail, e.meet_codigo, {
+      inicio: em(-7 * 24 * 60), fim: em(-7 * 24 * 60 + 50), participantes: pessoas,
+      transcricoes: [{ estado: 'FILE_GENERATED', falas: [{ participante: 'p1', inicio: em(-7 * 24 * 60 + 1), texto: 'Semana passada' }] }],
+    })
+    // A conexão cai aos 20 minutos e todos voltam aos 22.
+    google.registrarConferencia(p.ana.googleEmail, e.meet_codigo, {
+      inicio: em(0), fim: em(20), participantes: pessoas,
+      transcricoes: [{ estado: 'FILE_GENERATED', falas: [{ participante: 'p1', inicio: em(1), texto: 'Bom dia' }] }],
+    })
+    google.registrarConferencia(p.ana.googleEmail, e.meet_codigo, {
+      inicio: em(22), fim: em(58), participantes: pessoas,
+      gravacoes: [{ estado: 'FILE_GENERATED', link: GRAVACAO }],
+      transcricoes: [{ estado: 'FILE_GENERATED', falas: [{ participante: 'p2', inicio: em(23), texto: 'Voltamos' }] }],
+    })
+
+    expect((await buscar(p.ana, e.id)).reuniao).toMatchObject({ reuniao: 'pasta_criada', gravacao_url: GRAVACAO })
+    const [pasta] = await pastasDoEvento(e.id)
+    const arquivos = await arquivosDaPasta(pasta.id)
+    const transcricao = await conteudo(arquivos.find((a) => a.nome === 'transcricao.txt').caminho)
+    expect(transcricao.split('\n').map((linha) => linha.replace(/^\[[\d:]+\] /, ''))).toEqual([
+      'Ana Souza: Bom dia', 'Contato do Cliente: Voltamos', '',
+    ])
+    expect(await conteudo(arquivos.find((a) => a.nome === 'documentacao.md').caminho)).toContain('- **Duração:** 58 min')
+  })
+
   it('transcrição ainda processando: "aguardando", com o link da gravação já guardado', async () => {
     const e = await reuniao(p.ana, { cliente_id: cli.daAna, titulo: 'Diagnóstico' })
     conferencia(p.ana, e, { transcricao: 'STARTED' })

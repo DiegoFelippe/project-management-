@@ -308,10 +308,18 @@ export function criarGoogleFalso({ cliente = { id: 'cliente-falso', segredo: 'se
       if (!pode(MEET_LER)) return semEscopo()
       const todas = [...c.espacos.values()].flatMap((e) => e.conferencias)
       if (partes.length === 1 && metodo === 'GET') {
+        // Como a API: space.meeting_code = "…" e start_time >=, <=, >, < "…", ligados por AND.
         const filtro = /space\.meeting_code\s*=\s*"([^"]+)"/.exec(busca.filter ?? '')
         const espaco = filtro ? espacoPeloCodigo(c, filtro[1]) : undefined
+        const limites = [...(busca.filter ?? '').matchAll(/start_time\s*(>=|<=|>|<)\s*"([^"]+)"/g)]
+          .map(([, op, valor]) => ({ op, quando: Date.parse(valor) }))
+        if (limites.some((l) => Number.isNaN(l.quando))) return erroDaApi(400, 'Invalid filter.')
+        const dentro = (conferencia: any) => limites.every(({ op, quando }) => {
+          const inicio = Date.parse(conferencia.startTime)
+          return op === '>=' ? inicio >= quando : op === '<=' ? inicio <= quando : op === '>' ? inicio > quando : inicio < quando
+        })
         const lista = (filtro ? espaco?.conferencias ?? [] : todas)
-          .slice()
+          .filter(dentro)
           .sort((a, b) => Date.parse(b.startTime) - Date.parse(a.startTime))
           .map(conferenciaEmJson)
         return json(200, pagina(lista, busca, 'conferenceRecords', 25))

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CircleAlert, FolderCheck, FolderOpen, Hourglass, Loader2, PlayCircle, RefreshCw, Video, VideoOff } from 'lucide-react'
+import { CaptionsOff, CircleAlert, FolderCheck, FolderOpen, Hourglass, Loader2, PlayCircle, RefreshCw, Video, VideoOff } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { buscarAgora, tentarDeNovo } from '@/data/agenda'
@@ -28,7 +28,12 @@ export default function DetalheDoEvento({ evento, podeEditar, aoMudar }) {
   const terminou = Date.parse(evento.fim) <= agora
   const comRotina = Boolean(evento.com_meet && evento.cliente_id)
   const estado = situacao.reuniao === 'agendada' ? (terminou ? 'aguardando' : null) : situacao.reuniao
-  const info = comRotina && estado ? SITUACOES[estado] : null
+  // Gravou, mas a transcrição não veio: a gravação está aí ("Abrir gravação"); falta só a transcrição.
+  const info = comRotina && estado
+    ? (estado === 'sem_artefatos' && situacao.gravacao_url
+      ? { ...SITUACOES.sem_artefatos, rotulo: 'Sem transcrição', icone: CaptionsOff }
+      : SITUACOES[estado])
+    : null
   const pasta = situacao.pasta_id && evento.cliente_id ? `/clientes/${evento.cliente_id}?aba=arquivos&pasta=${situacao.pasta_id}` : null
 
   async function buscar() {

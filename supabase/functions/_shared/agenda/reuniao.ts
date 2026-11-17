@@ -6,7 +6,8 @@
 // fecharReuniao, para uma reunião com Meet e com cliente que já terminou e ainda espera ("agendada" ou "aguardando"):
 // - sem cliente no evento: nada (não há onde criar a pasta; nem pergunta ao Google);
 // - organizador sem Google → "erro": "Conecte o Google para buscar a gravação";
-// - lê, com o token do organizador, a gravação e a transcrição da conferência. O Google recusa: se tentar de novo
+// - lê, com o token do organizador, a gravação e a transcrição das conferências da janela do evento (uma reunião com
+//   queda tem mais de uma: as falas são juntadas). O Google recusa: se tentar de novo
 //   resolve (fora do ar, limite de pedidos, resposta que não veio), fica "aguardando" com o motivo e a rotina tenta de
 //   novo; se não (reconectar, sem permissão, não achou), "erro" com o motivo;
 // - transcrição pronta → cria a pasta "Reunião dd/MM/yyyy HH:mm — <título>" no cliente, com transcricao.txt e
@@ -401,7 +402,8 @@ export async function fecharReuniao(
 
   let artefatos: ArtefatosDaReuniao
   try {
-    artefatos = await google.artefatosDaReuniao(evento.meet_codigo)
+    // Só os registros de conferência da janela deste evento (o espaço do Meet pode ter outras reuniões).
+    artefatos = await google.artefatosDaReuniao(evento.meet_codigo, { inicio: evento.inicio, fim: evento.fim })
   } catch (erro) {
     if (!(erro instanceof ErroDoGoogle)) throw erro
     if (erroPassageiro(erro)) return aguardar(db, evento, GOOGLE_SEM_RESPOSTA, evento.gravacao_url, agora)

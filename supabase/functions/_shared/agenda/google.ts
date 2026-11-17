@@ -88,6 +88,9 @@ const CALENDARIO = 'https://www.googleapis.com/calendar/v3/calendars/primary/eve
 const MEET = 'https://meet.googleapis.com/v2'
 const LIMITE_MS = 15_000
 const MAXIMO_DE_PAGINAS = 100
+// A janela da reunião no Meet: quem entra antes da hora e a reunião que passa da hora (ou volta depois de uma queda).
+const ANTES_DO_INICIO_MS = 30 * 60_000
+const DEPOIS_DO_FIM_MS = 6 * 3_600_000
 const ATUALIZAR_GRAVACAO = [
   'config.artifactConfig.recordingConfig.autoRecordingGeneration',
   'config.artifactConfig.transcriptionConfig.autoTranscriptionGeneration',
@@ -272,12 +275,12 @@ export function criarGoogle({ fetch: buscar, obterToken, aoReconectar, limiteMs 
     }
   }
 
-  // Todas as páginas de uma lista do Meet (pageToken), até um teto de segurança.
-  async function todas(acao: string, url: string, chave: string, tamanho = 100): Promise<any[]> {
+  // Todas as páginas de uma lista do Meet (pageToken), até um teto de segurança. `extra`: outros parâmetros (filter).
+  async function todas(acao: string, url: string, chave: string, tamanho = 100, extra: Record<string, string> = {}): Promise<any[]> {
     const itens: any[] = []
     let pagina: string | undefined
     for (let i = 0; i < MAXIMO_DE_PAGINAS; i += 1) {
-      const busca = new URLSearchParams({ pageSize: String(tamanho), ...(pagina ? { pageToken: pagina } : {}) })
+      const busca = new URLSearchParams({ ...extra, pageSize: String(tamanho), ...(pagina ? { pageToken: pagina } : {}) })
       const dados = await pedir(acao, 'GET', `${url}?${busca}`)
       itens.push(...(Array.isArray(dados?.[chave]) ? dados[chave] : []))
       pagina = typeof dados?.nextPageToken === 'string' && dados.nextPageToken ? dados.nextPageToken : undefined
@@ -383,54 +386,77 @@ export function criarGoogle({ fetch: buscar, obterToken, aoReconectar, limiteMs 
     },
 
     // O que a reunião deixou: se terminou, o link da gravação e a transcrição (falas em ordem de hora, com o nome de
-    // quem falou). Usa a conferência mais recente do espaço. 'pronta' só quando todas as transcrições têm arquivo.
-    async artefatosDaReuniao(meetCodigo: string): Promise<ArtefatosDaReuniao> {
+    // quem falou). Com a `janela` do evento, só os registros de conferência que começaram entre 30 minutos antes do
+    // início e 6 horas depois do fim (o espaço do Meet pode ter outras reuniões, como numa reunião recorrente); sem
+    // ela, o mais recente do espaço. Uma reunião com queda tem mais de um registro: as falas dos que têm a transcrição
+    // pronta são juntadas em ordem (o que não tem transcrição fica de fora); enquanto algum ainda gera a transcrição,
+    // é 'processando' (para juntar tudo). A gravação é a da parte mais longa da reunião.
+    async artefatosDaReuniao(meetCodigo: string, janela?: { inicio: string; fim: string }): Promise<ArtefatosDaReuniao> {
       const codigo = conferir(meetCodigo, CODIGO_DO_MEET, 'Código do Meet')
       const acao = 'ler a gravação e a transcrição do Meet'
-      const filtro = new URLSearchParams({ filter: `space.meeting_code = "${codigo}"`, pageSize: '10' })
-      const lista = await pedir(acao, 'GET', `${MEET}/conferenceRecords?${filtro}`)
-      const registros = (Array.isArray(lista?.conferenceRecords) ? lista.conferenceRecords : [])
+      const de = janela ? Date.parse(janela.inicio) - ANTES_DO_INICIO_MS : null
+      const ate = janela ? Date.parse(janela.fim) + DEPOIS_DO_FIM_MS : null
+      if (janela && (Number.isNaN(de) || Number.isNaN(ate))) throw new ErroDoGoogle('recusado', 'Data inválida na janela da reunião.')
+      const filtro = [
+        `space.meeting_code = "${codigo}"`,
+        ...(janela ? [`start_time >= "${new Date(de!).toISOString()}"`, `start_time <= "${new Date(ate!).toISOString()}"`] : []),
+      ].join(' AND ')
+      const lista = await todas(acao, `${MEET}/conferenceRecords`, 'conferenceRecords', 10, { filter: filtro })
+      const validos = lista
         .filter((r: any) => typeof r?.name === 'string' && /^conferenceRecords\/[A-Za-z0-9_-]+$/.test(r.name))
-        .sort((a: any, b: any) => Date.parse(b.startTime ?? '') - Date.parse(a.startTime ?? ''))
-      const registro = registros[0]
-      if (!registro) {
+        .filter((r: any) => typeof r.startTime === 'string' && !Number.isNaN(Date.parse(r.startTime)))
+        .sort((a: any, b: any) => Date.parse(a.startTime) - Date.parse(b.startTime))
+      // O Google já filtrou pela janela; a conferência aqui garante o recorte mesmo se o filtro mudar.
+      const registros = janela
+        ? validos.filter((r: any) => Date.parse(r.startTime) >= de! && Date.parse(r.startTime) <= ate!)
+        : validos.slice(-1)
+      if (!registros.length) {
         return { terminou: false, inicio: null, fim: null, gravacaoUrl: null, transcricao: 'nenhuma', falas: [] }
       }
 
-      const terminou = typeof registro.endTime === 'string'
-      const [gravacoes, transcricoes] = await Promise.all([
-        todas(acao, `${MEET}/${registro.name}/recordings`, 'recordings'),
-        todas(acao, `${MEET}/${registro.name}/transcripts`, 'transcripts'),
-      ])
-      const gravacao = gravacoes
-        .filter((g) => g?.state === 'FILE_GENERATED' && typeof g.driveDestination?.exportUri === 'string')
-        .sort((a, b) => Date.parse(a.startTime ?? '') - Date.parse(b.startTime ?? ''))[0]
-      const prontas = transcricoes.filter((t) => t?.state === 'FILE_GENERATED')
-      const transcricao = !transcricoes.length
-        ? 'nenhuma'
-        : terminou && prontas.length === transcricoes.length ? 'pronta' : 'processando'
+      const terminou = registros.every((r: any) => typeof r.endTime === 'string')
+      const partes = await Promise.all(registros.map(async (registro: any) => {
+        const [gravacoes, transcricoes] = await Promise.all([
+          todas(acao, `${MEET}/${registro.name}/recordings`, 'recordings'),
+          todas(acao, `${MEET}/${registro.name}/transcripts`, 'transcripts'),
+        ])
+        const prontas = transcricoes.filter((t) => t?.state === 'FILE_GENERATED')
+        const transcricao: ArtefatosDaReuniao['transcricao'] = !transcricoes.length
+          ? 'nenhuma'
+          : typeof registro.endTime === 'string' && prontas.length === transcricoes.length ? 'pronta' : 'processando'
+        const gravacao = gravacoes
+          .filter((g) => g?.state === 'FILE_GENERATED' && typeof g.driveDestination?.exportUri === 'string')
+          .sort((a, b) => Date.parse(a.startTime ?? '') - Date.parse(b.startTime ?? ''))[0]
+        const duracao = typeof registro.endTime === 'string' ? Date.parse(registro.endTime) - Date.parse(registro.startTime) : 0
+        return { registro, transcricao, prontas, gravacaoUrl: gravacao?.driveDestination.exportUri ?? null, duracao }
+      }))
+      const transcricao: ArtefatosDaReuniao['transcricao'] = partes.some((p) => p.transcricao === 'processando')
+        ? 'processando'
+        : partes.some((p) => p.transcricao === 'pronta') ? 'pronta' : 'nenhuma'
 
       let falas: Fala[] = []
       if (transcricao === 'pronta') {
-        const nomes = new Map(
-          (await todas(acao, `${MEET}/${registro.name}/participants`, 'participants'))
-            .map((p) => [p?.name, nomeDoParticipante(p)]),
-        )
-        const entradas = (await Promise.all(prontas.map((t) => {
-          const nome = conferir(t.name, /^conferenceRecords\/[A-Za-z0-9_-]+\/transcripts\/[A-Za-z0-9_-]+$/, 'Transcrição do Meet')
-          return todas(acao, `${MEET}/${nome}/entries`, 'transcriptEntries')
-        }))).flat()
-        falas = entradas
-          .filter((e) => typeof e?.text === 'string' && e.text.trim() && typeof e.startTime === 'string')
-          .map((e) => ({ hora: e.startTime, nome: nomes.get(e.participant) ?? 'Participante', texto: e.text.trim() }))
-          .sort(porHora)
+        falas = (await Promise.all(partes.filter((p) => p.transcricao === 'pronta').map(async ({ registro, prontas }) => {
+          const nomes = new Map(
+            (await todas(acao, `${MEET}/${registro.name}/participants`, 'participants'))
+              .map((p) => [p?.name, nomeDoParticipante(p)]),
+          )
+          const entradas = (await Promise.all(prontas.map((t) => {
+            const nome = conferir(t.name, /^conferenceRecords\/[A-Za-z0-9_-]+\/transcripts\/[A-Za-z0-9_-]+$/, 'Transcrição do Meet')
+            return todas(acao, `${MEET}/${nome}/entries`, 'transcriptEntries')
+          }))).flat()
+          return entradas
+            .filter((e) => typeof e?.text === 'string' && e.text.trim() && typeof e.startTime === 'string')
+            .map((e) => ({ hora: e.startTime, nome: nomes.get(e.participant) ?? 'Participante', texto: e.text.trim() }))
+        }))).flat().sort(porHora)
       }
 
+      const comGravacao = partes.filter((p) => p.gravacaoUrl).sort((a, b) => b.duracao - a.duracao)
       return {
         terminou,
-        inicio: typeof registro.startTime === 'string' ? registro.startTime : null,
-        fim: terminou ? registro.endTime : null,
-        gravacaoUrl: gravacao?.driveDestination.exportUri ?? null,
+        inicio: registros[0].startTime,
+        fim: terminou ? registros.map((r: any) => r.endTime).sort((a: string, b: string) => Date.parse(a) - Date.parse(b)).at(-1) : null,
+        gravacaoUrl: comGravacao[0]?.gravacaoUrl ?? null,
         transcricao,
         falas,
       }

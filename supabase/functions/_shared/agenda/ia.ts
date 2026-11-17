@@ -69,21 +69,28 @@ export function lerResumo(texto: string): ResumoDaReuniao {
   }
 }
 
-// Um pedido à IA, cancelado de verdade quando passa do tempo.
-async function pedir(buscar: Buscar, url: string, cabecalhos: Record<string, string>, corpo: unknown) {
+// Um pedido à IA, cancelado de verdade quando passa do tempo. O tempo vale até o fim da leitura do corpo (a IA pode
+// mandar o cabeçalho na hora e demorar no resto).
+async function pedir(buscar: Buscar, url: string, cabecalhos: Record<string, string>, corpo: unknown, limiteMs: number) {
   const controle = new AbortController()
-  const resposta = await comLimite(buscar(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...cabecalhos },
-    body: JSON.stringify(corpo),
-    signal: controle.signal,
-  }), () => controle.abort(), LIMITE_MS)
-  const dados = await resposta.json().catch(() => null)
+  const { resposta, dados } = await comLimite((async () => {
+    const resposta = await buscar(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...cabecalhos },
+      body: JSON.stringify(corpo),
+      signal: controle.signal,
+    })
+    return { resposta, dados: await resposta.json().catch(() => null) }
+  })(), () => controle.abort(), limiteMs)
   if (!resposta.ok) throw new Error(`A IA respondeu com erro ${resposta.status}.`)
   return dados
 }
 
-export function criarIa({ fetch: buscar, provedor, modelo, chave }: ConexaoDaIa & { fetch: Buscar }): Ia {
+// `limiteMs`: tempo máximo de cada pedido, com a resposta inteira (padrão: 45 segundos; os testes usam menos).
+export function criarIa({ fetch: buscar, provedor, modelo, chave, limiteMs = LIMITE_MS }: ConexaoDaIa & {
+  fetch: Buscar
+  limiteMs?: number
+}): Ia {
   return async (pedido) => {
     const texto = mensagem(pedido)
     if (provedor === 'anthropic') {
@@ -95,7 +102,7 @@ export function criarIa({ fetch: buscar, provedor, modelo, chave }: ConexaoDaIa 
         max_tokens: MAXIMO_DE_TOKENS,
         system: INSTRUCOES,
         messages: [{ role: 'user', content: texto }],
-      })
+      }, limiteMs)
       const resposta = (Array.isArray(dados?.content) ? dados.content : [])
         .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
         .map((b: any) => b.text)
@@ -106,7 +113,7 @@ export function criarIa({ fetch: buscar, provedor, modelo, chave }: ConexaoDaIa 
       model: modelo,
       max_completion_tokens: MAXIMO_DE_TOKENS,
       messages: [{ role: 'system', content: INSTRUCOES }, { role: 'user', content: texto }],
-    })
+    }, limiteMs)
     const resposta = dados?.choices?.[0]?.message?.content
     return lerResumo(typeof resposta === 'string' ? resposta : '')
   }

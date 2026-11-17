@@ -301,6 +301,85 @@ describe('Google Meet', () => {
     expect(google.pedidosPara(/transcripts\/t0\/entries/).length).toBeGreaterThan(1)
   })
 
+  describe('reunião com queda (mais de um registro de conferência no espaço)', () => {
+    const JANELA = { inicio: REUNIAO.inicio, fim: REUNIAO.fim } // 17:00 a 18:30 (UTC)
+    const fala = (participante, inicio, texto) => ({ participante, inicio, texto })
+    const pronta = (falas) => [{ estado: 'FILE_GENERATED', falas }]
+
+    // Ontem, no mesmo espaço (reunião recorrente usa o mesmo Meet): fica fora da janela do evento.
+    function ontem(google, meetCodigo) {
+      google.registrarConferencia(EMAIL, meetCodigo, {
+        inicio: '2026-11-19T17:00:00Z', fim: '2026-11-19T18:00:00Z', participantes: [{ id: 'p9', nome: 'Ontem' }],
+        gravacoes: [{ estado: 'FILE_GENERATED', link: 'https://drive.google.com/file/d/ontem/view' }],
+        transcricoes: pronta([fala('p9', '2026-11-19T17:05:00Z', 'Reunião de ontem')]),
+      })
+    }
+
+    it('pede só os registros da janela do evento (início − 30 min até fim + 6 h) e junta as falas dos que estão prontos', async () => {
+      const google = criarGoogleFalso()
+      const { cliente } = clienteDireto(google)
+      const { meetCodigo } = await cliente.criarEvento(REUNIAO, { meet: true })
+      ontem(google, meetCodigo)
+      // A conexão caiu às 17:10 e todos voltaram às 17:12: dois registros.
+      google.registrarConferencia(EMAIL, meetCodigo, {
+        inicio: '2026-11-20T16:58:00Z', fim: '2026-11-20T17:10:00Z', participantes: [{ id: 'p1', nome: 'Ana Consultora' }],
+        gravacoes: [{ estado: 'FILE_GENERATED', link: 'https://drive.google.com/file/d/curta/view' }],
+        transcricoes: pronta([fala('p1', '2026-11-20T17:01:00Z', 'Começando'), fala('p1', '2026-11-20T17:09:00Z', 'Caiu?')]),
+      })
+      google.registrarConferencia(EMAIL, meetCodigo, {
+        inicio: '2026-11-20T17:12:00Z', fim: '2026-11-20T18:25:00Z',
+        participantes: [{ id: 'p1', nome: 'Ana Consultora' }, { id: 'p2', nome: 'Visitante', tipo: 'anonymousUser' }],
+        gravacoes: [{ estado: 'FILE_GENERATED', link: 'https://drive.google.com/file/d/longa/view' }],
+        transcricoes: pronta([fala('p2', '2026-11-20T17:13:00Z', 'Voltamos'), fala('p1', '2026-11-20T18:20:00Z', 'Até mais')]),
+      })
+
+      const r = await cliente.artefatosDaReuniao(meetCodigo, JANELA)
+      const [lista] = google.pedidosPara('/v2/conferenceRecords?')
+      expect(lista.busca.filter).toBe(`space.meeting_code = "${meetCodigo}" AND start_time >= "2026-11-20T16:30:00.000Z" ` +
+        'AND start_time <= "2026-11-21T00:30:00.000Z"')
+      expect(r).toMatchObject({
+        terminou: true, transcricao: 'pronta', inicio: '2026-11-20T16:58:00Z', fim: '2026-11-20T18:25:00Z',
+        // a gravação da parte mais longa da reunião
+        gravacaoUrl: 'https://drive.google.com/file/d/longa/view',
+      })
+      expect(r.falas.map((f) => `${f.nome}: ${f.texto}`)).toEqual([
+        'Ana Consultora: Começando', 'Ana Consultora: Caiu?', 'Visitante: Voltamos', 'Ana Consultora: Até mais',
+      ])
+    })
+
+    it('escolhe o registro que tem a transcrição pronta; com outro ainda processando, espera', async () => {
+      const google = criarGoogleFalso()
+      const { cliente } = clienteDireto(google)
+      const { meetCodigo } = await cliente.criarEvento(REUNIAO, { meet: true })
+      ontem(google, meetCodigo)
+      // Primeiro registro sem transcrição (ninguém ligou), o segundo com ela pronta.
+      google.registrarConferencia(EMAIL, meetCodigo, { inicio: '2026-11-20T17:00:00Z', fim: '2026-11-20T17:03:00Z' })
+      google.registrarConferencia(EMAIL, meetCodigo, {
+        inicio: '2026-11-20T17:05:00Z', fim: '2026-11-20T18:20:00Z', participantes: [{ id: 'p1', nome: 'Ana Consultora' }],
+        transcricoes: pronta([fala('p1', '2026-11-20T17:06:00Z', 'Agora sim')]),
+      })
+      const r = await cliente.artefatosDaReuniao(meetCodigo, JANELA)
+      expect(r).toMatchObject({ terminou: true, transcricao: 'pronta', gravacaoUrl: null })
+      expect(r.falas.map((f) => f.texto)).toEqual(['Agora sim'])
+
+      // Um terceiro registro, com a transcrição ainda sendo gerada: espera para juntar tudo.
+      google.registrarConferencia(EMAIL, meetCodigo, {
+        inicio: '2026-11-20T18:21:00Z', fim: '2026-11-20T18:40:00Z', transcricoes: [{ estado: 'ENDED' }],
+      })
+      expect(await cliente.artefatosDaReuniao(meetCodigo, JANELA)).toMatchObject({ transcricao: 'processando', falas: [] })
+    })
+
+    it('nenhum registro na janela (só o de ontem): não terminou e não há transcrição', async () => {
+      const google = criarGoogleFalso()
+      const { cliente } = clienteDireto(google)
+      const { meetCodigo } = await cliente.criarEvento(REUNIAO, { meet: true })
+      ontem(google, meetCodigo)
+      expect(await cliente.artefatosDaReuniao(meetCodigo, JANELA)).toMatchObject({
+        terminou: false, inicio: null, fim: null, gravacaoUrl: null, transcricao: 'nenhuma', falas: [],
+      })
+    })
+  })
+
   it('ninguém gravou nem transcreveu: transcrição nenhuma e sem link', async () => {
     const google = criarGoogleFalso()
     const { cliente } = clienteDireto(google)
