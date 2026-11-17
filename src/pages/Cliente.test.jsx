@@ -209,6 +209,9 @@ describe('Cliente (página)', () => {
     expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Arquivar' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Mover' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Editar' })).toHaveClass('border')
+    expect(screen.getByRole('button', { name: 'Apagar' })).toHaveClass('border')
+    expect(screen.getByRole('button', { name: 'Apagar' })).not.toHaveClass('bg-primary')
   })
 
   it('o administrador troca o consultor e ajusta a previsão', async () => {
@@ -217,12 +220,23 @@ describe('Cliente (página)', () => {
     expect(screen.getByRole('button', { name: 'Trocar consultor' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ajustar previsão' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Arquivar' })).not.toBeInTheDocument()
+    // Padrão Hub: no cabeçalho da página, sem a principal do contexto, tudo é outline (nada de link solto).
+    for (const nome of ['Trocar consultor', 'Ajustar previsão']) {
+      const botao = screen.getByRole('button', { name: nome })
+      expect(botao).toHaveClass('border')
+      expect(botao).not.toHaveClass('bg-primary')
+      expect(botao.className).not.toMatch(/text-muted-foreground/)
+    }
   })
 
   it('o consultor do cliente faz check-in e lança horas; outra pessoa não tem ações', async () => {
     const { unmount } = tela(consultor)
     expect(await screen.findByRole('button', { name: 'Fazer check-in' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Lançar horas' })).toBeInTheDocument()
+    // Padrão Hub: a principal do contexto cheia, as demais outline.
+    expect(screen.getByRole('button', { name: 'Fazer check-in' })).toHaveClass('bg-primary')
+    expect(screen.getByRole('button', { name: 'Lançar horas' })).toHaveClass('border')
+    expect(screen.getByRole('button', { name: 'Lançar horas' })).not.toHaveClass('bg-primary')
     unmount()
     tela(outraPessoa)
     await screen.findByRole('heading', { name: 'Provedor Alfa' })

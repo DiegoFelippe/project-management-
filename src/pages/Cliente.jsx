@@ -163,8 +163,8 @@ export default function Cliente() {
     <>
       {voltar}
       <Cabecalho titulo={cliente.nome} descricao={cliente.razao_social}>
-        {souConsultor && <AcoesDaLinha {...acoes} aba="meus" />}
-        {(central || (gestao && !cliente.arquivado)) && <AcoesDaLinha {...acoes} aba={aba} />}
+        {souConsultor && <AcoesDaLinha {...acoes} aba="meus" noCabecalho />}
+        {(central || (gestao && !cliente.arquivado)) && <AcoesDaLinha {...acoes} aba={aba} noCabecalho />}
       </Cabecalho>
       {aberto && souConsultor && aberto.cliente_id !== cliente.id && (
         <p id={idDoAviso} className="mb-3 text-sm text-muted-foreground">
