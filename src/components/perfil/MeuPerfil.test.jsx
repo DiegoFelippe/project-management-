@@ -82,16 +82,27 @@ describe('Meu perfil', () => {
     expect(mudarCor).not.toHaveBeenCalled()
   })
 
-  it('troca a senha quando as duas são iguais', async () => {
+  it('senha fraca não é enviada e o campo mostra o medidor, Validar e Gerar senha', async () => {
     await userEvent.type(screen.getByLabelText('Senha nova'), 'senha-nova-1')
-    await userEvent.type(screen.getByLabelText('Repita a senha nova'), 'senha-outra')
+    await userEvent.type(screen.getByLabelText('Repita a senha nova'), 'senha-nova-1')
+    await userEvent.click(screen.getByRole('button', { name: 'Validar' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Senha média. Falta: uma letra maiúscula.')
+    expect(screen.getByRole('button', { name: 'Gerar senha' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('A senha precisa ser forte')
+    expect(definirSenha).not.toHaveBeenCalled()
+  })
+
+  it('troca a senha quando as duas são iguais', async () => {
+    await userEvent.type(screen.getByLabelText('Senha nova'), 'Senha-nova-1!')
+    await userEvent.type(screen.getByLabelText('Repita a senha nova'), 'Senha-outra-1!')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(screen.getByRole('alert')).toHaveTextContent('As senhas não são iguais.')
     expect(definirSenha).not.toHaveBeenCalled()
     await userEvent.clear(screen.getByLabelText('Repita a senha nova'))
-    await userEvent.type(screen.getByLabelText('Repita a senha nova'), 'senha-nova-1')
+    await userEvent.type(screen.getByLabelText('Repita a senha nova'), 'Senha-nova-1!')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
-    expect(definirSenha).toHaveBeenCalledWith('senha-nova-1')
+    expect(definirSenha).toHaveBeenCalledWith('Senha-nova-1!')
     expect(gerenciarAcesso).not.toHaveBeenCalled()
   })
 

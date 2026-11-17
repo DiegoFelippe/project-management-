@@ -3,9 +3,11 @@ import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import EscolhaForma from '@/components/comum/EscolhaForma'
 import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import CampoSenha from '@/components/campos/CampoSenha'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { avaliarSenha } from '@/lib/senha'
 
 const VAZIO = { nome: '', forma: 'convite', adminNome: '', adminEmail: '', senha: '' }
 
@@ -29,7 +31,7 @@ export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
     if (dados.nome.trim().length < 2) achados.nome = 'Use pelo menos 2 caracteres.'
     if (dados.adminNome.trim().length < 2) achados.adminNome = 'Use pelo menos 2 caracteres.'
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dados.adminEmail.trim())) achados.adminEmail = 'Digite um e-mail válido.'
-    if (dados.forma === 'senha' && dados.senha.length < 8) achados.senha = 'A senha precisa ter pelo menos 8 caracteres.'
+    if (dados.forma === 'senha' && !avaliarSenha(dados.senha).forte) achados.senha = 'A senha provisória precisa ser forte: confira as regras abaixo do campo.'
     setErros(achados)
     return Object.keys(achados).length === 0
   }
@@ -75,7 +77,13 @@ export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
             {campo('admin-nome', 'Nome', 'adminNome', { maxLength: 120 })}
             {campo('admin-email', 'E-mail', 'adminEmail', { type: 'email' })}
           </div>
-          {dados.forma === 'senha' && campo('admin-senha', 'Senha provisória', 'senha')}
+          {dados.forma === 'senha' && (
+            <div className="grid gap-2">
+              <Label htmlFor="admin-senha">Senha provisória</Label>
+              <CampoSenha id="admin-senha" valor={dados.senha} invalido={!!erros.senha} aoMudar={(senha) => setDados((d) => ({ ...d, senha }))} />
+              {erros.senha && <p className="text-xs text-destructive">{erros.senha}</p>}
+            </div>
+          )}
         </SecaoFormulario>
         {erro && <Aviso>{erro}</Aviso>}
       </form>

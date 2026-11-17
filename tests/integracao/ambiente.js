@@ -12,7 +12,7 @@ const admin = createClient(status.API_URL, status.SECRET_KEY, semSessao)
 const criados = { consultorias: new Set(), usuarios: new Set(), clientes: new Set() }
 
 export const REDIRECT = 'http://localhost:5173/definir-senha'
-export const SENHA_TESTE = 'teste-1234'
+export const SENHA_TESTE = 'Teste-1234!x'
 
 export function clienteAdmin() {
   return admin

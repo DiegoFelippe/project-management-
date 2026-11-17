@@ -13,6 +13,8 @@ import SeletorDeCor from '@/components/comum/SeletorDeCor'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import CampoSenha from '@/components/campos/CampoSenha'
+import { avaliarSenha } from '@/lib/senha'
 import { Label } from '@/components/ui/label'
 import { mudarCor, tirarFoto, trocarFoto } from '@/data/imagens'
 import { atualizarMeuContato, gerenciarAcesso } from '@/data/usuarios'
@@ -88,7 +90,7 @@ export default function MeuPerfil({ aberto, aoFechar }) {
     evento.preventDefault()
     if (nome.trim().length < 2) return setErro('Use pelo menos 2 caracteres no nome.')
     if (senha || repetida) {
-      if (senha.length < 8) return setErro('A senha precisa ter pelo menos 8 caracteres.')
+      if (!avaliarSenha(senha).forte) return setErro('A senha precisa ser forte: confira as regras abaixo do campo.')
       if (senha !== repetida) return setErro('As senhas não são iguais.')
     }
     setErro(null)
@@ -161,14 +163,14 @@ export default function MeuPerfil({ aberto, aoFechar }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="perfil-senha">Senha nova</Label>
-              <Input id="perfil-senha" type="password" autoComplete="new-password" className="h-10" value={senha} onChange={(e) => setSenha(e.target.value)} />
+              <CampoSenha id="perfil-senha" valor={senha} aoMudar={setSenha} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="perfil-senha-repetida">Repita a senha nova</Label>
               <Input id="perfil-senha-repetida" type="password" autoComplete="new-password" className="h-10" value={repetida} onChange={(e) => setRepetida(e.target.value)} />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Pelo menos 8 caracteres. Deixe em branco para manter a atual.</p>
+          <p className="text-xs text-muted-foreground">Só senha forte é aceita. Deixe em branco para manter a atual.</p>
         </SecaoFormulario>
         {erro && <Aviso>{erro}</Aviso>}
       </form>

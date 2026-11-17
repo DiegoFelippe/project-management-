@@ -4,6 +4,8 @@ import { Aviso } from '@/components/auth/TelaDeAcesso'
 import Caixa from '@/components/campos/Caixa'
 import CampoData from '@/components/campos/CampoData'
 import CampoNumero from '@/components/campos/CampoNumero'
+import CampoSenha from '@/components/campos/CampoSenha'
+import { avaliarSenha } from '@/lib/senha'
 import Seletor from '@/components/campos/Seletor'
 import { GerirAusencias } from '@/components/capacidade/GerirAusencias'
 import { lerHoras } from '@/components/clientes/rotulos'
@@ -218,7 +220,7 @@ export default function FichaDoConsultor({
     const achados = {}
     if (dados.nome.trim().length < 2) achados.nome = 'Use pelo menos 2 caracteres.'
     if (novo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dados.email.trim())) achados.email = 'Digite um e-mail válido.'
-    if (novo && dados.forma === 'senha' && dados.senha.length < 8) achados.senha = 'A senha precisa ter pelo menos 8 caracteres.'
+    if (novo && dados.forma === 'senha' && !avaliarSenha(dados.senha).forte) achados.senha = 'A senha provisória precisa ser forte: confira as regras abaixo do campo.'
     if (mostraCapacidade) {
       const horas = lerHoras(dados.carga)
       if (horas === null || horas > 60) achados.carga = 'Use de 0 a 60 horas.'
@@ -474,9 +476,9 @@ export default function FichaDoConsultor({
             {dados.forma === 'senha' && (
               <div className="max-w-sm">
                 <Campo id="ficha-senha" rotulo="Senha provisória" erro={erros.senha}>
-                  <Input id="ficha-senha" type="text" autoComplete="off" className="h-10"
-                    aria-invalid={erros.senha ? true : undefined} value={dados.senha} onChange={mudar('senha')} />
-                  {!erros.senha && <p className="text-xs text-muted-foreground">Pelo menos 8 caracteres. A pessoa troca no primeiro acesso.</p>}
+                  <CampoSenha id="ficha-senha" valor={dados.senha} invalido={!!erros.senha}
+                    aoMudar={(senha) => setDados((d) => ({ ...d, senha }))} />
+                  {!erros.senha && <p className="text-xs text-muted-foreground">Só senha forte é aceita. A pessoa troca no primeiro acesso.</p>}
                 </Campo>
               </div>
             )}

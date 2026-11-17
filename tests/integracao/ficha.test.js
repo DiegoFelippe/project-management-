@@ -46,7 +46,7 @@ afterAll(limparTudo)
 describe('ficha do consultor', () => {
   it('criar acesso grava os campos novos (uf em maiúsculas, vazio vira nulo)', async () => {
     const r = await criar(comoAdminA, {
-      forma: 'senha', senha: 'senha-1234', nome: 'Ana Ficha', email: emailDeTeste('ficha'), papel: 'pessoa',
+      forma: 'senha', senha: 'Senha-1234!x', nome: 'Ana Ficha', email: emailDeTeste('ficha'), papel: 'pessoa',
       telefone: ' (11) 98888-7777 ', cidade: 'Campinas', uf: 'sp', cargo: 'Analista', data_entrada: '2024-05-10',
     })
     expect(r.status).toBe(201)
@@ -54,7 +54,7 @@ describe('ficha do consultor', () => {
       telefone: '(11) 98888-7777', cidade: 'Campinas', uf: 'SP', cargo: 'Analista', data_entrada: '2024-05-10',
     })
     const v = await criar(comoAdminA, {
-      forma: 'senha', senha: 'senha-1234', nome: 'Vazio Ficha', email: emailDeTeste('vazio'), papel: 'pessoa',
+      forma: 'senha', senha: 'Senha-1234!x', nome: 'Vazio Ficha', email: emailDeTeste('vazio'), papel: 'pessoa',
       telefone: '', cidade: '  ', uf: '', cargo: '', data_entrada: '',
     })
     expect(v.status).toBe(201)
@@ -62,7 +62,7 @@ describe('ficha do consultor', () => {
   })
 
   it('criar acesso recusa uf inválida e data no futuro', async () => {
-    const base = { forma: 'senha', senha: 'senha-1234', nome: 'Erro Ficha', papel: 'pessoa' }
+    const base = { forma: 'senha', senha: 'Senha-1234!x', nome: 'Erro Ficha', papel: 'pessoa' }
     const a = await criar(comoAdminA, { ...base, email: emailDeTeste('uf'), uf: 'XX' })
     expect(a.status).toBe(400)
     expect(a.corpo).toMatchObject({ codigo: 'dados_invalidos', campo: 'uf' })

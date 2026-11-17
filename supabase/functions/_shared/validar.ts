@@ -50,9 +50,16 @@ export function validarForma(valor: unknown, campo = 'forma'): Forma {
   return valor
 }
 
+// Mesmas regras de src/lib/senha.js (só Forte vale): 10+ caracteres, A-Z, a-z, 0-9 e um símbolo; sem espaço nas pontas.
+export function senhaForte(valor: string): boolean {
+  return valor.length >= 10 && valor === valor.trim() &&
+    /[A-Z]/.test(valor) && /[a-z]/.test(valor) && /[0-9]/.test(valor) &&
+    /[^A-Za-z0-9\s\u00C0-\uFFFF]/.test(valor)
+}
+
 export function validarSenha(forma: Forma, valor: unknown, campo = 'senha'): string | undefined {
   if (forma !== 'senha') return undefined
-  if (typeof valor !== 'string' || valor.length < 8 || valor.length > 72) invalido(campo)
+  if (typeof valor !== 'string' || valor.length > 72 || !senhaForte(valor)) invalido(campo)
   return valor
 }
 

@@ -158,7 +158,7 @@ describe('FichaDoConsultor: Novo acesso', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Criar pessoa' }))
     expect(aoCriar).not.toHaveBeenCalled()
     expect(screen.getByRole('tab', { name: 'Acesso, tem erro' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByText('A senha precisa ter pelo menos 8 caracteres.')).toBeInTheDocument()
+    expect(screen.getByText('A senha provisória precisa ser forte: confira as regras abaixo do campo.')).toBeInTheDocument()
     expect(screen.getByLabelText('Senha provisória')).toHaveFocus()
     expect(screen.queryByRole('tab', { name: /Dados pessoais, tem erro/ })).not.toBeInTheDocument()
   })
@@ -250,7 +250,7 @@ describe('FichaDoConsultor: Novo acesso', () => {
 
   it('envia os dados certos, só com os campos novos que foram preenchidos', async () => {
     const { aoCriar } = montarNovo()
-    await preencher({ senha: 'provisoria-1' })
+    await preencher({ senha: 'Provisoria-1!' })
     await userEvent.click(screen.getByRole('button', { name: 'Criar pessoa' }))
     expect(aoCriar).toHaveBeenCalledWith({
       forma: 'senha',
@@ -258,7 +258,7 @@ describe('FichaDoConsultor: Novo acesso', () => {
       email: 'joao@empresa.com.br',
       papel: 'pessoa',
       times: ['t1'],
-      senha: 'provisoria-1',
+      senha: 'Provisoria-1!',
     }, { carga: undefined })
   })
 
@@ -336,7 +336,7 @@ describe('FichaDoConsultor: Novo acesso', () => {
     montarNovo({
       aoCriar: vi.fn().mockResolvedValue({ codigo: 'ja_na_consultoria', erro: 'Essa pessoa já tem acesso na sua consultoria.', pessoa: { id: 'p1', nome: 'João' } }),
     })
-    await preencher({ senha: 'senha-forte-1' })
+    await preencher({ senha: 'Senha-forte-1!' })
     expect(screen.getByRole('tab', { name: 'Acesso' })).toHaveAttribute('aria-selected', 'true')
     await userEvent.click(screen.getByRole('button', { name: 'Criar pessoa' }))
     expect(await screen.findByText('Essa pessoa já tem acesso na sua consultoria.')).toBeInTheDocument()

@@ -61,11 +61,11 @@ describe('criar-acesso', () => {
 
   it('gestor cria pessoa com senha e ela entra e precisa trocar', async () => {
     const email = emailDeTeste('senha')
-    const r = await criar(comoGestor, { forma: 'senha', nome: 'Davi Souza', email, papel: 'pessoa', times: [t1], senha: 'provisoria-1' })
+    const r = await criar(comoGestor, { forma: 'senha', nome: 'Davi Souza', email, papel: 'pessoa', times: [t1], senha: 'Provisoria-1!' })
     expect(r.status).toBe(201)
     const { data: p } = await admin.from('perfis').select('*').eq('id', r.corpo.pessoa_id).single()
     expect(p.precisa_trocar_senha).toBe(true)
-    await expect(entrarComo({ email, senha: 'provisoria-1' })).resolves.toBeTruthy()
+    await expect(entrarComo({ email, senha: 'Provisoria-1!' })).resolves.toBeTruthy()
   })
 
   it('gestor não cria gestor', async () => {
@@ -119,10 +119,21 @@ describe('criar-acesso', () => {
     expect(r.corpo.codigo).toBe('email_indisponivel')
   })
 
-  it('senha curta', async () => {
-    const r = await criar(comoGestor, { forma: 'senha', nome: 'Senha Curta', email: emailDeTeste(), papel: 'pessoa', times: [], senha: '1234567' })
+  it.each([
+    ['curta', '1234567'],
+    ['sem maiúscula', 'provisoria-1!'],
+    ['sem minúscula', 'PROVISORIA-1!'],
+    ['sem número', 'Provisoria-um!'],
+    ['sem símbolo', 'Provisoria1x'],
+    ['com 9 caracteres', 'Abcde-12!'],
+    ['com espaço no fim', 'Provisoria-1! '],
+  ])('senha fraca (%s) é recusada e nenhum acesso é criado', async (_motivo, senha) => {
+    const email = emailDeTeste('fraca')
+    const r = await criar(comoGestor, { forma: 'senha', nome: 'Senha Fraca', email, papel: 'pessoa', times: [], senha })
     expect(r.status).toBe(400)
     expect(r.corpo).toMatchObject({ codigo: 'dados_invalidos', campo: 'senha' })
+    const { data } = await admin.from('perfis').select('id').eq('email', email)
+    expect(data).toEqual([])
   })
 
   it('dois pedidos iguais ao mesmo tempo criam um acesso só', async () => {

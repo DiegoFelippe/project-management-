@@ -39,11 +39,31 @@ describe('DefinirSenha', () => {
 
   it('senhas diferentes não são enviadas', async () => {
     const auth = montar({ sessao: { user: { id: 'u1' } } })
-    await userEvent.type(screen.getByLabelText('Senha nova'), 'abcdefgh')
-    await userEvent.type(screen.getByLabelText('Repita a senha'), 'abcdefgi')
+    await userEvent.type(screen.getByLabelText('Senha nova'), 'Abcdefgh1!')
+    await userEvent.type(screen.getByLabelText('Repita a senha'), 'Abcdefgi1!')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar senha' }))
     expect(screen.getByText('As senhas não são iguais.')).toBeInTheDocument()
     expect(auth.definirSenha).not.toHaveBeenCalled()
+  })
+})
+
+describe('DefinirSenha com senha fraca', () => {
+  it('não envia senha fraca e diz o que falta ao validar', async () => {
+    const auth = montar({ sessao: { user: { id: 'u1' } } })
+    await userEvent.type(screen.getByLabelText('Senha nova'), 'abcdefgh')
+    await userEvent.type(screen.getByLabelText('Repita a senha'), 'abcdefgh')
+    await userEvent.click(screen.getByRole('button', { name: 'Validar' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Senha fraca. Falta:')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar senha' }))
+    expect(screen.getByText(/A senha precisa ser forte/)).toBeInTheDocument()
+    expect(auth.definirSenha).not.toHaveBeenCalled()
+  })
+
+  it('Gerar senha preenche o campo e a pessoa só precisa repetir', async () => {
+    montar({ sessao: { user: { id: 'u1' } } })
+    await userEvent.click(screen.getByRole('button', { name: 'Gerar senha' }))
+    expect(screen.getByLabelText('Senha nova').value).toHaveLength(16)
+    expect(screen.getByText('Forte')).toBeInTheDocument()
   })
 })
 

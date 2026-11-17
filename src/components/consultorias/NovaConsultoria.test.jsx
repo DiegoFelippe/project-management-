@@ -35,16 +35,27 @@ describe('NovaConsultoria', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
-  it('com senha manda a senha provisória', async () => {
-    const aoCriar = vi.fn().mockResolvedValue({ consultoriaId: 'c9' })
+  it('senha provisória fraca não é enviada', async () => {
+    const aoCriar = vi.fn()
     render(<NovaConsultoria aberto aoFechar={vi.fn()} aoCriar={aoCriar} />)
     await userEvent.click(screen.getByRole('radio', { name: 'Criar com senha' }))
     await preencher()
     await userEvent.type(screen.getByLabelText('Senha provisória'), 'provisoria-1')
     await userEvent.click(screen.getByRole('button', { name: 'Criar consultoria' }))
+    expect(screen.getByText(/precisa ser forte/)).toBeInTheDocument()
+    expect(aoCriar).not.toHaveBeenCalled()
+  })
+
+  it('com senha manda a senha provisória', async () => {
+    const aoCriar = vi.fn().mockResolvedValue({ consultoriaId: 'c9' })
+    render(<NovaConsultoria aberto aoFechar={vi.fn()} aoCriar={aoCriar} />)
+    await userEvent.click(screen.getByRole('radio', { name: 'Criar com senha' }))
+    await preencher()
+    await userEvent.type(screen.getByLabelText('Senha provisória'), 'Provisoria-1!')
+    await userEvent.click(screen.getByRole('button', { name: 'Criar consultoria' }))
     expect(aoCriar).toHaveBeenCalledWith({
       nome: 'Acme Consultoria',
-      admin: { forma: 'senha', nome: 'Rita Alves', email: 'rita@acme.com.br', senha: 'provisoria-1' },
+      admin: { forma: 'senha', nome: 'Rita Alves', email: 'rita@acme.com.br', senha: 'Provisoria-1!' },
     })
   })
 })
