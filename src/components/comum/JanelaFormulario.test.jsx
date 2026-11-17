@@ -46,7 +46,7 @@ describe('JanelaFormulario', () => {
   })
 
   it('larguras lg e xl não encostam nas bordas entre 640 e 900px', () => {
-    for (const largura of ['md', 'lg', 'xl']) {
+    for (const largura of ['md', 'lg', 'xl', '5xl']) {
       const { unmount } = render(<JanelaFormulario aberto aoFechar={() => {}} titulo={`J ${largura}`} largura={largura}><p>x</p></JanelaFormulario>)
       expect(screen.getByRole('dialog').className).toMatch(/sm:max-w-\[min\([\d.]+rem,calc\(100%-2rem\)\)\]/)
       unmount()
@@ -95,5 +95,45 @@ describe('JanelaFormulario', () => {
     expect(aoFechar).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true')
     expect(document.querySelector('[data-slot="janela-rodape"] .animate-spin')).not.toBeNull()
+  })
+
+  it('abas: ficam no cabeçalho, abaixo do título, e quem não usa não ganha a linha', () => {
+    const { unmount } = render(
+      <JanelaFormulario aberto aoFechar={() => {}} titulo="Ficha" abas={<div role="tablist" aria-label="Seções" />}><p>x</p></JanelaFormulario>,
+    )
+    const faixa = document.querySelector('[data-slot="janela-abas"]')
+    expect(faixa).not.toBeNull()
+    expect(faixa).toContainElement(screen.getByRole('tablist', { name: 'Seções' }))
+    expect(document.querySelector('header')).not.toContainElement(faixa)
+    unmount()
+    montar()
+    expect(document.querySelector('[data-slot="janela-abas"]')).toBeNull()
+  })
+
+  it('alturaFixa: no desktop a janela tem altura fixa; sem ela, só o máximo', () => {
+    const { unmount } = render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A" alturaFixa><p>x</p></JanelaFormulario>)
+    expect(screen.getByRole('dialog').className).toContain('sm:h-[min(760px,calc(100dvh-2rem))]')
+    unmount()
+    montar()
+    expect(screen.getByRole('dialog').className).not.toContain('sm:h-[')
+  })
+
+  it('acaoEsquerda: fica no rodapé, à esquerda, antes do que vem de rodape', () => {
+    montar({ acaoEsquerda: <button type="button">Desativar</button> })
+    const rodape = document.querySelector('[data-slot="janela-rodape"]')
+    const esquerda = screen.getByRole('button', { name: 'Desativar' })
+    expect(rodape).toContainElement(esquerda)
+    expect(esquerda.parentElement).toHaveClass('mr-auto')
+    expect(rodape.firstElementChild).toBe(esquerda.parentElement)
+  })
+
+  it('acaoEsquerda sozinha já mostra o rodapé', () => {
+    render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A" acaoEsquerda={<button type="button">Sair</button>}><p>x</p></JanelaFormulario>)
+    expect(document.querySelector('[data-slot="janela-rodape"]')).not.toBeNull()
+  })
+
+  it('o foco inicial não cai no input de arquivo', () => {
+    render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A"><input type="file" aria-label="Arquivo" /><input aria-label="Nome" /></JanelaFormulario>)
+    expect(screen.getByLabelText('Nome')).toHaveFocus()
   })
 })
