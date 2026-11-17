@@ -4,7 +4,7 @@ import { Loader2, XIcon } from 'lucide-react'
 import { DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
-const LARGURAS = { md: 'sm:max-w-[min(32rem,calc(100%-2rem))]', lg: 'sm:max-w-[min(42rem,calc(100%-2rem))]', xl: 'sm:max-w-[min(56rem,calc(100%-2rem))]', '5xl': 'sm:max-w-[min(64rem,calc(100%-2rem))]' }
+const LARGURAS = { md: 'sm:max-w-[min(32rem,calc(100%-2rem))]', lg: 'sm:max-w-[min(42rem,calc(100%-2rem))]', xl: 'sm:max-w-[min(56rem,calc(100%-2rem))]', '5xl': 'sm:max-w-[min(64rem,calc(100%-2rem))]', '7xl': 'sm:max-w-[min(80rem,calc(100%-2rem))]' }
 
 // Primeiro foco do corpo da janela: de preferência um campo de digitar/escolher (no CampoNumero, o botão
 // "Diminuir" vem antes do número e um Enter nele diminuiria o valor); só então o primeiro focável.

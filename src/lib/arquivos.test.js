@@ -4,6 +4,7 @@ import {
   caminhoDoAnexo,
   caminhoDoArquivo,
   caminhosNaPasta,
+  formatarTamanho,
   limparPasta,
   nomeNoStorage,
   nomeParaMostrar,
@@ -58,6 +59,16 @@ describe('caminhos no balde quadros (o banco confere as duas formas)', () => {
     expect(caminhoDaImagem('k1', 'c1', 'image/webp', UUID)).toBe(`k1/c1/imagens/${UUID}.webp`)
     expect(caminhoDaImagem('k1', 'c1', 'image/svg+xml')).toBeNull()
     expect(caminhoDaImagem('k1', 'c1', '')).toBeNull()
+    // Nomes herdados de todo objeto (constructor, toString…) não contam como tipo aceito.
+    for (const herdado of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      expect(caminhoDaImagem('k1', 'c1', herdado), herdado).toBeNull()
+    }
+  })
+
+  it('tamanho para mostrar: B, KB e MB com uma casa', () => {
+    expect(formatarTamanho(512)).toBe('512 B')
+    expect(formatarTamanho(1536)).toBe('1,5 KB')
+    expect(formatarTamanho(26214400)).toBe('25 MB')
   })
 })
 

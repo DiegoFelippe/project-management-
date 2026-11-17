@@ -3,13 +3,7 @@
 // ({ itens, total } nas listas) e sobem o erro do banco; escritas devolvem { erro } (o texto para a pessoa, ou null) e,
 // quando criam algo, o que foi criado. Anexos e imagens da descrição ficam no balde privado "quadros", na pasta do
 // cliente e do cartão; a linha (ou o cartão) sai primeiro e o objeto depois, e o que não sair vira um aviso.
-import {
-  caminhoDaImagem,
-  caminhoDoAnexo,
-  nomeParaMostrar,
-  TAMANHO_MAXIMO_ARQUIVO,
-  TIPOS_DE_IMAGEM,
-} from '@/lib/arquivos'
+import { caminhoDaImagem, caminhoDoAnexo, imagemAceita, nomeParaMostrar, TAMANHO_MAXIMO_ARQUIVO } from '@/lib/arquivos'
 import { ARQUIVO_GRANDE_DEMAIS, traduzirErroBanco } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 
@@ -392,7 +386,7 @@ export async function apagarAnexo(anexo) {
 // Sobe a imagem colada ou escolhida na descrição (PNG, JPG, GIF ou WEBP, até 25 MB) na pasta de imagens do cartão:
 // { erro, caminho }. O nó "image" guarda o caminho (o banco recusa outro src); a tela mostra pela urlAssinada.
 export async function enviarImagemDaDescricao({ clienteId, cartaoId }, arquivo) {
-  if (!TIPOS_DE_IMAGEM[arquivo?.type]) return { erro: IMAGEM_DE_TIPO_ERRADO }
+  if (!imagemAceita(arquivo?.type)) return { erro: IMAGEM_DE_TIPO_ERRADO }
   if (!arquivo.size) return { erro: 'O arquivo está vazio.' }
   if (arquivo.size > TAMANHO_MAXIMO_ARQUIVO) return { erro: ARQUIVO_GRANDE_DEMAIS }
   const caminho = caminhoDaImagem(clienteId, cartaoId, arquivo.type)
@@ -402,20 +396,22 @@ export async function enviarImagemDaDescricao({ clienteId, cartaoId }, arquivo) 
 }
 
 // Link temporário de um objeto do balde: com `nome`, baixa o anexo com o nome original (60 s); sem, mostra a imagem da
-// descrição (1 h). { url } ou { erro } (quem não vê o cartão não recebe link).
+// descrição (1 h). Os dois vêm como download (Content-Disposition: attachment): o <img> mostra a imagem igual, e o link
+// aberto sozinho baixa em vez de virar página no navegador, seja qual for o tipo guardado. { url } ou { erro } (quem não
+// vê o cartão não recebe link).
 export async function urlAssinada(caminho, { nome } = {}) {
   const { data, error } = nome
     ? await balde().createSignedUrl(caminho, VALIDADE_DO_DOWNLOAD, { download: nome })
-    : await balde().createSignedUrl(caminho, VALIDADE_DA_IMAGEM)
+    : await balde().createSignedUrl(caminho, VALIDADE_DA_IMAGEM, { download: true })
   if (error) return { erro: traduzirArquivo(error) }
   return { url: data.signedUrl }
 }
 
-// Links das imagens de uma descrição num pedido só (1 h): { urls: { [caminho]: url } }; a que a pessoa não vê fica de
-// fora.
+// Links das imagens de uma descrição num pedido só (1 h, como download; ver urlAssinada): { urls: { [caminho]: url } };
+// a que a pessoa não vê fica de fora.
 export async function urlsAssinadas(caminhos) {
   if (!caminhos?.length) return { urls: {} }
-  const { data, error } = await balde().createSignedUrls(caminhos, VALIDADE_DA_IMAGEM)
+  const { data, error } = await balde().createSignedUrls(caminhos, VALIDADE_DA_IMAGEM, { download: true })
   if (error) return { erro: traduzirArquivo(error), urls: {} }
   const urls = {}
   for (const item of data ?? []) if (item.signedUrl && !item.error) urls[item.path] = item.signedUrl

@@ -15,21 +15,14 @@ import {
   apagarArquivo, apagarPasta, buscarPasta, criarPasta, enviarArquivo, linkParaBaixar, listarArquivos, listarPastas, renomearPasta,
 } from '@/data/arquivos'
 import { ARQUIVO_GRANDE_DEMAIS } from '@/lib/erros'
-import { TAMANHO_MAXIMO_ARQUIVO } from '@/lib/arquivos'
+import { formatarTamanho, TAMANHO_MAXIMO_ARQUIVO } from '@/lib/arquivos'
 import { FUSO } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
 import { cn } from '@/lib/utils'
 
 const QUANDO = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, dateStyle: 'short', timeStyle: 'short' })
-const DECIMAL = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 })
 const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
 const LIMITE_EM_MB = TAMANHO_MAXIMO_ARQUIVO / 1048576
-
-function formatarTamanho(bytes) {
-  if (bytes >= 1048576) return `${DECIMAL.format(bytes / 1048576)} MB`
-  if (bytes >= 1024) return `${DECIMAL.format(bytes / 1024)} KB`
-  return `${bytes} B`
-}
 
 // Quem manda arquivo, como private.posso_enviar_arquivo (o banco confere): a central, mesmo com o cliente
 // arquivado; e, com o cliente ativo na consultoria dela, a administração e o consultor dele.

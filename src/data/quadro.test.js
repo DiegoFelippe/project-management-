@@ -458,6 +458,9 @@ describe('imagens da descrição e links assinados', () => {
     const tipo = 'Envie uma imagem PNG, JPG, GIF ou WEBP.'
     expect(await enviarImagemDaDescricao(cartao, { name: 'x.svg', size: 10, type: 'image/svg+xml' })).toEqual({ erro: tipo })
     expect(await enviarImagemDaDescricao(cartao, { name: 'x.html', size: 10, type: 'text/html' })).toEqual({ erro: tipo })
+    for (const herdado of ['constructor', 'toString', '__proto__']) {
+      expect(await enviarImagemDaDescricao(cartao, { name: 'x', size: 10, type: herdado }), herdado).toEqual({ erro: tipo })
+    }
     expect(await enviarImagemDaDescricao(cartao, { name: 'x.png', size: 26214401, type: 'image/png' })).toEqual({
       erro: 'O arquivo passa de 25 MB.',
     })
@@ -466,17 +469,18 @@ describe('imagens da descrição e links assinados', () => {
     expect(await enviarImagemDaDescricao(cartao, { name: 'x.png', size: 10, type: 'image/png' })).toEqual({ erro: SEM_PERMISSAO })
   })
 
-  it('urlAssinada: com nome baixa o anexo (60 s); sem nome mostra a imagem (1 h)', async () => {
+  it('urlAssinada: com nome baixa o anexo (60 s); sem nome mostra a imagem (1 h), também assinada como download', async () => {
     balde.createSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://assinado' }, error: null })
     expect(await urlAssinada('k1/c1/u-x.pdf', { nome: 'Relatório.pdf' })).toEqual({ url: 'https://assinado' })
     expect(balde.createSignedUrl).toHaveBeenCalledWith('k1/c1/u-x.pdf', 60, { download: 'Relatório.pdf' })
     await urlAssinada('k1/c1/imagens/u.png')
-    expect(balde.createSignedUrl).toHaveBeenLastCalledWith('k1/c1/imagens/u.png', 3600)
+    // Como download: o <img> mostra igual, mas o link aberto sozinho não vira página no navegador (seja qual for o tipo).
+    expect(balde.createSignedUrl).toHaveBeenLastCalledWith('k1/c1/imagens/u.png', 3600, { download: true })
     balde.createSignedUrl.mockResolvedValue({ data: null, error: { statusCode: '404' } })
     expect(await urlAssinada('k1/c1/u-x.pdf')).toEqual({ erro: 'Esse arquivo não foi encontrado.' })
   })
 
-  it('urlsAssinadas: as imagens de uma descrição num pedido só', async () => {
+  it('urlsAssinadas: as imagens de uma descrição num pedido só, assinadas como download', async () => {
     balde.createSignedUrls.mockResolvedValue({
       data: [
         { path: 'k1/c1/imagens/a.png', signedUrl: 'https://a', error: null },
@@ -488,7 +492,7 @@ describe('imagens da descrição e links assinados', () => {
       urls: { 'k1/c1/imagens/a.png': 'https://a' },
     })
     expect(balde.createSignedUrls).toHaveBeenCalledTimes(1)
-    expect(balde.createSignedUrls).toHaveBeenCalledWith(['k1/c1/imagens/a.png', 'k1/c1/imagens/b.png'], 3600)
+    expect(balde.createSignedUrls).toHaveBeenCalledWith(['k1/c1/imagens/a.png', 'k1/c1/imagens/b.png'], 3600, { download: true })
     expect(await urlsAssinadas([])).toEqual({ urls: {} })
     expect(balde.createSignedUrls).toHaveBeenCalledTimes(1)
   })

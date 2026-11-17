@@ -1,3 +1,6 @@
+import { diaDaSemana, somarDias } from '@/lib/calendario'
+import { hoje as hojeEmSP } from '@/lib/mes'
+
 // Cores e selos do quadro (como no Kanban do Mochi). As classes ficam escritas por inteiro (o Tailwind só gera o que
 // aparece no código).
 
@@ -65,4 +68,11 @@ export function seloDoPrazo(prazo, hoje, concluidos = false) {
   if (faltam === 0) return { texto: 'Hoje', tom: 'aviso', titulo: 'Vence hoje' }
   if (faltam === 1) return { texto: 'Amanhã', tom: 'aviso', titulo: 'Vence amanhã' }
   return { texto: dataCurta(prazo, hoje), tom: 'neutro', titulo: `Prazo: ${dataCurta(prazo, hoje)}` }
+}
+
+// Atalhos do prazo além do "Hoje" do calendário, como no Mochi: amanhã e a próxima sexta (o dia em São Paulo; numa sexta,
+// a da semana que vem). Usados no "Novo cartão" e na janela do cartão.
+export function atalhosDoPrazo(dia = hojeEmSP()) {
+  const ateSexta = (5 - diaDaSemana(dia) + 7) % 7 || 7
+  return [{ rotulo: 'Amanhã', valor: somarDias(dia, 1) }, { rotulo: 'Sexta', valor: somarDias(dia, ateSexta) }]
 }

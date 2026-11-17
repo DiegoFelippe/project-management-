@@ -249,6 +249,33 @@
   }
 }
 
+/* Descrição do cartão (editor TipTap, EditorDaDescricao): o texto formatado com a escala da tipografia. O tamanho do
+   corpo vem da .texto-de-campo (16 px no celular); títulos pelo papel. */
+@layer components {
+  .descricao-do-cartao { @apply text-foreground leading-relaxed; overflow-wrap: anywhere; }
+  .descricao-do-cartao[contenteditable='true'] { min-height: 8rem; }
+  .descricao-do-cartao > * + * { margin-top: 0.5rem; }
+  .descricao-do-cartao h1 { @apply text-titulo font-bold; }
+  .descricao-do-cartao h2 { @apply text-janela font-bold; }
+  .descricao-do-cartao h3 { @apply text-subtitulo font-semibold; }
+  .descricao-do-cartao :is(h1, h2, h3):not(:first-child) { margin-top: 1rem; }
+  .descricao-do-cartao ul { list-style: disc; padding-left: 1.5rem; }
+  .descricao-do-cartao ol { list-style: decimal; padding-left: 1.5rem; }
+  .descricao-do-cartao li + li { margin-top: 0.125rem; }
+  .descricao-do-cartao blockquote { @apply border-primary/30 text-muted-foreground border-l-4 pl-3; }
+  .descricao-do-cartao code { @apply bg-muted rounded-md px-1 py-0.5; }
+  .descricao-do-cartao pre { @apply bg-muted rounded-lg p-3; white-space: pre-wrap; }
+  .descricao-do-cartao pre code { @apply bg-transparent p-0; }
+  .descricao-do-cartao a { @apply text-primary underline underline-offset-2; }
+  .descricao-do-cartao hr { @apply border-border my-3; }
+  .descricao-do-cartao .imagem-da-descricao { @apply bg-muted my-2 max-w-full rounded-xl border; height: auto; min-height: 2rem; }
+  .descricao-do-cartao .imagem-da-descricao.ProseMirror-selectednode { @apply ring-primary/50 ring-2; }
+  .descricao-do-cartao p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    @apply text-muted-foreground pointer-events-none float-left h-0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

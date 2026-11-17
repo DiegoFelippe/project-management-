@@ -34,10 +34,21 @@ export function caminhoDoAnexo(clienteId, cartaoId, nome, id = crypto.randomUUID
 // Imagens que a descrição aceita (o banco também recusa outra extensão; SVG fica de fora).
 export const TIPOS_DE_IMAGEM = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }
 
+// O tipo é uma das imagens aceitas? Só as chaves da lista (Object.hasOwn: "constructor", "toString" etc. não contam).
+export const imagemAceita = (tipo) => typeof tipo === 'string' && Object.hasOwn(TIPOS_DE_IMAGEM, tipo)
+
 // null quando o tipo não é uma das imagens aceitas.
 export function caminhoDaImagem(clienteId, cartaoId, tipo, id = crypto.randomUUID()) {
-  const extensao = TIPOS_DE_IMAGEM[tipo]
-  return extensao ? `${clienteId}/${cartaoId}/imagens/${id}.${extensao}` : null
+  return imagemAceita(tipo) ? `${clienteId}/${cartaoId}/imagens/${id}.${TIPOS_DE_IMAGEM[tipo]}` : null
+}
+
+const DECIMAL = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 })
+
+// Tamanho para mostrar na lista: "512 B", "1,5 KB", "25 MB".
+export function formatarTamanho(bytes) {
+  if (bytes >= 1048576) return `${DECIMAL.format(bytes / 1048576)} MB`
+  if (bytes >= 1024) return `${DECIMAL.format(bytes / 1024)} KB`
+  return `${bytes} B`
 }
 
 // Nome que aparece na lista: o original, sem espaços nas pontas, com até 200 caracteres (contados como o banco).

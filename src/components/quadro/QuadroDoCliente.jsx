@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { lazy, Suspense, useCallback, useState } from 'react'
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
 import { RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -18,24 +18,27 @@ import JanelaNovoCartao from './JanelaNovoCartao'
 import NovaColuna from './NovaColuna'
 import { FILTROS_VAZIOS, temFiltro, useQuadro } from './useQuadro'
 
-const nada = () => {}
+// A janela do cartão traz o editor de texto (TipTap): carrega só quando um cartão abre.
+const JanelaDoCartao = lazy(() => import('./JanelaDoCartao'))
 
 // Aba Quadro do cliente (Kanban do Mochi; desenho em docs/superpowers/specs/2026-11-17-kanban-do-cliente-design.md): barra
 // de filtros → 4 números → colunas lado a lado (300 px; o quadro rola dentro da área dele e, no celular, uma coluna por
 // vez). Quem mexe (consultor do cliente, administrador e gestor da consultoria, com o cliente ativo) cria e arrasta
 // cartões e colunas; apagar coluna é da gestão; a central e o dono só leem (e escolhem o quadro de uma consultoria
-// anterior). O banco decide (pode_mexer, pode_gerir); a tela só esconde o que a pessoa não pode. `aoAbrirCartao(id)`: a
-// janela do cartão (Task 5).
-export default function QuadroDoCliente({ cliente, perfil, aoAbrirCartao = nada }) {
+// anterior). O banco decide (pode_mexer, pode_gerir); a tela só esconde o que a pessoa não pode. Clicar num cartão (ou
+// criar um pelo "Novo cartão") abre a janela do cartão; ao fechar, o quadro relê as colunas que ela mexeu (mesmo sem o
+// tempo real, no plano B).
+export default function QuadroDoCliente({ cliente, perfil }) {
   const central = veTudo(perfil)
   const [filtros, setFiltros] = useState(FILTROS_VAZIOS)
   const buscaAtrasada = useAtraso(filtros.busca, 300)
   const [janela, setJanela] = useState(null) // { tipo: 'novo', colunaId } | { tipo: 'arquivados' } | { tipo: 'apagar', colunaId }
+  const [cartaoAberto, setCartaoAberto] = useState(null)
   const {
     quadros, quadro, erro, semAcesso, colunas, indicadores,
     escolher, lerTudo, relerQuadro, lerColuna, lerNumeros, mudarQuadro, verMais, comecarArrasto, soltar,
   } = useQuadro({ clienteId: cliente.id, central, filtros: { ...filtros, busca: buscaAtrasada } })
-  const abrirCartao = useCallback((id) => aoAbrirCartao(id), [aoAbrirCartao])
+  const abrirCartao = useCallback((id) => setCartaoAberto(id), [])
 
   if (semAcesso) return <ListaVazia>Você não tem mais acesso a este quadro.</ListaVazia>
   if (erro) {
@@ -104,6 +107,14 @@ export default function QuadroDoCliente({ cliente, perfil, aoAbrirCartao = nada 
     lerColuna(quadro.id, colunaId)
     lerNumeros(quadro.id)
     abrirCartao(id)
+  }
+
+  // A janela do cartão fechou: relê as colunas que ela mexeu (o cartão, a coluna nova dele) e os números.
+  function fecharCartao(colunasMexidas = []) {
+    setCartaoAberto(null)
+    const ids = colunasMexidas.filter((id) => quadro.colunas.some((c) => c.id === id))
+    for (const id of ids) lerColuna(quadro.id, id)
+    if (ids.length) lerNumeros(quadro.id)
   }
 
   function abrirApagar(coluna) {
@@ -192,6 +203,12 @@ export default function QuadroDoCliente({ cliente, perfil, aoAbrirCartao = nada 
       {apagando && (
         <ApagarColuna coluna={apagando} colunas={quadro.colunas} aoFechar={() => setJanela(null)}
           aoApagar={(opcoes) => apagarAColuna(apagando, opcoes)} />
+      )}
+      {cartaoAberto && (
+        <Suspense fallback={null}>
+          <JanelaDoCartao key={cartaoAberto} cartaoId={cartaoAberto} quadro={quadro} cliente={cliente} perfil={perfil}
+            aoFechar={fecharCartao} aoQuadroMudou={lerTudo} />
+        </Suspense>
       )}
     </section>
   )

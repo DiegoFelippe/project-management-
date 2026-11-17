@@ -1,10 +1,10 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  apagarColuna, cartoesDoQuadro, criarColuna, editarColuna, indicadoresDoQuadro, moverCartao, moverColuna,
-  pessoasDoQuadro, quadroDoCliente, quadroPorId, quadrosDoCliente,
+  anexosDoCartao, apagarColuna, buscarCartao, cartoesDoQuadro, comentariosDoCartao, criarCartao, criarColuna, editarCartao,
+  editarColuna, indicadoresDoQuadro, moverCartao, moverColuna, pessoasDoQuadro, quadroDoCliente, quadroPorId, quadrosDoCliente,
 } from '@/data/quadro'
 import { ouvirQuadro } from '@/data/quadroAoVivo'
 import { somarDias } from '@/lib/calendario'
@@ -12,6 +12,7 @@ import { hoje } from '@/lib/mes'
 import { arrastarComTeclado, simularGeometria, soltarArrasto } from '@/test/arrastar'
 import { escolherNoSeletor } from '@/test/campos'
 import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
+import { prepararEditor } from '@/test/editor'
 import { renderizarTela } from '@/test/renderizar'
 import QuadroDoCliente from './QuadroDoCliente'
 
@@ -21,6 +22,12 @@ vi.mock('@/data/quadro', () => ({
   indicadoresDoQuadro: vi.fn(), cartoesArquivados: vi.fn(), pessoasDoQuadro: vi.fn(), moverCartao: vi.fn(),
   moverColuna: vi.fn(), apagarColuna: vi.fn(), criarCartao: vi.fn(), restaurarCartao: vi.fn(), apagarCartao: vi.fn(),
   criarColuna: vi.fn(), editarColuna: vi.fn(),
+  // Janela do cartão
+  COMENTARIOS_POR_VEZ: 30, ANEXOS_POR_PAGINA: 15, buscarCartao: vi.fn(), editarCartao: vi.fn(), arquivarCartao: vi.fn(),
+  adicionarResponsavel: vi.fn(), tirarResponsavel: vi.fn(), criarItemDoChecklist: vi.fn(), editarItemDoChecklist: vi.fn(),
+  apagarItemDoChecklist: vi.fn(), comentariosDoCartao: vi.fn(), comentar: vi.fn(), editarComentario: vi.fn(),
+  apagarComentario: vi.fn(), anexosDoCartao: vi.fn(), enviarAnexo: vi.fn(), apagarAnexo: vi.fn(), urlAssinada: vi.fn(),
+  enviarImagemDaDescricao: vi.fn(), urlsAssinadas: vi.fn(),
 }))
 vi.mock('@/data/quadroAoVivo', () => ({ ouvirQuadro: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
@@ -49,6 +56,15 @@ let avisar
 const ordem = (nome) => within(screen.getByRole('region', { name: `Coluna ${nome}` }))
   .queryAllByRole('button', { name: /^Cartão / }).map((b) => b.getAttribute('aria-label').replace('Cartão ', ''))
 
+// O cartão aberto na janela (a janela tem os testes dela; aqui, só a ligação com o quadro).
+const cartaoAberto = (id, colunaId, titulo, extras = {}) => ({
+  id, quadro_id: 'q1', coluna_id: colunaId, titulo, descricao: null, prioridade: null, prazo: null, arquivado_em: null,
+  criado_em: '2026-11-10T13:00:00Z', coluna: { id: colunaId, nome: COLUNAS.find((c) => c.id === colunaId)?.nome, concluidos: false },
+  criado_por: pessoa('p1', 'Ana Lima'), responsaveis: [], checklist: [], comentarios: 0, anexos: 0, pode_mexer: true, pode_apagar: true,
+  ...extras,
+})
+
+beforeAll(prepararEditor)
 beforeEach(() => {
   vi.clearAllMocks()
   vi.restoreAllMocks()
@@ -76,6 +92,14 @@ beforeEach(() => {
   vi.mocked(criarColuna).mockResolvedValue({ erro: null, coluna: { id: 'col4' } })
   vi.mocked(editarColuna).mockResolvedValue({ erro: null })
   vi.mocked(apagarColuna).mockResolvedValue({ erro: null, movidos: 1, apagados: 0, idsApagados: [] })
+  vi.mocked(buscarCartao).mockImplementation(async (id) => {
+    const c = Object.values(cartoes).flat().find((x) => x.id === id)
+    return c ? cartaoAberto(c.id, c.coluna_id, c.titulo) : null
+  })
+  vi.mocked(editarCartao).mockResolvedValue({ erro: null })
+  vi.mocked(comentariosDoCartao).mockResolvedValue({ itens: [], haMais: false })
+  vi.mocked(anexosDoCartao).mockResolvedValue({ itens: [], total: 0 })
+  vi.mocked(criarCartao).mockResolvedValue({ erro: null, cartao: { id: 'c9' } })
   parar = vi.fn()
   avisar = null
   vi.mocked(ouvirQuadro).mockImplementation((_id, aoMudar) => {
@@ -84,10 +108,16 @@ beforeEach(() => {
   })
 })
 
-const tela = (perfil = consultor, { cliente = CLIENTE, aoAbrirCartao = vi.fn() } = {}) => {
+const tela = (perfil = consultor, { cliente = CLIENTE } = {}) => {
   simularGeometria()
-  const r = renderizarTela(<QuadroDoCliente cliente={cliente} perfil={perfil} aoAbrirCartao={aoAbrirCartao} />, { perfil })
-  return { ...r, aoAbrirCartao }
+  return renderizarTela(<QuadroDoCliente cliente={cliente} perfil={perfil} />, { perfil })
+}
+
+// Sem arrastar (só leitura ou filtro ligado), o espaço abre o cartão: ele continua um botão. Fecha a janela que abriu.
+const fecharJanelaDoCartao = async (titulo) => {
+  const janela = await screen.findByRole('dialog', { name: titulo })
+  await userEvent.setup().click(within(janela).getAllByRole('button', { name: 'Fechar' }).at(-1))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 }
 
 const pronto = async () => {
@@ -167,6 +197,7 @@ describe('aba Quadro: o que cada um vê', () => {
     expect(screen.getByText('Você vê este quadro só para ler.')).toBeInTheDocument()
     await arrastarComTeclado(screen.getByRole('button', { name: 'Cartão Mapear boletos' }), ['baixo'])
     expect(moverCartao).not.toHaveBeenCalled()
+    await fecharJanelaDoCartao('Mapear boletos')
     expect(ordem('A fazer')).toEqual(['Mapear boletos', 'Revisar contratos', 'Ligar para o financeiro'])
   })
 
@@ -225,11 +256,69 @@ describe('aba Quadro: o que cada um vê', () => {
     expect(screen.getByRole('button', { name: 'Cartão Mapear boletos' })).toBeInTheDocument()
   })
 
-  it('clicar no cartão abre o cartão (aoAbrirCartao)', async () => {
+  it('clicar no cartão abre a janela do cartão', async () => {
     const user = userEvent.setup()
-    const { aoAbrirCartao } = tela()
+    tela()
     await user.click(await screen.findByRole('button', { name: 'Cartão Revisar contratos' }))
-    expect(aoAbrirCartao).toHaveBeenCalledWith('c2')
+    expect(await screen.findByRole('dialog', { name: 'Revisar contratos' })).toBeInTheDocument()
+    expect(buscarCartao).toHaveBeenCalledWith('c2')
+  })
+
+  it('depois de criar pelo "Novo cartão", a janela abre no cartão novo (para completar)', async () => {
+    const user = userEvent.setup()
+    vi.mocked(buscarCartao).mockImplementation(async (id) => (id === 'c9' ? cartaoAberto('c9', 'col1', 'Enviar contrato') : null))
+    tela()
+    await pronto()
+    await user.click(screen.getByRole('button', { name: 'Novo cartão' }))
+    await user.type(within(screen.getByRole('dialog', { name: 'Novo cartão' })).getByLabelText('Título'), 'Enviar contrato')
+    await user.click(screen.getByRole('button', { name: 'Criar cartão' }))
+    expect(await screen.findByRole('dialog', { name: 'Enviar contrato' })).toBeInTheDocument()
+    expect(buscarCartao).toHaveBeenCalledWith('c9')
+    expect(screen.queryByRole('dialog', { name: 'Novo cartão' })).not.toBeInTheDocument()
+  })
+
+  it('fechar a janela depois de mudar algo relê a coluna do cartão e os números (mesmo sem o tempo real)', async () => {
+    const user = userEvent.setup()
+    tela()
+    await pronto()
+    await user.click(screen.getByRole('button', { name: 'Cartão Configurar OLT' }))
+    const janela = await screen.findByRole('dialog', { name: 'Configurar OLT' })
+    const titulo = within(janela).getByLabelText('Título')
+    await user.clear(titulo)
+    await user.type(titulo, 'Configurar a OLT')
+    await user.tab()
+    await waitFor(() => expect(editarCartao).toHaveBeenCalledWith('c4', { titulo: 'Configurar a OLT' }))
+    const antes = vi.mocked(cartoesDoQuadro).mock.calls.length
+    vi.mocked(indicadoresDoQuadro).mockClear()
+    await user.click(within(janela).getAllByRole('button', { name: 'Fechar' }).at(-1))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(vi.mocked(cartoesDoQuadro).mock.calls.length).toBe(antes + 1))
+    expect(cartoesDoQuadro).toHaveBeenLastCalledWith(expect.objectContaining({ quadroId: 'q1', colunaId: 'col2', pagina: 1 }))
+    expect(indicadoresDoQuadro).toHaveBeenCalled()
+  })
+
+  it('fechar sem mudar nada não relê nada', async () => {
+    const user = userEvent.setup()
+    tela()
+    await pronto()
+    await user.click(screen.getByRole('button', { name: 'Cartão Configurar OLT' }))
+    const janela = await screen.findByRole('dialog', { name: 'Configurar OLT' })
+    const antes = vi.mocked(cartoesDoQuadro).mock.calls.length
+    await user.click(within(janela).getAllByRole('button', { name: 'Fechar' }).at(-1))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(vi.mocked(cartoesDoQuadro).mock.calls.length).toBe(antes)
+  })
+
+  it('cartão que sumiu enquanto a janela abria: aviso, a janela fecha e o quadro é relido', async () => {
+    const user = userEvent.setup()
+    vi.mocked(buscarCartao).mockResolvedValue(null)
+    tela()
+    await pronto()
+    const antes = vi.mocked(quadroDoCliente).mock.calls.length
+    await user.click(screen.getByRole('button', { name: 'Cartão Configurar OLT' }))
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledWith('Este cartão não está mais no quadro (ou você não o vê mais).'))
+    await waitFor(() => expect(vi.mocked(quadroDoCliente).mock.calls.length).toBeGreaterThan(antes))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('o quadro rola dentro da área dele (colunas de 300 px; a página não alarga)', async () => {
@@ -337,6 +426,7 @@ describe('filtros', () => {
     expect(screen.getByText(/Com filtro ligado não dá para arrastar/)).toBeInTheDocument()
     await arrastarComTeclado(screen.getByRole('button', { name: 'Cartão Mapear boletos' }), ['baixo'])
     expect(moverCartao).not.toHaveBeenCalled()
+    await fecharJanelaDoCartao('Mapear boletos')
     await user.click(screen.getByRole('button', { name: 'Limpar filtros' }))
     await waitFor(() => expect(screen.queryByText(/Com filtro ligado/)).not.toBeInTheDocument())
     expect(cartoesDoQuadro).toHaveBeenLastCalledWith(expect.objectContaining({ prioridade: '' }))

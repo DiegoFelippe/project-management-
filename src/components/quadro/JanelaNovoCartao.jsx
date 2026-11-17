@@ -9,18 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { criarCartao, pessoasDoQuadro } from '@/data/quadro'
-import { diaDaSemana, somarDias } from '@/lib/calendario'
-import { hoje } from '@/lib/mes'
-import { OPCOES_DE_PRIORIDADE } from './cores'
+import { atalhosDoPrazo, OPCOES_DE_PRIORIDADE } from './cores'
 
 const PRIORIDADES = [{ valor: '', rotulo: 'Sem prioridade' }, ...OPCOES_DE_PRIORIDADE]
-
-// Atalhos do prazo além do "Hoje" do calendário, como no Mochi: amanhã e a próxima sexta (o dia em São Paulo).
-function atalhosDoPrazo() {
-  const dia = hoje()
-  const ateSexta = (5 - diaDaSemana(dia) + 7) % 7 || 7
-  return [{ rotulo: 'Amanhã', valor: somarDias(dia, 1) }, { rotulo: 'Sexta', valor: somarDias(dia, ateSexta) }]
-}
 
 // "Novo cartão" (como no Mochi): título, coluna, prioridade, prazo e responsáveis (só quem atende o cliente; a lista vem
 // do banco). Cria no fim da coluna. `aoCriado(id, colunaId, aviso?)`: o cartão já existe (aviso = um responsável que o
@@ -34,7 +25,7 @@ export default function JanelaNovoCartao({ quadro, colunaId, aoFechar, aoCriado,
   const [responsaveis, setResponsaveis] = useState([])
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
-  const [atalhos] = useState(atalhosDoPrazo)
+  const [atalhos] = useState(() => atalhosDoPrazo())
 
   const buscar = useCallback(async (termo) => {
     const { itens, total } = await pessoasDoQuadro({ quadroId: quadro.id, termo })

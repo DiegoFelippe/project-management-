@@ -58,6 +58,7 @@ const {
   quadrosDoCliente,
   restaurarCartao,
   urlAssinada,
+  urlsAssinadas,
 } = await import('../../src/data/quadro.js')
 
 const admin = clienteAdmin()
@@ -456,7 +457,14 @@ describe('anexos e imagens dos cartões no balde quadros', () => {
     const resposta = await fetch((await urlAssinada(caminho)).url)
     expect(resposta.status).toBe(200)
     expect(resposta.headers.get('content-type')).toContain('image/png')
+    // Assinada como download: o <img> mostra igual, mas o link aberto sozinho baixa (não vira página no navegador).
+    expect(resposta.headers.get('content-disposition')).toMatch(/^attachment/)
     expect(new Uint8Array(await resposta.arrayBuffer())).toEqual(PNG)
+    const { urls } = await urlsAssinadas([caminho])
+    const emLote = await fetch(urls[caminho])
+    expect(emLote.status).toBe(200)
+    expect(emLote.headers.get('content-disposition')).toMatch(/^attachment/)
+    expect(new Uint8Array(await emLote.arrayBuffer())).toEqual(PNG)
     entrar('colega')
     expect((await urlAssinada(caminho)).erro).toBeTruthy()
 

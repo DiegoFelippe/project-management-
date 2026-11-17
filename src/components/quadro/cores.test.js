@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CORES_DAS_COLUNAS, corDaColuna, OPCOES_DE_PRIORIDADE, PRIORIDADES, seloDoPrazo } from './cores'
+import { atalhosDoPrazo, corDaColuna, CORES_DAS_COLUNAS, OPCOES_DE_PRIORIDADE, PRIORIDADES, seloDoPrazo } from './cores'
 
 describe('cores das colunas', () => {
   it('10 cores, na ordem que o banco guarda (0 a 9)', () => {
@@ -43,5 +43,14 @@ describe('selo do prazo', () => {
 
   it('sem prazo, sem selo', () => {
     expect(seloDoPrazo(null, HOJE)).toBeNull()
+  })
+})
+
+describe('atalhos do prazo (Amanhã e Sexta, além do Hoje do calendário)', () => {
+  it('amanhã e a próxima sexta; numa sexta, a da semana que vem', () => {
+    // 2026-11-18 é quarta; 2026-11-20 é sexta.
+    expect(atalhosDoPrazo('2026-11-18')).toEqual([{ rotulo: 'Amanhã', valor: '2026-11-19' }, { rotulo: 'Sexta', valor: '2026-11-20' }])
+    expect(atalhosDoPrazo('2026-11-20')).toEqual([{ rotulo: 'Amanhã', valor: '2026-11-21' }, { rotulo: 'Sexta', valor: '2026-11-27' }])
+    expect(atalhosDoPrazo('2026-11-22')[1]).toEqual({ rotulo: 'Sexta', valor: '2026-11-27' })
   })
 })
