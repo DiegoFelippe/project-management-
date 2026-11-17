@@ -115,7 +115,7 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   `CartoesDeNumeros` (`src/components/comum/`): até 4, logo depois da barra, com "—" enquanto carregam, **contados no
   banco** por uma função por tela (`indicadores_de_clientes`, `_de_times`, `_de_usuarios`, `_de_consultorias`,
   `_de_integracoes`; Início e Calendário: `painel_do_inicio` e `indicadores_da_agenda`), no recorte de quem vê e
-  seguindo os filtros de consultoria/consultor (e o mês) da barra; situação/abas e busca não mudam os cartões. Leitura
+  seguindo os filtros de consultoria/consultor (e o período) da barra; situação/abas e busca não mudam os cartões. Leitura
   em `src/data/indicadores.js`, uma por tela, pelo `useLeitura`. **Os cartões animam ao passar o mouse**: sobem 1px
   com sombra e o ícone dá o pulinho dos botões (`.cartao-animado` em `src/index.css`; "reduzir movimento" para). No
   celular o ícone fica em cima do número. Teste de tela com `cartoesAbaixoDaBarra` (`src/test/cartoes.js`).

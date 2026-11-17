@@ -70,19 +70,25 @@ a partir de hoje (São Paulo). O período fica no endereço (`?periodo=mes&mes=A
 
 - **Uma função só:** `painel_do_inicio(p_mes, p_de, p_ate)`, todos opcionais (sem sobrecarga ambígua). Com o mês, é o
   painel de antes, sem mudar nada.
-- **Realizado** = check-ins fechados que começam entre De e Até. Meses inteiros saem do resumo por mês
-  (`checkins_horas_mes`); os pedaços de mês nas bordas, direto dos check-ins.
+- **Realizado** = check-ins fechados que começam entre De e Até. Meses inteiros saem dos resumos por mês
+  (`checkins_horas_mes`, por consultoria, e `checkins_horas_consultor_mes`, por consultor, os dois mantidos pelo mesmo
+  gatilho); só os pedaços de mês nas bordas (no máximo dois) leem os check-ins.
 - **Capacidade** = a do mês de cada consultor proporcional aos **dias úteis** de cada mês dentro do período (dias úteis
   sem feriado e sem ausência × carga / 5, a mesma conta do mês; um mês inteiro dá a capacidade do mês). Uma ausência
-  fora do período não desconta.
+  fora do período não desconta. **A capacidade conta só até hoje**: num período que passa de hoje (ex.: 1 a 30/11
+  visto em 17/11), os dias que ainda não aconteceram não entram, e o cartão diz "Capacidade … até hoje".
 - **Utilização** = realizado ÷ capacidade do período. Reservado, ocupação e previsão só no Mês (a previsão não tem
-  histórico); qualquer outro período mostra Utilização. Ranking e extremos pela utilização no período.
+  histórico); qualquer outro período mostra Utilização. Ranking ("Utilização por consultoria/consultor") e extremos
+  pela utilização no período.
 - Clientes ativos, aguardando e a fila são de hoje ("hoje" no rótulo, "Situação de hoje, não do período."); novos
   contam os criados no período.
 - **Horas por mês:** os meses tocados pelo período (no mínimo os 6 que terminam no mês do Até, no máximo 24), cada barra
-  com o mês inteiro; os meses do período ficam em destaque. Sem a linha da previsão no período.
+  com o mês inteiro; os meses do período ficam em destaque. Sem a linha da previsão no período. Com mais de 6 meses,
+  o valor de cada mês fica no título da barra e na descrição do gráfico, e o mês aparece a cada 2 a 4 meses (no
+  máximo 6 rótulos, sempre o último), para nada se sobrepor a 360 px.
 - **Limites** (na tela e no banco): De ≤ Até (escolher De depois do Até leva o Até junto), Até no máximo no fim do mês
-  atual (o calendário trava) e no máximo 2 anos ("O período pode ter no máximo 2 anos.").
+  atual (o calendário trava; "O período vai no máximo até o fim do mês atual.") e no máximo 2 anos ("O período pode
+  ter no máximo 2 anos."). Se o banco recusar, a tela mostra a frase dele.
 - Os links de "Ver todos" e dos nomes vão ao mês do Até (Usuários e Consultorias são por mês).
-- Volume: no Mês, os limites de antes; "Este ano" (pior caso, 12 meses até hoje) em até 1000 ms para a central e 300 ms
-  para a consultoria e o consultor.
+- Volume (24 meses de check-ins, 2,5 milhões): no Mês, os limites de antes; "Este ano" (pior caso, 12 meses até hoje)
+  e o Personalizado de 2 anos com os limites da seção do teste (`painel_volume.test.sql`).

@@ -300,7 +300,7 @@ describe('Início (período)', () => {
     vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
     const user = userEvent.setup()
     renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=personalizado&de=2026-11-01&ate=2026-12-05' })
-    expect(await screen.findByRole('alert')).toHaveTextContent('O período vai no máximo até o fim deste mês.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('O período vai no máximo até o fim do mês atual.')
     expect(painelDoInicio).not.toHaveBeenCalled()
     await user.click(screen.getByLabelText('Até'))
     const calendario = await screen.findByRole('dialog', { name: 'Escolher data' })
@@ -340,6 +340,27 @@ describe('Início (período)', () => {
     expect(screen.queryByText(/reservado/i)).not.toBeInTheDocument()
     expect(screen.getByText('Situação de hoje, não do período.')).toBeInTheDocument()
     expect(screen.queryByText(/previsão atual/)).not.toBeInTheDocument()
+  })
+
+  it('o banco recusa o período: mostra a frase dele, em português, no lugar do aviso genérico', async () => {
+    vi.mocked(painelDoInicio).mockRejectedValue({ code: '22023', message: 'periodo_invalido', details: 'O período pode ter no máximo 2 anos.' })
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=personalizado&de=2026-10-01&ate=2026-10-31' })
+    expect(await screen.findByRole('alert')).toHaveTextContent('O período pode ter no máximo 2 anos.')
+    expect(screen.queryByText(/Não foi possível carregar o painel/)).not.toBeInTheDocument()
+  })
+
+  it('período que passa de hoje: a capacidade diz "até hoje"', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue({ ...PERIODO, de: '2026-11-01', ate: '2026-11-30', capacidade_ate: '2026-11-17' })
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=personalizado&de=2026-11-01&ate=2026-11-30' })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores do período')
+    expect(await within(cartoes).findByText('Capacidade 200 h até hoje')).toBeInTheDocument()
+  })
+
+  it('no período, o ranking fala de utilização', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(PERIODO)
+    renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=ultimos-30' })
+    expect(await screen.findByRole('region', { name: 'Utilização por consultor' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Ocupação por consultor' })).not.toBeInTheDocument()
   })
 
   it('no período, os cartões carregam com o rótulo do período ("—")', async () => {

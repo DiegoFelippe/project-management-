@@ -3,7 +3,7 @@
 -- consultores_por_ocupacao e consultorias_por_ocupacao. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(124);
+select plan(150);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -303,6 +303,10 @@ select ok((select (j -> 'meus_clientes' -> 0 -> 'previsto') = 'null'::jsonb
 select ok((select (j -> 'indicadores' ->> 'realizado')::numeric = 46.2 and
     (j -> 'horas_por_mes' -> 4 ->> 'realizado')::numeric = 10
     from (select public.painel_do_inicio(testes.passado()) as j) x), 'consultor: realizado só dele, com histórico');
+select is((select (j -> 'indicadores' ->> 'ocupacao')::numeric from p_pessoa), round(70 / 167.2, 4),
+  'consultor no Mês: ocupação = reservado / capacidade, como em consultores_por_ocupacao');
+select is((select (public.painel_do_inicio(testes.passado()) -> 'indicadores' ->> 'ocupacao')::numeric), 0.25,
+  'consultor no mês passado: utilização = realizado / capacidade (46,2 / 184,8)');
 reset role;
 
 select testes.como('pessoa_b');
@@ -344,11 +348,32 @@ create function testes.segundos_no_periodo(p_consultoria uuid, p_de date, p_ate 
     and k.inicio < (p_ate + 1)::timestamp at time zone 'America/Sao_Paulo'
 $$;
 
+-- Segundos fechados de um consultor que começam entre p_de e p_ate em São Paulo (soma direta, como o sistema).
+create function testes.segundos_do_consultor(p_nome text, p_de date, p_ate date) returns numeric language sql stable as $$
+  select coalesce(sum(extract(epoch from k.fim - k.inicio)), 0)
+  from public.checkins k
+  where k.fim is not null and k.consultor_id = testes.id(p_nome)
+    and k.inicio >= p_de::timestamp at time zone 'America/Sao_Paulo'
+    and k.inicio < (p_ate + 1)::timestamp at time zone 'America/Sao_Paulo'
+$$;
+create function testes.hoje() returns date language sql stable as $$ select (now() at time zone 'America/Sao_Paulo')::date $$;
+create function testes.mes_atual() returns date language sql stable as $$
+  select date_trunc('month', now() at time zone 'America/Sao_Paulo')::date
+$$;
+create function testes.fim_do_mes_atual() returns date language sql stable as $$
+  select (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month - 1 day')::date
+$$;
+grant execute on function testes.hoje(), testes.mes_atual(), testes.fim_do_mes_atual() to authenticated;
+
 select testes.como('admin_a');
 create temp table p_admin_periodo as select public.painel_do_inicio(p_de => '2026-09-16', p_ate => '2026-10-15') as j;
 create temp table p_admin_meio as select public.painel_do_inicio(p_de => '2026-08-20', p_ate => '2026-10-15') as j;
 create temp table p_admin_outubro as select public.painel_do_inicio(p_de => '2026-10-01', p_ate => '2026-10-31') as j;
 create temp table p_admin_mes_outubro as select public.painel_do_inicio(testes.passado()) as j;
+create temp table p_admin_mes_inteiro as select public.painel_do_inicio(p_de => testes.mes_atual(), p_ate => testes.fim_do_mes_atual()) as j;
+create temp table p_admin_ate_hoje as select public.painel_do_inicio(p_de => testes.mes_atual(), p_ate => testes.hoje()) as j;
+create temp table p_admin_hoje_ao_fim as select public.painel_do_inicio(p_de => testes.hoje(), p_ate => testes.fim_do_mes_atual()) as j;
+create temp table p_admin_so_hoje as select public.painel_do_inicio(p_de => testes.hoje(), p_ate => testes.hoje()) as j;
 create temp table p_admin_trinta as select public.painel_do_inicio(
   p_de => (now() at time zone 'America/Sao_Paulo')::date - 29, p_ate => (now() at time zone 'America/Sao_Paulo')::date) as j;
 reset role;
@@ -373,6 +398,24 @@ select is((select (j -> 'indicadores' ->> 'realizado')::numeric from p_admin_mei
   'período com um mês inteiro no meio (resumo) e duas bordas: realizado igual à soma direta (59,5 h)');
 select is((select (j -> 'indicadores' ->> 'realizado')::numeric from p_admin_meio), 59.5::numeric,
   'período de 20/08 a 15/10: setembro inteiro (11,8 h) + 1 a 15/10 (47,7 h)');
+select is((select (r ->> 'capacidade')::numeric from p_admin_meio, jsonb_array_elements(j -> 'ranking') r
+    where r ->> 'id' = testes.id('pessoa_a')::text), 343.2::numeric,
+  'período de três meses: 8 dias úteis em agosto + 21 em setembro + 10 em outubro = 39 x 8,8 = 343,2 h');
+select ok((select bool_and((r ->> 'ocupacao')::numeric
+      = round(round(testes.segundos_do_consultor(n, '2026-08-20', '2026-10-15') / 3600, 1) / (r ->> 'capacidade')::numeric, 4))
+    from p_admin_meio, jsonb_array_elements(j -> 'ranking') r
+    join (values ('pessoa_a'), ('pessoa_c')) v(n) on r ->> 'id' = testes.id(v.n)::text),
+  'período com mês inteiro: a utilização de cada consultor (setembro pelo resumo por consultor + bordas) = soma direta / capacidade');
+select is((select (i.j -> 'indicadores' ->> 'capacidade')::numeric from p_admin_mes_inteiro i),
+  (select (h.j -> 'indicadores' ->> 'capacidade')::numeric from p_admin_ate_hoje h),
+  'período que passa de hoje: a capacidade conta só até hoje (o mês atual inteiro = do dia 1 até hoje)');
+select is((select j ->> 'capacidade_ate' from p_admin_mes_inteiro), testes.hoje()::text,
+  'período que passa de hoje: capacidade_ate = hoje (a tela diz "até hoje")');
+select is((select (f.j -> 'indicadores' ->> 'capacidade')::numeric from p_admin_hoje_ao_fim f),
+  (select (h.j -> 'indicadores' ->> 'capacidade')::numeric from p_admin_so_hoje h),
+  'de hoje ao fim do mês: só hoje entra na capacidade');
+select is((select j ->> 'capacidade_ate' from p_admin_periodo), '2026-10-15', 'período passado: capacidade_ate = até');
+select ok((select j -> 'capacidade_ate' = 'null'::jsonb from p_admin_passado), 'Mês: sem capacidade_ate');
 select ok((select (j -> 'indicadores' ->> 'ocupacao')::numeric = round(48.7 / 880, 4) from p_admin_periodo),
   'período: ocupação = utilização = realizado / capacidade do período');
 select ok((select j -> 'indicadores' -> 'reservado' = 'null'::jsonb and j -> 'previsao_atual' = 'null'::jsonb from p_admin_periodo),
@@ -437,6 +480,21 @@ select testes.como('pessoa_b');
 select is((select (public.painel_do_inicio(p_de => '2026-09-16', p_ate => '2026-10-15') -> 'indicadores' ->> 'realizado')::numeric),
   23.1::numeric, 'outro consultor no período vê só o dele (23,1 h)');
 reset role;
+
+-- Calendário: virada do ano, fevereiro bissexto e período sem dia útil (consultor de 44 h: 8,8 h por dia útil).
+select testes.como('pessoa_a');
+select is((select (public.painel_do_inicio(p_de => '2025-12-29', p_ate => '2026-01-02') -> 'indicadores' ->> 'capacidade')::numeric),
+  35.2::numeric, 'virada do ano: 29/12/2025 a 02/01/2026 tem 4 dias úteis (1/1 é feriado) = 35,2 h');
+select is((select (public.painel_do_inicio(p_de => '2024-02-26', p_ate => '2024-03-01') -> 'indicadores' ->> 'capacidade')::numeric),
+  44.0::numeric, 'fevereiro bissexto: 26/02 a 01/03/2024 tem 5 dias úteis, com o 29/02 (44 h)');
+select ok((select (j -> 'indicadores' ->> 'capacidade')::numeric = 0 and j -> 'indicadores' -> 'ocupacao' = 'null'::jsonb
+    from (select public.painel_do_inicio(p_de => '2026-10-10', p_ate => '2026-10-12') as j) x),
+  'só fim de semana e feriado (10 a 12/10/2026): capacidade 0 e utilização nula');
+reset role;
+select ok(not has_function_privilege('authenticated', 'private.capacidades_do_periodo(uuid, date, date, uuid[])', 'execute'),
+  'logado não executa private.capacidades_do_periodo');
+select ok(not has_function_privilege('authenticated', 'private.ocupacao_do_periodo(uuid, date, date, uuid[])', 'execute'),
+  'logado não executa private.ocupacao_do_periodo');
 
 -- Limites do período (o banco confere, além da tela).
 select testes.como('admin_a');
@@ -594,6 +652,63 @@ select ok((select not exists (
   'resumo: o recálculo da migração bate com a recontagem direta');
 select ok((select exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'checkins_horas_mes'
     and indexdef like '%(mes)%')), 'resumo: índice por mês');
+
+-- ── Resumo por consultor e mês (checkins_horas_consultor_mes), mantido pelo mesmo gatilho ─────────────────
+-- Depois de tudo o que os testes acima fizeram com os check-ins (mudar mês, consultoria, fechar, reabrir, apagar),
+-- o resumo por consultor bate com a soma direta.
+create function testes.resumo_por_consultor_confere() returns boolean language sql stable as $$
+  select not exists (
+    select 1 from (
+      select k.consultor_id, k.consultoria_id, date_trunc('month', k.inicio at time zone 'America/Sao_Paulo')::date as mes,
+        sum(extract(epoch from k.fim - k.inicio)) as segundos
+      from public.checkins k where k.fim is not null group by 1, 2, 3) d
+    full join private.checkins_horas_consultor_mes r
+      on r.consultor_id = d.consultor_id and r.consultoria_id = d.consultoria_id and r.mes = d.mes
+    where coalesce(d.segundos, 0) is distinct from coalesce(r.segundos, 0))
+$$;
+select ok(testes.resumo_por_consultor_confere(), 'resumo por consultor: igual à soma direta dos check-ins fechados');
+select testes.como('pessoa_c');
+insert into public.checkins (cliente_id, inicio, descricao) values (testes.id('c200'), '2025-02-10 08:00-03', 'Fevereiro');
+reset role;
+select is((select coalesce(sum(segundos), 0) from private.checkins_horas_consultor_mes
+    where consultor_id = testes.id('pessoa_c') and mes = '2025-02-01'), 0::numeric, 'resumo por consultor: aberto não entra');
+update public.checkins set fim = '2025-02-10 10:00-03' where cliente_id = testes.id('c200') and inicio = '2025-02-10 08:00-03';
+select is((select segundos from private.checkins_horas_consultor_mes
+    where consultor_id = testes.id('pessoa_c') and consultoria_id = testes.id('A') and mes = '2025-02-01'), 7200::numeric,
+  'resumo por consultor: fechar soma no mês e na consultoria do check-in');
+update public.checkins set consultor_id = testes.id('pessoa_d') where cliente_id = testes.id('c200') and inicio = '2025-02-10 08:00-03';
+select ok((select coalesce(sum(segundos) filter (where consultor_id = testes.id('pessoa_c')), 0) = 0
+    and coalesce(sum(segundos) filter (where consultor_id = testes.id('pessoa_d')), 0) = 7200
+    from private.checkins_horas_consultor_mes where mes = '2025-02-01'),
+  'resumo por consultor: mudar o consultor tira de um e soma no outro');
+update public.checkins set consultoria_id = testes.id('B') where cliente_id = testes.id('c200') and inicio = '2025-02-10 08:00-03';
+select is((select segundos from private.checkins_horas_consultor_mes
+    where consultor_id = testes.id('pessoa_d') and consultoria_id = testes.id('B') and mes = '2025-02-01'), 7200::numeric,
+  'resumo por consultor: mudar a consultoria leva as horas junto');
+delete from public.checkins where cliente_id = testes.id('c200') and inicio = '2025-02-10 08:00-03';
+select ok(testes.resumo_por_consultor_confere(), 'resumo por consultor: apagar desfaz e tudo continua batendo');
+select ok((select relrowsecurity from pg_class where oid = 'private.checkins_horas_consultor_mes'::regclass),
+  'resumo por consultor: RLS ligado');
+select ok(exists (select 1 from pg_indexes where schemaname = 'private' and tablename = 'checkins_horas_consultor_mes'
+    and indexdef like '%(consultoria_id, mes)%'), 'resumo por consultor: índice por consultoria e mês');
+select ok(to_regclass('public.checkins_horas_consultor_mes') is null,
+  'resumo por consultor fica em private, fora do PostgREST');
+-- Em public, uma tabela com chaves para perfis e consultorias dentro da chave primária vira "junção" para o PostgREST,
+-- e a leitura do perfil no login (perfis com a consultoria embutida) fica ambígua (HTTP 300).
+select is((select count(*)::int from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+    join pg_constraint pk on pk.conrelid = c.oid and pk.contype = 'p'
+    where exists (select 1 from pg_constraint f where f.conrelid = c.oid and f.contype = 'f'
+        and f.confrelid = 'public.perfis'::regclass and f.conkey <@ pk.conkey)
+      and exists (select 1 from pg_constraint f where f.conrelid = c.oid and f.contype = 'f'
+        and f.confrelid = 'public.consultorias'::regclass and f.conkey <@ pk.conkey)), 0,
+  'nenhuma tabela de public liga perfis e consultorias pela chave primária (o login não fica ambíguo)');
+select ok(not has_function_privilege('authenticated', 'private.somar_horas_consultor_mes(uuid, uuid, timestamp with time zone, numeric)', 'execute'),
+  'logado não executa private.somar_horas_consultor_mes');
+select testes.como('pessoa_a');
+select throws_ok($$ select * from private.checkins_horas_consultor_mes $$, '42501', null,
+  'resumo por consultor: sem acesso direto para quem está logado');
+reset role;
 
 -- ── Sem recorte ──────────────────────────────────────────────────────────────
 select testes.como('inativo_a');

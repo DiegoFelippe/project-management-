@@ -53,7 +53,7 @@ describe('periodo', () => {
     expect(validarPeriodo('2026-09-16', '2026-10-15', HOJE)).toBeNull()
     expect(validarPeriodo('2026-10-15', '2026-10-01', HOJE)).toBe('A data inicial vem depois da final.')
     expect(validarPeriodo('2026-11-01', '2026-11-30', HOJE)).toBeNull()
-    expect(validarPeriodo('2026-11-01', '2026-12-01', HOJE)).toBe('O período vai no máximo até o fim deste mês.')
+    expect(validarPeriodo('2026-11-01', '2026-12-01', HOJE)).toBe('O período vai no máximo até o fim do mês atual.')
     expect(validarPeriodo('2024-01-02', '2026-01-01', HOJE)).toBeNull()
     expect(validarPeriodo('2024-01-01', '2026-01-01', HOJE)).toBe('O período pode ter no máximo 2 anos.')
     // 29/02 + 2 anos = 28/02 (como o banco): até 27/02 cabe, 28/02 não.

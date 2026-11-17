@@ -88,7 +88,7 @@ export function periodoAoTrocar(atual, tipo, hoje) {
 export function validarPeriodo(de, ate, hoje) {
   if (!de || !ate) return 'Escolha as duas datas.'
   if (de > ate) return 'A data inicial vem depois da final.'
-  if (ate > fimDoMes(primeiroDoMes(hoje))) return 'O período vai no máximo até o fim deste mês.'
+  if (ate > fimDoMes(primeiroDoMes(hoje))) return 'O período vai no máximo até o fim do mês atual.'
   if (ate >= somarAnos(de, 2)) return 'O período pode ter no máximo 2 anos.'
   return null
 }

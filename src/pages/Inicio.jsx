@@ -27,10 +27,10 @@ export default function Inicio() {
   const noMes = tipo === 'mes'
   const erroDoPeriodo = noMes ? null : validarPeriodo(de, ate, hoje)
   const [painel, setPainel] = useState(null)
-  const [erro, setErro] = useState(false)
+  const [erro, setErro] = useState(null) // frase do aviso quando o painel não veio
 
   function irPara(novo) {
-    setErro(false)
+    setErro(null)
     setParametros(paraEndereco({ ...periodo, ...novo }), { replace: true })
   }
 
@@ -43,13 +43,14 @@ export default function Inicio() {
       .then((p) => {
         if (!ativo) return
         setPainel(p)
-        setErro(false)
+        setErro(null)
       })
-      .catch(() => {
+      .catch((e) => {
         if (!ativo) return
-        // Sem os números do período pedido, não deixa os do anterior sob o rótulo novo.
+        // Sem os números do período pedido, não deixa os do anterior sob o rótulo novo. Se o banco recusou o período
+        // (periodo_invalido), a frase dele já está em português; senão, o aviso de sempre.
         setPainel(null)
-        setErro(true)
+        setErro(e?.message === 'periodo_invalido' && e.details ? e.details : 'Não foi possível carregar o painel. Tente novamente em instantes.')
       })
     return () => {
       ativo = false
@@ -83,7 +84,7 @@ export default function Inicio() {
         <>
           {!erro && <Indicadores painel={atualizando ? null : painel} pessoa={perfil.papel === 'pessoa'}
             passado={noMes ? mes < mesAtual() : true} intervalo={!noMes} />}
-          {erro && <p role="alert" className="card border-destructive/40 p-4 text-corpo text-destructive">Não foi possível carregar o painel. Tente novamente em instantes.</p>}
+          {erro && <p role="alert" className="card border-destructive/40 p-4 text-corpo text-destructive">{erro}</p>}
           {!painel && !erro && <GraficoCarregando texto="Carregando o painel…" className="min-h-64 justify-center" />}
 
           {painel && (

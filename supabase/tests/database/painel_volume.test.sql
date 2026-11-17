@@ -1,11 +1,13 @@
--- Volume do painel do Início: 200 consultorias, 3.000 consultores, 50.000 clientes e 200.000 check-ins fechados no mês atual mais 500.000 nos 5 meses anteriores (o gráfico lê 6 meses), criados
--- aqui e desfeitos no fim (rollback: nada fica no banco). painel_do_inicio no Mês precisa responder em até 500 ms
--- para a central (tudo), 150 ms para uma consultoria e 100 ms para um consultor (média de 5 execuções, com 50% de
--- folga). No período "Este ano" (12 meses até hoje, o pior caso: lê os 700.000 check-ins), 1000 ms para a central e
--- 300 ms para a consultoria e para o consultor. Roda com: npm run test:db
+-- Volume do painel do Início: 200 consultorias, 3.000 consultores, 50.000 clientes e 200.000 check-ins fechados no mês
+-- atual mais 2.300.000 nos 23 meses anteriores (100.000 por mês: o período vai até 2 anos), criados aqui e desfeitos
+-- no fim (rollback: nada fica no banco). Média de 5 execuções, com 50% de folga:
+-- - Mês: 500 ms para a central (tudo), 150 ms para uma consultoria e 100 ms para um consultor;
+-- - "Este ano" no pior caso (12 meses até hoje, o "Este ano" de dezembro) e o Personalizado mais longo (2 anos até
+--   hoje): 600 ms para a central, 150 ms para a consultoria e 100 ms para o consultor (os meses inteiros vêm dos
+--   resumos por mês; só as bordas leem check-ins). Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(11);
+select plan(16);
 
 create schema testes;
 grant usage on schema testes to authenticated;
@@ -26,25 +28,28 @@ begin
 end $$;
 grant execute on function testes.media_ms() to authenticated;
 
--- "Este ano" no pior caso: 12 meses até hoje (o "Este ano" de dezembro), que cobre o volume inteiro (os check-ins são
--- do mês atual e dos 5 anteriores). Fixo assim, a medida não muda com o mês em que o teste roda.
+-- "Este ano" no pior caso: 12 meses até hoje (o "Este ano" de dezembro). Fixo assim, a medida não muda com o mês em
+-- que o teste roda. E o Personalizado mais longo: 2 anos até hoje (o banco aceita até < de + 2 anos).
 create function testes.ano_de() returns date language sql stable as $$
   select (date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '11 months')::date
 $$;
 create function testes.hoje() returns date language sql stable as $$
   select (now() at time zone 'America/Sao_Paulo')::date
 $$;
-grant execute on function testes.ano_de(), testes.hoje() to authenticated;
+create function testes.dois_anos_de() returns date language sql stable as $$
+  select ((now() at time zone 'America/Sao_Paulo')::date - interval '2 years' + interval '1 day')::date
+$$;
+grant execute on function testes.ano_de(), testes.hoje(), testes.dois_anos_de() to authenticated;
 
--- Média (ms) de 5 execuções do painel no "Este ano" acima, só para o relatório (diag).
-create function testes.media_ms_ano() returns numeric language plpgsql as $$
+-- Média (ms) de 5 execuções do painel num período, só para o relatório (diag).
+create function testes.media_ms_periodo(p_de date, p_ate date) returns numeric language plpgsql as $$
 declare t0 timestamptz; i int;
 begin
   t0 := clock_timestamp();
-  for i in 1..5 loop perform public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje()); end loop;
+  for i in 1..5 loop perform public.painel_do_inicio(p_de => p_de, p_ate => p_ate); end loop;
   return round(extract(epoch from clock_timestamp() - t0) * 1000 / 5, 1);
 end $$;
-grant execute on function testes.media_ms_ano() to authenticated;
+grant execute on function testes.media_ms_periodo(date, date) to authenticated;
 
 create function testes.como(p_nome text) returns void language plpgsql as $$
 begin
@@ -106,11 +111,15 @@ left join v_pessoas p on v.n <= 48000 and ((v.n - 1) / 200) % 16 < 15
 
 -- ── Check-ins ────────────────────────────────────────────────────────────────
 -- 200.000 check-ins fechados no mês atual, cerca de 67 por consultor, sem sobreposição: o i-ésimo do
--- consultor começa em início do mês + i x passo e dura meio passo. O gatilho checkins_validar (o consultor
--- logado faz o próprio check-in, nada no futuro) fica desligado só nesta transação: aqui quem grava é o
--- sistema, em lote. As restrições da tabela (sobreposição, 24 h, descrição) continuam valendo.
+-- consultor começa em início do mês + i x passo e dura meio passo. Os gatilhos checkins_validar (o consultor
+-- logado faz o próprio check-in, nada no futuro) e checkins_resumir_horas ficam desligados só nesta transação: aqui
+-- quem grava é o sistema, em lote, e os dois resumos por mês (por consultoria e por consultor) são preenchidos depois
+-- numa soma só, igual ao que o gatilho faria (o gatilho é conferido em painel_do_inicio.test.sql). Linha a linha, 2,5
+-- milhões de check-ins levariam minutos e deixariam milhões de versões mortas nos resumos (numa transação só, nada
+-- limpa), o que não acontece no banco de verdade. As restrições da tabela (sobreposição, 24 h, descrição) valem.
 
 alter table public.checkins disable trigger checkins_validar;
+alter table public.checkins disable trigger checkins_resumir_horas;
 
 insert into public.checkins (cliente_id, consultor_id, consultoria_id, inicio, fim, descricao)
 select cl.id, p.id, c.id, m.de + x.i * m.passo, m.de + x.i * m.passo + m.passo / 2, 'Atendimento'
@@ -124,11 +133,11 @@ join v_pessoas p on p.n = x.n
 join v_consultorias c on c.n = (x.n - 1) % 200 + 1
 join v_clientes cl on cl.n = x.n + 3200 * (x.i % 15);
 
--- Histórico: 100.000 check-ins em cada um dos 5 meses anteriores (o gráfico "Horas por mês" lê 6 meses). O i-ésimo
--- do consultor no mês começa em início do mês + i x 9 h e dura 4 h (34 por consultor: cabem no mês, sem sobreposição).
+-- Histórico: 100.000 check-ins em cada um dos 23 meses anteriores (o período vai até 2 anos). O i-ésimo do consultor
+-- no mês começa em início do mês + i x 9 h e dura 4 h (34 por consultor: cabem no mês, sem sobreposição).
 insert into public.checkins (cliente_id, consultor_id, consultoria_id, inicio, fim, descricao)
 select cl.id, p.id, c.id, m.de + x.i * interval '9 hours', m.de + x.i * interval '9 hours' + interval '4 hours', 'Histórico'
-from generate_series(1, 5) atras
+from generate_series(1, 23) atras
 cross join generate_series(1, 100000) k
 cross join lateral (select (k - 1) % 3000 + 1 as n, (k - 1) / 3000 as i) x
 cross join lateral (
@@ -139,6 +148,23 @@ join v_consultorias c on c.n = (x.n - 1) % 200 + 1
 join v_clientes cl on cl.n = x.n + 3200 * (x.i % 15);
 
 alter table public.checkins enable trigger checkins_validar;
+alter table public.checkins enable trigger checkins_resumir_horas;
+
+-- Os dois resumos, como o gatilho os deixaria (só os check-ins do volume; os de antes já estão neles).
+insert into public.checkins_horas_mes (consultoria_id, mes, segundos)
+select k.consultoria_id, date_trunc('month', k.inicio at time zone 'America/Sao_Paulo')::date, sum(extract(epoch from k.fim - k.inicio))
+from public.checkins k
+where k.fim is not null and k.consultoria_id in (select id from v_consultorias)
+group by 1, 2
+on conflict (consultoria_id, mes) do update set segundos = public.checkins_horas_mes.segundos + excluded.segundos;
+insert into private.checkins_horas_consultor_mes (consultor_id, consultoria_id, mes, segundos)
+select k.consultor_id, k.consultoria_id, date_trunc('month', k.inicio at time zone 'America/Sao_Paulo')::date,
+  sum(extract(epoch from k.fim - k.inicio))
+from public.checkins k
+where k.fim is not null and k.consultoria_id in (select id from v_consultorias)
+group by 1, 2, 3
+on conflict (consultor_id, consultoria_id, mes)
+  do update set segundos = private.checkins_horas_consultor_mes.segundos + excluded.segundos;
 
 -- ── Tempos ───────────────────────────────────────────────────────────────────
 -- O consultor n = 401 é o primeiro 'pessoa' (consultoria 1); o administrador n = 1 (consultoria 1).
@@ -158,33 +184,51 @@ select ok((select bool_and((e ->> 'realizado')::numeric > 0) from jsonb_array_el
 -- folga de 0,75 x limite: o limite como média, com 50% de tolerância.
 select performs_within('select public.painel_do_inicio()', 375, 375, 5,
   'central (todas as consultorias, 3.000 consultores): painel_do_inicio() em até 500 ms na média (+50%)');
--- "Este ano" (12 meses até hoje): utilização de 3.000 consultores sobre os 700.000 check-ins do volume.
-select diag('Este ano, média medida: ' || testes.media_ms_ano() || ' ms');
+-- Períodos: utilização de 3.000 consultores. Os meses inteiros vêm dos resumos; só o mês atual (borda) lê check-ins.
+select diag('Este ano, média medida: ' || testes.media_ms_periodo(testes.ano_de(), testes.hoje()) || ' ms');
+select diag('2 anos, média medida: ' || testes.media_ms_periodo(testes.dois_anos_de(), testes.hoje()) || ' ms');
 select is((public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje()) -> 'indicadores' ->> 'realizado')::numeric,
   (select round(sum(extract(epoch from k.fim - k.inicio)) / 3600, 1) from public.checkins k
    join public.consultorias co on co.id = k.consultoria_id and co.arquivada_em is null
    where k.fim is not null and k.inicio >= testes.ano_de()::timestamp at time zone 'America/Sao_Paulo'),
   'Este ano: o realizado da central soma todos os check-ins do ano (meses inteiros pelo resumo, o mês atual direto)');
-select performs_within('select public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje())', 750, 750, 5,
-  'central, Este ano (3.000 consultores, 700.000 check-ins): painel_do_inicio(de, até) em até 1000 ms na média (+50%)');
+select ok((select bool_and((e ->> 'ocupacao')::numeric = round(round(f.segundos / 3600, 1) / (e ->> 'capacidade')::numeric, 4))
+    from jsonb_array_elements(public.painel_do_inicio(p_de => testes.dois_anos_de(), p_ate => testes.hoje()) -> 'extremos' -> 'folga') e
+    cross join lateral (
+      select coalesce(sum(extract(epoch from k.fim - k.inicio)), 0) as segundos from public.checkins k
+      where k.fim is not null and k.consultor_id = (e ->> 'id')::uuid
+        and k.inicio >= testes.dois_anos_de()::timestamp at time zone 'America/Sao_Paulo') f),
+  '2 anos: a utilização de cada consultor nos extremos = soma direta dos check-ins / capacidade (resumo por consultor + borda)');
+select is(jsonb_array_length(public.painel_do_inicio(p_de => testes.dois_anos_de(), p_ate => testes.hoje()) -> 'horas_por_mes'), 24,
+  '2 anos: o gráfico mostra 24 meses');
+select performs_within('select public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje())', 450, 450, 5,
+  'central, Este ano (12 meses, 3.000 consultores, 1,3 milhão de check-ins): em até 600 ms na média (+50%)');
+select performs_within('select public.painel_do_inicio(p_de => testes.dois_anos_de(), p_ate => testes.hoje())', 450, 450, 5,
+  'central, 2 anos (2,5 milhões de check-ins): em até 600 ms na média (+50%)');
 reset role;
 
 select testes.como('adm1');
 select diag('média medida: ' || testes.media_ms() || ' ms');
 select performs_within('select public.painel_do_inicio()', 112.5, 112.5, 5,
   'administrador (15 consultores, 250 clientes): painel_do_inicio() em até 150 ms na média (+50%)');
-select diag('Este ano, média medida: ' || testes.media_ms_ano() || ' ms');
-select performs_within('select public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje())', 225, 225, 5,
-  'administrador, Este ano (15 consultores): painel_do_inicio(de, até) em até 300 ms na média (+50%)');
+select diag('Este ano, média medida: ' || testes.media_ms_periodo(testes.ano_de(), testes.hoje()) || ' ms');
+select diag('2 anos, média medida: ' || testes.media_ms_periodo(testes.dois_anos_de(), testes.hoje()) || ' ms');
+select performs_within('select public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje())', 112.5, 112.5, 5,
+  'administrador, Este ano (15 consultores): em até 150 ms na média (+50%)');
+select performs_within('select public.painel_do_inicio(p_de => testes.dois_anos_de(), p_ate => testes.hoje())', 112.5, 112.5, 5,
+  'administrador, 2 anos: em até 150 ms na média (+50%)');
 reset role;
 
 select testes.como('pessoa401');
 select diag('média medida: ' || testes.media_ms() || ' ms');
 select performs_within('select public.painel_do_inicio()', 75, 75, 5,
   'consultor (15 clientes, 67 check-ins): painel_do_inicio() em até 100 ms na média (+50%)');
-select diag('Este ano, média medida: ' || testes.media_ms_ano() || ' ms');
-select performs_within('select public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje())', 225, 225, 5,
-  'consultor, Este ano: painel_do_inicio(de, até) em até 300 ms na média (+50%)');
+select diag('Este ano, média medida: ' || testes.media_ms_periodo(testes.ano_de(), testes.hoje()) || ' ms');
+select diag('2 anos, média medida: ' || testes.media_ms_periodo(testes.dois_anos_de(), testes.hoje()) || ' ms');
+select performs_within('select public.painel_do_inicio(p_de => testes.ano_de(), p_ate => testes.hoje())', 75, 75, 5,
+  'consultor, Este ano: em até 100 ms na média (+50%)');
+select performs_within('select public.painel_do_inicio(p_de => testes.dois_anos_de(), p_ate => testes.hoje())', 75, 75, 5,
+  'consultor, 2 anos: em até 100 ms na média (+50%)');
 reset role;
 
 select * from finish();

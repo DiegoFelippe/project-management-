@@ -12,6 +12,8 @@ export default function Indicadores({ painel, pessoa, passado: passadoAgora, int
   const passado = painel?.passado ?? passadoAgora
   const intervalo = painel?.intervalo ?? intervaloAgora
   const noQue = intervalo ? 'no período' : 'no mês'
+  // Período que passa de hoje: a capacidade (do banco) conta só até hoje, e o cartão diz isso.
+  const ateHoje = painel?.capacidade_ate && painel.capacidade_ate < painel.ate ? ' até hoje' : ''
   const i = painel?.indicadores
   const acima = i?.ocupacao > 1
   const hoje = passado ? ' hoje' : ''
@@ -25,7 +27,7 @@ export default function Indicadores({ painel, pessoa, passado: passadoAgora, int
     ? [
       { chave: 'clientes', rotulo: `Meus clientes${hoje}`, icone: Users, valor: i?.clientes_ativos },
       { chave: 'capacidade', rotulo: 'Minha capacidade', icone: Hourglass, tom: 'neutro', valor: i ? formatarHoras(i.capacidade) : null,
-        detalhe: i && !passado ? `Reservado ${formatarHoras(i.reservado)}` : null },
+        detalhe: i && !passado ? `Reservado ${formatarHoras(i.reservado)}` : (i && ateHoje ? 'até hoje' : null) },
       ocupacao,
       realizado,
     ]
@@ -37,7 +39,7 @@ export default function Indicadores({ painel, pessoa, passado: passadoAgora, int
         detalhe: i && recorte === 'tudo'
           ? `${i.a_distribuir.toLocaleString('pt-BR')} a distribuir · ${i.sem_consultor.toLocaleString('pt-BR')} sem consultor` : null },
       { ...ocupacao,
-        detalhe: i ? `Capacidade ${formatarHoras(i.capacidade)}${passado ? '' : ` · reservado ${formatarHoras(i.reservado)}`}` : null },
+        detalhe: i ? `Capacidade ${formatarHoras(i.capacidade)}${ateHoje}${passado ? '' : ` · reservado ${formatarHoras(i.reservado)}`}` : null },
       realizado,
     ]
 

@@ -5,7 +5,8 @@ import { formatarHoras, formatarOcupacao } from '@/lib/horas'
 // No período (`intervalo`), a ordem é pela utilização no período; os links vão ao mês do fim do período (`mes`).
 export default function RankingDeOcupacao({ recorte, passado, intervalo = false, ranking, mes }) {
   const porConsultoria = recorte === 'tudo'
-  const titulo = porConsultoria ? 'Ocupação por consultoria' : 'Ocupação por consultor'
+  // Fora do Mês, o número é a utilização do período (o Mês, até no passado, segue "Ocupação por…", como antes).
+  const titulo = `${intervalo ? 'Utilização' : 'Ocupação'} por ${porConsultoria ? 'consultoria' : 'consultor'}`
   const ocupacaoDoMes = `/consultorias?aba=ocupacao&mes=${mes}`
   const rotulo = passado ? 'utilização' : 'ocupação'
   const neste = intervalo ? 'neste período' : 'neste mês'
