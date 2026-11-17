@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { defineConfig, mergeConfig } from 'vitest/config'
 import viteConfig from './vite.config.js'
 
@@ -19,6 +20,8 @@ export default mergeConfig(
           },
         },
         {
+          // O mesmo apelido '@' do app, para testar as funções de src/data/ contra o Supabase local de verdade.
+          resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
           test: {
             name: 'integracao',
             environment: 'node',

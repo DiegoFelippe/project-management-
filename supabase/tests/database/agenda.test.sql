@@ -2,7 +2,7 @@
 -- segredo do Google que o navegador nunca lê e os números do painel. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(51);
+select plan(80);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -258,6 +258,116 @@ select is((select count(*) from public.feriados_do_periodo(date '2026-11-01', da
   'feriados de novembro de 2026: 2, 15 e 20');
 select is((select count(*) from public.feriados_do_periodo(date '2026-12-20', date '2027-01-02')), 2::bigint,
   'o período cruza o ano: 25/12 e 01/01');
+reset role;
+
+-- ── Consistência entre consultorias (grava como service_role, o único que escreve) ──────────────────────────
+grant usage on schema testes to service_role;
+grant select on testes.fx to service_role;
+select set_config('request.jwt.claims', '', true);
+insert into public.clientes (id, nome, horas_mes, consultoria_id, consultor_id)
+values (gen_random_uuid(), 'Cliente agenda B', 10, testes.id('B'), testes.id('b1')),
+       (gen_random_uuid(), 'Cliente agenda A2', 10, testes.id('A'), testes.id('a2'));
+insert into testes.fx select 'clienteB', id from public.clientes where nome = 'Cliente agenda B';
+insert into testes.fx select 'clienteA2', id from public.clientes where nome = 'Cliente agenda A2';
+insert into public.cliente_pastas (id, cliente_id, nome) values (gen_random_uuid(), testes.id('clienteA2'), 'Pasta do A2');
+insert into testes.fx select 'pastaA2', id from public.cliente_pastas where nome = 'Pasta do A2';
+
+set local role service_role;
+select throws_ok(format($$ insert into public.agenda_participantes (evento_id, perfil_id) values (%L, %L) $$,
+  testes.id('e3'), testes.id('b1')), 'P0001', 'participante_invalido', 'participante de outra consultoria falha');
+select throws_ok(format($$ insert into public.agenda_participantes (evento_id, perfil_id) values (%L, %L) $$,
+  testes.id('e3'), testes.id('central1')), 'P0001', 'participante_invalido', 'pessoa da central não é participante (só consultor da consultoria)');
+select throws_ok(format($$ insert into public.agenda_eventos (consultoria_id, consultor_id, titulo, inicio, fim)
+  values (%L, %L, 'Consultor de fora', now(), now() + interval '1 hour') $$, testes.id('A'), testes.id('b1')),
+  'P0001', 'consultor_invalido', 'consultor de outra consultoria falha');
+select throws_ok(format($$ insert into public.agenda_eventos (consultoria_id, consultor_id, cliente_id, titulo, inicio, fim)
+  values (%L, %L, %L, 'Cliente de fora', now(), now() + interval '1 hour') $$, testes.id('A'), testes.id('a1'), testes.id('clienteB')),
+  'P0001', 'cliente_invalido', 'cliente de outra consultoria falha');
+select throws_ok(format($$ insert into public.agenda_eventos (consultoria_id, consultor_id, cliente_id, titulo, inicio, fim, pasta_id)
+  values (%L, %L, %L, 'Pasta de outro', now(), now() + interval '1 hour', %L) $$,
+  testes.id('A'), testes.id('a1'), testes.id('clienteA'), testes.id('pastaA2')),
+  'P0001', 'pasta_invalida', 'pasta de outro cliente falha');
+select throws_ok(format($$ update public.agenda_eventos set consultor_id = %L where id = %L $$, testes.id('b1'), testes.id('e5')),
+  'P0001', 'consultor_invalido', 'trocar o consultor para alguém de outra consultoria falha');
+select throws_ok(format($$ update public.agenda_eventos set consultoria_id = %L, consultor_id = %L where id = %L $$,
+  testes.id('B'), testes.id('b1'), testes.id('e2')), 'P0001', 'participante_invalido',
+  'mudar o evento de consultoria com participante da antiga falha');
+select throws_ok(format($$ insert into public.agenda_eventos (consultoria_id, consultor_id, titulo, inicio, fim)
+  values (%L, %L, 'Longo', timestamptz '2026-01-01 00:00-03', timestamptz '2026-02-01 00:00:01-03') $$,
+  testes.id('A'), testes.id('a1')), '23514', null, 'evento com mais de 31 dias falha');
+select lives_ok(format($$ insert into public.agenda_eventos (consultoria_id, consultor_id, titulo, inicio, fim)
+  values (%L, %L, 'Trinta e um dias', timestamptz '2026-01-01 00:00-03', timestamptz '2026-02-01 00:00-03') $$,
+  testes.id('A'), testes.id('a1')), 'evento de exatamente 31 dias vale');
+reset role;
+
+-- Defesa em profundidade: mesmo com um dado ruim (gatilho desligado só aqui), o convidado de outra consultoria não vê.
+select set_config('request.jwt.claims', '', true);
+alter table public.agenda_participantes disable trigger agenda_participantes_validar;
+insert into public.agenda_participantes (evento_id, perfil_id) values (testes.id('e3'), testes.id('b1'));
+alter table public.agenda_participantes enable trigger agenda_participantes_validar;
+select testes.como('b1');
+select is(testes.eventos_vistos(), 'e4', 'convidado de outra consultoria (dado ruim) não vê o evento da A');
+select is(public.evento_da_agenda(testes.id('e3')), null::jsonb, 'nem pelo detalhe');
+reset role;
+select set_config('request.jwt.claims', '', true);
+delete from public.agenda_participantes where evento_id = testes.id('e3') and perfil_id = testes.id('b1');
+
+-- ── Leitura do período (RPC) ─────────────────────────────────────────────────
+create function testes.ids_do_periodo(p_json jsonb) returns text language sql immutable as $$
+  select coalesce(string_agg(f.nome, ',' order by f.nome), '')
+  from jsonb_array_elements(p_json -> 'itens') i join testes.fx f on f.id = (i ->> 'id')::uuid
+$$;
+grant execute on function testes.ids_do_periodo(jsonb) to authenticated;
+
+select testes.como('a1', 'aal2');
+select is(testes.ids_do_periodo(public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-01 00:00-03')),
+  'e1,e2,e3,e5', 'consultor: o período traz os próprios e os em que foi convidado');
+select is(public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-01 00:00-03') -> 'ha_mais',
+  'false'::jsonb, 'ha_mais falso quando cabe');
+select is(jsonb_array_length(public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-01 00:00-03', null, null, null, 1) -> 'itens'),
+  1, 'o limite corta a lista');
+select is(public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-01 00:00-03', null, null, null, 1) -> 'ha_mais',
+  'true'::jsonb, 'e avisa que há mais');
+select is(testes.ids_do_periodo(public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-01 00:00-03', null, null, testes.id('clienteA'))),
+  'e1,e5', 'filtro de cliente no banco');
+select is((select i #>> '{consultor,nome}' from jsonb_array_elements(public.eventos_do_periodo(
+  timestamptz '2026-11-12 00:00-03', timestamptz '2026-11-13 00:00-03') -> 'itens') i limit 1),
+  'Pessoa a2', 'o convidado recebe o nome do consultor do evento (e3, de a2)');
+select is((select count(*) from jsonb_array_elements(public.eventos_do_periodo(
+  timestamptz '2026-11-12 00:00-03', timestamptz '2026-11-13 00:00-03') -> 'itens') i,
+  jsonb_array_elements(i -> 'participantes') pt where pt ->> 'nome' = 'Pessoa a1'), 1::bigint,
+  'os participantes vêm com o nome');
+select is(testes.ids_do_periodo(public.eventos_do_periodo(timestamptz '2026-11-14 10:30-03', timestamptz '2026-11-14 10:45-03')),
+  'e5', 'o período usa início < fim do período e fim > começo (o evento que o atravessa entra)');
+select is(testes.ids_do_periodo(public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-01 00:00-03', testes.id('a2'))),
+  'e2,e3', 'filtro de consultor: só o que ele vê dos eventos de a2');
+select ok(public.evento_da_agenda(testes.id('e3')) is not null, 'detalhe do evento em que foi convidado');
+select is(public.evento_da_agenda(testes.id('e7')), null::jsonb, 'detalhe de evento do colega: nulo');
+reset role;
+
+select testes.como('gestor_a');
+select is(testes.ids_do_periodo(public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-01 00:00-03')),
+  'e1,e2,e3,e5,e7', 'gestor: o período traz a consultoria toda');
+select is(testes.ids_do_periodo(public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-01 00:00-03', null, testes.id('B'))),
+  '', 'gestor pedindo outra consultoria não recebe nada');
+reset role;
+
+select testes.como('central1');
+select is(testes.ids_do_periodo(public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-01 00:00-03')),
+  'e1,e2,e3,e4,e5,e7', 'central: todas as consultorias');
+select is(testes.ids_do_periodo(public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-01 00:00-03', null, testes.id('B'))),
+  'e4', 'central filtra por consultoria');
+reset role;
+
+select testes.como('b1');
+select is(testes.ids_do_periodo(public.eventos_do_periodo(timestamptz '2026-11-01 00:00-03', timestamptz '2026-12-01 00:00-03')),
+  'e4', 'consultor de outra consultoria só recebe os dele');
+reset role;
+
+select testes.como('a1', 'aal1');
+select throws_ok($$ select public.eventos_do_periodo(now(), now() + interval '1 day') $$, 'P0001', 'sem_permissao',
+  'sessão aal1 de quem precisa do código não lê o período');
+select throws_ok($$ select public.evento_da_agenda(gen_random_uuid()) $$, 'P0001', 'sem_permissao', 'nem o detalhe');
 reset role;
 
 select * from finish();

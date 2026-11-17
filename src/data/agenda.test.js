@@ -32,33 +32,32 @@ function consulta(resposta) {
 describe('eventosDoPeriodo', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('pede o que toca o período, com participantes e cliente embutidos, numa consulta só', async () => {
-    const { proxy, chamadas } = consulta({ data: [{ id: 'e1' }], error: null })
-    vi.mocked(supabase.from).mockReturnValue(proxy)
+  it('chama a função do período uma vez e devolve { itens, haMais }', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: { itens: [{ id: 'e1' }], ha_mais: true }, error: null })
     const r = await eventosDoPeriodo({ de: '2026-11-01T00:00:00-03:00', ate: '2026-12-01T00:00:00-03:00' })
-    expect(r).toEqual([{ id: 'e1' }])
-    expect(supabase.from).toHaveBeenCalledTimes(1)
-    expect(supabase.from).toHaveBeenCalledWith('agenda_eventos')
-    const select = chamadas.find(([nome]) => nome === 'select')[1]
-    expect(select).toContain('participantes:agenda_participantes(')
-    expect(select).toContain('cliente:clientes(')
-    expect(chamadas).toContainEqual(['lt', 'inicio', '2026-12-01T00:00:00-03:00'])
-    expect(chamadas).toContainEqual(['gt', 'fim', '2026-11-01T00:00:00-03:00'])
-    expect(chamadas.some(([nome]) => nome === 'eq')).toBe(false)
+    expect(r).toEqual({ itens: [{ id: 'e1' }], haMais: true })
+    expect(supabase.rpc).toHaveBeenCalledTimes(1)
+    expect(supabase.rpc).toHaveBeenCalledWith('eventos_do_periodo', {
+      p_de: '2026-11-01T00:00:00-03:00',
+      p_ate: '2026-12-01T00:00:00-03:00',
+      p_consultor: null,
+      p_consultoria: null,
+      p_cliente: null,
+    })
   })
 
-  it('aplica os filtros de consultor, consultoria e cliente no banco', async () => {
-    const { proxy, chamadas } = consulta({ data: [], error: null })
-    vi.mocked(supabase.from).mockReturnValue(proxy)
+  it('manda os filtros de consultor, consultoria e cliente ao banco', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: { itens: [], ha_mais: false }, error: null })
     await eventosDoPeriodo({ de: 'a', ate: 'b', consultorId: 'p1', consultoriaId: 'c1', clienteId: 'k1' })
-    expect(chamadas).toContainEqual(['eq', 'consultor_id', 'p1'])
-    expect(chamadas).toContainEqual(['eq', 'consultoria_id', 'c1'])
-    expect(chamadas).toContainEqual(['eq', 'cliente_id', 'k1'])
+    expect(supabase.rpc).toHaveBeenCalledWith('eventos_do_periodo', {
+      p_de: 'a', p_ate: 'b', p_consultor: 'p1', p_consultoria: 'c1', p_cliente: 'k1',
+    })
   })
 
-  it('propaga o erro do banco', async () => {
-    const { proxy } = consulta({ data: null, error: { message: 'x' } })
-    vi.mocked(supabase.from).mockReturnValue(proxy)
+  it('resposta vazia vira lista vazia; o erro do banco sobe', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null })
+    expect(await eventosDoPeriodo({ de: 'a', ate: 'b' })).toEqual({ itens: [], haMais: false })
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'x' } })
     await expect(eventosDoPeriodo({ de: 'a', ate: 'b' })).rejects.toEqual({ message: 'x' })
   })
 })
@@ -67,12 +66,10 @@ describe('buscarEvento', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('devolve o evento, ou null quando a pessoa não o vê', async () => {
-    const achou = consulta({ data: { id: 'e1' }, error: null })
-    vi.mocked(supabase.from).mockReturnValueOnce(achou.proxy)
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: { id: 'e1' }, error: null })
     expect(await buscarEvento('e1')).toEqual({ id: 'e1' })
-    expect(achou.chamadas).toContainEqual(['eq', 'id', 'e1'])
-    const nada = consulta({ data: null, error: null })
-    vi.mocked(supabase.from).mockReturnValueOnce(nada.proxy)
+    expect(supabase.rpc).toHaveBeenCalledWith('evento_da_agenda', { p_id: 'e1' })
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null })
     expect(await buscarEvento('e2')).toBeNull()
   })
 })
@@ -105,6 +102,8 @@ describe('ausenciasDoPeriodo', () => {
     vi.mocked(supabase.from).mockReturnValue(proxy)
     expect(await ausenciasDoPeriodo({ de: '2026-11-01', ate: '2026-11-30', consultorId: 'p1' })).toEqual([{ id: 'a1' }])
     expect(supabase.from).toHaveBeenCalledWith('ausencias')
+    // a tabela tem duas relações com perfis (perfil_id e criado_por): sem a dica o PostgREST recusa (PGRST201)
+    expect(chamadas.find(([nome]) => nome === 'select')[1]).toContain('perfis!perfil_id(')
     expect(chamadas).toContainEqual(['lte', 'de', '2026-11-30'])
     expect(chamadas).toContainEqual(['gte', 'ate', '2026-11-01'])
     expect(chamadas).toContainEqual(['eq', 'perfil_id', 'p1'])
@@ -114,7 +113,7 @@ describe('ausenciasDoPeriodo', () => {
     const { proxy, chamadas } = consulta({ data: [], error: null })
     vi.mocked(supabase.from).mockReturnValue(proxy)
     await ausenciasDoPeriodo({ de: '2026-11-01', ate: '2026-11-30', consultoriaId: 'c1' })
-    expect(chamadas.find(([nome]) => nome === 'select')[1]).toContain('perfis!inner')
+    expect(chamadas.find(([nome]) => nome === 'select')[1]).toContain('perfis!perfil_id!inner')
     expect(chamadas).toContainEqual(['eq', 'perfil.consultoria_id', 'c1'])
   })
 })

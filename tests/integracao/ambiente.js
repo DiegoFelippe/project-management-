@@ -161,6 +161,11 @@ export async function limparTudo() {
     for (const linha of resposta.data ?? []) clientes.add(linha.id)
   }
   await limparArquivos([...clientes], consultorias)
+  if (consultorias.length) {
+    // Eventos da agenda seguram consultoria e consultor (restrict); os participantes saem com o evento.
+    conferirLimpeza('apagar os eventos da agenda das consultorias de teste',
+      await admin.from('agenda_eventos').delete().in('consultoria_id', consultorias))
+  }
   if (clientes.size) {
     conferirLimpeza('apagar os check-ins dos clientes de teste',
       await admin.from('checkins').delete().in('cliente_id', [...clientes]))

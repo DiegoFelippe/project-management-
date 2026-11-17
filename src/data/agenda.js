@@ -1,38 +1,27 @@
 // Agenda (leituras). O banco (RLS) decide quem vê cada evento; quem grava é a Edge Function, que mexe no Google junto.
 import { supabase } from '@/lib/supabase'
 
-// A tela pede só o período visível; este teto protege contra um período enorme (mês cheio da central).
+// Teto das ausências de um período.
 const LIMITE_DO_PERIODO = 2000
 
-// Participantes (da casa e de fora) e cliente vêm na mesma consulta. O nome de quem não é visível ao colega vem nulo.
-const CAMPOS_DO_EVENTO =
-  'id, consultoria_id, consultor_id, cliente_id, titulo, descricao, inicio, fim, dia_inteiro, cor, com_meet, ' +
-  'gravar, meet_link, meet_codigo, google_evento_id, reuniao, reuniao_erro, gravacao_url, pasta_id, criado_por, ' +
-  'criado_em, atualizado_em, ' +
-  'consultor:perfis!consultor_id(id, nome, cor), cliente:clientes(id, nome), ' +
-  'participantes:agenda_participantes(id, perfil_id, email, resposta, perfil:perfis(id, nome))'
-
-// Eventos que tocam o período [de, ate) (ISO): começam antes do fim dele e terminam depois do começo.
-// consultorId, consultoriaId e clienteId são filtros opcionais, rodados no banco.
+// Eventos que tocam o período [de, ate) (ISO), com consultor, cliente e participantes (com nome) numa chamada só:
+// { itens, haMais }. O banco decide quem vê o quê e usa índice por papel; consultorId, consultoriaId e clienteId são
+// filtros opcionais rodados lá. haMais avisa que o período tem mais eventos do que o teto da chamada (1.000).
 export async function eventosDoPeriodo({ de, ate, consultorId, consultoriaId, clienteId } = {}) {
-  let consulta = supabase
-    .from('agenda_eventos')
-    .select(CAMPOS_DO_EVENTO)
-    .lt('inicio', ate)
-    .gt('fim', de)
-    .order('inicio', { ascending: true })
-    .limit(LIMITE_DO_PERIODO)
-  if (consultorId) consulta = consulta.eq('consultor_id', consultorId)
-  if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
-  if (clienteId) consulta = consulta.eq('cliente_id', clienteId)
-  const { data, error } = await consulta
+  const { data, error } = await supabase.rpc('eventos_do_periodo', {
+    p_de: de,
+    p_ate: ate,
+    p_consultor: consultorId ?? null,
+    p_consultoria: consultoriaId ?? null,
+    p_cliente: clienteId ?? null,
+  })
   if (error) throw error
-  return data ?? []
+  return { itens: data?.itens ?? [], haMais: Boolean(data?.ha_mais) }
 }
 
-// Um evento com participantes e cliente; null quando não existe ou a pessoa não pode vê-lo.
+// Um evento no mesmo formato dos itens acima; null quando não existe ou a pessoa não pode vê-lo.
 export async function buscarEvento(id) {
-  const { data, error } = await supabase.from('agenda_eventos').select(CAMPOS_DO_EVENTO).eq('id', id).maybeSingle()
+  const { data, error } = await supabase.rpc('evento_da_agenda', { p_id: id })
   if (error) throw error
   return data
 }
@@ -44,14 +33,15 @@ export async function indicadoresDaAgenda(dia) {
   return data
 }
 
-// Ausências (dias inteiros) que tocam o período; de e ate: 'AAAA-MM-DD' (inclusive).
+// Ausências (dias inteiros) que tocam o período (perfis!perfil_id: a tabela também aponta para perfis por
+// criado_por); de e ate: 'AAAA-MM-DD' (inclusive).
 export async function ausenciasDoPeriodo({ de, ate, consultorId, consultoriaId } = {}) {
   let consulta = supabase
     .from('ausencias')
     .select(
       consultoriaId
-        ? 'id, perfil_id, de, ate, motivo, perfil:perfis!inner(id, nome, cor, consultoria_id)'
-        : 'id, perfil_id, de, ate, motivo, perfil:perfis(id, nome, cor)',
+        ? 'id, perfil_id, de, ate, motivo, perfil:perfis!perfil_id!inner(id, nome, cor, consultoria_id)'
+        : 'id, perfil_id, de, ate, motivo, perfil:perfis!perfil_id(id, nome, cor)',
     )
     .lte('de', ate)
     .gte('ate', de)
