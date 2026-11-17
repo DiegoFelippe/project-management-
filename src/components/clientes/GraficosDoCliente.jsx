@@ -1,10 +1,9 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { GraficoCarregando } from '@/components/comum/Carregando'
-import { Button } from '@/components/ui/button'
+import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import { checkinsPorSemana, horasPorConsultor, horasPorMes } from '@/data/clientes'
 import { formatarHoras } from '@/lib/horas'
-import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
+import { mesAtual, rotuloDoMes } from '@/lib/mes'
 
 // Gráficos da aba Geral, em SVG próprio (cores do tema, sem animação): horas por mês com a previsão atual,
 // horas por consultor e check-ins por semana. Os dois últimos seguem o mês escolhido. O banco soma só o que
@@ -125,14 +124,8 @@ export default function GraficosDoCliente({ cliente, versao = 0 }) {
 
   return (
     <section aria-label="Gráficos" className="mb-6 grid gap-4">
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Mês dos gráficos por consultor e por semana">
-        <Button type="button" variant="outline" size="sm" onClick={() => setMes(deslocarMes(mes, -1))}>
-          <ChevronLeft aria-hidden="true" /> Anterior
-        </Button>
-        <span className="min-w-36 text-center text-sm font-medium" aria-live="polite">{rotuloDoMes(mes)}</span>
-        <Button type="button" variant="outline" size="sm" disabled={mes >= atual} onClick={() => setMes(deslocarMes(mes, 1))}>
-          Próximo <ChevronRight aria-hidden="true" />
-        </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <NavegacaoDoMes mes={mes} aoMudar={setMes} maximo={atual} />
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <Cartao titulo="Horas por mês" subtitulo="Últimos 6 meses, com a previsão atual">

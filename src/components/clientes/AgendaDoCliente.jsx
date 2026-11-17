@@ -1,12 +1,11 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { GraficoCarregando } from '@/components/comum/Carregando'
-import { Button } from '@/components/ui/button'
+import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { checkinsDoMes } from '@/data/checkins'
 import { eventosDoMes } from '@/data/clientes'
 import { formatarDuracao, formatarHoras, horasEntre } from '@/lib/horas'
-import { deslocarMes, formatarDia, mesAtual, rotuloDoMes } from '@/lib/mes'
+import { formatarDia, mesAtual, rotuloDoMes } from '@/lib/mes'
 import { cn } from '@/lib/utils'
 import { textoDoEvento } from './rotulos'
 
@@ -141,8 +140,8 @@ export default function AgendaDoCliente({ clienteId, versao }) {
   const diasNoMes = semanas.flat().filter((d) => d.doMes).length
   const eventosAlemDosCarregados = pronto && !estado.erro ? Math.max(0, estado.totalDeEventos - estado.eventos.length) : 0
 
-  function mudarMes(quantidade) {
-    setMes(deslocarMes(mes, quantidade))
+  function mudarMes(novo) {
+    setMes(novo)
     setFoco(null)
     setAberto(null)
   }
@@ -164,14 +163,8 @@ export default function AgendaDoCliente({ clienteId, versao }) {
 
   return (
     <section aria-label="Agenda" className="grid gap-3">
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Mês da agenda">
-        <Button type="button" variant="outline" size="sm" onClick={() => mudarMes(-1)}>
-          <ChevronLeft aria-hidden="true" /> Anterior
-        </Button>
-        <span className="min-w-36 text-center text-sm font-medium" aria-live="polite">{rotuloDoMes(mes)}</span>
-        <Button type="button" variant="outline" size="sm" onClick={() => mudarMes(1)}>
-          Próximo <ChevronRight aria-hidden="true" />
-        </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <NavegacaoDoMes mes={mes} aoMudar={mudarMes} />
         {eventosAlemDosCarregados > 0 && (
           <span className="text-sm text-muted-foreground">
             e mais {eventosAlemDosCarregados} {eventosAlemDosCarregados === 1 ? 'evento' : 'eventos'}
