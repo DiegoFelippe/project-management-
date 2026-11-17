@@ -6,7 +6,8 @@ import { apagarCheckin, editarCheckin, listarCheckins, meuCheckinAberto } from '
 import { eventosDoPeriodo, feriadosDoPeriodo, indicadoresDaAgenda, meuGoogle } from '@/data/agenda'
 import { limparPastaDoCliente, listarArquivos, listarPastas } from '@/data/arquivos'
 import { apagarCliente, buscarCliente, checkinsPorSemana, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
-import { limparQuadroDoCliente } from '@/data/quadro'
+import { cartoesDoQuadro, indicadoresDoQuadro, limparQuadroDoCliente, quadroDoCliente } from '@/data/quadro'
+import { ouvirQuadro } from '@/data/quadroAoVivo'
 import { renderizarTela } from '@/test/renderizar'
 import Cliente from './Cliente'
 
@@ -34,7 +35,13 @@ vi.mock('@/data/arquivos', () => ({
   listarArquivos: vi.fn(), enviarArquivo: vi.fn(), linkParaBaixar: vi.fn(), apagarArquivo: vi.fn(), limparPastaDoCliente: vi.fn(),
   listarPastas: vi.fn(), criarPasta: vi.fn(), renomearPasta: vi.fn(), apagarPasta: vi.fn(),
 }))
-vi.mock('@/data/quadro', () => ({ limparQuadroDoCliente: vi.fn() }))
+vi.mock('@/data/quadro', () => ({
+  CARTOES_POR_PAGINA: 50, ARQUIVADOS_POR_PAGINA: 15, limparQuadroDoCliente: vi.fn(),
+  quadroDoCliente: vi.fn(), quadrosDoCliente: vi.fn(), quadroPorId: vi.fn(), cartoesDoQuadro: vi.fn(), indicadoresDoQuadro: vi.fn(),
+  cartoesArquivados: vi.fn(), pessoasDoQuadro: vi.fn(), moverCartao: vi.fn(), moverColuna: vi.fn(), apagarColuna: vi.fn(),
+  criarCartao: vi.fn(), restaurarCartao: vi.fn(), apagarCartao: vi.fn(), criarColuna: vi.fn(), editarColuna: vi.fn(),
+}))
+vi.mock('@/data/quadroAoVivo', () => ({ ouvirQuadro: vi.fn(() => () => {}) }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
 vi.mock('@/data/capacidade', () => ({ consultoriasPorOcupacao: vi.fn(), consultoresPorOcupacao: vi.fn() }))
 
@@ -118,10 +125,10 @@ describe('Cliente (página)', () => {
     expect(await screen.findByText('Cliente não encontrado.')).toBeInTheDocument()
   })
 
-  it('a aba Agenda (entre Geral e Check-ins) é o calendário do menu só com os compromissos do cliente', async () => {
+  it('a aba Agenda (entre Quadro e Check-ins) é o calendário do menu só com os compromissos do cliente', async () => {
     tela(adminDaSti, '/clientes/k1?aba=agenda')
     expect(await screen.findByRole('region', { name: 'Calendário' })).toBeInTheDocument()
-    expect(screen.getAllByRole('tab').map((a) => a.textContent)).toEqual(['Geral', 'Agenda', 'Check-ins', 'Arquivos', 'Histórico'])
+    expect(screen.getAllByRole('tab').map((a) => a.textContent)).toEqual(['Geral', 'Quadro', 'Agenda', 'Check-ins', 'Arquivos', 'Histórico'])
     await waitFor(() => expect(eventosDoPeriodo).toHaveBeenCalledWith(expect.objectContaining({ clienteId: 'k1' })))
     expect(eventosDoPeriodo.mock.calls.every(([filtros]) => filtros.clienteId === 'k1')).toBe(true)
     expect(indicadoresDaAgenda).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), { clienteId: 'k1' })
@@ -270,10 +277,32 @@ describe('Cliente (página)', () => {
   it('mostra as abas na ordem e abre Geral com os dados e as ações', async () => {
     tela()
     await screen.findByRole('heading', { name: 'Provedor Alfa' })
-    expect(screen.getAllByRole('tab').map((a) => a.textContent)).toEqual(['Geral', 'Agenda', 'Check-ins', 'Arquivos', 'Histórico'])
+    expect(screen.getAllByRole('tab').map((a) => a.textContent)).toEqual(['Geral', 'Quadro', 'Agenda', 'Check-ins', 'Arquivos', 'Histórico'])
     expect(screen.getByRole('tab', { name: 'Geral' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByRole('table', { name: 'Check-ins' })).not.toBeInTheDocument()
     expect(screen.getByText('Alfa Telecom Ltda')).toBeInTheDocument()
+  })
+
+  it('a aba Quadro (logo depois de Geral) abre o quadro do cliente', async () => {
+    vi.mocked(quadroDoCliente).mockResolvedValue({
+      id: 'q1', cliente_id: 'k1', consultoria_id: 's1', pode_mexer: true, pode_gerir: false,
+      colunas: [{ id: 'col1', nome: 'A fazer', cor: null, concluidos: false, posicao: 1024, cartoes: 0, arquivados: 0 }],
+    })
+    vi.mocked(cartoesDoQuadro).mockResolvedValue({ itens: [], total: 0 })
+    vi.mocked(indicadoresDoQuadro).mockResolvedValue({ cartoes: 0, atrasados: 0, vencem_em_7_dias: 0, sem_responsavel: 0 })
+    tela(consultor, '/clientes/k1?aba=quadro')
+    expect(await screen.findByRole('region', { name: 'Coluna A fazer' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Quadro' })).toHaveAttribute('aria-selected', 'true')
+    expect(quadroDoCliente).toHaveBeenCalledWith('k1')
+    expect(ouvirQuadro).toHaveBeenCalledWith('q1', expect.any(Function), { juntarMs: 300 })
+  })
+
+  it('colega sem acesso ao cliente não vê nenhuma aba (nem o Quadro)', async () => {
+    vi.mocked(buscarCliente).mockResolvedValue(null)
+    tela(outraPessoa, '/clientes/k1?aba=quadro')
+    expect(await screen.findByText('Cliente não encontrado.')).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Quadro' })).not.toBeInTheDocument()
+    expect(quadroDoCliente).not.toHaveBeenCalled()
   })
 
   it('?aba=arquivos abre Arquivos', async () => {

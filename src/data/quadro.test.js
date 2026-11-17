@@ -30,6 +30,8 @@ import {
   moverColuna,
   pessoasDoQuadro,
   quadroDoCliente,
+  quadroPorId,
+  quadrosDoCliente,
   restaurarCartao,
   tirarResponsavel,
   urlAssinada,
@@ -67,6 +69,32 @@ describe('leituras do quadro (funções do banco)', () => {
     expect(await quadroDoCliente('k1')).toBeNull()
     vi.mocked(supabase.rpc).mockClear()
     expect(await quadroDoCliente(null)).toBeNull()
+    expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+
+  it('quadrosDoCliente lista os quadros do cliente para a central (o atual primeiro); vazio sem quadro', async () => {
+    const lista = [
+      { id: 'q2', atual: true, criado_em: '2026-11-17T10:00:00Z', consultoria: { id: 's2', nome: 'Beta' } },
+      { id: 'q1', atual: false, criado_em: '2026-11-01T10:00:00Z', consultoria: { id: 's1', nome: 'Alfa' } },
+    ]
+    rpcResponde(lista)
+    expect(await quadrosDoCliente('k1')).toEqual(lista)
+    expect(supabase.rpc).toHaveBeenCalledWith('quadros_do_cliente', { p_cliente: 'k1' })
+    rpcResponde(null)
+    expect(await quadrosDoCliente('k1')).toEqual([])
+    vi.mocked(supabase.rpc).mockClear()
+    expect(await quadrosDoCliente(null)).toEqual([])
+    expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+
+  it('quadroPorId abre um quadro pelo id (o de uma consultoria anterior, para a central ler); null quando não vê', async () => {
+    rpcResponde({ id: 'q1', pode_mexer: false, colunas: [] })
+    expect(await quadroPorId('q1')).toEqual({ id: 'q1', pode_mexer: false, colunas: [] })
+    expect(supabase.rpc).toHaveBeenCalledWith('quadro_por_id', { p_quadro: 'q1' })
+    rpcResponde(null)
+    expect(await quadroPorId('q1')).toBeNull()
+    vi.mocked(supabase.rpc).mockClear()
+    expect(await quadroPorId(null)).toBeNull()
     expect(supabase.rpc).not.toHaveBeenCalled()
   })
 

@@ -101,6 +101,20 @@ export async function quadroDoCliente(clienteId) {
   return (await ler('quadro_do_cliente', { p_cliente: clienteId })) ?? null
 }
 
+// Só a central e o dono: os quadros do cliente, um por consultoria que o atendeu, o da que atende hoje primeiro
+// ([{ id, consultoria: { id, nome }, atual, criado_em }]). Quem é de consultoria recebe sem_permissao (o erro sobe).
+export async function quadrosDoCliente(clienteId) {
+  if (!clienteId) return []
+  return (await ler('quadros_do_cliente', { p_cliente: clienteId })) ?? []
+}
+
+// Um quadro pelo id, no formato de quadroDoCliente (a central abre o de uma consultoria anterior, só para ler). Nunca
+// cria. null quando a pessoa não o vê.
+export async function quadroPorId(quadroId) {
+  if (!quadroId) return null
+  return (await ler('quadro_por_id', { p_quadro: quadroId })) ?? null
+}
+
 // Uma página (50) dos cartões não arquivados de uma coluna, com os filtros: { itens, total }. Cada item traz
 // responsaveis [{ id, nome, foto, cor }], checklist { total, feitos }, comentarios (quantos), autor { id, nome } e o
 // resumo da descrição.
@@ -121,7 +135,7 @@ export async function indicadoresDoQuadro({ quadroId, ...filtros } = {}) {
 }
 
 // Arquivados do quadro (mais recentes primeiro), 15 por página, com busca: { itens, total }. Cada item: { id, titulo,
-// prioridade, prazo, arquivado_em, criado_em, coluna: { id, nome } }.
+// prioridade, prazo, arquivado_em, criado_em, criado_por, coluna: { id, nome } }.
 export async function cartoesArquivados({ quadroId, busca, pagina = 1 } = {}) {
   const data = await ler('cartoes_arquivados', { p_quadro: quadroId, p_busca: busca?.trim() || null, p_pagina: pagina })
   return { itens: data?.itens ?? [], total: data?.total ?? 0 }

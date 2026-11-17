@@ -13,6 +13,7 @@ import { useAcoesDoCliente } from '@/components/clientes/useAcoesDoCliente'
 import CheckinsDoCliente from '@/components/clientes/CheckinsDoCliente'
 import GraficosDoCliente from '@/components/clientes/GraficosDoCliente'
 import HistoricoDoCliente from '@/components/clientes/HistoricoDoCliente'
+import QuadroDoCliente from '@/components/quadro/QuadroDoCliente'
 import { Badge } from '@/components/ui/badge'
 import { buscarCliente } from '@/data/clientes'
 import { meuCheckinAberto } from '@/data/checkins'
@@ -146,6 +147,8 @@ export default function Cliente() {
       </>
       ),
     },
+    // O quadro Kanban do cliente na consultoria que o atende (a central escolhe o de uma consultoria anterior).
+    { id: 'quadro', rotulo: 'Quadro', conteudo: <QuadroDoCliente key={cliente.id} cliente={cliente} perfil={perfil} /> },
     // O calendário do menu, só com os compromissos deste cliente (check-ins e histórico têm as abas deles).
     { id: 'agenda', rotulo: 'Agenda', conteudo: <CalendarioDaAgenda key={cliente.id} cliente={cliente} /> },
     { id: 'checkins', rotulo: 'Check-ins', conteudo: <CheckinsDoCliente cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar} /> },

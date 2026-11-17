@@ -54,6 +54,8 @@ const {
   moverColuna,
   pessoasDoQuadro,
   quadroDoCliente,
+  quadroPorId,
+  quadrosDoCliente,
   restaurarCartao,
   urlAssinada,
 } = await import('../../src/data/quadro.js')
@@ -318,6 +320,19 @@ describe('quadro do cliente contra o banco de verdade', () => {
     entrar('central')
     expect(titulos(await cartoesDoQuadro({ quadroId: quadro.id, colunaId: coluna.fazendo })))
       .toEqual(['Integração um', 'Integração dois (editado)'])
+
+    // A central escolhe entre os quadros do cliente (o atual primeiro) e abre o antigo só para ler.
+    const lista = await quadrosDoCliente(cliente)
+    expect(lista.map((q) => [q.id, q.atual, q.consultoria.id])).toEqual([[novo.id, true, B], [quadro.id, false, A]])
+    expect(await quadroPorId(quadro.id)).toMatchObject({ id: quadro.id, consultoria_id: A, pode_mexer: false, pode_gerir: false })
+
+    // Quem é de consultoria não lista os quadros do cliente nem abre o de outra consultoria pelo id.
+    entrar('pessoaB')
+    await expect(quadrosDoCliente(cliente)).rejects.toMatchObject({ message: 'sem_permissao' })
+    expect(await quadroPorId(quadro.id)).toBeNull()
+    expect(await quadroPorId(novo.id)).toMatchObject({ id: novo.id, pode_mexer: true })
+    entrar('gestor')
+    expect(await quadroPorId(quadro.id)).toBeNull()
   })
 })
 
