@@ -121,7 +121,8 @@ digita o código depois da senha ou do Google. Sem o código, o banco só entreg
 perfil (é assim que a tela sabe que falta o código), as próprias ausências e as próprias preferências (tema), que ela
 também grava. Todo o resto some (`private.liberado()` exige a sessão `aal2`) e as Edge Functions respondem
 `verificacao_pendente`. O banco também confere a sessão do token: encerrada no Auth (Zerar, Sair), o token antigo
-para de valer na hora, sem esperar vencer.
+para de valer na hora para todo o resto, sem esperar vencer (até vencer, em no máximo 1 h, ainda lê o próprio
+perfil, as próprias ausências e as próprias preferências).
 
 - **Local:** já vem ligado em `supabase/config.toml` (`[auth.mfa.totp] enroll_enabled = true` e `verify_enabled = true`).
 - **Nuvem:** no painel do Supabase, **Authentication → Multi-Factor (MFA)**: ligue **TOTP (App Authenticator)**

@@ -28,7 +28,8 @@ Data: 2026-11-16. Projeto: `~/Documents/consultoria`. Branch: `feat/clientes` (P
   (`quemChama`) também. Assim, sem o código, nada é lido nem gravado além do que é da própria pessoa: ela lê o
   próprio perfil (é assim que a tela sabe que falta o código), as próprias ausências e lê e grava as próprias
   preferências (tema). Se o token traz `session_id`, a sessão precisa existir no Auth (para todos) e, para quem
-  precisa do código, ser `aal2` também lá: depois do Zerar (ou do Sair), o token antigo para de valer na hora.
+  precisa do código, ser `aal2` também lá: depois do Zerar (ou do Sair), o token antigo para de valer na hora, exceto o que é da própria pessoa (perfil,
+  ausências e preferências), até vencer.
 - Supabase: ligar TOTP (`[auth.mfa.totp] enroll_enabled/verify_enabled = true` no `config.toml`; na nuvem, no painel do
   Supabase — README). SMS fica de fora.
 - **(minha)** Sem códigos de recuperação nesta entrega: quem perder o celular pede a quem administra para "Zerar".
