@@ -5,18 +5,19 @@ import { formatarHoras } from '@/lib/horas'
 // Até 5 clientes do mês. Mês passado: só o realizado (o previsto de hoje não vale para aquele mês).
 export default function MeusClientes({ passado, clientes }) {
   return (
-    <section aria-label="Meus clientes no mês" className="grid gap-2">
-      <h2 className="text-sm font-semibold text-muted-foreground">Meus clientes no mês</h2>
+    <section aria-label="Meus clientes no mês">
       {clientes.length === 0 ? (
-        <div className="card p-4 text-sm text-muted-foreground">Nenhum cliente seu neste mês.</div>
+        <div className="card p-4">
+          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Meus clientes no mês</h2>
+          <p className="text-sm text-muted-foreground">Nenhum cliente seu neste mês.</p>
+        </div>
       ) : (
-        <Tabela rotulo="Meus clientes" colunas={['Cliente', ...(passado ? [] : ['Previsto']), 'Realizado']} larguraMinima={380}>
+        <Tabela rotulo="Meus clientes" titulo="Meus clientes no mês" semAcoes colunas={['Cliente', ...(passado ? [] : ['Previsto']), 'Realizado']} larguraMinima={380}>
           {clientes.map((c) => (
             <Linha key={c.id}>
               <Celula><Link to={`/clientes/${c.id}`} className="font-medium hover:underline">{c.nome}</Link></Celula>
               {!passado && <Celula className="tabular-nums">{formatarHoras(c.previsto)}</Celula>}
               <Celula className="tabular-nums">{formatarHoras(c.realizado)}</Celula>
-              <td />
             </Linha>
           ))}
         </Tabela>

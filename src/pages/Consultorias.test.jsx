@@ -107,6 +107,14 @@ describe('Consultorias', () => {
   })
 
   describe('Ocupação do mês', () => {
+    it('?aba=ocupacao abre a aba do mês para a central', async () => {
+      renderizarTela(<Consultorias />, { perfil: dono, endereco: '/consultorias?aba=ocupacao' })
+      expect(await screen.findByRole('table', { name: 'Ocupação do mês' })).toBeInTheDocument()
+    })
+    it('?aba=ocupacao é ignorado para quem não vê todas', async () => {
+      renderizarTela(<Consultorias />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' }, endereco: '/consultorias?aba=ocupacao' })
+      expect(await screen.findByRole('table', { name: 'Consultorias' })).toBeInTheDocument()
+    })
     it('a aba aparece para o dono e para a central', async () => {
       for (const papel of ['dono', 'central']) {
         const { unmount } = renderizarTela(<Consultorias />, { perfil: { id: 'x', papel, consultoria_id: null } })

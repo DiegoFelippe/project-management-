@@ -4,6 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Paginacao, Tabela } from './Tabela'
 
 describe('Tabela (padrão das listas)', () => {
+  it('semAcoes tira a coluna de ações e titulo entra no cartão', () => {
+    render(<Tabela rotulo="Fila" titulo="Quem espera" semAcoes colunas={['Nome']}><Linha><Celula>Ana</Celula></Linha></Tabela>)
+    const tabela = screen.getByRole('table', { name: 'Fila' })
+    expect(within(tabela).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Nome'])
+    expect(screen.getByRole('heading', { name: 'Quem espera' })).toBeInTheDocument()
+  })
+
   it('tem nome, as colunas, a coluna de ações e uma linha por item', () => {
     render(
       <Tabela rotulo="Times" colunas={['Time', 'Gestor']}>

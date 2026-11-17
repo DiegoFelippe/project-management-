@@ -29,9 +29,11 @@ export function Paginacao({ pagina, total, porPagina = POR_PAGINA, aoMudar }) {
   )
 }
 
-export function Tabela({ rotulo, colunas, larguraMinima = 720, paginacao, children }) {
+// semAcoes: tabela só de leitura, sem a coluna de ações. titulo: cabeçalho dentro do cartão.
+export function Tabela({ rotulo, titulo, colunas, larguraMinima = 720, paginacao, semAcoes = false, children }) {
   return (
     <div className="card overflow-hidden">
+      {titulo && <h2 className="px-4 pt-4 pb-2 text-sm font-semibold text-muted-foreground">{titulo}</h2>}
       <div className="overflow-x-auto">
         <table aria-label={rotulo} className="w-full text-left text-sm" style={{ minWidth: larguraMinima }}>
           <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
@@ -39,7 +41,7 @@ export function Tabela({ rotulo, colunas, larguraMinima = 720, paginacao, childr
               {colunas.map((coluna) => (
                 <th key={coluna} className="px-4 py-2.5 font-medium">{coluna}</th>
               ))}
-              <th className="sticky right-0 border-l bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] px-4 py-2.5"><span className="sr-only">Ações</span></th>
+              {!semAcoes && <th className="sticky right-0 border-l bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] px-4 py-2.5"><span className="sr-only">Ações</span></th>}
             </tr>
           </thead>
           <tbody>{children}</tbody>

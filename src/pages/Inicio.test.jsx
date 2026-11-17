@@ -18,7 +18,7 @@ const base = {
 const CENTRAL = {
   ...base, recorte: 'tudo',
   ranking: [{ id: 'k1', nome: 'Consultoria Exemplo', ocupacao: 1.2, capacidade: 100 }],
-  esperando: [{ id: 'c1', nome: 'Cliente Novo', desde: '2026-11-01T12:00:00Z', situacao: 'a_distribuir', consultoria_nome: null }],
+  esperando: [{ id: 'c1', nome: 'Cliente Novo', desde: new Date(Date.now() - 9 * 86_400_000).toISOString(), situacao: 'a_distribuir', consultoria_nome: null }],
   extremos: { acima: [{ id: 'p1', nome: 'Ana Acima', ocupacao: 1.3, capacidade: 100, consultoria_nome: 'Consultoria Exemplo' }], folga: [] },
 }
 const ADMIN = {
@@ -40,11 +40,11 @@ describe('Início (painel)', () => {
     renderizarTela(<Inicio />, { perfil: perfil('central') })
     expect(screen.getByRole('heading', { name: 'Olá, Ana.' })).toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'Ocupação por consultoria' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Ver todas' })).toHaveAttribute('href', '/consultorias')
+    expect(screen.getByRole('link', { name: 'Ver todas' })).toHaveAttribute('href', '/consultorias?aba=ocupacao')
     expect(screen.getByText(/3 a distribuir/)).toBeInTheDocument()
     const fila = screen.getByRole('table', { name: 'Clientes esperando' })
     expect(within(fila).getByRole('link', { name: 'Cliente Novo' })).toHaveAttribute('href', '/clientes/c1')
-    expect(screen.getByText('A distribuir', { selector: 'span' })).toBeInTheDocument()
+    expect(within(fila).getByText('A distribuir')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Ana Acima/ })).toHaveAttribute('href', '/usuarios')
     expect(screen.getByText('Ocupação', { selector: 'p' })).toBeInTheDocument()
     expect(screen.queryByText('Seus projetos vão aparecer aqui')).not.toBeInTheDocument()
@@ -114,5 +114,35 @@ describe('Início (painel)', () => {
     renderizarTela(<Inicio />, { perfil: perfil('admin') })
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar o painel')
     expect(screen.getByRole('heading', { name: 'Olá, Ana.' })).toBeInTheDocument()
+  })
+
+  it('mês passado (administrador): Utilização, capacidade sem reservado, ranking e extremos em utilização', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue({ ...ADMIN, passado: true,
+      extremos: { acima: [{ id: 'p9', nome: 'Caio Cheio', ocupacao: 1.4, capacidade: 100, consultoria_nome: 'X' }], folga: [] } })
+    renderizarTela(<Inicio />, { perfil: perfil('admin') })
+    expect(await screen.findByText('Utilização', { selector: 'p' })).toBeInTheDocument()
+    expect(screen.getByText(/Capacidade 200 h/)).toBeInTheDocument()
+    expect(screen.queryByText(/reservado/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Beto Consultor: 50% de utilização' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Acima de 100% de utilização' })).toBeInTheDocument()
+  })
+
+  it('erro ao trocar de mês: some o painel do mês anterior e fica só o aviso', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValueOnce(ADMIN).mockRejectedValueOnce(new Error('x'))
+    renderizarTela(<Inicio />, { perfil: perfil('admin') })
+    await screen.findByRole('region', { name: 'Horas por mês' })
+    await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Horas por mês' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Clientes ativos')).not.toBeInTheDocument()
+  })
+
+  it('fila: situação e há quanto tempo; consultoria só para a central', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue({ ...CENTRAL, esperando: [{ ...CENTRAL.esperando[0], consultoria_nome: 'Consultoria Exemplo' }] })
+    renderizarTela(<Inicio />, { perfil: perfil('central') })
+    const fila = await screen.findByRole('table', { name: 'Clientes esperando' })
+    expect(within(fila).getByText('há 9 dias')).toBeInTheDocument()
+    expect(within(fila).getByText('Consultoria Exemplo')).toBeInTheDocument()
+    expect(within(fila).queryByRole('columnheader', { name: 'Ações' })).not.toBeInTheDocument()
   })
 })

@@ -1,5 +1,6 @@
 import { Archive, ArchiveRestore, Building2, Pencil, Plus, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
@@ -40,7 +41,9 @@ export default function Consultorias() {
   const [erro, setErro] = useState(null)
   const [nova, setNova] = useState(false)
   const [novoAdminEm, setNovoAdminEm] = useState(null)
-  const [filtro, setFiltro] = useState('ativas')
+  // ?aba=ocupacao abre direto a aba do mês (só quem vê todas as consultorias; os outros caem em Ativas).
+  const [parametros] = useSearchParams()
+  const [filtro, setFiltro] = useState(() => (parametros.get('aba') === 'ocupacao' && veTudo(perfil) ? 'ocupacao' : 'ativas'))
   const [editando, setEditando] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
   const emOcupacao = filtro === 'ocupacao'

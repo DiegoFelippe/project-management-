@@ -29,7 +29,12 @@ export default function Inicio() {
         setPainel(p)
         setErro(false)
       })
-      .catch(() => ativo && setErro(true))
+      .catch(() => {
+        if (!ativo) return
+        // Sem os números do mês pedido, não deixa os do mês anterior sob o rótulo novo.
+        setPainel(null)
+        setErro(true)
+      })
     return () => {
       ativo = false
     }
@@ -59,7 +64,7 @@ export default function Inicio() {
             {dono ? <RankingDeOcupacao recorte={painel.recorte} passado={painel.passado} ranking={painel.ranking} />
               : <MeusClientes passado={painel.passado} clientes={painel.meus_clientes} />}
             {dono && <ClientesEsperando recorte={painel.recorte} esperando={painel.esperando} />}
-            {dono && <Extremos extremos={painel.extremos} passado={painel.passado} />}
+            {dono && <Extremos recorte={painel.recorte} extremos={painel.extremos} passado={painel.passado} />}
           </div>
         </div>
       )}
