@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ESPERA_PARA_FECHAR, INTERVALO_SEM_CANAL, ouvirQuadro } from './quadroAoVivo'
+import {
+  ESPERA_PARA_FECHAR,
+  ESPERA_PARA_REABRIR,
+  INTERVALO_SEM_CANAL,
+  JUNTAR_PADRAO,
+  juntarAvisos,
+  ouvirQuadro,
+} from './quadroAoVivo'
 
 // Um Realtime falso por teste: guarda os canais abertos e deixa o teste dizer o que o servidor respondeu.
 const falso = vi.hoisted(() => ({ realtime: null, auth: null }))
@@ -31,7 +38,6 @@ function criarRealtime() {
         opcoes,
         ouvintes: [],
         aoEstado: null,
-        removido: false,
         on(tipo, filtro, cb) {
           this.ouvintes.push({ tipo, filtro, cb })
           return this
@@ -53,18 +59,27 @@ function criarRealtime() {
       canais.push(canal)
       return canal
     }),
-    removeChannel: vi.fn(async (canal) => {
-      canal.removido = true
-      return 'ok'
-    }),
+    removeChannel: vi.fn(async () => 'ok'),
   }
 }
 
 const RECUSA = new Error('Unauthorized: You do not have permissions to read from this Channel topic: quadro:q1')
 const AVISO = { tabela: 'cartoes', operacao: 'insert', cartoes: ['k1'], colunas: ['c1'] }
+const ACESSO = { tabela: 'clientes', operacao: 'update', acesso: true }
+const CONECTOU = { motivo: 'conectou' }
+const RECONECTOU = { motivo: 'reconectou' }
 
 // Deixa as promessas do ouvirQuadro (sessão, setAuth) andarem.
 const andar = () => vi.advanceTimersByTimeAsync(0)
+
+// Ouve o quadro e já deixa o canal no ar (o "conectou" fica fora da conta).
+async function noAr(aoMudar, quadroId = 'q1') {
+  const parar = ouvirQuadro(quadroId, aoMudar)
+  await andar()
+  canais.at(-1).estado('SUBSCRIBED')
+  aoMudar.mockClear()
+  return parar
+}
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -74,6 +89,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 describe('ouvirQuadro', () => {
@@ -86,15 +102,30 @@ describe('ouvirQuadro', () => {
     parar()
   })
 
-  it('repassa cada aviso do banco; entrar no canal pela primeira vez não pede releitura', async () => {
+  it('o canal no ar avisa "conectou" (a tela relê uma vez e fecha a janela da primeira leitura); depois, cada aviso', async () => {
     const aoMudar = vi.fn()
     const parar = ouvirQuadro('q1', aoMudar)
     await andar()
-    canais[0].estado('SUBSCRIBED')
     expect(aoMudar).not.toHaveBeenCalled()
+    canais[0].estado('SUBSCRIBED')
+    expect(aoMudar.mock.calls).toEqual([[CONECTOU]])
     canais[0].mandar(AVISO)
-    expect(aoMudar).toHaveBeenCalledWith(AVISO)
+    expect(aoMudar.mock.calls).toEqual([[CONECTOU], [AVISO]])
     parar()
+  })
+
+  it('quem passa a ouvir um canal que já está no ar recebe "conectou" logo em seguida (só ele)', async () => {
+    const primeiro = vi.fn()
+    const pararPrimeiro = await noAr(primeiro)
+    const segundo = vi.fn()
+    const pararSegundo = ouvirQuadro('q1', segundo)
+    expect(segundo).not.toHaveBeenCalled()
+    await andar()
+    expect(segundo.mock.calls).toEqual([[CONECTOU]])
+    expect(primeiro).not.toHaveBeenCalled()
+    expect(falso.realtime.channel).toHaveBeenCalledTimes(1)
+    pararPrimeiro()
+    pararSegundo()
   })
 
   it('sem quadro, não abre nada', async () => {
@@ -113,16 +144,16 @@ describe('ouvirQuadro', () => {
     expect(falso.realtime.channel).toHaveBeenCalledTimes(1)
     canais[0].estado('SUBSCRIBED')
     canais[0].mandar(AVISO)
-    expect(primeiro).toHaveBeenCalledWith(AVISO)
-    expect(segundo).toHaveBeenCalledWith(AVISO)
+    expect(primeiro.mock.calls).toEqual([[CONECTOU], [AVISO]])
+    expect(segundo.mock.calls).toEqual([[CONECTOU], [AVISO]])
 
     pararPrimeiro()
     pararPrimeiro()
     await vi.advanceTimersByTimeAsync(ESPERA_PARA_FECHAR * 2)
     expect(falso.realtime.removeChannel).not.toHaveBeenCalled()
     canais[0].mandar(AVISO)
-    expect(primeiro).toHaveBeenCalledTimes(1)
-    expect(segundo).toHaveBeenCalledTimes(2)
+    expect(primeiro).toHaveBeenCalledTimes(2)
+    expect(segundo).toHaveBeenCalledTimes(3)
 
     pararSegundo()
     await vi.advanceTimersByTimeAsync(ESPERA_PARA_FECHAR - 1)
@@ -140,7 +171,7 @@ describe('ouvirQuadro', () => {
     expect(falso.realtime.removeChannel).not.toHaveBeenCalled()
     canais[0].estado('SUBSCRIBED')
     canais[0].mandar(AVISO)
-    expect(aoMudar).toHaveBeenCalledTimes(1)
+    expect(aoMudar.mock.calls).toEqual([[CONECTOU], [AVISO]])
     parar()
   })
 
@@ -169,10 +200,10 @@ describe('ouvirQuadro', () => {
     await andar()
     expect(falso.realtime.channel).toHaveBeenCalledTimes(2)
 
-    // O canal voltou: o plano B para e a tela relê uma vez (pode ter perdido avisos).
+    // O canal entrou no ar pela primeira vez: o plano B para e a tela relê ("conectou").
     aoMudar.mockClear()
     canais[1].estado('SUBSCRIBED')
-    expect(aoMudar).toHaveBeenCalledWith({ motivo: 'reconectou' })
+    expect(aoMudar.mock.calls).toEqual([[CONECTOU]])
     aoMudar.mockClear()
     await vi.advanceTimersByTimeAsync(INTERVALO_SEM_CANAL * 3)
     expect(aoMudar).not.toHaveBeenCalled()
@@ -181,9 +212,7 @@ describe('ouvirQuadro', () => {
 
   it('conexão caída: o realtime-js tenta de novo sozinho; enquanto isso, plano B (30 s e ao voltar para a aba)', async () => {
     const aoMudar = vi.fn()
-    const parar = ouvirQuadro('q1', aoMudar)
-    await andar()
-    canais[0].estado('SUBSCRIBED')
+    const parar = await noAr(aoMudar)
     canais[0].estado('CHANNEL_ERROR', new Error('error'))
     expect(falso.realtime.removeChannel).not.toHaveBeenCalled()
     expect(aoMudar).not.toHaveBeenCalled()
@@ -202,7 +231,7 @@ describe('ouvirQuadro', () => {
 
     aoMudar.mockClear()
     canais[0].estado('SUBSCRIBED')
-    expect(aoMudar).toHaveBeenCalledWith({ motivo: 'reconectou' })
+    expect(aoMudar.mock.calls).toEqual([[RECONECTOU]])
     aoMudar.mockClear()
     await vi.advanceTimersByTimeAsync(INTERVALO_SEM_CANAL * 2)
     window.dispatchEvent(new Event('focus'))
@@ -220,18 +249,32 @@ describe('ouvirQuadro', () => {
     parar()
   })
 
-  it('canal fechado pelo servidor (token vencido): plano B e entra de novo no próximo tique', async () => {
+  it('canal fechado pelo servidor (token vencido): abre de novo na hora; fechado de novo em menos de 10 s, espera', async () => {
     const aoMudar = vi.fn()
-    const parar = ouvirQuadro('q1', aoMudar)
-    await andar()
-    canais[0].estado('SUBSCRIBED')
+    const parar = await noAr(aoMudar)
     canais[0].estado('CLOSED')
-    await vi.advanceTimersByTimeAsync(INTERVALO_SEM_CANAL)
-    expect(aoMudar).toHaveBeenCalledWith({ motivo: 'plano_b' })
     await andar()
     expect(falso.realtime.channel).toHaveBeenCalledTimes(2)
     canais[1].estado('SUBSCRIBED')
-    expect(aoMudar).toHaveBeenCalledWith({ motivo: 'reconectou' })
+    expect(aoMudar.mock.calls).toEqual([[RECONECTOU]])
+
+    // Fechou de novo logo em seguida: nada de laço; o plano B (30 s) abre o próximo.
+    aoMudar.mockClear()
+    await vi.advanceTimersByTimeAsync(ESPERA_PARA_REABRIR - 1000)
+    canais[1].estado('CLOSED')
+    await andar()
+    expect(falso.realtime.channel).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(INTERVALO_SEM_CANAL)
+    expect(aoMudar).toHaveBeenCalledWith({ motivo: 'plano_b' })
+    await andar()
+    expect(falso.realtime.channel).toHaveBeenCalledTimes(3)
+    canais[2].estado('SUBSCRIBED')
+    expect(aoMudar).toHaveBeenLastCalledWith(RECONECTOU)
+
+    // Passados 10 s da última reabertura, abre na hora de novo.
+    canais[2].estado('CLOSED')
+    await andar()
+    expect(falso.realtime.channel).toHaveBeenCalledTimes(4)
     parar()
   })
 
@@ -247,12 +290,9 @@ describe('ouvirQuadro', () => {
 
   it('aviso de acesso (o cliente mudou de consultor, de consultoria ou foi arquivado): repassa e entra de novo no canal', async () => {
     const aoMudar = vi.fn()
-    const parar = ouvirQuadro('q1', aoMudar)
-    await andar()
-    canais[0].estado('SUBSCRIBED')
-    const acesso = { tabela: 'clientes', operacao: 'update', acesso: true }
-    canais[0].mandar(acesso)
-    expect(aoMudar).toHaveBeenCalledWith(acesso)
+    const parar = await noAr(aoMudar)
+    canais[0].mandar(ACESSO)
+    expect(aoMudar).toHaveBeenCalledWith(ACESSO)
     expect(falso.realtime.removeChannel).toHaveBeenCalledWith(canais[0])
     await andar()
     expect(falso.realtime.channel).toHaveBeenCalledTimes(2)
@@ -263,6 +303,59 @@ describe('ouvirQuadro', () => {
     aoMudar.mockClear()
     canais[0].mandar(AVISO)
     expect(aoMudar).not.toHaveBeenCalled()
+    parar()
+  })
+
+  it('quem ainda vê o quadro, depois do aviso de acesso, volta ao canal e relê ("reconectou")', async () => {
+    const aoMudar = vi.fn()
+    const parar = await noAr(aoMudar)
+    canais[0].mandar(ACESSO)
+    await andar()
+    canais[1].estado('SUBSCRIBED')
+    expect(aoMudar.mock.calls).toEqual([[ACESSO], [RECONECTOU]])
+    parar()
+  })
+
+  it('um ouvinte que dá erro não atrapalha os outros nem a nova conferência do canal', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const quebrado = vi.fn(() => {
+      throw new Error('tela quebrou')
+    })
+    const outro = vi.fn()
+    const pararQuebrado = ouvirQuadro('q1', quebrado)
+    const pararOutro = ouvirQuadro('q1', outro)
+    await andar()
+    canais[0].estado('SUBSCRIBED')
+    expect(outro).toHaveBeenCalledWith(CONECTOU)
+    canais[0].mandar(ACESSO)
+    expect(outro).toHaveBeenCalledWith(ACESSO)
+    expect(falso.realtime.removeChannel).toHaveBeenCalledWith(canais[0])
+    await andar()
+    expect(falso.realtime.channel).toHaveBeenCalledTimes(2)
+    expect(erro).toHaveBeenCalled()
+    pararQuebrado()
+    pararOutro()
+  })
+
+  it('canal pela metade (o .on falhou): sai dele e o plano B abre outro no próximo tique', async () => {
+    const aoMudar = vi.fn()
+    const criar = falso.realtime.channel.getMockImplementation()
+    falso.realtime.channel.mockImplementationOnce((...args) => {
+      const canal = criar(...args)
+      canal.on = () => {
+        throw new Error('falhou')
+      }
+      return canal
+    })
+    const parar = ouvirQuadro('q1', aoMudar)
+    await andar()
+    expect(falso.realtime.removeChannel).toHaveBeenCalledWith(canais[0])
+    await vi.advanceTimersByTimeAsync(INTERVALO_SEM_CANAL)
+    expect(aoMudar).toHaveBeenCalledWith({ motivo: 'plano_b' })
+    await andar()
+    expect(falso.realtime.channel).toHaveBeenCalledTimes(2)
+    canais[1].estado('SUBSCRIBED')
+    expect(aoMudar).toHaveBeenLastCalledWith(CONECTOU)
     parar()
   })
 
@@ -315,5 +408,72 @@ describe('ouvirQuadro', () => {
     await andar()
     expect(falso.realtime.channel).toHaveBeenCalledTimes(2)
     outro()
+  })
+
+  it('com { juntarMs }, avisos próximos chegam num resumo só; parar descarta o que esperava', async () => {
+    const aoMudar = vi.fn()
+    const parar = ouvirQuadro('q1', aoMudar, { juntarMs: 200 })
+    await andar()
+    canais[0].estado('SUBSCRIBED')
+    canais[0].mandar(AVISO)
+    expect(aoMudar).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(200)
+    expect(aoMudar).toHaveBeenCalledTimes(1)
+    expect(aoMudar.mock.calls[0][0]).toMatchObject({ eventos: [CONECTOU, AVISO], tudo: true, cartoes: ['k1'] })
+
+    canais[0].mandar(AVISO)
+    parar()
+    await vi.advanceTimersByTimeAsync(ESPERA_PARA_FECHAR)
+    expect(aoMudar).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('juntarAvisos', () => {
+  it('junta o que chega na janela num resumo: tabelas, colunas e cartões sem repetir', async () => {
+    const aoMudar = vi.fn()
+    const juntar = juntarAvisos(aoMudar)
+    // Um arrastar com renumeração: dois avisos.
+    juntar({ tabela: 'cartoes', operacao: 'update', cartoes: ['k1', 'k2'], colunas: ['c1'] })
+    juntar({ tabela: 'cartoes', operacao: 'update', cartoes: ['k1'], colunas: ['c1', 'c2'] })
+    juntar({ tabela: 'cartao_comentarios', operacao: 'insert', cartoes: ['k3'], colunas: ['c2'] })
+    await vi.advanceTimersByTimeAsync(JUNTAR_PADRAO - 1)
+    expect(aoMudar).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(aoMudar).toHaveBeenCalledTimes(1)
+    expect(aoMudar.mock.calls[0][0]).toEqual({
+      eventos: expect.any(Array),
+      tudo: false,
+      acesso: false,
+      tabelas: ['cartoes', 'cartao_comentarios'],
+      colunas: ['c1', 'c2'],
+      cartoes: ['k1', 'k2', 'k3'],
+    })
+    expect(aoMudar.mock.calls[0][0].eventos).toHaveLength(3)
+
+    // A próxima janela começa vazia.
+    juntar(AVISO)
+    await vi.advanceTimersByTimeAsync(JUNTAR_PADRAO)
+    expect(aoMudar).toHaveBeenCalledTimes(2)
+    expect(aoMudar.mock.calls[1][0]).toMatchObject({ eventos: [AVISO], cartoes: ['k1'], colunas: ['c1'] })
+  })
+
+  it('aviso de acesso e motivos pedem reler tudo; aviso sem a lista de cartões deixa cartoes nulo', async () => {
+    const aoMudar = vi.fn()
+    const juntar = juntarAvisos(aoMudar, 100)
+    juntar(ACESSO)
+    juntar(RECONECTOU)
+    juntar({ tabela: 'cartoes', operacao: 'insert', cartoes: null, colunas: ['c1'] })
+    juntar(AVISO)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(aoMudar.mock.calls[0][0]).toMatchObject({ tudo: true, acesso: true, cartoes: null, colunas: ['c1'] })
+  })
+
+  it('cancelar descarta o que esperava', async () => {
+    const aoMudar = vi.fn()
+    const juntar = juntarAvisos(aoMudar, 100)
+    juntar(AVISO)
+    juntar.cancelar()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(aoMudar).not.toHaveBeenCalled()
   })
 })

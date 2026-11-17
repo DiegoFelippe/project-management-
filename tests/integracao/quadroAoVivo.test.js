@@ -114,8 +114,10 @@ afterAll(async () => {
 
 describe('quadro em tempo real contra o Supabase local', () => {
   it('o que uma pessoa muda a outra recebe pelo canal, em até 2 s, só com ids (sem o texto)', async () => {
+    // "conectou" diz à tela que o canal está no ar (ela relê uma vez e fecha a janela da primeira leitura).
     const gestor = ouvir('gestor')
-    await noCanal('gestor')
+    await esperar(() => gestor.eventos.find((e) => e.motivo === 'conectou'), ENTRAR, 'o canal do gestor entrar no ar')
+    expect(canalDe('gestor').state).toBe('joined')
 
     const antes = Date.now()
     const cartaoId = await novoCartao('pessoa', 'Título que não vai no aviso')
@@ -144,7 +146,12 @@ describe('quadro em tempo real contra o Supabase local', () => {
 
     // E no outro sentido: o gestor apaga, a pessoa (ouvindo agora) recebe.
     const pessoa = ouvir('pessoa')
-    await noCanal('pessoa')
+    await esperar(() => pessoa.eventos.find((e) => e.motivo === 'conectou'), ENTRAR, 'o canal da pessoa entrar no ar')
+    // Outro ouvinte do gestor no mesmo canal (já no ar): recebe o seu "conectou" logo em seguida, e o primeiro não.
+    const jaTinha = gestor.eventos.length
+    const gestor2 = ouvir('gestor')
+    await esperar(() => gestor2.eventos.find((e) => e.motivo === 'conectou'), ATE_2_S, 'o segundo ouvinte do gestor')
+    expect(gestor.eventos.slice(jaTinha).filter((e) => e.motivo)).toEqual([])
     const apagado = await sessoes.gestor.rpc('apagar_cartao', { p_cartao: cartaoId })
     expect(apagado.error).toBeNull()
     const apagou = await esperar(() => doBanco(pessoa.eventos).find((e) => e.operacao === 'delete'), ATE_2_S,
