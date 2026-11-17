@@ -2,7 +2,7 @@
 -- segredo do Google que o navegador nunca lê e os números do painel. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(94);
+select plan(103);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -425,6 +425,78 @@ reset role;
 select testes.como('a1', 'aal1');
 select throws_ok($$ select public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30') $$, 'P0001', 'sem_permissao',
   'sessão aal1 de quem precisa do código não lê');
+reset role;
+
+-- ── Cliente apagado ou movido de consultoria ─────────────────────────────────
+select set_config('request.jwt.claims', '', true);
+create function testes.cliente_a(p_nome text, p_consultor text) returns uuid language plpgsql as $$
+declare v uuid;
+begin
+  insert into public.clientes (nome, horas_mes, consultoria_id, consultor_id)
+  values ('Cliente ' || p_nome, 10, testes.id('A'), testes.id(p_consultor)) returning id into v;
+  insert into testes.fx values (p_nome, v);
+  return v;
+end $$;
+-- Evento do cliente com a pasta da reunião.
+create function testes.evento_com_pasta(p_nome text, p_cliente text, p_dia int) returns void language plpgsql as $$
+declare v_pasta uuid;
+begin
+  perform testes.evento(p_nome, 'A', 'a1', p_dia, testes.id(p_cliente));
+  insert into public.cliente_pastas (cliente_id, nome, evento_id)
+  values (testes.id(p_cliente), 'Pasta ' || p_nome, testes.id(p_nome)) returning id into v_pasta;
+  update public.agenda_eventos set pasta_id = v_pasta where id = testes.id(p_nome);
+end $$;
+
+-- 1. Apagar o cliente (sem horas): o evento fica, sem cliente e sem pasta
+select testes.cliente_a('cli_apagar', 'a1');
+select testes.evento_com_pasta('ev_apagar', 'cli_apagar', 20);
+select lives_ok(format($$ delete from public.clientes where id = %L $$, testes.id('cli_apagar')),
+  'apagar cliente com evento e pasta vazia da reunião funciona');
+select ok((select cliente_id is null and pasta_id is null and titulo = 'Evento ev_apagar'
+  from public.agenda_eventos where id = testes.id('ev_apagar')), 'o evento fica, sem cliente e sem pasta');
+
+-- 2. Cliente com horas: segue recusado, com o mesmo erro de antes (o app traduz em "arquive em vez de apagar")
+select testes.cliente_a('cli_horas', 'a1');
+select testes.evento_com_pasta('ev_horas', 'cli_horas', 21);
+alter table public.checkins disable trigger checkins_validar;
+insert into public.checkins (cliente_id, consultor_id, consultoria_id, inicio, fim, descricao)
+values (testes.id('cli_horas'), testes.id('a1'), testes.id('A'), now() - interval '3 hours', now() - interval '2 hours', 'Atendimento');
+alter table public.checkins enable trigger checkins_validar;
+select throws_ok(format($$ delete from public.clientes where id = %L $$, testes.id('cli_horas')),
+  '23503', null, 'cliente com horas continua não sendo apagado (restrict dos check-ins)');
+select ok((select cliente_id is not null and pasta_id is not null from public.agenda_eventos where id = testes.id('ev_horas')),
+  'e o evento segue ligado ao cliente');
+delete from public.checkins where cliente_id = testes.id('cli_horas');
+
+-- 3. Cliente muda de consultoria: o evento da antiga perde cliente e pasta, o resto fica
+select testes.cliente_a('cli_move', 'a1');
+select testes.evento_com_pasta('ev_move', 'cli_move', 22);
+update public.clientes set consultoria_id = testes.id('B'), consultor_id = null where id = testes.id('cli_move');
+select ok((select cliente_id is null and pasta_id is null and consultoria_id = testes.id('A') and consultor_id = testes.id('a1')
+  and titulo = 'Evento ev_move' from public.agenda_eventos where id = testes.id('ev_move')),
+  'cliente movido para B: o evento de A perde cliente e pasta e mantém o resto');
+select testes.como('admin_a');
+select ok((select i -> 'cliente' = 'null'::jsonb and i ->> 'titulo' = 'Evento ev_move'
+  from jsonb_array_elements(public.eventos_do_periodo(timestamptz '2026-12-02 00:00-03', timestamptz '2026-12-03 00:00-03') -> 'itens') i
+  where i ->> 'id' = testes.id('ev_move')::text), 'o administrador de A lê o evento sem o cliente');
+reset role;
+select testes.como('gestor_b');
+select is((select count(*) from jsonb_array_elements(public.eventos_do_periodo(timestamptz '2026-12-02 00:00-03', timestamptz '2026-12-03 00:00-03') -> 'itens') i
+  where i ->> 'id' = testes.id('ev_move')::text), 0::bigint, 'a consultoria B nunca vê o evento de A');
+reset role;
+
+-- 4. Defesa em profundidade: sem o gatilho de limpeza, o JSON ainda esconde o cliente de outra consultoria
+select set_config('request.jwt.claims', '', true);
+select testes.cliente_a('cli_move2', 'a1');
+select testes.evento('ev_move2', 'A', 'a1', 23, testes.id('cli_move2'));
+alter table public.clientes disable trigger clientes_limpar_agenda;
+update public.clientes set consultoria_id = testes.id('B'), consultor_id = null where id = testes.id('cli_move2');
+alter table public.clientes enable trigger clientes_limpar_agenda;
+select testes.como('admin_a');
+select ok((select i -> 'cliente' = 'null'::jsonb
+  from jsonb_array_elements(public.eventos_do_periodo(timestamptz '2026-12-03 00:00-03', timestamptz '2026-12-04 00:00-03') -> 'itens') i
+  where i ->> 'id' = testes.id('ev_move2')::text), 'mesmo sem a limpeza, o JSON não entrega o cliente de outra consultoria');
+select ok(public.evento_da_agenda(testes.id('ev_move2')) -> 'cliente' = 'null'::jsonb, 'nem o detalhe');
 reset role;
 
 select * from finish();
