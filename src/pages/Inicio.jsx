@@ -44,8 +44,8 @@ export default function Inicio() {
   const dono = painel && painel.recorte !== 'pessoa'
 
   return (
-    <section className="grid gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className="grid grid-cols-[minmax(0,1fr)] gap-5">
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Olá, {primeiroNome(perfil.nome)}.</h1>
           <p className="text-muted-foreground">{NOME_DO_PAPEL[perfil.papel]} {onde}.</p>
@@ -57,9 +57,9 @@ export default function Inicio() {
       {!painel && !erro && <GraficoCarregando texto="Carregando o painel…" className="min-h-64 justify-center" />}
 
       {painel && (
-        <div aria-busy={atualizando ? 'true' : undefined} className={`grid gap-5 transition-opacity ${atualizando ? 'opacity-60' : ''}`}>
+        <div aria-busy={atualizando ? 'true' : undefined} className={`grid grid-cols-[minmax(0,1fr)] gap-5 transition-opacity ${atualizando ? 'opacity-60' : ''}`}>
           <Indicadores painel={painel} />
-          <div className="grid gap-5 xl:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[repeat(2,minmax(0,1fr))]">
             <HorasPorMes meses={painel.horas_por_mes} previsao={painel.previsao_atual} />
             {dono ? <RankingDeOcupacao recorte={painel.recorte} passado={painel.passado} ranking={painel.ranking} />
               : <MeusClientes passado={painel.passado} clientes={painel.meus_clientes} />}

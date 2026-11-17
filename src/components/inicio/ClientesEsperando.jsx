@@ -1,13 +1,15 @@
 import { Link } from 'react-router'
 import { Celula, Linha, Tabela } from '@/components/comum/Tabela'
 import { Badge } from '@/components/ui/badge'
+import { hoje } from '@/lib/mes'
 
 const SITUACAO = { a_distribuir: 'A distribuir', sem_consultor: 'Sem consultor' }
 const DIA = 86_400_000
 
-// "hoje", "há 1 dia", "há 9 dias" (só formatação; a ordem e o corte vêm do banco).
-function haQuantoTempo(iso, agora = Date.now()) {
-  const dias = Math.max(0, Math.floor((agora - new Date(iso).getTime()) / DIA))
+// "hoje", "há 1 dia", "há 9 dias" por dias do calendário de São Paulo (só formatação; a ordem e o corte vêm do banco).
+function haQuantoTempo(iso, agora = new Date()) {
+  const dia = (d) => Date.parse(`${hoje(d)}T00:00:00Z`)
+  const dias = Math.max(0, Math.round((dia(agora) - dia(new Date(iso))) / DIA))
   if (dias === 0) return 'hoje'
   return `há ${dias} ${dias === 1 ? 'dia' : 'dias'}`
 }

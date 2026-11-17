@@ -145,4 +145,29 @@ describe('Início (painel)', () => {
     expect(within(fila).getByText('Consultoria Exemplo')).toBeInTheDocument()
     expect(within(fila).queryByRole('columnheader', { name: 'Ações' })).not.toBeInTheDocument()
   })
+
+  it('largura: as grades usam minmax(0,1fr) para um bloco largo não estourar a tela; a tabela rola no cartão', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(CENTRAL)
+    const { container } = renderizarTela(<Inicio />, { perfil: perfil('central') })
+    const fila = await screen.findByRole('table', { name: 'Clientes esperando' })
+    for (const grade of [container.querySelector('section'), screen.getByRole('region', { name: 'Horas por mês' }).parentElement]) {
+      expect(grade.className).toContain('grid-cols-[minmax(0,1fr)]')
+    }
+    expect(fila.parentElement).toHaveClass('overflow-x-auto')
+    expect(screen.getByRole('region', { name: 'Horas por mês' })).toHaveClass('min-w-0')
+  })
+
+  it('"há N dias" conta dias do calendário de São Paulo', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-16T15:00:00Z')) // 12h em SP
+    vi.mocked(painelDoInicio).mockResolvedValue({ ...CENTRAL, esperando: [
+      { ...CENTRAL.esperando[0], id: 'a', nome: 'Ontem 23h', desde: '2026-11-16T02:00:00Z' }, // 15/11 23h em SP
+      { ...CENTRAL.esperando[0], id: 'b', nome: 'Hoje cedo', desde: '2026-11-16T10:00:00Z' },
+    ] })
+    renderizarTela(<Inicio />, { perfil: perfil('central') })
+    const fila = await screen.findByRole('table', { name: 'Clientes esperando' })
+    vi.useRealTimers()
+    expect(within(fila.querySelectorAll('tbody tr')[0]).getByText('há 1 dia')).toBeInTheDocument()
+    expect(within(fila.querySelectorAll('tbody tr')[1]).getByText('hoje')).toBeInTheDocument()
+  })
 })
