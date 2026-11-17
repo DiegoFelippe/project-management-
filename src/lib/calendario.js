@@ -201,25 +201,27 @@ export function agruparPorDia({ dias, eventos = [], ausencias = [], feriados = [
 
 // ── Janela do evento ──
 
-// Data e horários da janela → { inicio, fim, dia_inteiro } (instantes de São Paulo) ou { erro }. Sem horário de
-// início, o evento é de dia inteiro (até o dia em que termina, inclusive); só com o início, dura uma hora. As
-// regras do banco (fim depois do início, até 31 dias) são conferidas antes de enviar.
+// Data e horários da janela → { inicio, fim, dia_inteiro } (instantes de São Paulo) ou { erro, campo } (o campo a
+// corrigir: data, dataFim, horaInicio ou horaFim). Sem horário de início, o evento é de dia inteiro (até o dia em que
+// termina, inclusive); só com o início e no mesmo dia, dura uma hora; terminando em outro dia, o horário do fim é
+// obrigatório. As regras do banco (fim depois do início, até 31 dias) são conferidas antes de enviar.
 export function montarHorario({ data, horaInicio = '', horaFim = '', dataFim = '' }) {
-  if (!data) return { erro: 'Escolha a data do evento.' }
+  if (!data) return { erro: 'Escolha a data do evento.', campo: 'data' }
   const ultimo = dataFim || data
-  if (ultimo < data) return { erro: 'O dia em que termina não pode ser antes do início.' }
+  if (ultimo < data) return { erro: 'O dia em que termina não pode ser antes do início.', campo: 'dataFim' }
   let horario
   if (!horaInicio) {
-    if (horaFim) return { erro: 'Escolha também o horário de início (sem horário, o evento é de dia inteiro).' }
+    if (horaFim) return { erro: 'Escolha também o horário de início (sem horário, o evento é de dia inteiro).', campo: 'horaInicio' }
     horario = { inicio: instanteEmSP(data), fim: instanteEmSP(somarDias(ultimo, 1)), dia_inteiro: true }
   } else {
+    if (!horaFim && ultimo > data) return { erro: 'Escolha o horário em que termina.', campo: 'horaFim' }
     const inicio = instanteEmSP(data, horaInicio)
     const fim = horaFim ? instanteEmSP(ultimo, horaFim) : instanteEmSP(...partesUmaHoraDepois(inicio))
     horario = { inicio, fim, dia_inteiro: false }
   }
   const duracao = Date.parse(horario.fim) - Date.parse(horario.inicio)
-  if (duracao <= 0) return { erro: 'O fim precisa ser depois do início.' }
-  if (duracao > MAXIMO_DE_DIAS * DIA_MS) return { erro: `Um evento dura no máximo ${MAXIMO_DE_DIAS} dias.` }
+  if (duracao <= 0) return { erro: 'O fim precisa ser depois do início.', campo: 'horaFim' }
+  if (duracao > MAXIMO_DE_DIAS * DIA_MS) return { erro: `Um evento dura no máximo ${MAXIMO_DE_DIAS} dias.`, campo: 'dataFim' }
   return horario
 }
 

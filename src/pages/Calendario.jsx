@@ -15,7 +15,7 @@ import ProximosDias from '@/components/calendario/ProximosDias'
 import VisaoAgenda from '@/components/calendario/VisaoAgenda'
 import VisaoMes from '@/components/calendario/VisaoMes'
 import VisaoSemana from '@/components/calendario/VisaoSemana'
-import { TUDO, mostrarItem } from '@/components/calendario/cores'
+import { TUDO } from '@/components/calendario/cores'
 import { Button } from '@/components/ui/button'
 import {
   ausenciasDoPeriodo, buscarEvento, concluirGoogle, conectarGoogle, desconectarGoogle, eventosDoPeriodo, feriadosDoPeriodo,
@@ -40,7 +40,7 @@ const SEM_FILTRO = { valor: '', nome: null }
 const ehCelular = () => typeof window.matchMedia === 'function' && !window.matchMedia('(min-width: 768px)').matches
 
 // Leituras do banco (uma chamada cada, só do intervalo pedido; os filtros rodam lá).
-const lerEventos = ({ de, ate, consultorId, consultoriaId, clienteId }) => eventosDoPeriodo({ de, ate, consultorId, consultoriaId, clienteId })
+const lerEventos = ({ de, ate, consultorId, consultoriaId, clienteId, tipo }) => eventosDoPeriodo({ de, ate, consultorId, consultoriaId, clienteId, tipo })
 const lerAusencias = ({ de, ate, consultorId, consultoriaId }) => ausenciasDoPeriodo({ de, ate, consultorId, consultoriaId })
 const lerFeriados = ({ de, ate }) => feriadosDoPeriodo(de, ate)
 const lerIndicadores = ({ dia }) => indicadoresDaAgenda(dia)
@@ -64,27 +64,28 @@ function useLeitura(ler, parametros) {
   return estado.chave === chave ? estado : { carregando: Boolean(chave) }
 }
 
-// Eventos, ausências e feriados de [de, ate) (dias), com os filtros da barra, agrupados por dia e já com o "Mostrar".
+// O "Mostrar" dos eventos vai ao banco: as duas caixas = todos (sem tipo); uma só = aquele tipo; nenhuma = não lê.
+function tipoDosEventos(mostrar) {
+  if (mostrar.reunioes && mostrar.compromissos) return { ler: true, tipo: undefined }
+  if (mostrar.reunioes) return { ler: true, tipo: 'reunioes' }
+  return { ler: mostrar.compromissos, tipo: 'compromissos' }
+}
+
+// Eventos, ausências e feriados de [de, ate) (dias), com os filtros da barra e o "Mostrar" (tudo no banco; ausências e
+// feriados escondidos nem são lidos), agrupados por dia.
 function useItensDoPeriodo({ de, ate, filtros, mostrar, versao, ligado = true }) {
   const ultimo = somarDias(ate, -1)
-  const eventos = useLeitura(lerEventos, ligado ? { ...limitesEmSP(de, ate), ...filtros, versao } : null)
+  const { ler, tipo } = tipoDosEventos(mostrar)
+  const eventos = useLeitura(lerEventos, ligado && ler ? { ...limitesEmSP(de, ate), ...filtros, tipo, versao } : null)
   const pessoa = { consultorId: filtros.consultorId, consultoriaId: filtros.consultoriaId }
   const ausencias = useLeitura(lerAusencias, ligado && mostrar.ausencias ? { de, ate: ultimo, ...pessoa, versao } : null)
   const feriados = useLeitura(lerFeriados, ligado && mostrar.feriados ? { de, ate: ultimo } : null)
-  const porDia = useMemo(() => {
-    const todos = agruparPorDia({
-      dias: diasEntre(de, ate),
-      eventos: eventos.dados?.itens ?? [],
-      ausencias: ausencias.dados?.itens ?? [],
-      feriados: feriados.dados ?? [],
-    })
-    const filtrado = new Map()
-    for (const [dia, itens] of todos) {
-      const visiveis = itens.filter((item) => mostrarItem(item, mostrar))
-      if (visiveis.length) filtrado.set(dia, visiveis)
-    }
-    return filtrado
-  }, [de, ate, eventos.dados, ausencias.dados, feriados.dados, mostrar])
+  const porDia = useMemo(() => agruparPorDia({
+    dias: diasEntre(de, ate),
+    eventos: eventos.dados?.itens ?? [],
+    ausencias: ausencias.dados?.itens ?? [],
+    feriados: feriados.dados ?? [],
+  }), [de, ate, eventos.dados, ausencias.dados, feriados.dados])
   return {
     porDia,
     carregando: eventos.carregando || ausencias.carregando || feriados.carregando,

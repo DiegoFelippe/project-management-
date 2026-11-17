@@ -13,6 +13,7 @@ import {
   indicadoresDaAgenda,
   meuGoogle,
   novoIdDeEvento,
+  pessoasParaConvidar,
   responderConvite,
   salvarEvento,
   tentarDeNovo,
@@ -53,14 +54,15 @@ describe('eventosDoPeriodo', () => {
       p_consultor: null,
       p_consultoria: null,
       p_cliente: null,
+      p_tipo: null,
     })
   })
 
   it('manda os filtros de consultor, consultoria e cliente ao banco', async () => {
     vi.mocked(supabase.rpc).mockResolvedValue({ data: { itens: [], ha_mais: false }, error: null })
-    await eventosDoPeriodo({ de: 'a', ate: 'b', consultorId: 'p1', consultoriaId: 'c1', clienteId: 'k1' })
+    await eventosDoPeriodo({ de: 'a', ate: 'b', consultorId: 'p1', consultoriaId: 'c1', clienteId: 'k1', tipo: 'reunioes' })
     expect(supabase.rpc).toHaveBeenCalledWith('eventos_do_periodo', {
-      p_de: 'a', p_ate: 'b', p_consultor: 'p1', p_consultoria: 'c1', p_cliente: 'k1',
+      p_de: 'a', p_ate: 'b', p_consultor: 'p1', p_consultoria: 'c1', p_cliente: 'k1', p_tipo: 'reunioes',
     })
   })
 
@@ -69,6 +71,28 @@ describe('eventosDoPeriodo', () => {
     expect(await eventosDoPeriodo({ de: 'a', ate: 'b' })).toEqual({ itens: [], haMais: false })
     vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'x' } })
     await expect(eventosDoPeriodo({ de: 'a', ate: 'b' })).rejects.toEqual({ message: 'x' })
+  })
+})
+
+describe('pessoasParaConvidar', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('busca no banco as pessoas da consultoria do evento: { itens, total }', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: [{ id: 'p2', nome: 'Beto', cor: null }], error: null })
+    expect(await pessoasParaConvidar({ consultoriaId: 's1', termo: 'be', limite: 12 })).toEqual({
+      itens: [{ id: 'p2', nome: 'Beto', cor: null }], total: 1,
+    })
+    expect(supabase.rpc).toHaveBeenCalledWith('pessoas_para_convidar', { p_consultoria: 's1', p_busca: 'be', p_limite: 12 })
+  })
+
+  it('termo vazio vai nulo; sem consultoria não pergunta; o erro sobe', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null })
+    expect(await pessoasParaConvidar({ consultoriaId: 's1', termo: '' })).toEqual({ itens: [], total: 0 })
+    expect(supabase.rpc).toHaveBeenCalledWith('pessoas_para_convidar', { p_consultoria: 's1', p_busca: null, p_limite: 20 })
+    expect(await pessoasParaConvidar({ consultoriaId: null })).toEqual({ itens: [], total: 0 })
+    expect(supabase.rpc).toHaveBeenCalledTimes(1)
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'x' } })
+    await expect(pessoasParaConvidar({ consultoriaId: 's1' })).rejects.toEqual({ message: 'x' })
   })
 })
 

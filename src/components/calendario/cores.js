@@ -38,10 +38,3 @@ export const ESTILO_DO_CHIP = {
 
 // Bolinha da ausência e do feriado nas listas (a do evento é a cor dele).
 export const BOLINHA = { ausencia: 'bg-amber-500', feriado: 'bg-rose-500' }
-
-// O item vale para o "Mostrar" escolhido? Reunião com cliente = evento com cliente; compromisso = sem cliente.
-export function mostrarItem(item, mostrar) {
-  if (item.tipo === 'feriado') return mostrar.feriados
-  if (item.tipo === 'ausencia') return mostrar.ausencias
-  return item.evento.cliente_id ? mostrar.reunioes : mostrar.compromissos
-}

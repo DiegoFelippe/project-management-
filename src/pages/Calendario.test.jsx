@@ -21,7 +21,7 @@ vi.mock('@/data/agenda', async (importOriginal) => {
     eventosDoPeriodo: vi.fn(), buscarEvento: vi.fn(), indicadoresDaAgenda: vi.fn(), ausenciasDoPeriodo: vi.fn(),
     feriadosDoPeriodo: vi.fn(), meuGoogle: vi.fn(), conectarGoogle: vi.fn(), concluirGoogle: vi.fn(),
     desconectarGoogle: vi.fn(), salvarEvento: vi.fn(), apagarEvento: vi.fn(), responderConvite: vi.fn(),
-    novoIdDeEvento: vi.fn(() => 'novo-1'), buscarAgora: vi.fn(), tentarDeNovo: vi.fn(),
+    novoIdDeEvento: vi.fn(() => 'novo-1'), buscarAgora: vi.fn(), tentarDeNovo: vi.fn(), pessoasParaConvidar: vi.fn(),
   }
 })
 vi.mock('@/data/capacidade', () => ({ consultoresPorOcupacao: vi.fn() }))
@@ -78,7 +78,10 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-17T15:00:00Z')) // terça, 17/11, meio-dia em São Paulo
   celular(false)
-  vi.mocked(eventosDoPeriodo).mockResolvedValue({ itens: [EVENTO, COMPROMISSO], haMais: false })
+  // O banco filtra o "Mostrar" (tipo): reuniões têm cliente, compromissos não.
+  vi.mocked(eventosDoPeriodo).mockImplementation(async ({ tipo }) => ({
+    itens: [EVENTO, COMPROMISSO].filter((e) => !tipo || (tipo === 'reunioes') === Boolean(e.cliente_id)), haMais: false,
+  }))
   vi.mocked(ausenciasDoPeriodo).mockResolvedValue({ itens: [], haMais: false })
   vi.mocked(feriadosDoPeriodo).mockResolvedValue(['2026-11-20'])
   vi.mocked(indicadoresDaAgenda).mockResolvedValue({ semana: 3, mes: 9, aguardando: 1, pastas_no_mes: 4 })
@@ -106,7 +109,7 @@ describe('Calendário: consultor (visão privada)', () => {
     expect(screen.queryByLabelText('Consultoria')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Cliente')).toBeInTheDocument()
     expect(eventosDoPeriodo).toHaveBeenCalledTimes(1)
-    expect(eventosDoPeriodo).toHaveBeenCalledWith({ ...MES, consultorId: undefined, consultoriaId: undefined, clienteId: undefined })
+    expect(eventosDoPeriodo).toHaveBeenCalledWith({ ...MES, consultorId: undefined, consultoriaId: undefined, clienteId: undefined, tipo: undefined })
     expect(ausenciasDoPeriodo).toHaveBeenCalledWith({ de: '2026-11-01', ate: '2026-12-05', consultorId: undefined, consultoriaId: undefined })
     expect(feriadosDoPeriodo).toHaveBeenCalledWith('2026-11-01', '2026-12-05')
     expect(screen.getByRole('button', { name: 'Novo evento' })).toBeInTheDocument()
@@ -138,19 +141,23 @@ describe('Calendário: consultor (visão privada)', () => {
     expect(eventosDoPeriodo).toHaveBeenCalledTimes(1)
   })
 
-  it('Mostrar: tirar as reuniões com cliente esconde os chips sem ler de novo', async () => {
+  it('Mostrar: tirar as reuniões com cliente pede ao banco só os compromissos; sem os dois, nem pede', async () => {
     const user = userEvent.setup()
     tela(consultor)
     const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
     await within(grade).findByRole('button', { name: /Kickoff Alfa/ })
     await user.click(screen.getByRole('button', { name: /Mostrar: tudo/ }))
     await user.click(screen.getByRole('checkbox', { name: 'Reuniões com cliente' }))
+    await waitFor(() => expect(eventosDoPeriodo).toHaveBeenLastCalledWith(expect.objectContaining({ ...MES, tipo: 'compromissos' })))
+    expect(await within(grade).findByRole('button', { name: /Planejamento interno/ })).toBeInTheDocument()
     expect(within(grade).queryByRole('button', { name: /Kickoff Alfa/ })).not.toBeInTheDocument()
-    expect(within(grade).getByRole('button', { name: /Planejamento interno/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Mostrar: 3 de 4/ })).toBeInTheDocument()
-    expect(eventosDoPeriodo).toHaveBeenCalledTimes(1)
+    await user.click(screen.getByRole('checkbox', { name: 'Compromissos' }))
+    expect(within(grade).queryByRole('button', { name: /Planejamento interno/ })).not.toBeInTheDocument()
+    expect(eventosDoPeriodo).toHaveBeenCalledTimes(2)
     await user.click(screen.getByRole('button', { name: 'Limpar filtros' }))
-    expect(within(grade).getByRole('button', { name: /Kickoff Alfa/ })).toBeInTheDocument()
+    expect(await within(grade).findByRole('button', { name: /Kickoff Alfa/ })).toBeInTheDocument()
+    expect(eventosDoPeriodo).toHaveBeenLastCalledWith(expect.objectContaining({ ...MES, tipo: undefined }))
   })
 
   it('dois cliques num dia abrem o Novo evento naquele dia', async () => {

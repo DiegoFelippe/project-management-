@@ -161,6 +161,13 @@ describe('montar o horário da janela', () => {
     })
   })
 
+  it('termina em outro dia com início e sem o horário do fim: pede o horário em que termina (não vira uma hora)', () => {
+    expect(montarHorario({ data: '2026-11-20', horaInicio: '14:00', horaFim: '', dataFim: '2026-11-22' }))
+      .toEqual({ erro: 'Escolha o horário em que termina.', campo: 'horaFim' })
+    // No mesmo dia (sem "termina em"), só o início continua valendo uma hora.
+    expect(montarHorario({ data: '2026-11-20', horaInicio: '14:00', horaFim: '', dataFim: '2026-11-20' }).erro).toBeUndefined()
+  })
+
   it('recusa o que o banco recusaria', () => {
     expect(montarHorario({ data: '' }).erro).toBe('Escolha a data do evento.')
     expect(montarHorario({ data: '2026-11-20', horaInicio: '15:00', horaFim: '14:00' }).erro).toBe('O fim precisa ser depois do início.')

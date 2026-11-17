@@ -43,6 +43,7 @@ const {
   indicadoresDaAgenda,
   meuGoogle,
   novoIdDeEvento,
+  pessoasParaConvidar,
   responderConvite,
   salvarEvento,
 } = await import('../../src/data/agenda.js')
@@ -140,6 +141,30 @@ describe('agenda: leituras contra o banco de verdade', () => {
     entrar('pessoa')
     expect(titulos(await eventosDoPeriodo({ de: DE, ate: ATE, clienteId: clienteA }))).toEqual(['Integração proprio'])
     expect(titulos(await eventosDoPeriodo({ de: DE, ate: ATE, consultorId: pessoaA2.id }))).toEqual(['Integração convidado'])
+  })
+
+  it('o "Mostrar" roda no banco: reuniões (com cliente) e compromissos (sem cliente), em cada papel', async () => {
+    entrar('pessoa')
+    expect(titulos(await eventosDoPeriodo({ de: DE, ate: ATE, tipo: 'reunioes' }))).toEqual(['Integração proprio'])
+    expect(titulos(await eventosDoPeriodo({ de: DE, ate: ATE, tipo: 'compromissos' }))).toEqual(['Integração convidado'])
+    entrar('gestor')
+    expect(titulos(await eventosDoPeriodo({ de: DE, ate: ATE, tipo: 'compromissos' }))).toEqual(['Integração colega', 'Integração convidado'])
+    entrar('central')
+    expect(titulos(await eventosDoPeriodo({ de: DE, ate: ATE, consultoriaId: A, tipo: 'reunioes' }))).toEqual(['Integração proprio'])
+  })
+
+  it('pessoas para convidar: o consultor busca as pessoas da própria consultoria, nunca as de outra', async () => {
+    const ids = (r) => r.itens.map((p) => p.id).sort()
+    entrar('pessoa')
+    const daA = await pessoasParaConvidar({ consultoriaId: A })
+    expect(ids(daA)).toEqual([gestorA.id, pessoaA.id, pessoaA2.id].sort())
+    expect(Object.keys(daA.itens[0]).sort()).toEqual(['cor', 'id', 'nome'])
+    expect(ids(await pessoasParaConvidar({ consultoriaId: A, termo: 'gestor' }))).toEqual([gestorA.id])
+    expect((await pessoasParaConvidar({ consultoriaId: B })).itens).toEqual([])
+    entrar('pessoaB')
+    expect((await pessoasParaConvidar({ consultoriaId: A })).itens).toEqual([])
+    entrar('central')
+    expect(ids(await pessoasParaConvidar({ consultoriaId: B }))).toEqual([pessoaB.id])
   })
 
   it('gestor vê a consultoria toda; central vê tudo e filtra; outra consultoria não vê a A', async () => {

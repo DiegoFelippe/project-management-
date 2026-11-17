@@ -3,18 +3,35 @@ import { traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
 
 // Eventos que tocam o período [de, ate) (ISO), com consultor, cliente e participantes (com nome) numa chamada só:
-// { itens, haMais }. O banco decide quem vê o quê e usa índice por papel; consultorId, consultoriaId e clienteId são
-// filtros opcionais rodados lá. haMais avisa que o período tem mais eventos do que o teto da chamada (1.000).
-export async function eventosDoPeriodo({ de, ate, consultorId, consultoriaId, clienteId } = {}) {
+// { itens, haMais }. O banco decide quem vê o quê e usa índice por papel; consultorId, consultoriaId, clienteId e tipo
+// ('reunioes' = com cliente, 'compromissos' = sem cliente; o "Mostrar" da tela) são filtros opcionais rodados lá.
+// haMais avisa que o período tem mais eventos do que o teto da chamada (1.000).
+export async function eventosDoPeriodo({ de, ate, consultorId, consultoriaId, clienteId, tipo } = {}) {
   const { data, error } = await supabase.rpc('eventos_do_periodo', {
     p_de: de,
     p_ate: ate,
     p_consultor: consultorId ?? null,
     p_consultoria: consultoriaId ?? null,
     p_cliente: clienteId ?? null,
+    p_tipo: tipo ?? null,
   })
   if (error) throw error
   return { itens: data?.itens ?? [], haMais: Boolean(data?.ha_mais) }
+}
+
+// Quem a janela do evento oferece para convidar: as pessoas ativas da consultoria do evento, pelo nome (busca no banco,
+// sem acento), `limite` por vez: { itens: [{ id, nome, cor }], total }. O consultor não lê os colegas direto; a função
+// do banco devolve só isso, e só da consultoria de quem pergunta (a central, de qualquer uma). total = os que vieram.
+export async function pessoasParaConvidar({ consultoriaId, termo = '', limite = 20 } = {}) {
+  if (!consultoriaId) return { itens: [], total: 0 }
+  const { data, error } = await supabase.rpc('pessoas_para_convidar', {
+    p_consultoria: consultoriaId,
+    p_busca: termo?.trim() || null,
+    p_limite: limite,
+  })
+  if (error) throw error
+  const itens = data ?? []
+  return { itens, total: itens.length }
 }
 
 // Um evento no mesmo formato dos itens acima; null quando não existe ou a pessoa não pode vê-lo.

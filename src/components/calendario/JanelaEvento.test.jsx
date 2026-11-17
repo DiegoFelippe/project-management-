@@ -2,16 +2,16 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { apagarEvento, novoIdDeEvento, responderConvite, salvarEvento } from '@/data/agenda'
+import { apagarEvento, novoIdDeEvento, pessoasParaConvidar, responderConvite, salvarEvento } from '@/data/agenda'
 import { consultoresPorOcupacao } from '@/data/capacidade'
 import { buscarClientes } from '@/data/clientes'
-import { escolherNoSeletor } from '@/test/campos'
+import { escolherData, escolherHora, escolherNoSeletor } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
 import JanelaEvento from './JanelaEvento'
 
 vi.mock('@/data/agenda', () => ({
   salvarEvento: vi.fn(), apagarEvento: vi.fn(), responderConvite: vi.fn(), novoIdDeEvento: vi.fn(),
-  buscarAgora: vi.fn(), tentarDeNovo: vi.fn(),
+  buscarAgora: vi.fn(), tentarDeNovo: vi.fn(), pessoasParaConvidar: vi.fn(),
 }))
 vi.mock('@/data/capacidade', () => ({ consultoresPorOcupacao: vi.fn() }))
 vi.mock('@/data/clientes', () => ({ buscarClientes: vi.fn() }))
@@ -51,6 +51,9 @@ beforeEach(() => {
     { id: 'k1', nome: 'Provedor Alfa', consultoria_id: 's1', contato_nome: 'Carla Dias', contato_email: 'carla@alfa.com.br' },
     { id: 'k2', nome: 'Provedor Beta', consultoria_id: 's1', contato_nome: null, contato_email: null },
   ], total: 2 })
+  vi.mocked(pessoasParaConvidar).mockResolvedValue({ itens: [
+    { id: 'p1', nome: 'Ana Souza', cor: '#16a34a' }, { id: 'p2', nome: 'Beto Lima', cor: null }, { id: 'p3', nome: 'Caio Melo', cor: null },
+  ], total: 3 })
   vi.mocked(consultoresPorOcupacao).mockResolvedValue({ itens: [
     { id: 'p1', nome: 'Ana Souza', email: 'ana@x.test', consultoria_id: 's1', consultoria_nome: 'STI' },
     { id: 'p2', nome: 'Beto Lima', email: 'beto@x.test', consultoria_id: 's1', consultoria_nome: 'STI' },
@@ -140,6 +143,26 @@ describe('JanelaEvento: novo', () => {
     expect(toast.success).toHaveBeenCalledWith('Evento criado.')
   })
 
+  it('termina em outro dia sem o horário do fim: a tela pede o horário e não grava uma hora só', async () => {
+    const user = userEvent.setup()
+    janela({ perfil: consultora, evento: null })
+    await user.type(screen.getByLabelText('Título'), 'Imersão')
+    await escolherHora(user, 'Das', '14:00')
+    await user.click(screen.getByRole('button', { name: 'Termina em outro dia' }))
+    await escolherData(user, 'Termina em', '2026-11-22')
+    expect(screen.getByText(/até Dom, 22 de nov\. · 14:00$/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Criar evento' }))
+    const quando = screen.getByRole('group', { name: 'Quando' })
+    expect(within(quando).getByRole('alert')).toHaveTextContent('Escolha o horário em que termina.')
+    expect(salvarEvento).not.toHaveBeenCalled()
+    await escolherHora(user, 'Até', '10:00')
+    expect(within(quando).queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Criar evento' }))
+    await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({
+      inicio: '2026-11-20T14:00:00-03:00', fim: '2026-11-22T10:00:00-03:00', dia_inteiro: false,
+    })))
+  })
+
   it('escolher o cliente sugere o contato dele como convidado e liga o Meet com a gravação', async () => {
     const user = userEvent.setup()
     janela({ perfil: consultora, evento: null })
@@ -171,6 +194,26 @@ describe('JanelaEvento: novo', () => {
     expect(salvarEvento).not.toHaveBeenCalled()
   })
 
+  it('o consultor busca colegas da consultoria (pela função do banco) e convida; ele mesmo não aparece', async () => {
+    const user = userEvent.setup()
+    janela({ perfil: consultora, evento: null })
+    await user.click(screen.getByLabelText('Convidar consultor'))
+    const opcoes = () => screen.getAllByRole('option').map((o) => o.querySelector('span > span')?.textContent)
+    await waitFor(() => expect(opcoes()).toEqual(['Beto Lima', 'Caio Melo']))
+    expect(pessoasParaConvidar).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1', termo: '' }))
+    await user.click(screen.getAllByRole('option').find((o) => o.textContent.endsWith('Beto Lima')))
+    const lista = screen.getByRole('list', { name: 'Participantes' })
+    expect(within(lista).getByText('Beto Lima')).toBeInTheDocument()
+    expect(within(lista).getByText('Novo')).toBeInTheDocument()
+    // Quem já está na lista sai das opções.
+    await user.click(screen.getByLabelText('Convidar consultor'))
+    await waitFor(() => expect(opcoes()).toEqual(['Caio Melo']))
+    await user.keyboard('{Escape}')
+    await user.type(screen.getByLabelText('Título'), 'Alinhamento do time')
+    await user.click(screen.getByRole('button', { name: 'Criar evento' }))
+    await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({ participantes: ['p2'] })))
+  })
+
   it('a gestora escolhe de quem é a agenda e convida consultores da consultoria', async () => {
     const user = userEvent.setup()
     janela({ evento: null })
@@ -179,6 +222,7 @@ describe('JanelaEvento: novo', () => {
     await escolherNoSeletor(user, 'Convidar consultor', 'Caio Melo')
     expect(within(screen.getByRole('list', { name: 'Participantes' })).getByText('Caio Melo')).toBeInTheDocument()
     expect(consultoresPorOcupacao).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1' }))
+    expect(pessoasParaConvidar).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1', termo: '' }))
     await user.type(screen.getByLabelText('Título'), 'Revisão')
     await user.click(screen.getByRole('button', { name: 'Criar evento' }))
     await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({ consultor_id: 'p1', participantes: ['p3'] })))
