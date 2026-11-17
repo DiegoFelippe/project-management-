@@ -414,9 +414,9 @@ export default function JanelaDoCartao({ cartaoId, quadro, cliente, perfil, aoFe
       titulo={<span className="break-words">{cartao.titulo}</span>} descricao={cabecalho(cartao)}
       acaoEsquerda={podeMexer && (
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" disabled={fechando} onClick={() => setConfirmar('arquivar')}><Archive /> Arquivar</Button>
+          <Button type="button" variant="outline" disabled={fechando} onClick={() => setConfirmar('arquivar')}><Archive /> <span className="max-sm:sr-only">Arquivar</span></Button>
           {cartao.pode_apagar && (
-            <Button type="button" variant="outline" disabled={fechando} className={BOTAO_PERIGO} onClick={abrirApagar}><Trash2 /> Apagar</Button>
+            <Button type="button" variant="outline" disabled={fechando} className={BOTAO_PERIGO} onClick={abrirApagar}><Trash2 /> <span className="max-sm:sr-only">Apagar</span></Button>
           )}
         </div>
       )}

@@ -70,6 +70,7 @@ if (jaExiste) {
   consultoria = await criarConsultoria()
 }
 await eventosDeExemplo()
+await quadroDeExemplo()
 process.exit(0)
 
 async function criarConsultoria() {
@@ -167,4 +168,81 @@ async function eventosDeExemplo() {
   const { error } = await admin.from('agenda_eventos').upsert(eventos, { onConflict: 'id', ignoreDuplicates: true })
   if (error) parar(`Não consegui criar os eventos de exemplo: ${error.message}`)
   console.log(`${eventos.length} eventos de exemplo na agenda (sem Google); rodar de novo não repete.`)
+}
+
+// Quadro (Kanban) de exemplo: só na Consultoria Exemplo, no cliente "Provedor Teste Navegador" (ou o primeiro dela).
+// Reaproveita o quadro se já existir (criado ao abrir a aba) e pula o cartão cujo título já está no quadro:
+// rodar de novo não muda nada. Com a chave secreta (sem pessoa logada) o banco aceita a escrita direta; posição,
+// autor e datas vêm dos gatilhos.
+async function quadroDeExemplo() {
+  const { data: ana } = await admin.from('perfis').select('id').eq('email', 'ana@exemplo.test').maybeSingle()
+  if (!ana) return
+  let { data: cliente } = await admin.from('clientes').select('id, nome')
+    .eq('consultoria_id', consultoria.id).eq('nome', 'Provedor Teste Navegador').maybeSingle()
+  if (!cliente) {
+    const { data } = await admin.from('clientes').select('id, nome').eq('consultoria_id', consultoria.id)
+      .order('criado_em').limit(1)
+    cliente = data?.[0]
+  }
+  if (!cliente) {
+    console.log('Quadro de exemplo: a consultoria de exemplo não tem cliente; nada criado.')
+    return
+  }
+
+  let { data: quadro } = await admin.from('quadros').select('id').eq('cliente_id', cliente.id).eq('consultoria_id', consultoria.id).maybeSingle()
+  if (!quadro) {
+    const { data, error } = await admin.from('quadros').insert({ cliente_id: cliente.id, consultoria_id: consultoria.id }).select('id').single()
+    if (error) parar(`Não consegui criar o quadro de exemplo: ${error.message}`)
+    quadro = data
+  }
+  const { data: existentes } = await admin.from('quadro_colunas').select('id').eq('quadro_id', quadro.id)
+  if (!existentes?.length) {
+    const { error } = await admin.from('quadro_colunas').insert([
+      { quadro_id: quadro.id, nome: 'A fazer', posicao: 1024 },
+      { quadro_id: quadro.id, nome: 'Em andamento', posicao: 2048 },
+      { quadro_id: quadro.id, nome: 'Concluído', posicao: 3072, concluidos: true },
+    ])
+    if (error) parar(`Não consegui criar as colunas do quadro: ${error.message}`)
+  }
+  const { data: colunas } = await admin.from('quadro_colunas').select('id, posicao').eq('quadro_id', quadro.id).order('posicao')
+  const coluna = (i) => colunas[Math.min(i, colunas.length - 1)].id
+
+  const dia = (dias) => {
+    const d = new Date()
+    d.setDate(d.getDate() + dias)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  const cartoes = [
+    { titulo: 'Levantar DRE do trimestre', col: 0, prioridade: 'alta', prazo: dia(-3),
+      checklist: [['Exportar balancetes', true], ['Conferir contas de receita', true], ['Montar o comparativo', false]],
+      comentario: 'Já tenho os balancetes de janeiro e fevereiro; falta o de março.' },
+    { titulo: 'Revisar plano de contas', col: 1, prioridade: 'media', prazo: dia(3),
+      checklist: [['Listar contas duplicadas', true], ['Alinhar nomes com o cliente', false]] },
+    { titulo: 'Reunião de alinhamento mensal', col: 0, prioridade: 'baixa', prazo: dia(20) },
+    { titulo: 'Entregar relatório de indicadores', col: 2, prioridade: 'media', prazo: dia(-10),
+      checklist: [['Fechar números do mês', true], ['Enviar ao cliente', true]] },
+  ]
+  let criados = 0
+  for (const c of cartoes) {
+    const { data: ja } = await admin.from('cartoes').select('id').eq('quadro_id', quadro.id).eq('titulo', c.titulo).limit(1)
+    if (ja?.length) continue
+    const { data: novo, error } = await admin.from('cartoes')
+      .insert({ quadro_id: quadro.id, coluna_id: coluna(c.col), titulo: c.titulo, prioridade: c.prioridade, prazo: c.prazo, criado_por: ana.id })
+      .select('id').single()
+    if (error) parar(`Não consegui criar o cartão "${c.titulo}": ${error.message}`)
+    const { error: erroResp } = await admin.from('cartao_responsaveis').insert({ cartao_id: novo.id, perfil_id: ana.id })
+    if (erroResp) parar(`Não consegui pôr a Ana no cartão "${c.titulo}": ${erroResp.message}`)
+    for (const [texto, feito] of c.checklist ?? []) {
+      const { error: erroItem } = await admin.from('cartao_checklist').insert({ cartao_id: novo.id, texto, feito })
+      if (erroItem) parar(`Não consegui criar o item "${texto}": ${erroItem.message}`)
+    }
+    if (c.comentario) {
+      const { error: erroCom } = await admin.from('cartao_comentarios').insert({ cartao_id: novo.id, autor_id: ana.id, texto: c.comentario })
+      if (erroCom) parar(`Não consegui criar o comentário: ${erroCom.message}`)
+    }
+    criados += 1
+  }
+  console.log(criados
+    ? `Quadro de exemplo (${cliente.nome}): ${criados} cartões criados.`
+    : `Quadro de exemplo (${cliente.nome}): já tinha os cartões, nada foi alterado.`)
 }

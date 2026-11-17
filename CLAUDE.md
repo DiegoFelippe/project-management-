@@ -61,6 +61,27 @@ Toda tela nova segue esta ordem e estes componentes (detalhes nas seções abaix
 8. **Sempre:** tipografia da escala (números em colunas com `tabular-nums`), botões animados, CRUD completo, banco com
    RLS e testes (banco, integração e tela) como as telas que já existem.
 
+## Quadro (Kanban)
+
+Design: `docs/superpowers/specs/2026-11-17-kanban-do-cliente-design.md` (inclui a "Resposta do Diego").
+
+- **Quem faz o quê:** o consultor do cliente e a gestão (admin e gestor da consultoria) mexem no quadro: colunas,
+  cartões, checklist, comentários e anexos. Central e dono só leem. **Apagar cartão:** quem criou ou a gestão (os
+  demais arquivam). **Apagar coluna:** só a gestão (`apagar_coluna`, com destino ou apagando os cartões). A regra é do
+  banco (RLS e funções `quadro_do_cliente`, `cartoes_do_quadro`, `mover_cartao`...), nunca só da tela.
+- **Um quadro por cliente e consultoria:** cliente que volta a uma consultoria reencontra o quadro antigo; a central
+  vê os quadros das consultorias anteriores só para ler, pelo seletor "Consultoria".
+- **Posição fracionária** (`numeric`, passos de 1024): mover grava só a linha movida entre os vizinhos
+  (`mover_cartao`, `mover_coluna`); o banco renumera quando o espaço acaba.
+- **Descrição é JSON do TipTap, validada no banco** (nunca HTML): links só `http`, `https` e `mailto`; imagem só do
+  balde `quadros`, com o caminho no nó (`<cliente>/<cartão>/...`) e URL assinada na hora de mostrar (com download).
+  Anexos e imagens ficam no balde privado `quadros`.
+- **Tempo real por canal privado:** o aviso leva só ids, nunca dados; a tela relê pelo banco ao receber o aviso e ao
+  `conectou`, `reconectou`, `plano_b` e `sem_acesso` (e quando o acesso muda). O plano B (releitura) roda a cada 30 s
+  enquanto o canal não está de pé.
+- **Os 4 números do topo seguem só o filtro Responsável** (busca, prioridade e prazo não mudam os números).
+- **Cartões lidos por coluna** (50 por vez, "ver mais"): nunca o quadro inteiro de uma vez.
+
 ## Padrão Hub: botões, formulários, campos e abas
 
 Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/2026-11-16-padrao-hub.md`.
@@ -73,6 +94,9 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   texto salva, porque as ausências têm o formulário delas) e o formulário em linha de `GerirAusencias` tem o
   próprio botão dentro dele. `VerificacaoDoPerfil` e `CadastroDoAutenticador` (`src/components/verificacao/`, na
   aba Acesso da `FichaDoConsultor` no modo próprio) têm formulário em linha com o próprio botão, como `GerirAusencias`.
+- **Exceção registrada: `JanelaDoCartao`** (Quadro) grava campo a campo, com o estado "Salvando… / Salvo / Erro ao
+  salvar" e sem botão Salvar; ao fechar com algo não salvo, pergunta. O rodapé tem Fechar, e Arquivar/Apagar ficam só
+  com o ícone no celular (`max-sm:sr-only`).
 - **Meu perfil é a própria `FichaDoConsultor`** (pedido do Diego, 17/11): a bolinha do trilho e a própria linha em
   Usuários abrem `MinhaFicha` (a ficha no modo próprio, `pessoa.id === perfilDeQuem.id`). A pessoa muda só o que o
   banco aceita dela (nome, foto, cor, contato, senha e o app autenticador); o resto aparece só para ler.

@@ -103,6 +103,9 @@ describe('janela do cartão: abrir', () => {
     expect(await within(j).findByRole('table', { name: 'Anexos do cartão' })).toHaveTextContent('contrato.pdf')
     expect(within(j).getByRole('button', { name: 'Arquivar' })).toBeInTheDocument()
     expect(within(j).getByRole('button', { name: 'Apagar' })).toBeInTheDocument()
+    // No celular (360 px) só o ícone aparece; o nome acessível fica.
+    expect(within(within(j).getByRole('button', { name: 'Arquivar' })).getByText('Arquivar')).toHaveClass('max-sm:sr-only')
+    expect(within(within(j).getByRole('button', { name: 'Apagar' })).getByText('Apagar')).toHaveClass('max-sm:sr-only')
   })
 
   it('cartão que já não existe (ou que a pessoa não vê mais) ao abrir: avisa, fecha e relê o quadro', async () => {
