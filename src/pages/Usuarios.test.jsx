@@ -6,9 +6,11 @@ import { mudarCor, trocarFoto } from '@/data/imagens'
 import { toast } from 'sonner'
 import { apagarAusencia, definirCarga, listarAusencias, ocupacaoDasPessoas } from '@/data/capacidade'
 import { buscarConsultorias, buscarConsultoriasAtivas } from '@/data/consultorias'
+import { indicadoresDeUsuarios } from '@/data/indicadores'
 import { atualizarMeuContato, buscarUsuario, criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
 import { escolherNoSeletor } from '@/test/campos'
+import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
 import Usuarios from './Usuarios'
 
@@ -21,6 +23,7 @@ vi.mock('@/data/capacidade', () => ({
 }))
 vi.mock('@/data/clientes', () => ({ contarClientesAtivos: vi.fn() }))
 vi.mock('@/data/consultorias', () => ({ buscarConsultorias: vi.fn(), buscarConsultoriasAtivas: vi.fn() }))
+vi.mock('@/data/indicadores', () => ({ indicadoresDeUsuarios: vi.fn() }))
 vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn().mockResolvedValue({ erro: null }), tirarFoto: vi.fn(), mudarCor: vi.fn().mockResolvedValue({ erro: null }) }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
 vi.mock('@/data/times', () => ({
@@ -40,6 +43,7 @@ beforeEach(() => {
   vi.mocked(buscarConsultoriasAtivas).mockResolvedValue({ itens: [{ id: 'k1', nome: 'Acme' }], total: 1 })
   vi.mocked(listarAusencias).mockResolvedValue({ itens: [], total: 0 })
   vi.mocked(ocupacaoDasPessoas).mockResolvedValue({})
+  vi.mocked(indicadoresDeUsuarios).mockResolvedValue({ mes: mesAtual(), passado: false, pessoas_ativas: 6, ocupacao_media: 0.6234, acima_de_100: 1, sem_tipo: 3 })
   vi.mocked(listarUsuarios).mockResolvedValue({
     itens: [
       {
@@ -728,5 +732,40 @@ describe('Usuários', () => {
       renderizarTela(<Usuarios />, { perfil: { id: 'p1', papel: 'pessoa', consultoria_id: 'c1' } })
       expect(await botao('Ana')).toBeNull()
     })
+  })
+})
+
+describe('Usuários: cartões de números abaixo dos filtros', () => {
+  const admin = { id: 'a1', papel: 'admin', consultoria_id: 'c1' }
+
+  it('Pessoas ativas, Ocupação média do mês, Acima de 100% e Sem tipo de consultoria, do banco', async () => {
+    renderizarTela(<Usuarios />, { perfil: admin })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos usuários')
+    await waitFor(() => expect(numeroDoCartao(cartoes, 'Pessoas ativas')).toBe('6'))
+    expect(numeroDoCartao(cartoes, 'Ocupação média do mês')).toBe('62%')
+    expect(numeroDoCartao(cartoes, 'Acima de 100%')).toBe('1')
+    expect(numeroDoCartao(cartoes, 'Sem tipo de consultoria')).toBe('3')
+    expect(indicadoresDeUsuarios).toHaveBeenCalledWith({ consultoriaId: 'c1', mes: mesAtual() })
+  })
+
+  it('mês passado: Utilização média; trocar o mês pede os números do mês novo', async () => {
+    renderizarTela(<Usuarios />, { perfil: admin })
+    await cartoesAbaixoDaBarra('Indicadores dos usuários')
+    vi.mocked(indicadoresDeUsuarios).mockResolvedValue({ mes: deslocarMes(mesAtual(), -1), passado: true, pessoas_ativas: 6, ocupacao_media: 0.5, acima_de_100: 0, sem_tipo: 3 })
+    await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
+    await waitFor(() => expect(indicadoresDeUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', mes: deslocarMes(mesAtual(), -1) }))
+    const cartoes = screen.getByRole('region', { name: 'Indicadores dos usuários' })
+    await waitFor(() => expect(numeroDoCartao(cartoes, 'Utilização média do mês')).toBe('50%'))
+  })
+
+  it('a central vê os números de todas e o filtro de consultoria muda os cartões (o Tipo não)', async () => {
+    renderizarTela(<Usuarios />, { perfil: { id: 'c0', papel: 'central', consultoria_id: null } })
+    await cartoesAbaixoDaBarra('Indicadores dos usuários')
+    expect(indicadoresDeUsuarios).toHaveBeenLastCalledWith({ consultoriaId: undefined, mes: mesAtual() })
+    await escolherNoSeletor(userEvent, 'Tipo', 'Gestão')
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith(expect.objectContaining({ tipo: 'gestao' })))
+    expect(indicadoresDeUsuarios).toHaveBeenCalledTimes(1)
+    await escolherNoSeletor(userEvent, 'Consultoria', 'Acme')
+    await waitFor(() => expect(indicadoresDeUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'k1', mes: mesAtual() }))
   })
 })

@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { Archive, Building2, CalendarX, Hourglass, Plus, RadioTower, Timer, TrendingUp, Users } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
@@ -6,6 +6,7 @@ import { GraficoCarregando } from '@/components/comum/Carregando'
 import Seletor from '@/components/campos/Seletor'
 import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
+import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import { AcoesDaLinha } from '@/components/clientes/AcoesDoCliente'
@@ -17,10 +18,12 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { listarClientes } from '@/data/clientes'
 import { meuCheckinAberto } from '@/data/checkins'
+import { indicadoresDeClientes } from '@/data/indicadores'
 import { formatarCnpj } from '@/lib/cnpj'
 import { formatarHoras } from '@/lib/horas'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
+import { useLeitura } from '@/lib/useLeitura'
 
 // Situação (filtro) por papel. A central e o dono veem tudo e começam pelo que espera a central; admin e gestor
 // começam pelo que está em atendimento. A pessoa não tem filtro: só vê os clientes dela.
@@ -43,6 +46,35 @@ const VAZIO = {
   aguardando: 'Nenhum cliente aguardando consultor.',
   atendimento: 'Nenhum cliente em atendimento.',
   meus: 'Você ainda não tem clientes.',
+}
+
+// Números dos cartões (contados no banco, no recorte de quem vê): seguem a consultoria e o consultor do filtro; a
+// situação e a busca não mudam os cartões (eles mostram justamente a divisão por situação).
+const lerNumeros = ({ consultoriaId, consultorId }) => indicadoresDeClientes({ consultoriaId, consultorId })
+
+// Os 4 cartões de cada papel: central e dono, a fila e as situações; administrador e gestor, a consultoria; o
+// consultor, os clientes dele.
+function cartoesDoPapel(papel, n) {
+  const passaram = { chave: 'passaram', rotulo: 'Passaram da previsão no mês', icone: TrendingUp, tom: 'perigo',
+    valor: n?.passaram_da_previsao, destaque: n?.passaram_da_previsao > 0 ? 'perigo' : null }
+  const parados = { chave: 'parados', rotulo: 'Sem check-in há 30 dias', icone: CalendarX, tom: 'aviso',
+    valor: n?.sem_checkin_30_dias, destaque: n?.sem_checkin_30_dias > 0 ? 'atencao' : null }
+  const aguardando = { chave: 'aguardando', rotulo: 'Aguardando consultor', icone: Hourglass, tom: 'aviso', valor: n?.aguardando_consultor }
+  const atendimento = { chave: 'atendimento', rotulo: 'Em atendimento', icone: RadioTower, tom: 'positivo', valor: n?.em_atendimento }
+  if (papel === 'central') {
+    return [
+      { chave: 'distribuir', rotulo: 'Aguardando consultoria', icone: Building2, valor: n?.aguardando_consultoria },
+      aguardando, atendimento,
+      { chave: 'arquivados', rotulo: 'Arquivados', icone: Archive, tom: 'neutro', valor: n?.arquivados },
+    ]
+  }
+  if (papel === 'gestao') return [aguardando, atendimento, passaram, parados]
+  return [
+    { chave: 'meus', rotulo: 'Meus clientes', icone: Users, valor: n?.meus_clientes },
+    passaram,
+    { chave: 'horas', rotulo: 'Horas no mês', icone: Timer, tom: 'ceu', valor: n ? formatarHoras(n.horas_no_mes) : null },
+    parados,
+  ]
 }
 
 function Previsao({ cliente, comRealizado }) {
@@ -82,6 +114,9 @@ export default function Clientes() {
   const consultorFiltrado = mostraFiltroConsultor && (semConsultorVale || consultor.valor !== 'sem') ? consultor.valor : ''
   const recarregar = () => setVersao((v) => v + 1)
   const { abrir, janelas } = useAcoesDoCliente({ aoMudar: recarregar })
+  const numeros = useLeitura(lerNumeros, {
+    consultoriaId: consultoriaId || undefined, consultorId: consultorFiltrado || undefined, versao,
+  }).dados
 
   // Uma página por vez, filtrada e paginada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
@@ -170,6 +205,8 @@ export default function Clientes() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
+      <CartoesDeNumeros rotulo="Indicadores dos clientes"
+        cartoes={cartoesDoPapel(central ? 'central' : doConsultor ? 'consultor' : 'gestao', numeros)} />
       {!central && aberto && clientes?.some((c) => c.id !== aberto.cliente_id && (doConsultor || c.consultor_id === perfil.id)) && (
         <p id={idDoAviso} className="mb-3 text-corpo text-muted-foreground">
           Você está com check-in aberto em {aberto.cliente?.nome ?? 'outro cliente'} desde {HORA.format(new Date(aberto.inicio))}.

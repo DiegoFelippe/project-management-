@@ -1,7 +1,7 @@
 // Integrações da consultoria (desenho em docs/superpowers/specs/2026-11-12-integracoes-design.md):
 // IA, e-mail (SMTP) e Google. Aqui só se conecta; o resto do sistema usa a mesma conexão.
 // O administrador conecta, edita, testa e desconecta; o dono escolhe a consultoria e só olha.
-import { Calendar, Mail, Pencil, PlugZap, RefreshCw, Sparkles, Unplug } from 'lucide-react'
+import { Calendar, CircleAlert, CircleCheck, History, Mail, Pencil, Plug, PlugZap, RefreshCw, Sparkles, Unplug } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -10,6 +10,7 @@ import { Aviso } from '@/components/auth/TelaDeAcesso'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
+import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
@@ -25,7 +26,9 @@ import {
   salvarIntegracao,
   testarIntegracao,
 } from '@/data/integracoes'
+import { indicadoresDeIntegracoes } from '@/data/indicadores'
 import { veTudo } from '@/lib/papeis'
+import { useLeitura } from '@/lib/useLeitura'
 
 const INTEGRACOES = [
   { tipo: 'ia', nome: 'Inteligência artificial', descricao: 'Claude (Anthropic) ou OpenAI, para os recursos de IA.', icone: Sparkles },
@@ -55,6 +58,19 @@ function detalhes(tipo, config) {
 const quando = (data) =>
   data ? new Date(data).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'
 
+// Cartões (contados no banco): a consultoria escolhida (o dono, antes de escolher, vê todas); o filtro
+// Conectadas/Não conectadas não muda os números. "Último teste": dia/mês e hora do teste mais recente.
+const lerNumeros = ({ consultoriaId }) => indicadoresDeIntegracoes({ consultoriaId })
+const testeCurto = (data) =>
+  data ? new Date(data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Nenhum'
+const cartoesDasIntegracoes = (n) => [
+  { chave: 'conectadas', rotulo: 'Conectadas', icone: CircleCheck, tom: 'positivo', valor: n?.conectadas },
+  { chave: 'com_erro', rotulo: 'Com erro', icone: CircleAlert, tom: 'perigo', valor: n?.com_erro,
+    destaque: n?.com_erro > 0 ? 'perigo' : null },
+  { chave: 'nao_configuradas', rotulo: 'Não configuradas', icone: Plug, tom: 'neutro', valor: n?.nao_configuradas },
+  { chave: 'ultimo_teste', rotulo: 'Último teste', icone: History, tom: 'ceu', valor: n ? testeCurto(n.ultimo_teste) : null },
+]
+
 function avisarResultado(resposta, sucesso) {
   if (resposta.erro) return toast.error(resposta.erro)
   if (resposta.integracao?.situacao === 'conectada') return toast.success(sucesso)
@@ -75,6 +91,7 @@ export default function Integracoes() {
   const [versao, setVersao] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
   const [busca, setBusca] = useSearchParams()
+  const numeros = useLeitura(lerNumeros, { consultoriaId: consultoriaId || undefined, versao }).dados
 
   // volta do "Conectar com Google"
   useEffect(() => {
@@ -149,6 +166,7 @@ export default function Integracoes() {
         <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={situacaoFiltro} aoMudar={setSituacaoFiltro} />
         {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setIntegracoes(null) }} />}
       </BarraDeFiltros>
+      <CartoesDeNumeros rotulo="Indicadores das integrações" cartoes={cartoesDasIntegracoes(numeros)} />
       {aviso && <div className="mb-4"><Aviso>{aviso}</Aviso></div>}
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {ehDono && !consultoriaId && <ListaVazia>Escolha uma consultoria para ver as integrações dela.</ListaVazia>}

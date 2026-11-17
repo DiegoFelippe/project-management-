@@ -4,8 +4,10 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { consultoriasPorOcupacao } from '@/data/capacidade'
 import { contarClientesAtivos } from '@/data/clientes'
 import { gerenciarConsultoria, listarConsultorias } from '@/data/consultorias'
+import { indicadoresDeConsultorias } from '@/data/indicadores'
 import { trocarLogo } from '@/data/imagens'
 import { deslocarMes, mesAtual } from '@/lib/mes'
+import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
 import Consultorias from './Consultorias'
 
@@ -16,6 +18,7 @@ vi.mock('@/data/capacidade', () => ({ consultoriasPorOcupacao: vi.fn(), definirC
 vi.mock('@/data/usuarios', () => ({ criarAcesso: vi.fn() }))
 vi.mock('@/data/clientes', () => ({ contarClientesAtivos: vi.fn() }))
 vi.mock('@/data/imagens', () => ({ trocarLogo: vi.fn().mockResolvedValue({ erro: null }), tirarLogo: vi.fn() }))
+vi.mock('@/data/indicadores', () => ({ indicadoresDeConsultorias: vi.fn() }))
 
 beforeAll(() => {
   URL.createObjectURL = vi.fn(() => 'blob:previa')
@@ -36,6 +39,9 @@ beforeEach(() => {
   })
   vi.mocked(gerenciarConsultoria).mockResolvedValue({ erro: null })
   vi.mocked(contarClientesAtivos).mockResolvedValue(0)
+  vi.mocked(indicadoresDeConsultorias).mockResolvedValue({
+    mes: mesAtual(), passado: false, consultorias_ativas: 12, clientes_ativos: 1340, consultores: 88, ocupacao_media: 0.71,
+  })
   vi.mocked(consultoriasPorOcupacao).mockResolvedValue({
     itens: [{ id: 'c1', nome: 'Acme', consultores: 4, capacidade: 160, reservado: 80, realizado: 40, ocupacao: 0.5, clientes: 7, aguardando: 2 }],
     total: 1,
@@ -190,5 +196,37 @@ describe('Consultorias', () => {
       expect(within(tabela).getByRole('columnheader', { name: 'Utilização' })).toBeInTheDocument()
       expect(within(tabela).queryByRole('columnheader', { name: 'Reservado' })).toBeNull()
     })
+  })
+})
+
+describe('Consultorias: cartões de números abaixo dos filtros', () => {
+  it('Consultorias ativas, Clientes ativos, Consultores e Ocupação média do mês, do banco', async () => {
+    renderizarTela(<Consultorias />, { perfil: dono })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores das consultorias')
+    await vi.waitFor(() => expect(numeroDoCartao(cartoes, 'Consultorias ativas')).toBe('12'))
+    expect(numeroDoCartao(cartoes, 'Clientes ativos')).toBe('1.340')
+    expect(numeroDoCartao(cartoes, 'Consultores')).toBe('88')
+    expect(numeroDoCartao(cartoes, 'Ocupação média do mês')).toBe('71%')
+    expect(indicadoresDeConsultorias).toHaveBeenCalledWith({ mes: mesAtual() })
+  })
+
+  it('o mês da aba Ocupação vale para os cartões; mês passado vira Utilização média', async () => {
+    renderizarTela(<Consultorias />, { perfil: dono })
+    await userEvent.click(await screen.findByRole('button', { name: 'Ocupação do mês' }))
+    await screen.findByRole('table', { name: 'Ocupação do mês' })
+    vi.mocked(indicadoresDeConsultorias).mockResolvedValue({
+      mes: deslocarMes(mesAtual(), -1), passado: true, consultorias_ativas: 12, clientes_ativos: 1340, consultores: 88, ocupacao_media: 0.4,
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
+    await vi.waitFor(() => expect(indicadoresDeConsultorias).toHaveBeenLastCalledWith({ mes: deslocarMes(mesAtual(), -1) }))
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores das consultorias')
+    await vi.waitFor(() => expect(numeroDoCartao(cartoes, 'Utilização média do mês')).toBe('40%'))
+  })
+
+  it('quem não vê todas as consultorias não tem os cartões nem pede os números', async () => {
+    renderizarTela(<Consultorias />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await screen.findByRole('table', { name: 'Consultorias' })
+    expect(screen.queryByRole('region', { name: 'Indicadores das consultorias' })).toBeNull()
+    expect(indicadoresDeConsultorias).not.toHaveBeenCalled()
   })
 })

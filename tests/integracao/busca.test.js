@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { padraoDeBusca } from '../../src/lib/busca.js'
-import { clienteAdmin, criarConsultoriaDeTeste, criarPerfilDeTeste, entrarComo, limparTudo } from './ambiente.js'
+import { clienteAdmin, criarConsultoriaDeTeste, criarPerfilDeTeste, criarTimeDeTeste, entrarComo, limparTudo } from './ambiente.js'
 
 // A busca dos seletores (pessoas e consultorias) ignora acento e maiúscula no banco, com o mesmo recorte de RLS.
 const admin = clienteAdmin()
@@ -37,6 +37,18 @@ describe('busca sem acento (nome_busca)', () => {
     expect(propria.data).toEqual([{ id: A }])
     const alheia = await comoB.from('consultorias').select('id', { count: 'exact' }).ilike('nome_busca', padrao)
     expect(alheia.count).toBe(0)
+  })
+
+  it('times: "implantacao" acha "Implantação" pelo nome_busca, só na própria consultoria', async () => {
+    await criarTimeDeTeste({ consultoriaId: A, gestorId: adminA.id, nome: `Implantação ${marca}` })
+    const padrao = padraoDeBusca(`IMPLANTACAO ${marca}`)
+    const propria = await comoA.from('times').select('nome', { count: 'exact' }).ilike('nome_busca', padrao)
+    expect(propria.error).toBeNull()
+    expect(propria.data).toEqual([{ nome: `Implantação ${marca}` }])
+    const alheia = await comoB.from('times').select('id', { count: 'exact' }).ilike('nome_busca', padrao)
+    expect(alheia.count).toBe(0)
+    const { error } = await comoA.from('times').update({ nome_busca: 'x' }).eq('consultoria_id', A)
+    expect(error).not.toBeNull()
   })
 
   it('nome_busca não é gravável por quem está logado', async () => {

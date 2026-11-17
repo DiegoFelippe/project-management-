@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { painelDoInicio } from '@/data/painel'
 import { deslocarMes, mesAtual } from '@/lib/mes'
+import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
 import Inicio from './Inicio'
 
@@ -55,6 +56,26 @@ describe('Início (painel)', () => {
     renderizarTela(<Inicio />, { perfil: perfil('central') })
     const barra = screen.getByText('Filtros').parentElement
     expect(within(barra).getByRole('button', { name: 'Mês anterior' })).toBeInTheDocument()
+  })
+
+  it('os números do mês ficam logo abaixo da barra, com "—" enquanto o painel carrega', async () => {
+    vi.mocked(painelDoInicio).mockReturnValue(new Promise(() => {}))
+    renderizarTela(<Inicio />, { perfil: perfil('admin') })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores do mês')
+    expect(numeroDoCartao(cartoes, 'Clientes ativos')).toBe('—')
+    expect(numeroDoCartao(cartoes, 'Ocupação')).toBe('—')
+    expect(screen.getByText('Carregando o painel…')).toBeInTheDocument()
+  })
+
+  it('com o painel, os cartões trazem os números do banco (e a cor de alerta quando passa de 100%)', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue({ ...ADMIN, indicadores: { ...ADMIN.indicadores, ocupacao: 1.25 } })
+    renderizarTela(<Inicio />, { perfil: perfil('admin') })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores do mês')
+    await waitFor(() => expect(numeroDoCartao(cartoes, 'Clientes ativos')).toBe('12'))
+    expect(numeroDoCartao(cartoes, 'Aguardando consultor')).toBe('1')
+    expect(numeroDoCartao(cartoes, 'Ocupação')).toBe('125%')
+    expect(numeroDoCartao(cartoes, 'Realizado')).toBe('80 h')
+    expect(within(cartoes).getByText('125%')).toHaveClass('text-destructive')
   })
 
   it('administrador: ranking de consultores e sem "a distribuir"', async () => {

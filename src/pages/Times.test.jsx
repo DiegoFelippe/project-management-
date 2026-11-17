@@ -1,15 +1,19 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { buscarConsultorias } from '@/data/consultorias'
+import { indicadoresDeTimes } from '@/data/indicadores'
 import { buscarPessoas } from '@/data/pessoas'
 import { apagarTime, criarTime, editarTime, listarTimes } from '@/data/times'
 import { escolherNoSeletor } from '@/test/campos'
+import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
 import Times from './Times'
 
 vi.mock('@/data/times', () => ({ listarTimes: vi.fn(), criarTime: vi.fn(), editarTime: vi.fn(), apagarTime: vi.fn() }))
 vi.mock('@/data/pessoas', () => ({ buscarPessoas: vi.fn() }))
-vi.mock('@/data/consultorias', () => ({ buscarConsultorias: vi.fn().mockResolvedValue({ itens: [], total: 0 }) }))
+vi.mock('@/data/consultorias', () => ({ buscarConsultorias: vi.fn() }))
+vi.mock('@/data/indicadores', () => ({ indicadoresDeTimes: vi.fn() }))
 
 const gil = { id: 'g1', nome: 'Gil Gestor' }
 const TIMES = [
@@ -27,6 +31,8 @@ beforeEach(() => {
   vi.mocked(apagarTime).mockResolvedValue({ erro: null })
   vi.mocked(criarTime).mockResolvedValue({ id: 't9' })
   vi.mocked(buscarPessoas).mockResolvedValue({ itens: [{ id: 'g9', nome: 'Gabi Gestora', email: 'gabi@x.test', papel: 'gestor' }], total: 1 })
+  vi.mocked(buscarConsultorias).mockResolvedValue({ itens: [{ id: 'c2', nome: 'Beta' }], total: 1 })
+  vi.mocked(indicadoresDeTimes).mockResolvedValue({ times: 12, pessoas_em_times: 1340, pessoas_sem_time: 5, times_sem_membros: 2 })
 })
 
 describe('Times', () => {
@@ -106,5 +112,43 @@ describe('Times', () => {
     expect(listarTimes).toHaveBeenLastCalledWith({ consultoriaId: 'c1', pagina: 1 })
     await userEvent.click(screen.getByRole('button', { name: /Próxima/ }))
     expect(listarTimes).toHaveBeenLastCalledWith({ consultoriaId: 'c1', pagina: 2 })
+  })
+
+  it('buscar estando na página 2 volta para a página 1, com o termo no banco', async () => {
+    vi.mocked(listarTimes).mockResolvedValue({ itens: TIMES, total: 31 })
+    renderizarTela(<Times />, { perfil: admin })
+    await userEvent.click(await screen.findByRole('button', { name: /Próxima/ }))
+    expect(listarTimes).toHaveBeenLastCalledWith({ consultoriaId: 'c1', pagina: 2 })
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar times' }), 'implantação 50%')
+    await vi.waitFor(() => expect(listarTimes).toHaveBeenLastCalledWith({ consultoriaId: 'c1', busca: 'implantação 50%', pagina: 1 }))
+  })
+
+  it('cartões logo abaixo da barra, com os números do banco: Times, Pessoas em times, Pessoas sem time, Times sem membros', async () => {
+    renderizarTela(<Times />, { perfil: admin })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos times')
+    await vi.waitFor(() => expect(numeroDoCartao(cartoes, 'Times')).toBe('12'))
+    expect(numeroDoCartao(cartoes, 'Pessoas em times')).toBe('1.340')
+    expect(numeroDoCartao(cartoes, 'Pessoas sem time')).toBe('5')
+    expect(numeroDoCartao(cartoes, 'Times sem membros')).toBe('2')
+    expect(indicadoresDeTimes).toHaveBeenCalledWith({ consultoriaId: 'c1' })
+  })
+
+  it('a busca não muda os cartões; o filtro de consultoria do dono muda', async () => {
+    renderizarTela(<Times />, { perfil: { id: 'd1', papel: 'dono', consultoria_id: null } })
+    await cartoesAbaixoDaBarra('Indicadores dos times')
+    expect(indicadoresDeTimes).toHaveBeenLastCalledWith({ consultoriaId: undefined })
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar times' }), 'Sup')
+    await vi.waitFor(() => expect(listarTimes).toHaveBeenLastCalledWith(expect.objectContaining({ busca: 'Sup' })))
+    expect(indicadoresDeTimes).toHaveBeenCalledTimes(1)
+    await escolherNoSeletor(userEvent, 'Consultoria', 'Beta')
+    await vi.waitFor(() => expect(indicadoresDeTimes).toHaveBeenLastCalledWith({ consultoriaId: 'c2' }))
+  })
+
+  it('sem resposta dos números, os cartões mostram "—" e a lista continua', async () => {
+    vi.mocked(indicadoresDeTimes).mockRejectedValue(new Error('x'))
+    renderizarTela(<Times />, { perfil: admin })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos times')
+    expect(numeroDoCartao(cartoes, 'Times')).toBe('—')
+    expect(await screen.findByRole('table', { name: 'Times' })).toBeInTheDocument()
   })
 })

@@ -56,19 +56,19 @@ export default function Inicio() {
         <NavegacaoDoMes mes={mes} aoMudar={(novo) => { setErro(false); setMes(novo) }} />
       </BarraDeFiltros>
 
+      {/* Os números do mês logo abaixo da barra ("—" enquanto o mês pedido carrega); com erro, só o aviso. */}
+      {!erro && <Indicadores painel={atualizando ? null : painel} pessoa={perfil.papel === 'pessoa'} passado={mes < mesAtual()} />}
       {erro && <p role="alert" className="card border-destructive/40 p-4 text-corpo text-destructive">Não foi possível carregar o painel. Tente novamente em instantes.</p>}
       {!painel && !erro && <GraficoCarregando texto="Carregando o painel…" className="min-h-64 justify-center" />}
 
       {painel && (
-        <div aria-busy={atualizando ? 'true' : undefined} className={`grid grid-cols-[minmax(0,1fr)] gap-5 transition-opacity ${atualizando ? 'opacity-60' : ''}`}>
-          <Indicadores painel={painel} />
-          <div className="grid grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[repeat(2,minmax(0,1fr))]">
-            <HorasPorMes meses={painel.horas_por_mes} previsao={painel.previsao_atual} />
-            {veEquipe ? <RankingDeOcupacao recorte={painel.recorte} passado={painel.passado} ranking={painel.ranking} mes={painel.mes} />
-              : <MeusClientes passado={painel.passado} clientes={painel.meus_clientes} />}
-            {veEquipe && <ClientesEsperando recorte={painel.recorte} esperando={painel.esperando} passado={painel.passado} />}
-            {veEquipe && <Extremos recorte={painel.recorte} extremos={painel.extremos} passado={painel.passado} mes={painel.mes} />}
-          </div>
+        <div aria-busy={atualizando ? 'true' : undefined}
+          className={`grid grid-cols-[minmax(0,1fr)] gap-5 transition-opacity xl:grid-cols-[repeat(2,minmax(0,1fr))] ${atualizando ? 'opacity-60' : ''}`}>
+          <HorasPorMes meses={painel.horas_por_mes} previsao={painel.previsao_atual} />
+          {veEquipe ? <RankingDeOcupacao recorte={painel.recorte} passado={painel.passado} ranking={painel.ranking} mes={painel.mes} />
+            : <MeusClientes passado={painel.passado} clientes={painel.meus_clientes} />}
+          {veEquipe && <ClientesEsperando recorte={painel.recorte} esperando={painel.esperando} passado={painel.passado} />}
+          {veEquipe && <Extremos recorte={painel.recorte} extremos={painel.extremos} passado={painel.passado} mes={painel.mes} />}
         </div>
       )}
     </section>

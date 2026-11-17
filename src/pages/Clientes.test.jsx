@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { consultoriasPorOcupacao, consultoresPorOcupacao } from '@/data/capacidade'
@@ -7,7 +7,10 @@ import {
   mandarParaConsultoria, reativarCliente,
 } from '@/data/clientes'
 import { fazerCheckin, lancarHoras, meuCheckinAberto } from '@/data/checkins'
+import { buscarConsultorias } from '@/data/consultorias'
+import { indicadoresDeClientes } from '@/data/indicadores'
 import { escolherData, escolherHora, escolherNoSeletor } from '@/test/campos'
+import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
 import Clientes from './Clientes'
 
@@ -21,7 +24,8 @@ vi.mock('@/data/checkins', () => ({
   listarCheckins: vi.fn(), editarCheckin: vi.fn(), apagarCheckin: vi.fn(),
 }))
 vi.mock('@/data/capacidade', () => ({ consultoriasPorOcupacao: vi.fn(), consultoresPorOcupacao: vi.fn() }))
-vi.mock('@/data/consultorias', () => ({ buscarConsultorias: vi.fn().mockResolvedValue({ itens: [], total: 0 }) }))
+vi.mock('@/data/consultorias', () => ({ buscarConsultorias: vi.fn() }))
+vi.mock('@/data/indicadores', () => ({ indicadoresDeClientes: vi.fn() }))
 
 const base = {
   razao_social: null, cidade: 'Natal', uf: 'RN', enviado_em: null, consultor_desde: null, arquivado: false,
@@ -46,6 +50,8 @@ beforeEach(() => {
     { id: 'p2', nome: 'Beto', capacidade: 100, reservado: 60, ocupacao: 0.6 },
   ], total: 2 })
   vi.mocked(meuCheckinAberto).mockResolvedValue(null)
+  vi.mocked(buscarConsultorias).mockResolvedValue({ itens: [{ id: 's1', nome: 'STI' }], total: 1 })
+  vi.mocked(indicadoresDeClientes).mockResolvedValue({ recorte: 'tudo', aguardando_consultoria: 0, aguardando_consultor: 0, em_atendimento: 0, arquivados: 0 })
   vi.mocked(fazerCheckin).mockResolvedValue({ erro: null })
   vi.mocked(lancarHoras).mockResolvedValue({ erro: null })
   for (const f of [criarCliente, editarCliente, arquivarCliente, reativarCliente, apagarCliente, mandarParaConsultoria, escolherConsultor, ajustarPrevisao]) {
@@ -488,5 +494,69 @@ describe('Clientes: check-in do consultor', () => {
     renderizarTela(<Clientes />, { perfil: pessoa })
     await screen.findByRole('table', { name: 'Clientes' })
     expect(screen.queryByText('Meus check-ins')).not.toBeInTheDocument()
+  })
+})
+
+describe('Clientes: cartões de números abaixo dos filtros', () => {
+  const gestor = { id: 'g1', papel: 'gestor', consultoria_id: 's1' }
+
+  it('central: Aguardando consultoria, Aguardando consultor, Em atendimento e Arquivados, do banco', async () => {
+    vi.mocked(indicadoresDeClientes).mockResolvedValue({
+      recorte: 'tudo', aguardando_consultoria: 3, aguardando_consultor: 4, em_atendimento: 1200, arquivados: 9,
+    })
+    renderizarTela(<Clientes />, { perfil: central })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos clientes')
+    await waitFor(() => expect(numeroDoCartao(cartoes, 'Aguardando consultoria')).toBe('3'))
+    expect(numeroDoCartao(cartoes, 'Aguardando consultor')).toBe('4')
+    expect(numeroDoCartao(cartoes, 'Em atendimento')).toBe('1.200')
+    expect(numeroDoCartao(cartoes, 'Arquivados')).toBe('9')
+    expect(indicadoresDeClientes).toHaveBeenCalledWith({ consultoriaId: undefined, consultorId: undefined })
+  })
+
+  it('administrador e gestor: Aguardando consultor, Em atendimento, Passaram da previsão no mês e Sem check-in há 30 dias', async () => {
+    vi.mocked(indicadoresDeClientes).mockResolvedValue({
+      recorte: 'consultoria', aguardando_consultor: 2, em_atendimento: 15, passaram_da_previsao: 1, sem_checkin_30_dias: 4,
+    })
+    renderizarTela(<Clientes />, { perfil: gestor })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos clientes')
+    await waitFor(() => expect(numeroDoCartao(cartoes, 'Aguardando consultor')).toBe('2'))
+    expect(numeroDoCartao(cartoes, 'Em atendimento')).toBe('15')
+    expect(numeroDoCartao(cartoes, 'Passaram da previsão no mês')).toBe('1')
+    expect(numeroDoCartao(cartoes, 'Sem check-in há 30 dias')).toBe('4')
+    expect(within(cartoes).queryByText('Arquivados')).not.toBeInTheDocument()
+  })
+
+  it('consultor: Meus clientes, Passaram da previsão no mês, Horas no mês e Sem check-in há 30 dias', async () => {
+    vi.mocked(indicadoresDeClientes).mockResolvedValue({
+      recorte: 'pessoa', meus_clientes: 7, passaram_da_previsao: 0, horas_no_mes: 12.5, sem_checkin_30_dias: 1,
+    })
+    renderizarTela(<Clientes />, { perfil: { id: 'p9', papel: 'pessoa', consultoria_id: 's1' } })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos clientes')
+    await waitFor(() => expect(numeroDoCartao(cartoes, 'Meus clientes')).toBe('7'))
+    expect(numeroDoCartao(cartoes, 'Passaram da previsão no mês')).toBe('0')
+    expect(numeroDoCartao(cartoes, 'Horas no mês')).toBe('12,5 h')
+    expect(numeroDoCartao(cartoes, 'Sem check-in há 30 dias')).toBe('1')
+  })
+
+  it('os números seguem a consultoria e o consultor do filtro; a situação e a busca não mudam os cartões', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    await cartoesAbaixoDaBarra('Indicadores dos clientes')
+    await escolherNoSeletor(userEvent, 'Situação', 'Todas')
+    expect(indicadoresDeClientes).toHaveBeenCalledTimes(1)
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar clientes' }), 'Alfa')
+    await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ busca: 'Alfa' })))
+    expect(indicadoresDeClientes).toHaveBeenCalledTimes(1)
+    await escolherNoSeletor(userEvent, 'Consultoria', 'STI')
+    await waitFor(() => expect(indicadoresDeClientes).toHaveBeenLastCalledWith({ consultoriaId: 's1', consultorId: undefined }))
+    await escolherNoSeletor(userEvent, 'Consultor', 'Sem consultor')
+    await waitFor(() => expect(indicadoresDeClientes).toHaveBeenLastCalledWith({ consultoriaId: 's1', consultorId: 'sem' }))
+  })
+
+  it('carregando ou sem resposta: "—" nos cartões e a lista continua', async () => {
+    vi.mocked(indicadoresDeClientes).mockRejectedValue(new Error('x'))
+    renderizarTela(<Clientes />, { perfil: central })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos clientes')
+    expect(numeroDoCartao(cartoes, 'Em atendimento')).toBe('—')
+    expect(await screen.findByRole('table', { name: 'Clientes' })).toBeInTheDocument()
   })
 })

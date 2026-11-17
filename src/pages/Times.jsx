@@ -1,4 +1,4 @@
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2, UserCheck, UserMinus, Users, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -6,6 +6,7 @@ import { useAuth } from '@/auth/useAuth'
 import Avatar from '@/components/comum/Avatar'
 import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
+import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
@@ -13,10 +14,15 @@ import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/com
 import EditarTime from '@/components/times/EditarTime'
 import NovoTime from '@/components/times/NovoTime'
 import { Button } from '@/components/ui/button'
+import { indicadoresDeTimes } from '@/data/indicadores'
 import { buscarPessoas } from '@/data/pessoas'
 import { apagarTime, criarTime, editarTime, listarTimes } from '@/data/times'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
+import { useLeitura } from '@/lib/useLeitura'
+
+// Números dos cartões (contados no banco, no recorte de quem vê): seguem a consultoria do filtro, não a busca.
+const lerNumeros = ({ consultoriaId }) => indicadoresDeTimes({ consultoriaId })
 
 // Rostos: o gestor e os primeiros membros (amostra que vem do banco); o número é o total contado no banco.
 function Rostos({ time }) {
@@ -54,6 +60,7 @@ export default function Times() {
   const [apagando, setApagando] = useState(null)
   const [versao, setVersao] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
+  const numeros = useLeitura(lerNumeros, { consultoriaId: consultoriaId || undefined, versao }).dados
 
   // Uma página por vez, paginada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
@@ -129,6 +136,12 @@ export default function Times() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
+      <CartoesDeNumeros rotulo="Indicadores dos times" cartoes={[
+        { chave: 'times', rotulo: 'Times', icone: Users, valor: numeros?.times },
+        { chave: 'em_times', rotulo: 'Pessoas em times', icone: UserCheck, tom: 'positivo', valor: numeros?.pessoas_em_times },
+        { chave: 'sem_time', rotulo: 'Pessoas sem time', icone: UserMinus, tom: 'aviso', valor: numeros?.pessoas_sem_time },
+        { chave: 'sem_membros', rotulo: 'Times sem membros', icone: UsersRound, tom: 'neutro', valor: numeros?.times_sem_membros },
+      ]} />
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && times === null && <GraficoCarregando texto="Carregando os times…" className="py-12" />}
       {times?.length === 0 && (

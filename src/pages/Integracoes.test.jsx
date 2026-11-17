@@ -8,7 +8,9 @@ import {
   salvarIntegracao,
   testarIntegracao,
 } from '@/data/integracoes'
+import { indicadoresDeIntegracoes } from '@/data/indicadores'
 import { escolherNoSeletor } from '@/test/campos'
+import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
 import Integracoes from './Integracoes'
 
@@ -17,6 +19,7 @@ vi.mock('@/data/integracoes', () => ({
   desconectarIntegracao: vi.fn(), iniciarGoogle: vi.fn(),
 }))
 vi.mock('@/data/consultorias', () => ({ buscarConsultorias: vi.fn().mockResolvedValue({ itens: [{ id: 'c1', nome: 'Acme' }], total: 1 }) }))
+vi.mock('@/data/indicadores', () => ({ indicadoresDeIntegracoes: vi.fn() }))
 
 const admin = { id: 'a1', papel: 'admin', consultoria_id: 'c1' }
 const SMTP = {
@@ -31,6 +34,7 @@ beforeEach(() => {
   vi.mocked(salvarIntegracao).mockResolvedValue({ erro: null, integracao: { situacao: 'conectada' } })
   vi.mocked(testarIntegracao).mockResolvedValue({ erro: null, integracao: { situacao: 'conectada' } })
   vi.mocked(desconectarIntegracao).mockResolvedValue({ erro: null })
+  vi.mocked(indicadoresDeIntegracoes).mockResolvedValue({ conectadas: 1, com_erro: 0, nao_configuradas: 2, ultimo_teste: '2026-11-12T16:00:00Z' })
 })
 
 describe('Integrações', () => {
@@ -114,5 +118,39 @@ describe('Integrações', () => {
     await screen.findByRole('table', { name: 'Integrações' })
     expect(listarIntegracoes).toHaveBeenCalledWith({ consultoriaId: 'c1' })
     expect(screen.queryByRole('button', { name: /Editar|Conectar|Testar|Desconectar/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('Integrações: cartões de números abaixo dos filtros', () => {
+  const dataCurta = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+  it('Conectadas, Com erro, Não configuradas e Último teste (o mais recente), do banco', async () => {
+    renderizarTela(<Integracoes />, { perfil: admin })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores das integrações')
+    await vi.waitFor(() => expect(numeroDoCartao(cartoes, 'Conectadas')).toBe('1'))
+    expect(numeroDoCartao(cartoes, 'Com erro')).toBe('0')
+    expect(numeroDoCartao(cartoes, 'Não configuradas')).toBe('2')
+    expect(numeroDoCartao(cartoes, 'Último teste')).toBe(dataCurta('2026-11-12T16:00:00Z'))
+    expect(indicadoresDeIntegracoes).toHaveBeenCalledWith({ consultoriaId: 'c1' })
+  })
+
+  it('nunca testada: "Nenhum"; o filtro Conectadas/Não conectadas não muda os cartões; Testar recarrega', async () => {
+    vi.mocked(indicadoresDeIntegracoes).mockResolvedValue({ conectadas: 0, com_erro: 0, nao_configuradas: 3, ultimo_teste: null })
+    renderizarTela(<Integracoes />, { perfil: admin })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores das integrações')
+    await vi.waitFor(() => expect(numeroDoCartao(cartoes, 'Último teste')).toBe('Nenhum'))
+    await userEvent.click(screen.getByRole('button', { name: 'Conectadas' }))
+    expect(indicadoresDeIntegracoes).toHaveBeenCalledTimes(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Todas' }))
+    await userEvent.click(within(await screen.findByRole('row', { name: /E-mail/ })).getByRole('button', { name: 'Testar' }))
+    await vi.waitFor(() => expect(indicadoresDeIntegracoes).toHaveBeenCalledTimes(2))
+  })
+
+  it('o dono vê os números de todas antes de escolher, e os da consultoria escolhida depois', async () => {
+    renderizarTela(<Integracoes />, { perfil: { id: 'd1', papel: 'dono', consultoria_id: null } })
+    await cartoesAbaixoDaBarra('Indicadores das integrações')
+    expect(indicadoresDeIntegracoes).toHaveBeenLastCalledWith({ consultoriaId: undefined })
+    await escolherNoSeletor(userEvent, 'Consultoria', 'Acme')
+    await vi.waitFor(() => expect(indicadoresDeIntegracoes).toHaveBeenLastCalledWith({ consultoriaId: 'c1' }))
   })
 })

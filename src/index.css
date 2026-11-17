@@ -347,6 +347,11 @@
 .botao-animado:hover:not(:disabled) > svg,
 .botao-animado:focus-visible > svg { animation: icone-botao 0.45s ease-out; }
 
+/* Cartões de números (abaixo da barra de filtros, CartoesDeNumeros): ao passar o mouse (ou focar), o cartão sobe 1px com
+   sombra (classes do componente) e o ícone dá o mesmo pulinho dos botões. "Reduzir movimento" para tudo (regra acima). */
+.cartao-animado:hover .icone-do-cartao,
+.cartao-animado:focus-visible .icone-do-cartao { animation: icone-botao 0.45s ease-out; }
+
 
 /* Botão com Plus (criar): em vez do pulinho, o Plus gira 90° no hover (padrão Hub). */
 .botao-animado > svg.lucide-plus { transition: transform 0.2s ease-out; }

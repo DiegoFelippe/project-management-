@@ -1,4 +1,5 @@
 // Times e membros. O banco (RLS) decide o que cada papel vê e pode mexer.
+import { padraoDeBusca } from '@/lib/busca'
 import { traduzirErroBanco } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import { buscarPagina } from './paginar'
@@ -19,9 +20,9 @@ export async function listarTimes({ consultoriaId, busca, pagina = 1 } = {}) {
     .order('id')
     .limit(ROSTOS, { referencedTable: 'membros' })
   if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
-  // Busca pelo nome no banco (ilike; a tabela não tem coluna sem acento, então o acento conta).
-  const termo = String(busca ?? '').replace(/\*/g, '').trim()
-  if (termo) consulta = consulta.ilike('nome', `%${termo.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
+  // Busca pelo nome no banco, sem acento e sem maiúscula (nome_busca, com índice trigram), como clientes e pessoas.
+  const padrao = padraoDeBusca(busca)
+  if (padrao) consulta = consulta.ilike('nome_busca', padrao)
   const resultado = await buscarPagina(consulta, pagina)
   const itens = resultado.itens.map(({ total, ...time }) => ({
     ...time,

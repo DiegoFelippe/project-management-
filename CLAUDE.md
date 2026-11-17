@@ -48,8 +48,9 @@ Toda tela nova segue esta ordem e estes componentes (detalhes nas seções abaix
    os outros `outline`).
 3. **Barra de filtros** (`BarraDeFiltros`): começa sempre com o ícone e "Filtros"; depois abas
    (`AbasSegmentadas`), busca, filtros e o botão principal no fim. Filtros rodam no banco e voltam para a página 1.
-4. **Cartões de números** logo abaixo da barra: até 4, com o componente comum dos cartões (o mesmo do Início e do
-   Calendário), contados no banco no recorte de quem vê e seguindo os filtros de consultoria/consultor da barra.
+4. **Cartões de números** logo abaixo da barra: até 4, com o componente comum dos cartões (`CartoesDeNumeros`, o mesmo
+   do Início e do Calendário), contados no banco no recorte de quem vê e seguindo os filtros de consultoria/consultor da
+   barra. Animam ao passar o mouse (sobem 1px com sombra e o ícone dá o pulinho, como os botões).
 5. **Conteúdo:** lista sempre em `Tabela` (paginação de 15 vinda do banco, `ListaVazia`, ações na última coluna);
    Editar abre o formulário preenchido.
 6. **Formulário:** `JanelaFormulario` + `SecaoFormulario` (abas `AbasSegmentadas` e 2 colunas quando é grande, como
@@ -84,7 +85,15 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   busca, filtros e o botão principal no fim. Tela sem filtro natural ainda ganha a barra com o recorte que faz
   sentido (Início: o mês; Times: busca pelo nome; Integrações: Todas/Conectadas/Não conectadas). As abas são
   `AbasSegmentadas`; `comoAbas` só nas abas de página, como as do cliente. Times: "Novo time" é o botão principal
-  da barra (administrador e gestor), e o dono vê a consultoria no lugar dele.
+  da barra (administrador e gestor), e o dono vê a consultoria no lugar dele. **Toda tela do menu: barra de filtros
+  (ícone + "Filtros") → cartões de números → conteúdo.** Os cartões (pedido do Diego, 17/11) são o
+  `CartoesDeNumeros` (`src/components/comum/`): até 4, logo depois da barra, com "—" enquanto carregam, **contados no
+  banco** por uma função por tela (`indicadores_de_clientes`, `_de_times`, `_de_usuarios`, `_de_consultorias`,
+  `_de_integracoes`; Início e Calendário: `painel_do_inicio` e `indicadores_da_agenda`), no recorte de quem vê e
+  seguindo os filtros de consultoria/consultor (e o mês) da barra; situação/abas e busca não mudam os cartões. Leitura
+  em `src/data/indicadores.js`, uma por tela, pelo `useLeitura`. **Os cartões animam ao passar o mouse** (e ao focar):
+  sobem 1px com sombra e o ícone dá o pulinho dos botões (`.cartao-animado` em `src/index.css`; "reduzir movimento"
+  para). Teste de tela com `cartoesAbaixoDaBarra` (`src/test/cartoes.js`).
 - **Botões do cabeçalho da página** (`Cabecalho`): a ação principal do contexto é `default` (cheia, `--primary`) e as
   demais são `outline`, tamanho padrão, com ícone. Apagar no cabeçalho é `outline` com o realce de perigo no hover.
   `ghost sm` só dentro de linhas de tabela e listas. Ações que servem aos dois lugares (`AcoesDaLinha`,

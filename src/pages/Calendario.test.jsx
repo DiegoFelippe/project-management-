@@ -12,6 +12,7 @@ import {
   indicadoresDaAgenda, meuGoogle,
 } from '@/data/agenda'
 import { escolherNoSeletor } from '@/test/campos'
+import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import Calendario from './Calendario'
 
 vi.mock('@/data/agenda', async (importOriginal) => {
@@ -123,6 +124,13 @@ describe('Calendário: consultor (visão privada)', () => {
     expect(within(indicadores).getByText('Aguardando transcrição').parentElement).toHaveTextContent('1')
     expect(within(indicadores).getByText('Pastas criadas no mês').parentElement).toHaveTextContent('4')
     expect(indicadoresDaAgenda).toHaveBeenCalledWith('2026-11-17')
+  })
+
+  it('os indicadores são os cartões do padrão, logo abaixo da barra de filtros', async () => {
+    tela(consultor)
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores da agenda')
+    await waitFor(() => expect(numeroDoCartao(cartoes, 'Reuniões no mês')).toBe('9'))
+    expect(within(cartoes).getByText('9')).toHaveClass('text-destaque', 'tabular-nums')
   })
 
   it('clicar num dia mostra o detalhe dele; os próximos 7 dias vêm do mesmo pedido', async () => {

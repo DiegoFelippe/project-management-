@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, Building2, Pencil, Plus, UserPlus } from 'lucide-react'
+import { Archive, ArchiveRestore, Building2, Gauge, Pencil, Plus, RadioTower, UserPlus, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -6,6 +6,7 @@ import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
+import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import FichaDoConsultor from '@/components/usuarios/FichaDoConsultor'
 import { consultoriasPorOcupacao, definirCarga } from '@/data/capacidade'
 import { criarConsultoria, gerenciarConsultoria, listarConsultorias } from '@/data/consultorias'
+import { indicadoresDeConsultorias } from '@/data/indicadores'
 import { tirarLogo, trocarLogo } from '@/data/imagens'
 import { useAuth } from '@/auth/useAuth'
 import { POR_PAGINA } from '@/data/paginar'
@@ -23,12 +25,23 @@ import { colunasDoMes, formatarHoras, formatarOcupacao } from '@/lib/horas'
 import { mesAtual } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
+import { useLeitura } from '@/lib/useLeitura'
 import { urlPublica } from '@/lib/imagem'
 import { criarAcesso } from '@/data/usuarios'
 
 const ABAS = [{ valor: 'ativas', rotulo: 'Ativas' }, { valor: 'arquivadas', rotulo: 'Arquivadas' }]
 const ABA_OCUPACAO = { valor: 'ocupacao', rotulo: 'Ocupação do mês' }
 const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
+
+// Cartões da plataforma (só quem vê todas; contados no banco): seguem o mês da aba Ocupação; as abas e a busca, não.
+const lerNumeros = ({ mes }) => indicadoresDeConsultorias({ mes })
+const cartoesDoMes = (n, passado) => [
+  { chave: 'ativas', rotulo: 'Consultorias ativas', icone: Building2, valor: n?.consultorias_ativas },
+  { chave: 'clientes', rotulo: 'Clientes ativos', icone: RadioTower, tom: 'positivo', valor: n?.clientes_ativos },
+  { chave: 'consultores', rotulo: 'Consultores', icone: Users, tom: 'ceu', valor: n?.consultores },
+  { chave: 'ocupacao', rotulo: passado ? 'Utilização média do mês' : 'Ocupação média do mês', icone: Gauge, tom: 'aviso',
+    valor: n ? formatarOcupacao(n.ocupacao_media) : null },
+]
 
 export default function Consultorias() {
   const { perfil } = useAuth()
@@ -86,6 +99,7 @@ export default function Consultorias() {
   }
   const [versao, setVersao] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
+  const numeros = useLeitura(lerNumeros, veTudo(perfil) ? { mes, versao } : null).dados
 
   // Uma página por vez, ativas ou arquivadas, filtrada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
@@ -153,6 +167,7 @@ export default function Consultorias() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
+      {veTudo(perfil) && <CartoesDeNumeros rotulo="Indicadores das consultorias" cartoes={cartoesDoMes(numeros, numeros ? numeros.passado : passado)} />}
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as consultorias…" className="py-12" />}
       {resultado && lista.length === 0 && (

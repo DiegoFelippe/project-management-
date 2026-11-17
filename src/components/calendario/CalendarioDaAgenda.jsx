@@ -16,6 +16,7 @@ import {
 } from '@/lib/calendario'
 import { hoje as hojeEmSP } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
+import { useLeitura } from '@/lib/useLeitura'
 import BarraDoCalendario from './BarraDoCalendario'
 import DetalheDoDia from './DetalheDoDia'
 import IndicadoresDaAgenda from './IndicadoresDaAgenda'
@@ -49,25 +50,6 @@ const lerAusencias = ({ de, ate, consultorId, consultoriaId }) => ausenciasDoPer
 const lerFeriados = ({ de, ate }) => feriadosDoPeriodo(de, ate)
 // Sem recorte, só o dia; na agenda do cliente, os números só daquele cliente.
 const lerIndicadores = ({ dia, clienteId }) => (clienteId ? indicadoresDaAgenda(dia, { clienteId }) : indicadoresDaAgenda(dia))
-
-// Uma leitura por chave (os parâmetros): muda a chave, lê de novo; parametros null = não lê. Resposta de uma chave
-// velha é descartada. Devolve { dados } da chave atual, { erro } ou { carregando }.
-function useLeitura(ler, parametros) {
-  const chave = parametros ? JSON.stringify(parametros) : null
-  const [estado, setEstado] = useState({ chave: null })
-  useEffect(() => {
-    if (!chave) return undefined
-    let ativo = true
-    ler(JSON.parse(chave)).then(
-      (dados) => ativo && setEstado({ chave, dados }),
-      () => ativo && setEstado({ chave, erro: true }),
-    )
-    return () => {
-      ativo = false
-    }
-  }, [ler, chave])
-  return estado.chave === chave ? estado : { carregando: Boolean(chave) }
-}
 
 // O "Mostrar" dos eventos vai ao banco: as duas caixas = todos (sem tipo); uma só = aquele tipo; nenhuma = não lê.
 function tipoDosEventos(mostrar) {

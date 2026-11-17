@@ -1,4 +1,4 @@
-import { Gauge, Pencil, Plus, Send, UserCheck, UserX, Landmark } from 'lucide-react'
+import { Gauge, Pencil, Plus, Send, Tags, TrendingUp, UserCheck, UserX, Landmark, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -9,6 +9,7 @@ import Avatar from '@/components/comum/Avatar'
 import BarraDeFiltros, { AcaoPrincipal } from '@/components/comum/BarraDeFiltros'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import Cabecalho from '@/components/comum/Cabecalho'
+import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
@@ -24,6 +25,7 @@ import MinhaFicha from '@/components/usuarios/MinhaFicha'
 import { definirCarga, ocupacaoDasPessoas } from '@/data/capacidade'
 import { buscarConsultoriasAtivas } from '@/data/consultorias'
 import { mudarCor, tirarFoto, trocarFoto } from '@/data/imagens'
+import { indicadoresDeUsuarios } from '@/data/indicadores'
 import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
 import { buscarUsuario, criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { formatarHoras, formatarOcupacao } from '@/lib/horas'
@@ -31,8 +33,21 @@ import { mesAtual } from '@/lib/mes'
 import { ehPapelDeConsultoria, veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
 import { OPCOES_DE_TIPO, rotulosDosTipos } from '@/lib/tiposDeConsultoria'
+import { useLeitura } from '@/lib/useLeitura'
 
 const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'desativados', rotulo: 'Desativados' }]
+
+// Cartões (contados no banco, no recorte de quem vê): seguem a consultoria do filtro e o mês; as abas e o Tipo, não.
+const lerNumeros = ({ consultoriaId, mes }) => indicadoresDeUsuarios({ consultoriaId, mes })
+const cartoesDoMes = (n, passado) => [
+  { chave: 'ativas', rotulo: 'Pessoas ativas', icone: Users, valor: n?.pessoas_ativas },
+  { chave: 'ocupacao', rotulo: passado ? 'Utilização média do mês' : 'Ocupação média do mês', icone: Gauge, tom: 'ceu',
+    valor: n ? formatarOcupacao(n.ocupacao_media) : null },
+  { chave: 'acima', rotulo: 'Acima de 100%', icone: TrendingUp, tom: 'perigo', valor: n?.acima_de_100,
+    destaque: n?.acima_de_100 > 0 ? 'perigo' : null },
+  { chave: 'sem_tipo', rotulo: 'Sem tipo de consultoria', icone: Tags, tom: 'aviso', valor: n?.sem_tipo },
+]
+
 // Situação é etiqueta ao lado do nome, só quando não é o estado normal ("Ativo" não aparece).
 const COR_DA_SITUACAO = {
   'Convite pendente': 'notice',
@@ -112,6 +127,7 @@ export default function Usuarios() {
   const [versaoNumeros, setVersaoNumeros] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
   const recarregarNumeros = () => setVersaoNumeros((v) => v + 1)
+  const cartoes = useLeitura(lerNumeros, { consultoriaId: consultoriaId || undefined, mes, versao, versaoNumeros }).dados
 
   // Uma página por vez, filtrada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
@@ -339,6 +355,7 @@ export default function Usuarios() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
+      <CartoesDeNumeros rotulo="Indicadores dos usuários" cartoes={cartoesDoMes(cartoes, cartoes ? cartoes.passado : mes < mesAtual())} />
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {aviso && <p role="status" className="mb-3 text-corpo text-muted-foreground">{aviso}</p>}
       {comNumeros && erroNumeros && !erro && <p role="status" className="mb-3 text-corpo text-muted-foreground">Não foi possível carregar a capacidade do mês.</p>}
