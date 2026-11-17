@@ -48,7 +48,7 @@ export default function Inicio() {
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-titulo font-bold">Olá, {primeiroNome(perfil.nome)}.</h1>
-          <p className="text-muted-foreground">{NOME_DO_PAPEL[perfil.papel]} {onde}.</p>
+          <p className="text-subtitulo text-muted-foreground">{NOME_DO_PAPEL[perfil.papel]} {onde}.</p>
         </div>
         <NavegacaoDoMes mes={mes} aoMudar={(novo) => { setErro(false); setMes(novo) }} />
       </div>

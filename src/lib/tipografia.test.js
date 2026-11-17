@@ -41,6 +41,9 @@ describe('escala no CSS (src/index.css)', () => {
     expect(css).toMatch(/--font-sans:\s*'Inter Variable'/)
     expect(css).not.toMatch(/font-stretch/)
   })
+  it('o texto sem classe de tamanho cai na escala: body usa text-corpo', () => {
+    expect(css).toMatch(/body \{[^}]*\btext-corpo\b/)
+  })
   it('.texto-de-campo existe: 16 px no celular e text-corpo a partir de sm', () => {
     const regra = css.slice(css.indexOf('.texto-de-campo'))
     expect(regra).toMatch(/text-base/)

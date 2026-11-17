@@ -228,7 +228,7 @@
 @layer base {
   * { @apply border-border outline-ring/50; }
   html { -webkit-text-size-adjust: 100%; }
-  body { @apply bg-moldura text-foreground antialiased; }
+  body { @apply bg-moldura text-corpo text-foreground antialiased; }
   ::selection { background: color-mix(in oklab, var(--primary) 25%, transparent); }
   /* Foco global do padrão Hub, na cor de destaque da consultoria. */
   :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
