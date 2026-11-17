@@ -132,7 +132,8 @@ export async function apagarCliente(id) {
 }
 
 // Histórico do cliente, do mais novo para o mais antigo. Os nomes vêm resolvidos pelo banco, que esconde
-// (devolve null) o que é de outra consultoria. Devolve { itens, total }.
+// (devolve null) o que é de outra consultoria; nos eventos de modelo de check-in (aplicado, trocado, tirado), modelo é o
+// nome do modelo, só para a Central e para a consultoria do check-list. Devolve { itens, total }.
 export async function listarEventos(clienteId, { pagina = 1 } = {}) {
   const { data, error } = await supabase.rpc('historico_do_cliente', {
     p_cliente: clienteId,

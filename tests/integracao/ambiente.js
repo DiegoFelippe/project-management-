@@ -216,9 +216,23 @@ async function limparModelos(consultorias) {
   }
 }
 
+// Check-lists dos clientes e das consultorias de teste: seguram o cliente e a consultoria (restrict), e o modelo com
+// check-list ativo não se apaga. Saem antes dos clientes e dos modelos; etapas, tarefas, dependências e as tarefas
+// marcadas nos check-ins saem junto.
+async function limparChecklists(clientes, consultorias) {
+  if (clientes.length) {
+    conferirLimpeza('apagar os check-lists dos clientes de teste',
+      await admin.from('cliente_checklists').delete().in('cliente_id', clientes))
+  }
+  if (consultorias.length) {
+    conferirLimpeza('apagar os check-lists das consultorias de teste',
+      await admin.from('cliente_checklists').delete().in('consultoria_id', consultorias))
+  }
+}
+
 export async function limparTudo() {
   const consultorias = [...criados.consultorias]
-  // Arquivos, check-ins, quadros e clientes seguram consultorias e clientes (restrict): saem antes.
+  // Arquivos, check-lists, check-ins, quadros e clientes seguram consultorias e clientes (restrict): saem antes.
   const clientes = new Set(criados.clientes)
   if (consultorias.length) {
     const resposta = await admin.from('clientes').select('id').in('consultoria_id', consultorias)
@@ -227,6 +241,7 @@ export async function limparTudo() {
   }
   await limparQuadros([...clientes], consultorias)
   await limparArquivos([...clientes], consultorias)
+  await limparChecklists([...clientes], consultorias)
   if (consultorias.length) {
     // Eventos da agenda seguram consultoria e consultor (restrict); os participantes saem com o evento.
     conferirLimpeza('apagar os eventos da agenda das consultorias de teste',

@@ -96,6 +96,20 @@ const ERROS_MENSAGEM_BANCO = {
   dependencia_invalida: 'Uma tarefa só pode depender de tarefas que vêm antes dela na lista.',
   modelo_grande_demais: 'O modelo passou do limite: até 50 etapas, 500 tarefas e 30 dependências por tarefa.',
   consultoria_invalida: 'Escolha uma consultoria ativa para o modelo.',
+  modelo_em_uso: 'Este modelo está em uso: clientes têm check-list dele. Arquive em vez de apagar.',
+  // Check-list do cliente (aplicar, marcar e a nota)
+  so_o_consultor_marca: 'Só o consultor do cliente marca as tarefas.',
+  checklist_encerrado: 'Este check-list foi trocado ou tirado. Atualize a página para ver o atual.',
+  cliente_arquivado: 'Este cliente está arquivado: o check-list fica só para ler. Reative o cliente antes.',
+  cliente_sem_consultoria: 'Mande o cliente para uma consultoria antes de aplicar um modelo.',
+  modelo_indisponivel: 'Esse modelo não está mais disponível para este cliente. Escolha outro.',
+  inicio_invalido: 'O início dos prazos precisa estar entre 2 anos atrás e 1 ano à frente.',
+  tarefa_bloqueada: 'Esta tarefa depende de outras que ainda não foram feitas.',
+}
+
+// Códigos que só valem no check-list (o mesmo código tem outro sentido em outras telas).
+const ERROS_DO_CHECKLIST = {
+  estado_invalido: 'Essa situação de tarefa não existe. Atualize a página.',
 }
 
 // As regras das colunas dos modelos recusam (23514) texto acima do tamanho; a tela confere o mesmo antes de enviar.
@@ -117,8 +131,11 @@ function traduzirErroDoStorage(erro) {
   return null
 }
 
-// `sobre`: 'time' (padrão) | 'cliente' | 'checkin' | 'arquivo' | 'modelo' — muda o texto de alguns códigos.
+// `sobre`: 'time' (padrão) | 'cliente' | 'checkin' | 'arquivo' | 'modelo' | 'checklist' — muda o texto de alguns
+// códigos.
 export function traduzirErroBanco(erro, { sobre = 'time' } = {}) {
+  const doChecklist = sobre === 'checklist' ? ERROS_DO_CHECKLIST[erro?.message] : null
+  if (doChecklist) return doChecklist
   const mensagem = ERROS_MENSAGEM_BANCO[erro?.message]
   if (mensagem) return mensagem
   if (sobre === 'arquivo') {
@@ -130,12 +147,14 @@ export function traduzirErroBanco(erro, { sobre = 'time' } = {}) {
       ? 'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).'
       : 'Já existe um time com esse nome.'
   }
-  // Check-ins, arquivos e cartões do quadro seguram o cliente (on delete restrict).
+  // Check-ins, arquivos, cartões do quadro e check-lists de modelo seguram o cliente (on delete restrict).
   if (erro?.code === '23503' && sobre === 'cliente') {
-    return 'Este cliente tem horas, arquivos ou cartões registrados. Arquive em vez de apagar.'
+    return 'Este cliente tem horas, arquivos, cartões ou modelo de check-in registrados. Arquive em vez de apagar.'
   }
   if (erro?.code === '23514') {
     if (sobre === 'checkin') return CHECKIN_DE_MAIS_DE_24H
+    // No check-list, o que a pessoa digita é só a nota da tarefa.
+    if (sobre === 'checklist') return 'A nota vai até 500 letras.'
     // Só as regras de tamanho dos textos (nome, descrição, título); as outras (ex.: tipo) ficam no texto de sempre.
     if (sobre === 'modelo' && /_(nome|descricao|titulo)_check"/.test(erro.message ?? '')) {
       return TEXTO_DO_MODELO_GRANDE_DEMAIS

@@ -96,7 +96,7 @@ describe('traduzirErroBanco com contexto', () => {
       'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).',
     )
     expect(traduzirErroBanco({ code: '23503' }, { sobre: 'cliente' })).toBe(
-      'Este cliente tem horas, arquivos ou cartões registrados. Arquive em vez de apagar.',
+      'Este cliente tem horas, arquivos, cartões ou modelo de check-in registrados. Arquive em vez de apagar.',
     )
     expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')
     expect(traduzirErroBanco({ code: '23514' }, { sobre: 'checkin' })).toBe(
@@ -182,6 +182,31 @@ describe('traduzirErroBanco com contexto', () => {
     expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')
     expect(traduzirErroBanco({ code: '23514', message: 'violates check constraint "modelos_nome_check"' }))
       .toBe('Confira os campos destacados.')
+  })
+
+  it('traduz as recusas do check-list do cliente', () => {
+    const msg = (message, code = 'P0001') => traduzirErroBanco({ code, message }, { sobre: 'checklist' })
+    expect(msg('sem_permissao')).toBe('Você não tem permissão para isso.')
+    expect(msg('so_o_consultor_marca')).toBe('Só o consultor do cliente marca as tarefas.')
+    expect(msg('checklist_encerrado')).toBe('Este check-list foi trocado ou tirado. Atualize a página para ver o atual.')
+    expect(msg('cliente_arquivado')).toBe('Este cliente está arquivado: o check-list fica só para ler. Reative o cliente antes.')
+    expect(msg('cliente_sem_consultoria')).toBe('Mande o cliente para uma consultoria antes de aplicar um modelo.')
+    expect(msg('modelo_indisponivel')).toBe('Esse modelo não está mais disponível para este cliente. Escolha outro.')
+    expect(msg('inicio_invalido')).toBe('O início dos prazos precisa estar entre 2 anos atrás e 1 ano à frente.')
+    expect(msg('tarefa_bloqueada')).toBe('Esta tarefa depende de outras que ainda não foram feitas.')
+    expect(msg('estado_invalido')).toBe('Essa situação de tarefa não existe. Atualize a página.')
+    // A nota acima do tamanho (o banco confere ao gravar).
+    expect(msg('new row for relation "checklist_tarefas" violates check constraint "checklist_tarefas_nota_check"', '23514'))
+      .toBe('A nota vai até 500 letras.')
+    // Fora do check-list, estado_invalido e o 23514 continuam os de sempre.
+    expect(traduzirErroBanco({ code: 'P0001', message: 'estado_invalido' })).toBe('Algo deu errado. Tente de novo.')
+    expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')
+  })
+
+  it('modelo em uso não se apaga: pede para arquivar', () => {
+    expect(traduzirErroBanco({ code: 'P0001', message: 'modelo_em_uso' }, { sobre: 'modelo' })).toBe(
+      'Este modelo está em uso: clientes têm check-list dele. Arquive em vez de apagar.',
+    )
   })
 
   it('traduz as recusas da descrição do cartão', () => {

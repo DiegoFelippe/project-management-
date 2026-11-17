@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { buscarClientes, contarClientesAtivos, listarClientes } from './clientes'
+import { buscarClientes, contarClientesAtivos, listarClientes, listarEventos } from './clientes'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 
@@ -81,5 +81,17 @@ describe('buscarClientes (seletores)', () => {
     await buscarClientes({})
     expect(banco.chamadas.some(([m, c]) => m === 'eq' && c === 'arquivado')).toBe(false)
     expect(banco.chamadas.some(([m]) => m === 'ilike')).toBe(false)
+  })
+})
+
+describe('listarEventos (histórico do cliente)', () => {
+  it('pede a página ao banco e traz o nome do modelo de check-in que o banco deixou ver', async () => {
+    const linhas = [
+      { id: 'e1', tipo: 'modelo_trocado', modelo: 'Implantação', total: 2 },
+      { id: 'e2', tipo: 'modelo_aplicado', modelo: null, total: 2 },
+    ]
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: linhas, error: null })
+    expect(await listarEventos('k1', { pagina: 2 })).toEqual({ itens: linhas, total: 2 })
+    expect(supabase.rpc).toHaveBeenCalledWith('historico_do_cliente', { p_cliente: 'k1', p_limite: 15, p_deslocamento: 15 })
   })
 })

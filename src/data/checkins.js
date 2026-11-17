@@ -4,10 +4,12 @@ import { supabase } from '@/lib/supabase'
 import { buscarPagina } from './paginar'
 
 // consultor e cliente vêm das relações calculadas do banco: o gestor vê os check-ins da consultoria toda,
-// mas em perfis só enxerga quem criou e as pessoas dos times dele.
+// mas em perfis só enxerga quem criou e as pessoas dos times dele. As tarefas do check-list marcadas em cada check-in:
+// só as 3 primeiras (na ordem em que foram marcadas) e o total, contado no banco.
 const CAMPOS_DA_LISTA =
   'id, inicio, fim, descricao, consultor_id, consultoria_id, consultor:consultor_do_checkin(nome), ' +
-  'cliente:cliente_do_checkin(id, nome)'
+  'cliente:cliente_do_checkin(id, nome), tarefas:checkin_tarefas(titulo), total_tarefas:checkin_tarefas(count)'
+const TAREFAS_NA_LISTA = 3
 
 const traduzir = (erro) => traduzirErroBanco(erro, { sobre: 'checkin' })
 
@@ -62,13 +64,35 @@ export async function apagarCheckin(id) {
   return resultadoDaEscrita(await supabase.from('checkins').delete().eq('id', id).select('id'))
 }
 
+// Uma página de check-ins. Cada um traz tarefas ([{ titulo }], até 3) e total_tarefas (número).
 export async function listarCheckins({ clienteId, consultorId, pagina = 1 } = {}) {
   let consulta = supabase
     .from('checkins')
     .select(CAMPOS_DA_LISTA, { count: 'exact' })
     .order('inicio', { ascending: false })
     .order('id')
+    .order('marcada_em', { referencedTable: 'tarefas' })
+    .limit(TAREFAS_NA_LISTA, { referencedTable: 'tarefas' })
   if (clienteId) consulta = consulta.eq('cliente_id', clienteId)
   if (consultorId) consulta = consulta.eq('consultor_id', consultorId)
-  return buscarPagina(consulta, pagina)
+  const resultado = await buscarPagina(consulta, pagina)
+  const itens = resultado.itens.map(({ total_tarefas: total, ...checkin }) => ({
+    ...checkin,
+    tarefas: checkin.tarefas ?? [],
+    total_tarefas: total?.[0]?.count ?? 0,
+  }))
+  return { ...resultado, itens }
+}
+
+// As tarefas do check-list marcadas como feitas num check-in (o título guardado nele), na ordem em que foram marcadas:
+// [{ tarefa_id, titulo }]. Para o check-out e para editar o check-in.
+export async function tarefasDoCheckin(checkinId) {
+  const { data, error } = await supabase
+    .from('checkin_tarefas')
+    .select('tarefa_id, titulo')
+    .eq('checkin_id', checkinId)
+    .order('marcada_em')
+    .order('titulo')
+  if (error) throw error
+  return data ?? []
 }

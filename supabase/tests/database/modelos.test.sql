@@ -169,13 +169,16 @@ create function testes.dependencias(p_modelo uuid) returns text[] language sql s
 $$;
 
 -- Os números esperados, contados direto nas tabelas (o recorte de quem vê a consultoria p_consultoria; nula = todos).
+-- Clientes usando: os check-lists ativos no recorte (as consultorias deste teste não têm clientes; a Central sem filtro
+-- conta também os do banco local).
 create function testes.numeros_esperados(p_recorte text, p_consultoria uuid) returns jsonb language sql stable as $$
   select jsonb_build_object(
     'recorte', p_recorte,
     'ativos', count(*),
     'da_central', count(*) filter (where m.da_central),
     'da_consultoria', count(*) filter (where not m.da_central),
-    'clientes_usando', 0)
+    'clientes_usando', (select count(*) from public.cliente_checklists cl
+      where cl.encerrado_em is null and (p_consultoria is null or cl.consultoria_id = p_consultoria)))
   from public.modelos m
   where m.arquivado_em is null
     and (p_consultoria is null or m.consultoria_id = p_consultoria or m.consultoria_id is null)

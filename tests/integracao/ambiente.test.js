@@ -51,6 +51,29 @@ describe('limparTudo', () => {
     expect((await admin.from('consultorias').select('id').eq('id', consultoria)).data).toEqual([])
   })
 
+  it('apaga o check-list do cliente de teste (ele segura o cliente e a consultoria)', async () => {
+    const consultoria = await criarConsultoriaDeTeste()
+    const { data: cliente, error } = await admin
+      .from('clientes')
+      .insert({ nome: 'Limpeza do check-list', horas_mes: 1, consultoria_id: consultoria })
+      .select('id')
+      .single()
+    expect(error).toBeNull()
+    registrarCliente(cliente.id)
+    const { data: checklist, error: erroChecklist } = await admin
+      .from('cliente_checklists')
+      .insert({ cliente_id: cliente.id, consultoria_id: consultoria, modelo_nome: 'Limpeza', inicio: '2026-11-17' })
+      .select('id')
+      .single()
+    expect(erroChecklist).toBeNull()
+
+    await limparTudo()
+
+    expect((await admin.from('cliente_checklists').select('id').eq('id', checklist.id)).data).toEqual([])
+    expect((await admin.from('clientes').select('id').eq('id', cliente.id)).data).toEqual([])
+    expect((await admin.from('consultorias').select('id').eq('id', consultoria)).data).toEqual([])
+  })
+
   it('apaga os arquivos do cliente e os objetos do Storage, inclusive o que ficou sem linha', async () => {
     const consultoria = await criarConsultoriaDeTeste()
     const pessoa = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: consultoria })
