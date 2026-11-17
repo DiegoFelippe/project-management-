@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { apagarArquivo, enviarArquivo, limparPastaDoCliente, linkParaBaixar, listarArquivos } from './arquivos'
+import {
+  apagarArquivo, apagarPasta, criarPasta, enviarArquivo, limparPastaDoCliente, linkParaBaixar, listarArquivos, listarPastas,
+  renomearPasta,
+} from './arquivos'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), storage: { from: vi.fn() } } }))
 
@@ -44,6 +47,78 @@ describe('listarArquivos', () => {
     expect(banco.chamou('range', 15, 29)).toBe(true)
     expect(total).toBe(20)
     expect(itens.map((i) => i.autor)).toEqual(['Ana', 'Central', 'Central', null])
+    expect(banco.chamou('is', 'pasta_id', null)).toBe(true)
+  })
+
+  it('com pastaId, só os arquivos da pasta', async () => {
+    banco.resposta = { data: [], error: null, count: 0 }
+    await listarArquivos('c1', { pastaId: 'd1' })
+    expect(banco.chamou('eq', 'pasta_id', 'd1')).toBe(true)
+    expect(chamada('is')).toBeUndefined()
+  })
+})
+
+describe('enviarArquivo numa pasta', () => {
+  it('grava a linha com o pasta_id', async () => {
+    banco.resposta = { data: null, error: null }
+    await enviarArquivo('c1', arquivo('x'), { pastaId: 'd1' })
+    expect(chamada('insert')[1]).toMatchObject({ pasta_id: 'd1' })
+  })
+})
+
+describe('pastas', () => {
+  it('listarPastas pede a página do cliente, mais novas primeiro, e devolve a contagem de arquivos', async () => {
+    banco.resposta = {
+      data: [{ id: 'd1', nome: 'Contratos', arquivos: [{ count: 3 }] }, { id: 'd2', nome: 'Atas', arquivos: [] }],
+      error: null, count: 17,
+    }
+    const { itens, total } = await listarPastas('c1', { pagina: 2 })
+    expect(chamada('from')).toEqual(['from', 'cliente_pastas'])
+    expect(chamada('select')[1]).toContain('arquivos:cliente_arquivos(count)')
+    expect(chamada('select')[2]).toEqual({ count: 'exact' })
+    expect(banco.chamou('eq', 'cliente_id', 'c1')).toBe(true)
+    expect(banco.chamou('order', 'criada_em', { ascending: false })).toBe(true)
+    expect(banco.chamou('range', 15, 29)).toBe(true)
+    expect(total).toBe(17)
+    expect(itens.map((p) => p.arquivos)).toEqual([3, 0])
+  })
+
+  it('criarPasta grava o nome sem espaços nas pontas; nome repetido tem mensagem própria', async () => {
+    banco.resposta = { data: null, error: null }
+    expect(await criarPasta('c1', '  Atas ')).toEqual({ erro: null })
+    expect(banco.chamou('insert', { cliente_id: 'c1', nome: 'Atas' })).toBe(true)
+    banco.resposta = { data: null, error: { code: '23505' } }
+    expect(await criarPasta('c1', 'Atas')).toEqual({ erro: 'Já existe uma pasta com esse nome neste cliente.' })
+  })
+
+  it('renomearPasta: sem linha mudada, sem permissão', async () => {
+    banco.resposta = { data: [{ id: 'd1' }], error: null }
+    expect(await renomearPasta('d1', ' Novo ')).toEqual({ erro: null })
+    expect(banco.chamou('update', { nome: 'Novo' })).toBe(true)
+    banco.resposta = { data: [], error: null }
+    expect(await renomearPasta('d1', 'Novo')).toEqual({ erro: PERMISSAO })
+  })
+
+  it('apagarPasta apaga a pasta e depois tira do Storage os objetos dos arquivos dela', async () => {
+    banco.resposta = { data: [{ caminho: 'c1/a-x.pdf', id: 'd1' }], error: null }
+    expect(await apagarPasta({ id: 'd1' })).toEqual({ erro: null })
+    expect(banco.chamou('eq', 'pasta_id', 'd1')).toBe(true)
+    expect(banco.chamou('from', 'cliente_pastas')).toBe(true)
+    expect(bucket.remove).toHaveBeenCalledWith(['c1/a-x.pdf'])
+  })
+
+  it('apagarPasta sem permissão não tira objeto nenhum', async () => {
+    banco.resposta = { data: [], error: null }
+    expect(await apagarPasta({ id: 'd1' })).toEqual({ erro: PERMISSAO })
+    expect(bucket.remove).not.toHaveBeenCalled()
+  })
+
+  it('apagarPasta avisa quando algum objeto não saiu', async () => {
+    banco.resposta = { data: [{ caminho: 'c1/a-x.pdf' }], error: null }
+    bucket.remove.mockResolvedValue({ data: [], error: null })
+    const r = await apagarPasta({ id: 'd1' })
+    expect(r.erro).toBeNull()
+    expect(r.aviso).toMatch(/cópia guardada/)
   })
 })
 
@@ -58,7 +133,7 @@ describe('enviarArquivo', () => {
     expect(corpo).toBe(ata)
     expect(opcoes).toEqual({ contentType: 'application/pdf' })
     expect(banco.chamou('insert', {
-      cliente_id: 'c1', caminho, nome: 'Ata da reunião.pdf', tamanho: ata.size, tipo: 'application/pdf',
+      cliente_id: 'c1', caminho, nome: 'Ata da reunião.pdf', tamanho: ata.size, tipo: 'application/pdf', pasta_id: null,
     })).toBe(true)
     expect(bucket.remove).not.toHaveBeenCalled()
   })

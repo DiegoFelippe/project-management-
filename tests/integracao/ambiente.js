@@ -145,6 +145,9 @@ async function limparArquivos(clientes, consultorias) {
   if (consultorias.length) {
     conferirLimpeza('apagar os arquivos das consultorias de teste',
       await admin.from('cliente_arquivos').delete().in('consultoria_id', consultorias))
+    // As pastas seguram a consultoria (restrict); as dos clientes de teste saem com o cliente.
+    conferirLimpeza('apagar as pastas das consultorias de teste',
+      await admin.from('cliente_pastas').delete().in('consultoria_id', consultorias))
   }
 }
 

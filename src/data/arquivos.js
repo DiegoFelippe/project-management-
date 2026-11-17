@@ -12,9 +12,15 @@ const BUCKET = 'arquivos'
 const CAMPOS_DA_LISTA =
   'id, nome, tamanho, tipo, enviado_em, enviado_por, consultoria_id, caminho, autor:autor_do_arquivo(nome)'
 
+// Pastas do cliente: quem criou vem de criada_por (a tela confere quem renomeia e apaga); `arquivos(count)` é
+// quantos arquivos a pasta tem (os que a pessoa vê), para a confirmação de apagar.
+const CAMPOS_DA_PASTA = 'id, nome, evento_id, consultoria_id, criada_por, criada_em, arquivos:cliente_arquivos(count)'
+
 const OBJETO_FICOU = 'O arquivo saiu da lista, mas a cópia guardada não foi apagada. Avise o suporte.'
 
 const traduzir = (erro) => traduzirErroBanco(erro, { sobre: 'arquivo' })
+// Nome repetido no mesmo cliente é o único conflito de uma pasta.
+const traduzirPasta = (erro) => (erro?.code === '23505' ? 'Já existe uma pasta com esse nome neste cliente.' : traduzir(erro))
 const storage = () => supabase.storage.from(BUCKET)
 
 // Sem autor visível (a pessoa foi apagada), o arquivo sem consultoria continua sendo da central.
@@ -23,11 +29,13 @@ const comAutor = ({ autor, ...arquivo }) => ({
   autor: autor?.nome ?? (arquivo.consultoria_id ? null : 'Central'),
 })
 
-export async function listarArquivos(clienteId, { pagina = 1 } = {}) {
-  const consulta = supabase
+// Sem `pastaId`, os arquivos soltos (que não estão em pasta); com ele, os da pasta.
+export async function listarArquivos(clienteId, { pastaId = null, pagina = 1 } = {}) {
+  let consulta = supabase
     .from('cliente_arquivos')
     .select(CAMPOS_DA_LISTA, { count: 'exact' })
     .eq('cliente_id', clienteId)
+  consulta = (pastaId ? consulta.eq('pasta_id', pastaId) : consulta.is('pasta_id', null))
     .order('enviado_em', { ascending: false })
     .order('id')
   const resultado = await buscarPagina(consulta, pagina)
@@ -35,7 +43,7 @@ export async function listarArquivos(clienteId, { pagina = 1 } = {}) {
 }
 
 // Sobe o objeto e depois grava a linha; se a linha não grava, tira o objeto que subiu.
-export async function enviarArquivo(clienteId, arquivo) {
+export async function enviarArquivo(clienteId, arquivo, { pastaId = null } = {}) {
   if (!arquivo?.size) return { erro: 'O arquivo está vazio.' }
   if (arquivo.size > TAMANHO_MAXIMO_ARQUIVO) return { erro: ARQUIVO_GRANDE_DEMAIS }
   const caminho = caminhoDoArquivo(clienteId, arquivo.name)
@@ -48,10 +56,62 @@ export async function enviarArquivo(clienteId, arquivo) {
     nome: nomeParaMostrar(arquivo.name),
     tamanho: arquivo.size,
     tipo,
+    pasta_id: pastaId,
   })
   if (erroLinha) {
     await storage().remove([caminho])
     return { erro: traduzir(erroLinha) }
+  }
+  return { erro: null }
+}
+
+// Pastas do cliente, da mais nova para a mais antiga, 15 por página: { itens, total }. Cada item traz
+// `arquivos` (quantos arquivos tem).
+export async function listarPastas(clienteId, { pagina = 1 } = {}) {
+  const consulta = supabase
+    .from('cliente_pastas')
+    .select(CAMPOS_DA_PASTA, { count: 'exact' })
+    .eq('cliente_id', clienteId)
+    .order('criada_em', { ascending: false })
+    .order('id')
+  const resultado = await buscarPagina(consulta, pagina)
+  return { ...resultado, itens: resultado.itens.map(({ arquivos, ...pasta }) => ({ ...pasta, arquivos: arquivos?.[0]?.count ?? 0 })) }
+}
+
+export async function criarPasta(clienteId, nome) {
+  const { error } = await supabase.from('cliente_pastas').insert({ cliente_id: clienteId, nome: nome.trim() })
+  return { erro: error ? traduzirPasta(error) : null }
+}
+
+// O banco decide quem renomeia: sem permissão, nenhuma linha muda.
+export async function renomearPasta(id, nome) {
+  const { data, error } = await supabase.from('cliente_pastas').update({ nome: nome.trim() }).eq('id', id).select('id')
+  if (error) return { erro: traduzirPasta(error) }
+  if (!data?.length) return { erro: traduzir({ code: '42501' }) }
+  return { erro: null }
+}
+
+const POR_LOTE = 1000
+
+// Apaga a pasta (o banco decide quem pode) e, com ela, as linhas dos arquivos dela; depois tira do Storage os
+// objetos que eram dessas linhas, pelo mesmo caminho de apagarArquivo. Se algum objeto não sair, a pasta
+// continua apagada e vem um aviso.
+export async function apagarPasta(pasta) {
+  const caminhos = []
+  for (let de = 0; ; de += POR_LOTE) {
+    const { data, error } = await supabase.from('cliente_arquivos').select('caminho').eq('pasta_id', pasta.id)
+      .order('id').range(de, de + POR_LOTE - 1)
+    if (error) return { erro: traduzir(error) }
+    caminhos.push(...data.map((a) => a.caminho))
+    if (data.length < POR_LOTE) break
+  }
+  const { data, error } = await supabase.from('cliente_pastas').delete().eq('id', pasta.id).select('id')
+  if (error) return { erro: traduzir(error) }
+  if (!data?.length) return { erro: traduzir({ code: '42501' }) }
+  for (let de = 0; de < caminhos.length; de += POR_LOTE) {
+    const lote = caminhos.slice(de, de + POR_LOTE)
+    const { data: tirados, error: erroObjeto } = await storage().remove(lote)
+    if (erroObjeto || (tirados?.length ?? 0) < lote.length) return { erro: null, aviso: OBJETO_FICOU }
   }
   return { erro: null }
 }

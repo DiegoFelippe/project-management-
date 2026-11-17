@@ -281,3 +281,58 @@ describe('objetos sem linha e cliente apagado', () => {
     expect((await comoCentral.storage.from(BUCKET).list(clienteSai)).data).toHaveLength(1)
   })
 })
+
+describe('pastas do cliente', () => {
+  let pastaId
+
+  it('a consultora cria a pasta; nome repetido (sem diferenciar maiúsculas) é recusado', async () => {
+    const { data, error } = await comoPessoa.from('cliente_pastas').insert({ cliente_id: clienteId, nome: 'Contratos' }).select('id').single()
+    expect(error).toBeNull()
+    pastaId = data.id
+    const repetido = await comoPessoa.from('cliente_pastas').insert({ cliente_id: clienteId, nome: ' contratos ' })
+    expect(repetido.error.code).toBe('23505')
+    const forasteiro = await comoAdminB.from('cliente_pastas').insert({ cliente_id: clienteId, nome: 'Invasão' })
+    expect(forasteiro.error.code).toBe('42501')
+  })
+
+  it('o arquivo sobe para dentro da pasta, a lista da pasta o mostra e a raiz não', async () => {
+    const arquivo = new Blob(['dentro'], { type: 'text/plain' })
+    const caminho = caminhoDoArquivo(clienteId, 'Dentro.txt')
+    expect((await comoPessoa.storage.from(BUCKET).upload(caminho, arquivo, { contentType: 'text/plain' })).error).toBeNull()
+    const { error } = await comoPessoa.from('cliente_arquivos')
+      .insert({ cliente_id: clienteId, caminho, nome: 'Dentro.txt', tamanho: arquivo.size, tipo: 'text/plain', pasta_id: pastaId })
+    expect(error).toBeNull()
+
+    const dentro = await comoGestor.from('cliente_arquivos').select('nome', { count: 'exact' }).eq('pasta_id', pastaId)
+    expect(dentro.data).toEqual([{ nome: 'Dentro.txt' }])
+    const soltos = await comoGestor.from('cliente_arquivos').select('nome').eq('cliente_id', clienteId).is('pasta_id', null)
+    expect(soltos.data.map((a) => a.nome)).not.toContain('Dentro.txt')
+
+    const pastas = await comoGestor.from('cliente_pastas')
+      .select('id, nome, arquivos:cliente_arquivos(count)', { count: 'exact' }).eq('cliente_id', clienteId)
+    expect(pastas.count).toBe(1)
+    expect(pastas.data[0]).toMatchObject({ nome: 'Contratos', arquivos: [{ count: 1 }] })
+    expect((await comoAdminB.from('cliente_pastas').select('id').eq('id', pastaId)).data).toEqual([])
+  })
+
+  it('quem criou renomeia; outra pessoa da consultoria não', async () => {
+    expect((await comoOutra.from('cliente_pastas').update({ nome: 'X' }).eq('id', pastaId).select('id')).data).toEqual([])
+    const { data, error } = await comoPessoa.from('cliente_pastas').update({ nome: 'Contratos 2026' }).eq('id', pastaId).select('nome')
+    expect(error).toBeNull()
+    expect(data).toEqual([{ nome: 'Contratos 2026' }])
+  })
+
+  it('o gestor apaga a pasta: as linhas saem junto e ele tira os objetos do Storage', async () => {
+    const { data: linhas } = await comoGestor.from('cliente_arquivos').select('caminho').eq('pasta_id', pastaId)
+    expect(linhas).toHaveLength(1)
+    expect(await existe(linhas[0].caminho)).toBe(true)
+    const { data, error } = await comoGestor.from('cliente_pastas').delete().eq('id', pastaId).select('id')
+    expect(error).toBeNull()
+    expect(data).toHaveLength(1)
+    expect((await admin.from('cliente_arquivos').select('id').eq('pasta_id', pastaId)).data).toEqual([])
+    const { data: tirados, error: erroObjeto } = await comoGestor.storage.from(BUCKET).remove([linhas[0].caminho])
+    expect(erroObjeto).toBeNull()
+    expect(tirados).toHaveLength(1)
+    expect(await existe(linhas[0].caminho)).toBe(false)
+  })
+})

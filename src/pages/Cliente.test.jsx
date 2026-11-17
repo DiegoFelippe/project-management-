@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apagarCheckin, checkinsDoMes, editarCheckin, listarCheckins, meuCheckinAberto } from '@/data/checkins'
-import { limparPastaDoCliente, listarArquivos } from '@/data/arquivos'
+import { limparPastaDoCliente, listarArquivos, listarPastas } from '@/data/arquivos'
 import { apagarCliente, buscarCliente, checkinsPorSemana, eventosDoMes, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
 import { renderizarTela } from '@/test/renderizar'
 import Cliente from './Cliente'
@@ -20,6 +20,7 @@ vi.mock('@/data/checkins', () => ({
 }))
 vi.mock('@/data/arquivos', () => ({
   listarArquivos: vi.fn(), enviarArquivo: vi.fn(), linkParaBaixar: vi.fn(), apagarArquivo: vi.fn(), limparPastaDoCliente: vi.fn(),
+  listarPastas: vi.fn(), criarPasta: vi.fn(), renomearPasta: vi.fn(), apagarPasta: vi.fn(),
 }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
 vi.mock('@/data/capacidade', () => ({ consultoriasPorOcupacao: vi.fn(), consultoresPorOcupacao: vi.fn() }))
@@ -257,9 +258,10 @@ describe('Cliente (página)', () => {
       itens: [{ id: 'a1', nome: 'contrato.pdf', tamanho: 100, enviado_em: '2026-11-10T12:00:00Z', consultoria_id: 's1', caminho: 'k1/a', autor: 'Ana' }],
       total: 1,
     })
+    vi.mocked(listarPastas).mockResolvedValue({ itens: [], total: 0 })
     tela(central, '/clientes/k1?aba=arquivos')
     expect(await screen.findByRole('table', { name: 'Arquivos' })).toBeInTheDocument()
-    expect(listarArquivos).toHaveBeenCalledWith('k1', { pagina: 1 })
+    expect(listarArquivos).toHaveBeenCalledWith('k1', { pastaId: null, pagina: 1 })
   })
 
   it('trocar de aba mantém o cliente carregado', async () => {
