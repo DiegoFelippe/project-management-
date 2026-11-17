@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import Avatar from '@/components/comum/Avatar'
-import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
+import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { buscarPessoas } from '@/data/pessoas'
 import { apagarTime, criarTime, editarTime, listarTimes } from '@/data/times'
 import { veTudo } from '@/lib/papeis'
+import { useAtraso } from '@/lib/useAtraso'
 
 // Rostos: o gestor e os primeiros membros (amostra que vem do banco); o número é o total contado no banco.
 function Rostos({ time }) {
@@ -45,6 +46,8 @@ export default function Times() {
   const [consultoriaId, setConsultoriaId] = useState(ehDono ? '' : perfil.consultoria_id)
   const [resultado, setResultado] = useState(null)
   const [pagina, setPagina] = useState(1)
+  const [busca, setBusca] = useState('')
+  const buscaAtrasada = useAtraso(busca.trim(), 300)
   const [erro, setErro] = useState(null)
   const [novo, setNovo] = useState(false)
   const [editando, setEditando] = useState(null)
@@ -55,7 +58,7 @@ export default function Times() {
   // Uma página por vez, paginada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
     let ativo = true
-    listarTimes({ consultoriaId: consultoriaId || undefined, pagina })
+    listarTimes({ consultoriaId: consultoriaId || undefined, busca: buscaAtrasada || undefined, pagina })
       .then((r) => {
         if (!ativo) return
         if (r.foraDaFaixa && pagina > 1) return setPagina(1)
@@ -66,7 +69,7 @@ export default function Times() {
     return () => {
       ativo = false
     }
-  }, [consultoriaId, pagina, versao])
+  }, [consultoriaId, buscaAtrasada, pagina, versao])
 
   // Gestores para escolher ao criar ou editar um time (o administrador): busca no banco pelo nome, nunca a lista inteira.
   const buscarGestores = useCallback(
@@ -113,22 +116,23 @@ export default function Times() {
 
   return (
     <>
-      <Cabecalho titulo="Times" descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'time' : 'times'}` : null}>
+      <Cabecalho titulo="Times" descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'time' : 'times'}` : null} />
+      <BarraDeFiltros>
+        <CampoBusca rotulo="Buscar times" placeholder="Buscar time" valor={busca}
+          aoMudar={(texto) => { setBusca(texto); setPagina(1) }} />
+        {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />}
         {!ehDono && (
-          <Button onClick={() => setNovo(true)}>
-            <Plus /> Novo time
-          </Button>
+          <AcaoPrincipal>
+            <Button onClick={() => setNovo(true)}>
+              <Plus /> Novo time
+            </Button>
+          </AcaoPrincipal>
         )}
-      </Cabecalho>
-      {ehDono && (
-        <BarraDeFiltros>
-          <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />
-        </BarraDeFiltros>
-      )}
+      </BarraDeFiltros>
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && times === null && <GraficoCarregando texto="Carregando os times…" className="py-12" />}
       {times?.length === 0 && (
-        <ListaVazia>{ehDono ? 'Nenhum time por aqui.' : 'Nenhum time ainda. Crie o primeiro em "Novo time".'}</ListaVazia>
+        <ListaVazia>{buscaAtrasada ? 'Nenhum time encontrado.' : ehDono ? 'Nenhum time por aqui.' : 'Nenhum time ainda. Crie o primeiro em "Novo time".'}</ListaVazia>
       )}
       {times?.length > 0 && (
         <Tabela rotulo="Times" colunas={['Time', 'Gestor', 'Pessoas']} paginacao={{ pagina, total, aoMudar: setPagina }}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/auth/useAuth'
+import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import ClientesEsperando from '@/components/inicio/ClientesEsperando'
@@ -50,8 +51,10 @@ export default function Inicio() {
           <h1 className="text-titulo font-bold">Olá, {primeiroNome(perfil.nome)}.</h1>
           <p className="text-subtitulo text-muted-foreground">{NOME_DO_PAPEL[perfil.papel]} {onde}.</p>
         </div>
-        <NavegacaoDoMes mes={mes} aoMudar={(novo) => { setErro(false); setMes(novo) }} />
       </div>
+      <BarraDeFiltros className="mb-0">
+        <NavegacaoDoMes mes={mes} aoMudar={(novo) => { setErro(false); setMes(novo) }} />
+      </BarraDeFiltros>
 
       {erro && <p role="alert" className="card border-destructive/40 p-4 text-corpo text-destructive">Não foi possível carregar o painel. Tente novamente em instantes.</p>}
       {!painel && !erro && <GraficoCarregando texto="Carregando o painel…" className="min-h-64 justify-center" />}

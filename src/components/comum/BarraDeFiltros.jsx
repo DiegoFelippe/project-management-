@@ -1,10 +1,17 @@
-import { Search } from 'lucide-react'
+import { Search, SlidersHorizontal } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
-// Cartão que reúne, nesta ordem, as abas, a busca, os filtros pequenos e a ação principal (no fim, à direita).
+// Cartão que reúne, nesta ordem, o rótulo "Filtros" (ícone + texto, sempre, como no Calendário), as abas, a busca, os filtros pequenos e a ação principal (no fim, à direita).
 export default function BarraDeFiltros({ children, className }) {
-  return <div className={cn('card mb-4 flex flex-wrap items-center gap-3 p-3', className)}>{children}</div>
+  return (
+    <div className={cn('card mb-4 flex flex-wrap items-center gap-3 p-3', className)}>
+      <span className="inline-flex items-center gap-1.5 text-rotulo font-semibold text-foreground/80">
+        <SlidersHorizontal className="size-3.5" aria-hidden="true" /> Filtros
+      </span>
+      {children}
+    </div>
+  )
 }
 
 // Busca com lupa. `rotulo` é o nome acessível do campo.

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { ChevronDown, Plus, SlidersHorizontal, X } from 'lucide-react'
+import { ChevronDown, Plus, X } from 'lucide-react'
 import Caixa from '@/components/campos/Caixa'
 import Flutuante from '@/components/campos/Flutuante'
 import Seletor from '@/components/campos/Seletor'
@@ -128,9 +128,6 @@ export default function BarraDoCalendario({
 }) {
   return (
     <BarraDeFiltros className="gap-x-3 gap-y-2">
-      <span className="inline-flex items-center gap-1.5 text-rotulo font-semibold text-foreground/80">
-        <SlidersHorizontal className="size-3.5" aria-hidden="true" /> Filtros
-      </span>
       <MostrarTipos tipos={tipos} mostrar={mostrar} aoMudar={aoMostrar} />
       {!doCliente && central && <FiltroConsultoria valor={consultoria} aoMudar={aoConsultoria} />}
       {!doCliente && (central || gestao) && (

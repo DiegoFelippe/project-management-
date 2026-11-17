@@ -44,6 +44,16 @@ describe('Integrações', () => {
     expect(listarIntegracoes).toHaveBeenCalledWith({ consultoriaId: 'c1' })
   })
 
+  it('a barra começa com Filtros e o filtro Conectadas/Não conectadas recorta a tabela', async () => {
+    renderizarTela(<Integracoes />, { perfil: admin })
+    expect(await screen.findByText('Filtros')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Conectadas' }))
+    const tabela = screen.getByRole('table', { name: 'Integrações' })
+    expect(within(tabela).getAllByRole('row')).toHaveLength(2)
+    await userEvent.click(screen.getByRole('button', { name: 'Não conectadas' }))
+    expect(within(screen.getByRole('table', { name: 'Integrações' })).getAllByRole('row')).toHaveLength(3)
+  })
+
   it('Editar abre o formulário do e-mail preenchido; a senha vem em branco e em branco fica a guardada', async () => {
     renderizarTela(<Integracoes />, { perfil: admin })
     await userEvent.click(within(await screen.findByRole('row', { name: /E-mail/ })).getByRole('button', { name: 'Editar' }))

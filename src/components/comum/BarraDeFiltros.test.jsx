@@ -25,6 +25,13 @@ describe('BarraDeFiltros', () => {
     expect(screen.getByRole('button', { name: 'Novo' }).parentElement).toHaveClass('ml-auto')
   })
 
+  it('começa sempre com o ícone e a palavra Filtros, antes de tudo', () => {
+    const { container } = render(<BarraDeFiltros><button type="button">Filtro</button></BarraDeFiltros>)
+    const rotulo = screen.getByText('Filtros')
+    expect(rotulo.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(container.firstChild.firstChild).toBe(rotulo)
+  })
+
   it('é um cartão que quebra linha em telas estreitas', () => {
     const { container } = render(<BarraDeFiltros><span>x</span></BarraDeFiltros>)
     expect(container.firstChild).toHaveClass('card', 'flex', 'flex-wrap')

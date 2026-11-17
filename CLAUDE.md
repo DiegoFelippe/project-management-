@@ -54,13 +54,13 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
 - **Campos só de `src/components/campos/`**: `Seletor`, `CampoData`, `CampoHora`, `CampoNumero`, `Caixa`, `Chave`.
   **Nunca** `<select>` nem `type="date|time|number|datetime-local"` nativos.
 - **`Seletor` com muitas opções** usa `buscar` (busca no banco), nunca a lista inteira.
-- **Listas** abrem com `BarraDeFiltros` (abas, busca, filtros e botão principal no fim). As abas são
-  `AbasSegmentadas`; `comoAbas` só nas abas de página, como as do cliente. **Exceção:** em Times, administrador
-  e gestor não têm barra (não há filtro) e o "Novo time" fica no cabeçalho; só o dono vê a barra, com a consultoria.
-- **Botões do cabeçalho da página** (`Cabecalho`): a ação principal do contexto é `default` (cheia, `--primary`) e as
-  demais são `outline`, tamanho padrão, com ícone. Apagar no cabeçalho é `outline` com o realce de perigo no hover.
-  `ghost sm` só dentro de linhas de tabela e listas. Ações que servem aos dois lugares (`AcoesDaLinha`,
-  `BotaoCheckin`) recebem `noCabecalho` e usam `estiloDaAcao` (`src/components/clientes/estiloDaAcao.js`).
+- **Todo menu do trilho abre com `BarraDeFiltros`** (Início, Clientes, Calendário, Times, Usuários, Consultorias,
+  Integrações), e a barra **sempre começa com o ícone e a palavra "Filtros"** (como no Calendário; o componente já
+  traz, não repita na tela). Pedido do Diego (2026-11-17). Nada de prop para esconder o rótulo. Depois vêm abas,
+  busca, filtros e o botão principal no fim. Tela sem filtro natural ainda ganha a barra com o recorte que faz
+  sentido (Início: o mês; Times: busca pelo nome; Integrações: Todas/Conectadas/Não conectadas). As abas são
+  `AbasSegmentadas`; `comoAbas` só nas abas de página, como as do cliente. Times: "Novo time" é o botão principal
+  da barra (administrador e gestor), e o dono vê a consultoria no lugar dele.
 - **Mês sempre pela `NavegacaoDoMes`** (`maximo` trava o Próximo); nunca montar Anterior/Próximo de mês à mão.
   `src/components/comum/navegacaoDoMesVarredura.test.js` falha se `deslocarMes` aparecer fora dela.
   **Exceção: o Calendário.** O "Hoje ‹ ›" dele anda por semana ou por mês, como o Hub, conforme a visão, e por isso

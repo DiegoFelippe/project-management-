@@ -7,6 +7,7 @@ import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import { GraficoCarregando } from '@/components/comum/Carregando'
@@ -30,6 +31,13 @@ const INTEGRACOES = [
   { tipo: 'ia', nome: 'Inteligência artificial', descricao: 'Claude (Anthropic) ou OpenAI, para os recursos de IA.', icone: Sparkles },
   { tipo: 'smtp', nome: 'E-mail (SMTP)', descricao: 'Servidor que manda as mensagens do sistema.', icone: Mail },
   { tipo: 'google', nome: 'Google', descricao: 'Agenda e Drive da conta da consultoria.', icone: Calendar },
+]
+
+// Filtro da barra: o catálogo tem só três integrações fixas, então o recorte é feito aqui, sem ir ao banco.
+const ABAS = [
+  { valor: 'todas', rotulo: 'Todas' },
+  { valor: 'conectadas', rotulo: 'Conectadas' },
+  { valor: 'nao_conectadas', rotulo: 'Não conectadas' },
 ]
 
 const SITUACAO = {
@@ -59,6 +67,7 @@ export default function Integracoes() {
   const [consultoriaId, setConsultoriaId] = useState(ehDono ? '' : perfil.consultoria_id)
   const [integracoes, setIntegracoes] = useState(null)
   const [erro, setErro] = useState(null)
+  const [situacaoFiltro, setSituacaoFiltro] = useState('todas')
   const [aviso, setAviso] = useState(null)
   const [editando, setEditando] = useState(null)
   const [desconectando, setDesconectando] = useState(null)
@@ -126,24 +135,28 @@ export default function Integracoes() {
     return resposta
   }
 
+  const visiveis = INTEGRACOES.filter((item) => {
+    const conectada = Boolean(integracoes?.[item.tipo])
+    return situacaoFiltro === 'todas' || (situacaoFiltro === 'conectadas') === conectada
+  })
   const abrir = (item) => (item.tipo === 'google' ? conectarGoogle() : setEditando(item.tipo))
 
   return (
     <>
       <Cabecalho titulo="Integrações"
         descricao="Conexões que o sistema usa. Cada consultoria conecta as suas, e todo o sistema usa a mesma conexão." />
-      {ehDono && (
-        <BarraDeFiltros>
-          <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setIntegracoes(null) }} />
-        </BarraDeFiltros>
-      )}
+      <BarraDeFiltros>
+        <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={situacaoFiltro} aoMudar={setSituacaoFiltro} />
+        {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setIntegracoes(null) }} />}
+      </BarraDeFiltros>
       {aviso && <div className="mb-4"><Aviso>{aviso}</Aviso></div>}
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {ehDono && !consultoriaId && <ListaVazia>Escolha uma consultoria para ver as integrações dela.</ListaVazia>}
       {consultoriaId && !erro && integracoes === null && <GraficoCarregando texto="Carregando as integrações…" className="py-12" />}
-      {consultoriaId && integracoes && (
+      {consultoriaId && integracoes && visiveis.length === 0 && <ListaVazia>Nenhuma integração neste filtro.</ListaVazia>}
+      {consultoriaId && integracoes && visiveis.length > 0 && (
         <Tabela rotulo="Integrações" colunas={['Integração', 'Situação', 'Conexão', 'Último teste']} larguraMinima={760}>
-          {INTEGRACOES.map((item) => {
+          {visiveis.map((item) => {
             const integracao = integracoes[item.tipo]
             const situacao = integracao ? SITUACAO[integracao.situacao] : { rotulo: 'Não conectada', variante: 'outline' }
             const Icone = item.icone

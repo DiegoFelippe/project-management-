@@ -50,6 +50,13 @@ describe('Início (painel)', () => {
     expect(screen.queryByText('Seus projetos vão aparecer aqui')).not.toBeInTheDocument()
   })
 
+  it('o mês fica dentro da barra Filtros', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(CENTRAL)
+    renderizarTela(<Inicio />, { perfil: perfil('central') })
+    const barra = screen.getByText('Filtros').parentElement
+    expect(within(barra).getByRole('button', { name: 'Mês anterior' })).toBeInTheDocument()
+  })
+
   it('administrador: ranking de consultores e sem "a distribuir"', async () => {
     vi.mocked(painelDoInicio).mockResolvedValue(ADMIN)
     renderizarTela(<Inicio />, { perfil: perfil('admin') })

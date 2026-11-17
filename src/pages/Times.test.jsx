@@ -90,6 +90,15 @@ describe('Times', () => {
     expect(within(await screen.findByRole('row', { name: /Implantação/ })).getByText('121 pessoas')).toBeInTheDocument()
   })
 
+  it('a barra começa com Filtros, busca o nome no banco (voltando à página 1) e traz o Novo time no fim', async () => {
+    renderizarTela(<Times />, { perfil: admin })
+    expect(await screen.findByText('Filtros')).toBeInTheDocument()
+    const novo = screen.getByRole('button', { name: 'Novo time' })
+    expect(novo.parentElement).toHaveClass('ml-auto')
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar times' }), 'Sup')
+    await vi.waitFor(() => expect(listarTimes).toHaveBeenLastCalledWith({ consultoriaId: 'c1', busca: 'Sup', pagina: 1 }))
+  })
+
   it('pagina no banco acima de 15 times', async () => {
     vi.mocked(listarTimes).mockResolvedValue({ itens: TIMES, total: 31 })
     renderizarTela(<Times />, { perfil: admin })

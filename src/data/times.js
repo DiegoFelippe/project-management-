@@ -11,7 +11,7 @@ const CAMPOS_DA_LISTA =
   `${CAMPOS}, membros:time_membros(pessoa:perfis!time_membros_pessoa_id_fkey(id, nome, foto, cor)), total:time_membros(count)`
 
 // Uma página de times, paginada no banco. Membro que quem olha não pode ver vem nulo e fica de fora.
-export async function listarTimes({ consultoriaId, pagina = 1 } = {}) {
+export async function listarTimes({ consultoriaId, busca, pagina = 1 } = {}) {
   let consulta = supabase
     .from('times')
     .select(CAMPOS_DA_LISTA, { count: 'exact' })
@@ -19,6 +19,9 @@ export async function listarTimes({ consultoriaId, pagina = 1 } = {}) {
     .order('id')
     .limit(ROSTOS, { referencedTable: 'membros' })
   if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
+  // Busca pelo nome no banco (ilike; a tabela não tem coluna sem acento, então o acento conta).
+  const termo = String(busca ?? '').replace(/\*/g, '').trim()
+  if (termo) consulta = consulta.ilike('nome', `%${termo.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
   const resultado = await buscarPagina(consulta, pagina)
   const itens = resultado.itens.map(({ total, ...time }) => ({
     ...time,
