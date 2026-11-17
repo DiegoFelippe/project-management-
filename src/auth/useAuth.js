@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 
-// { sessao, perfil, carregando, entrarComSenha, entrarComGoogle, entrarComSso,
-//   enviarRecuperacao, definirSenha, recarregarPerfil, sair } — ver AuthProvider.jsx
+// { sessao, perfil, carregando, verificacao ('ok' | 'codigo' | 'configurar'), conferirVerificacao, entrarComSenha,
+//   entrarComGoogle, entrarComSso, enviarRecuperacao, definirSenha, recarregarPerfil, sair } — ver AuthProvider.jsx
 export const AuthContext = createContext(null)
 
 export function useAuth() {

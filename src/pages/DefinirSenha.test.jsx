@@ -3,7 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '../auth/useAuth'
+import { confirmarCodigo } from '@/data/verificacao'
 import DefinirSenha from './DefinirSenha'
+
+vi.mock('@/data/verificacao', () => ({ confirmarCodigo: vi.fn().mockResolvedValue({ erro: null }) }))
 
 function montar(valor) {
   const auth = {
@@ -74,5 +77,15 @@ describe('DefinirSenha com link vencido', () => {
     expect(screen.getByText('Esse link expirou ou já foi usado.')).toBeInTheDocument()
     expect(screen.queryByLabelText('Senha nova')).not.toBeInTheDocument()
     window.history.replaceState(null, '', '/')
+  })
+})
+
+describe('DefinirSenha de quem tem o app autenticador ativo', () => {
+  it('pede o código antes da senha nova (o Auth só troca a senha de uma sessão confirmada)', async () => {
+    montar({ sessao: { user: { id: 'u1' } }, verificacao: 'codigo' })
+    expect(screen.getByText(/Antes de criar a senha, digite o código do seu app autenticador/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Senha nova')).not.toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('Código de 6 dígitos'), '123456{Enter}')
+    expect(confirmarCodigo).toHaveBeenCalledWith('123456')
   })
 })

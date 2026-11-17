@@ -3,6 +3,7 @@ import RotaProtegida from '@/auth/RotaProtegida'
 import Moldura from '@/components/shell/Moldura'
 import Cliente from '@/pages/Cliente'
 import Clientes from '@/pages/Clientes'
+import ConfigurarVerificacao from '@/pages/ConfigurarVerificacao'
 import Consultorias from '@/pages/Consultorias'
 import DefinirSenha from '@/pages/DefinirSenha'
 import Entrar from '@/pages/Entrar'
@@ -13,6 +14,7 @@ import Time from '@/pages/Time'
 import Times from '@/pages/Times'
 import TrocarSenha from '@/pages/TrocarSenha'
 import Usuarios from '@/pages/Usuarios'
+import VerificarCodigo from '@/pages/VerificarCodigo'
 
 export default function Rotas() {
   return (
@@ -21,7 +23,9 @@ export default function Rotas() {
       <Route path="/esqueci-senha" element={<EsqueciSenha />} />
       <Route path="/definir-senha" element={<DefinirSenha />} />
       <Route element={<RotaProtegida />}>
+        <Route path="/verificar" element={<VerificarCodigo />} />
         <Route path="/trocar-senha" element={<TrocarSenha />} />
+        <Route path="/configurar-verificacao" element={<ConfigurarVerificacao />} />
         <Route element={<Moldura />}>
           <Route path="/" element={<Inicio />} />
           <Route path="/capacidade" element={<Navigate to="/usuarios" replace />} />

@@ -1,4 +1,5 @@
-// Meu perfil (abre pela bolinha da pessoa no trilho, acima do Sair): foto, nome, contato e senha de quem está usando.
+// Meu perfil (abre pela bolinha da pessoa no trilho, acima do Sair): foto, nome, contato, senha e verificação em duas
+// etapas de quem está usando.
 // E-mail e papel quem muda é o administrador; cargo, data de entrada e carga semanal aparecem só para ler.
 // O nome passa pela Edge Function; o contato, pela função do banco; a foto, pelo Storage.
 import { UserRound } from 'lucide-react'
@@ -16,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import CampoSenha from '@/components/campos/CampoSenha'
 import { avaliarSenha } from '@/lib/senha'
 import { Label } from '@/components/ui/label'
+import VerificacaoDoPerfil from './VerificacaoDoPerfil'
 import { mudarCor, tirarFoto, trocarFoto } from '@/data/imagens'
 import { atualizarMeuContato, gerenciarAcesso } from '@/data/usuarios'
 import { corDaPessoa } from '@/lib/cores'
@@ -105,7 +107,7 @@ export default function MeuPerfil({ aberto, aoFechar }) {
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo="Meu perfil" icone={UserRound} largura="lg" enviando={enviando}
-      descricao="Sua foto, seu nome, seu contato e sua senha. O e-mail e o papel quem muda é o administrador."
+      descricao="Sua foto, seu nome, seu contato, sua senha e a verificação em duas etapas. O e-mail e o papel quem muda é o administrador."
       rodape={(
         <>
           <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
@@ -174,6 +176,7 @@ export default function MeuPerfil({ aberto, aoFechar }) {
         </SecaoFormulario>
         {erro && <Aviso>{erro}</Aviso>}
       </form>
+      <VerificacaoDoPerfil perfil={perfil} aoMudar={recarregarPerfil} />
     </JanelaFormulario>
   )
 }
