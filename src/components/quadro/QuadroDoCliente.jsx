@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
 import { RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -9,6 +9,7 @@ import { apagarColuna, criarColuna, editarColuna } from '@/data/quadro'
 import { hoje as hojeEmSP } from '@/lib/mes'
 import { useAtraso } from '@/lib/useAtraso'
 import { veTudo } from '@/lib/papeis'
+import AbrirCartao from './AbrirCartao'
 import ApagarColuna from './ApagarColuna'
 import BarraDoQuadro from './BarraDoQuadro'
 import Coluna from './Coluna'
@@ -17,9 +18,6 @@ import JanelaArquivados from './JanelaArquivados'
 import JanelaNovoCartao from './JanelaNovoCartao'
 import NovaColuna from './NovaColuna'
 import { FILTROS_VAZIOS, temFiltro, useQuadro } from './useQuadro'
-
-// A janela do cartão traz o editor de texto (TipTap): carrega só quando um cartão abre.
-const JanelaDoCartao = lazy(() => import('./JanelaDoCartao'))
 
 // Aba Quadro do cliente (Kanban do Mochi; desenho em docs/superpowers/specs/2026-11-17-kanban-do-cliente-design.md): barra
 // de filtros → 4 números → colunas lado a lado (300 px; o quadro rola dentro da área dele e, no celular, uma coluna por
@@ -205,10 +203,8 @@ export default function QuadroDoCliente({ cliente, perfil }) {
           aoApagar={(opcoes) => apagarAColuna(apagando, opcoes)} />
       )}
       {cartaoAberto && (
-        <Suspense fallback={null}>
-          <JanelaDoCartao key={cartaoAberto} cartaoId={cartaoAberto} quadro={quadro} cliente={cliente} perfil={perfil}
-            aoFechar={fecharCartao} aoQuadroMudou={lerTudo} />
-        </Suspense>
+        <AbrirCartao key={cartaoAberto} cartaoId={cartaoAberto} quadro={quadro} cliente={cliente} perfil={perfil}
+          aoFechar={fecharCartao} aoQuadroMudou={lerTudo} />
       )}
     </section>
   )

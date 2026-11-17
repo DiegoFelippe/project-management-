@@ -268,7 +268,11 @@
   .descricao-do-cartao pre code { @apply bg-transparent p-0; }
   .descricao-do-cartao a { @apply text-primary underline underline-offset-2; }
   .descricao-do-cartao hr { @apply border-border my-3; }
-  .descricao-do-cartao .imagem-da-descricao { @apply bg-muted my-2 max-w-full rounded-xl border; height: auto; min-height: 2rem; }
+  .descricao-do-cartao .imagem-da-descricao { @apply my-2 w-fit max-w-full rounded-xl; }
+  .descricao-do-cartao .imagem-da-descricao img { @apply bg-muted max-w-full rounded-xl border; height: auto; min-height: 2rem; }
+  .descricao-do-cartao .imagem-indisponivel {
+    @apply text-muted-foreground text-rotulo inline-flex items-center rounded-xl border border-dashed px-3 py-2;
+  }
   .descricao-do-cartao .imagem-da-descricao.ProseMirror-selectednode { @apply ring-primary/50 ring-2; }
   .descricao-do-cartao p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);

@@ -84,13 +84,18 @@ export function limparDescricao(no, pasta) {
 }
 
 // Assina os caminhos das imagens em lotes (os pedidos na mesma volta vão juntos num pedido só, sem um pedido por imagem)
-// e guarda o link de cada caminho. `assinarVarios(caminhos)` → { urls: { [caminho]: url } } (urlsAssinadas). Devolve
-// `assinar(caminho)` → Promise<url | null>; o caminho que não ganhou link é pedido de novo na próxima vez.
-export function criarAssinador(assinarVarios) {
-  const links = new Map()
+// e guarda o link de cada caminho por `validade` (50 min: o link do balde vale 1 h; depois disso, pede outro).
+// `assinarVarios(caminhos)` → { urls: { [caminho]: url } } (urlsAssinadas). Devolve `assinar(caminho)` →
+// Promise<url | null>; o caminho que não ganhou link é pedido de novo na próxima vez, e `assinar.esquecer(caminho)` tira
+// o link guardado (a imagem não abriu com ele).
+export const VALIDADE_DO_LINK_GUARDADO = 50 * 60 * 1000
+
+export function criarAssinador(assinarVarios, { validade = VALIDADE_DO_LINK_GUARDADO, agora = Date.now } = {}) {
+  const links = new Map() // caminho → { promessa, vence }
   let lote = null
-  return function assinar(caminho) {
-    if (links.has(caminho)) return links.get(caminho)
+  function assinar(caminho) {
+    const guardado = links.get(caminho)
+    if (guardado && agora() < guardado.vence) return guardado.promessa
     if (!lote) {
       const este = new Map()
       lote = este
@@ -108,8 +113,11 @@ export function criarAssinador(assinarVarios) {
         }
       }, 0)
     }
-    const promessa = new Promise((resolver) => lote.set(caminho, resolver))
-    links.set(caminho, promessa)
+    const pendente = lote.has(caminho) ? null : new Promise((resolver) => lote.set(caminho, resolver))
+    const promessa = pendente ?? links.get(caminho).promessa
+    links.set(caminho, { promessa, vence: agora() + validade })
     return promessa
   }
+  assinar.esquecer = (caminho) => links.delete(caminho)
+  return assinar
 }

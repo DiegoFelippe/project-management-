@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apagarComentario, comentar, comentariosDoCartao, editarComentario } from '@/data/quadro'
 import ComentariosDoCartao from './ComentariosDoCartao'
 
@@ -39,6 +39,43 @@ function tela(props = {}) {
 const textos = () => within(screen.getByRole('list', { name: 'Comentários' })).getAllByRole('listitem')
   .map((li) => li.querySelector('[data-texto]')?.textContent)
 const doComentario = (texto) => within(screen.getByText(texto).closest('li'))
+
+// O jsdom não mede: a área dos comentários "tem" 100 px por comentário (e 40 do botão de ver anteriores).
+let altura
+beforeEach(() => {
+  altura = vi.spyOn(Element.prototype, 'scrollHeight', 'get').mockImplementation(function medir() {
+    if (!this.hasAttribute('data-rolagem')) return 0
+    const verAnteriores = [...this.querySelectorAll('button')].some((b) => b.textContent.includes('Ver comentários anteriores'))
+    return this.querySelectorAll('li').length * 100 + (verAnteriores ? 40 : 0)
+  })
+})
+afterEach(() => altura.mockRestore())
+const rolagem = () => document.querySelector('[data-rolagem]')
+
+describe('comentários do cartão: rolagem', () => {
+  it('abre no fim (os mais novos à vista) e, depois de comentar, vai para o fim de novo', async () => {
+    const user = userEvent.setup()
+    tela()
+    await waitFor(() => expect(textos()).toHaveLength(2))
+    expect(rolagem().scrollTop).toBe(240)
+    rolagem().scrollTop = 0
+    await user.type(screen.getByRole('textbox', { name: 'Novo comentário' }), 'Contrato enviado')
+    await user.click(screen.getByRole('button', { name: 'Comentar' }))
+    await waitFor(() => expect(textos()).toHaveLength(3))
+    expect(rolagem().scrollTop).toBe(340)
+  })
+
+  it('"Ver anteriores" põe os antigos em cima sem tirar do lugar o que a pessoa estava lendo', async () => {
+    const user = userEvent.setup()
+    tela()
+    await waitFor(() => expect(textos()).toHaveLength(2))
+    rolagem().scrollTop = 0
+    await user.click(screen.getByRole('button', { name: 'Ver comentários anteriores' }))
+    await waitFor(() => expect(textos()).toHaveLength(3))
+    // Antes: 240 de altura, no topo. Depois: 300 (um comentário a mais, sem o botão): o mesmo comentário continua no topo.
+    expect(rolagem().scrollTop).toBe(60)
+  })
+})
 
 describe('comentários do cartão', () => {
   it('mostra os 30 mais recentes, do mais antigo para o mais novo; "Ver anteriores" pede os de antes do mais antigo', async () => {

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -70,10 +70,34 @@ describe('descrição do cartão: mostrar', () => {
       },
     })
     expect(screen.getByText('perigo').closest('a').getAttribute('href')).toBe('')
-    const img = screen.getByRole('img', { name: 'Imagem da descrição' })
     await new Promise((r) => setTimeout(r, 20))
-    expect(img).not.toHaveAttribute('src')
+    expect(screen.getByText('Imagem indisponível')).toBeInTheDocument()
+    expect(document.querySelector('img[src]')).toBeNull()
     expect(urlsAssinadas).not.toHaveBeenCalled()
+  })
+
+  it('imagem sem link (a pessoa não a vê, ou o arquivo sumiu): "Imagem indisponível"', async () => {
+    vi.mocked(urlsAssinadas).mockResolvedValue({ urls: {} })
+    tela({ conteudo: { type: 'doc', content: [{ type: 'image', attrs: { src: NOSSA } }] } })
+    expect(await screen.findByText('Imagem indisponível')).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Imagem da descrição' })).not.toBeInTheDocument()
+  })
+
+  it('a imagem não abriu (link vencido): pede um link novo uma vez; se de novo não abrir, "Imagem indisponível"', async () => {
+    let vez = 0
+    vi.mocked(urlsAssinadas).mockImplementation(async (caminhos) => {
+      vez += 1
+      return { urls: Object.fromEntries(caminhos.map((c) => [c, `https://assinado.local/${c}?vez=${vez}`])) }
+    })
+    tela({ conteudo: { type: 'doc', content: [{ type: 'image', attrs: { src: NOSSA } }] } })
+    const img = await screen.findByRole('img', { name: 'Imagem da descrição' })
+    await waitFor(() => expect(img).toHaveAttribute('src', `https://assinado.local/${NOSSA}?vez=1`))
+    fireEvent.error(img)
+    await waitFor(() => expect(img).toHaveAttribute('src', `https://assinado.local/${NOSSA}?vez=2`))
+    expect(urlsAssinadas).toHaveBeenCalledTimes(2)
+    fireEvent.error(img)
+    expect(await screen.findByText('Imagem indisponível')).toBeInTheDocument()
+    expect(urlsAssinadas).toHaveBeenCalledTimes(2)
   })
 
   it('só leitura: sem a barra de ferramentas e o texto não se edita', () => {

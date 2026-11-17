@@ -88,7 +88,7 @@ describe('anexos do cartão', () => {
     const area = screen.getByRole('region', { name: 'Anexos' })
     fireEvent.dragOver(area, { dataTransfer: { files: [a, b], types: ['Files'] } })
     expect(screen.getByText('Solte para anexar.')).toBeInTheDocument()
-    fireEvent.drop(area, { dataTransfer: { files: [a, b], types: ['Files'] } })
+    expect(fireEvent.drop(area, { dataTransfer: { files: [a, b], types: ['Files'] } })).toBe(false)
     await waitFor(() => expect(enviarAnexo).toHaveBeenCalledTimes(2))
     expect(enviarAnexo).toHaveBeenNthCalledWith(1, { clienteId: 'k1', cartaoId: 'c1' }, a)
     expect(enviarAnexo).toHaveBeenNthCalledWith(2, { clienteId: 'k1', cartaoId: 'c1' }, b)
@@ -124,7 +124,18 @@ describe('anexos do cartão', () => {
     expect(screen.queryByRole('button', { name: /Apagar|Escolher arquivo/ })).not.toBeInTheDocument()
     expect(linha('contrato.pdf').getByRole('button', { name: 'Baixar contrato.pdf' })).toBeInTheDocument()
     const area = screen.getByRole('region', { name: 'Anexos' })
-    fireEvent.drop(area, { dataTransfer: { files: [new File(['a'], 'a.pdf')], types: ['Files'] } })
+    // O arquivo solto aqui não abre no lugar do app (o navegador abriria o arquivo e a janela se perderia).
+    expect(fireEvent.drop(area, { dataTransfer: { files: [new File(['a'], 'a.pdf')], types: ['Files'] } })).toBe(false)
+    expect(enviarAnexo).not.toHaveBeenCalled()
+  })
+
+  it('arrastar texto (não arquivo) não acende a área nem é tratado como anexo', async () => {
+    tela()
+    await tabela()
+    const area = screen.getByRole('region', { name: 'Anexos' })
+    expect(fireEvent.dragOver(area, { dataTransfer: { files: [], types: ['text/plain'] } })).toBe(true)
+    expect(screen.queryByText('Solte para anexar.')).not.toBeInTheDocument()
+    fireEvent.drop(area, { dataTransfer: { files: [], types: ['text/plain'] } })
     expect(enviarAnexo).not.toHaveBeenCalled()
   })
 

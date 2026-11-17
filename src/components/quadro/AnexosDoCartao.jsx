@@ -9,6 +9,7 @@ import { ANEXOS_POR_PAGINA, anexosDoCartao, apagarAnexo, enviarAnexo, urlAssinad
 import { formatarTamanho, TAMANHO_MAXIMO_ARQUIVO } from '@/lib/arquivos'
 import { FUSO } from '@/lib/mes'
 import { cn } from '@/lib/utils'
+import { temArquivos } from './useArquivosSoltos'
 
 const QUANDO = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, dateStyle: 'short', timeStyle: 'short' })
 const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
@@ -79,11 +80,6 @@ export default function AnexosDoCartao({ clienteId, cartaoId, podeMexer, aoMexer
     enviar(arquivos)
   }
 
-  function soltar(e) {
-    e.preventDefault()
-    setArrastando(false)
-    enviar(Array.from(e.dataTransfer?.files ?? []))
-  }
 
   // Depois do await, o Safari bloqueia window.open: o link vem como download e um <a> clicado aqui baixa sem sair da
   // página (como em Arquivos do cliente).
@@ -119,15 +115,21 @@ export default function AnexosDoCartao({ clienteId, cartaoId, podeMexer, aoMexer
   return (
     <section aria-label="Anexos" className="min-w-0 space-y-3"
       onDragOver={(e) => {
-        if (!soltavel) return
+        // Só arquivo, e só para quem mexe (sem isso, o navegador recusa o solto e a janela de baixo o barra).
+        if (!soltavel || !temArquivos(e)) return
         e.preventDefault()
+        e.dataTransfer.dropEffect = 'copy'
         setArrastando(true)
       }}
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setArrastando(false)
       }}
       onDrop={(e) => {
-        if (soltavel) soltar(e)
+        if (!temArquivos(e)) return
+        // O arquivo solto nunca abre no lugar do app, nem para quem só lê.
+        e.preventDefault()
+        setArrastando(false)
+        if (soltavel) enviar(Array.from(e.dataTransfer.files ?? []))
       }}>
       <h3 className="section-label flex items-center gap-1.5">
         <Paperclip className="size-3.5" aria-hidden="true" /> Anexos

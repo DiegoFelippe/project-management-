@@ -21,7 +21,8 @@ const IMAGEM_DE_FORA = 'A imagem colada de outro endereço não entrou. Para pô
 
 // Imagem da descrição: o nó guarda o caminho no balde (src), nunca um link. Só entra (ao colar, arrastar ou abrir) a
 // imagem deste cartão; o que aparece na tela é o link assinado, pedido na hora de mostrar (em lote, por `assinar`).
-// Sem a regra de markdown "![](endereço)" do TipTap, que criaria imagem de fora.
+// Se a imagem não abre (o link venceu), pede um link novo uma vez; sem link (ou de novo sem abrir), mostra "Imagem
+// indisponível". Sem a regra de markdown "![](endereço)" do TipTap, que criaria imagem de fora.
 const ImagemDoCartao = Image.extend({
   addOptions() {
     return { ...this.parent?.(), inline: false, allowBase64: false, pasta: '', assinar: async () => null }
@@ -35,9 +36,30 @@ const ImagemDoCartao = Image.extend({
   addNodeView() {
     const { pasta, assinar } = this.options
     return ({ node }) => {
+      const caixa = document.createElement('div')
+      caixa.className = 'imagem-da-descricao'
       const img = document.createElement('img')
-      img.className = 'imagem-da-descricao'
+      const aviso = document.createElement('span')
+      aviso.className = 'imagem-indisponivel'
+      aviso.textContent = 'Imagem indisponível'
+      caixa.append(img, aviso)
       let atual
+      let pediuDeNovo = false
+      const indisponivel = (sim) => {
+        img.hidden = sim
+        aviso.hidden = !sim
+      }
+      const assinarEMostrar = (src) => assinar(src).then((url) => {
+        if (atual !== src) return
+        if (url) img.src = url
+        else indisponivel(true)
+      })
+      img.addEventListener('error', () => {
+        if (!atual || pediuDeNovo) return indisponivel(true)
+        pediuDeNovo = true
+        assinar.esquecer?.(atual)
+        assinarEMostrar(atual)
+      })
       const mostrar = (n) => {
         img.alt = n.attrs.alt || 'Imagem da descrição'
         if (n.attrs.title) img.title = n.attrs.title
@@ -45,16 +67,16 @@ const ImagemDoCartao = Image.extend({
         const src = n.attrs.src
         if (src === atual) return
         atual = src
+        pediuDeNovo = false
         img.removeAttribute('src')
+        indisponivel(false)
         // Endereço de fora nunca é carregado (o banco também não deixa gravar).
-        if (!imagemDoCartao(src, pasta)) return
-        assinar(src).then((url) => {
-          if (url && atual === src) img.src = url
-        })
+        if (!imagemDoCartao(src, pasta)) return indisponivel(true)
+        assinarEMostrar(src)
       }
       mostrar(node)
       return {
-        dom: img,
+        dom: caixa,
         update: (n) => {
           if (n.type !== node.type) return false
           mostrar(n)

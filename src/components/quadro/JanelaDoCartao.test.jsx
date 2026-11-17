@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -48,7 +48,8 @@ const CARTAO = {
 
 beforeAll(prepararEditor)
 beforeEach(() => {
-  vi.clearAllMocks()
+  // reset (não só clear): respostas "uma vez" que sobraram de um teste não passam para o próximo.
+  vi.resetAllMocks()
   vi.mocked(buscarCartao).mockResolvedValue(CARTAO)
   vi.mocked(editarCartao).mockResolvedValue({ erro: null })
   vi.mocked(moverCartao).mockResolvedValue({ erro: null, cartao: { id: 'c1', coluna_id: 'col2' }, renumerou: false })
@@ -226,17 +227,102 @@ describe('janela do cartão: grava campo a campo', () => {
     expect(editarCartao).toHaveBeenCalledWith('c1', { descricao: expect.objectContaining({ type: 'doc' }) })
   })
 
-  it('fechar com a descrição recusada: a janela fica aberta mostrando "Erro ao salvar" (nada se perde)', async () => {
+  it('fechar com a descrição recusada: a janela fica aberta e pergunta o que fazer; "Fechar sem salvar" descarta e fecha', async () => {
     vi.mocked(editarCartao).mockResolvedValue({ erro: 'A descrição tem uma formatação que o quadro não aceita. Cole o texto de novo, sem a formatação.' })
     const user = userEvent.setup()
     const { aoFechar } = abrir()
     const j = await janela()
     colar(within(j).getByRole('textbox', { name: 'Descrição do cartão' }), { html: '<p>Nova descrição</p>' })
     await user.click(within(j).getAllByRole('button', { name: 'Fechar' }).at(-1))
-    expect(await within(j).findByText('Erro ao salvar')).toBeInTheDocument()
-    await waitFor(() => expect(within(j).getAllByRole('button', { name: 'Fechar' }).at(-1)).toBeEnabled())
+    const pergunta = await screen.findByRole('alertdialog', { name: 'Algumas mudanças não foram salvas' })
+    expect(pergunta).toHaveTextContent('Não foi possível salvar a descrição.')
+    expect(within(j).getByText('Erro ao salvar')).toBeInTheDocument()
     expect(aoFechar).not.toHaveBeenCalled()
+    await user.click(within(pergunta).getByRole('button', { name: 'Continuar editando' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(within(j).getByRole('textbox', { name: 'Descrição do cartão' })).toHaveTextContent('Nova descrição')
+    expect(aoFechar).not.toHaveBeenCalled()
+
+    await user.click(within(j).getAllByRole('button', { name: 'Fechar' }).at(-1))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Fechar sem salvar' }))
+    await waitFor(() => expect(aoFechar).toHaveBeenCalled())
+  })
+
+  it('a descrição que falhou ao gravar (depois dos 900 ms) volta a esperar: Fechar tenta de novo e, gravando, fecha', async () => {
+    vi.mocked(editarCartao).mockResolvedValueOnce({ erro: 'Não foi possível concluir. Tente de novo.' }).mockResolvedValue({ erro: null })
+    const user = userEvent.setup()
+    const { aoFechar } = abrir()
+    const j = await janela()
+    colar(within(j).getByRole('textbox', { name: 'Descrição do cartão' }), { html: '<p>Texto importante</p>' })
+    expect(await within(j).findByText('Erro ao salvar', {}, { timeout: 2000 })).toBeInTheDocument()
+    expect(editarCartao).toHaveBeenCalledTimes(1)
+    await user.click(within(j).getAllByRole('button', { name: 'Fechar' }).at(-1))
+    await waitFor(() => expect(aoFechar).toHaveBeenCalledWith(['col1']))
+    expect(editarCartao).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(editarCartao).mock.calls[1]).toEqual(vi.mocked(editarCartao).mock.calls[0])
+    expect(JSON.stringify(vi.mocked(editarCartao).mock.calls[1][1])).toContain('Texto importante')
+  })
+
+  it('falhou de novo ao fechar: pergunta; "Tentar de novo" grava e fecha', async () => {
+    vi.mocked(editarCartao)
+      .mockResolvedValueOnce({ erro: 'Não foi possível concluir. Tente de novo.' })
+      .mockResolvedValueOnce({ erro: 'Não foi possível concluir. Tente de novo.' })
+      .mockResolvedValue({ erro: null })
+    const user = userEvent.setup()
+    const { aoFechar } = abrir()
+    const j = await janela()
+    colar(within(j).getByRole('textbox', { name: 'Descrição do cartão' }), { html: '<p>Texto importante</p>' })
+    await within(j).findByText('Erro ao salvar', {}, { timeout: 2000 })
+    await user.click(within(j).getAllByRole('button', { name: 'Fechar' }).at(-1))
+    const pergunta = await screen.findByRole('alertdialog', { name: 'Algumas mudanças não foram salvas' })
+    expect(aoFechar).not.toHaveBeenCalled()
+    await user.click(within(pergunta).getByRole('button', { name: 'Tentar de novo' }))
+    await waitFor(() => expect(aoFechar).toHaveBeenCalledWith(['col1']))
+    expect(editarCartao).toHaveBeenCalledTimes(3)
+  })
+
+  it('título com erro de rede: o cabeçalho não mostra o título que não gravou, o campo guarda o texto e Fechar tenta de novo', async () => {
+    vi.mocked(editarCartao).mockResolvedValueOnce({ erro: 'Não foi possível concluir. Tente de novo.' }).mockResolvedValue({ erro: null })
+    vi.mocked(buscarCartao).mockResolvedValueOnce(CARTAO).mockRejectedValue(new Error('rede'))
+    const user = userEvent.setup()
+    const { aoFechar } = abrir()
+    const j = await janela()
+    const titulo = within(j).getByLabelText('Título')
+    await user.clear(titulo)
+    await user.type(titulo, 'Mapear boletos de outubro')
+    await user.tab()
+    expect(await within(j).findByText('Erro ao salvar')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Mapear boletos' })).toBeInTheDocument()
+    expect(titulo).toHaveValue('Mapear boletos de outubro')
+    await user.click(within(j).getAllByRole('button', { name: 'Fechar' }).at(-1))
+    await waitFor(() => expect(aoFechar).toHaveBeenCalledWith(['col1']))
+    expect(editarCartao).toHaveBeenCalledTimes(2)
+    expect(editarCartao).toHaveBeenLastCalledWith('c1', { titulo: 'Mapear boletos de outubro' })
+  })
+
+  it('outro campo que falhou (prioridade): Fechar pergunta, dizendo qual; "Tentar de novo" refaz a mudança', async () => {
+    vi.mocked(editarCartao).mockResolvedValueOnce({ erro: 'Não foi possível concluir. Tente de novo.' }).mockResolvedValue({ erro: null })
+    const user = userEvent.setup()
+    const { aoFechar } = abrir()
+    const j = await janela()
+    await escolher(user, 'Prioridade', 'Baixa')
+    await waitFor(() => expect(lateral().getByText('Erro ao salvar')).toBeInTheDocument())
+    await user.click(within(j).getAllByRole('button', { name: 'Fechar' }).at(-1))
+    const pergunta = await screen.findByRole('alertdialog', { name: 'Algumas mudanças não foram salvas' })
+    expect(pergunta).toHaveTextContent('Não foi possível salvar a prioridade.')
+    expect(editarCartao).toHaveBeenCalledTimes(1)
+    await user.click(within(pergunta).getByRole('button', { name: 'Tentar de novo' }))
+    await waitFor(() => expect(aoFechar).toHaveBeenCalledWith(['col1']))
+    expect(editarCartao).toHaveBeenLastCalledWith('c1', { prioridade: 'baixa' })
+  })
+
+  it('arquivo solto fora da área de anexos não abre no lugar do app (nada se perde); arrastar texto segue normal', async () => {
+    abrir()
+    await janela()
+    const arquivo = { files: [new File(['a'], 'a.pdf')], types: ['Files'] }
+    expect(fireEvent.dragOver(document.body, { dataTransfer: arquivo })).toBe(false)
+    expect(fireEvent.drop(document.body, { dataTransfer: arquivo })).toBe(false)
+    expect(fireEvent.dragOver(document.body, { dataTransfer: { files: [], types: ['text/plain'] } })).toBe(true)
   })
 
   it('fechar não fica preso se o banco não responde: espera um tempo e fecha', async () => {
@@ -278,7 +364,7 @@ describe('janela do cartão: grava campo a campo', () => {
 })
 
 describe('janela do cartão: recusas do banco', () => {
-  it('erro ao salvar: "Erro ao salvar", o motivo e o cartão relido (os campos voltam ao que está gravado)', async () => {
+  it('erro ao salvar: "Erro ao salvar", o motivo e o cartão relido (escolhas voltam ao gravado; o texto digitado fica)', async () => {
     vi.mocked(editarCartao).mockResolvedValue({ erro: 'Confira os campos destacados.' })
     const user = userEvent.setup()
     const { aoQuadroMudou } = abrir()
@@ -290,8 +376,13 @@ describe('janela do cartão: recusas do banco', () => {
     expect(await within(j).findByText('Erro ao salvar')).toBeInTheDocument()
     expect(toast.error).toHaveBeenCalledWith('Confira os campos destacados.')
     await waitFor(() => expect(buscarCartao).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(titulo).toHaveValue('Mapear boletos'))
     expect(aoQuadroMudou).toHaveBeenCalled()
+    // O cabeçalho mostra o que está gravado; o texto que não gravou continua no campo (Fechar tenta de novo ou pergunta).
+    expect(screen.getByRole('dialog', { name: 'Mapear boletos' })).toBeInTheDocument()
+    expect(titulo).toHaveValue('x'.repeat(10))
+    await escolher(user, 'Prioridade', 'Baixa')
+    await waitFor(() => expect(buscarCartao).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(lateral().getByLabelText('Prioridade')).toHaveTextContent('Alta'))
   })
 
   it('sem permissão no meio (42501): a janela passa a só leitura e o quadro é relido', async () => {

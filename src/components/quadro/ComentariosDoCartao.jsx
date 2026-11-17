@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronsUp, MessageSquare, Pencil, Send, Trash2 } from 'lucide-react'
 import Avatar from '@/components/comum/Avatar'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
@@ -28,13 +28,26 @@ export default function ComentariosDoCartao({ cartaoId, perfil, podeMexer, podeG
   const [editando, setEditando] = useState(null) // { id, texto }
   const [apagando, setApagando] = useState(null)
   const campoEdicao = useRef(null)
+  const area = useRef(null)
+  // Para onde rolar depois que a lista mudar: 'fim' (abriu, ou a pessoa comentou: os mais novos à vista) ou
+  // { distancia } do fim (os anteriores entraram em cima: o que a pessoa lia não sai do lugar).
+  const rolar = useRef(null)
   useEscNoCampo(campoEdicao, Boolean(editando), () => setEditando(null))
+
+  useLayoutEffect(() => {
+    const el = area.current
+    const pedido = rolar.current
+    if (!el || !pedido) return
+    rolar.current = null
+    el.scrollTop = pedido === 'fim' ? el.scrollHeight : el.scrollHeight - pedido.distancia
+  }, [lista, haMais])
 
   useEffect(() => {
     let ativo = true
     comentariosDoCartao({ cartaoId })
       .then((r) => {
         if (!ativo) return
+        rolar.current = 'fim'
         setLista([...r.itens].reverse())
         setHaMais(r.haMais)
       })
@@ -50,6 +63,7 @@ export default function ComentariosDoCartao({ cartaoId, perfil, podeMexer, podeG
     try {
       const r = await comentariosDoCartao({ cartaoId, antesId: lista[0].id })
       const vistos = new Set(lista.map((c) => c.id))
+      if (area.current) rolar.current = { distancia: area.current.scrollHeight - area.current.scrollTop }
       setLista((atual) => [...[...r.itens].reverse().filter((c) => !vistos.has(c.id)), ...atual])
       setHaMais(r.haMais)
     } catch {
@@ -67,6 +81,7 @@ export default function ComentariosDoCartao({ cartaoId, perfil, podeMexer, podeG
     setEnviando(false)
     if (resposta.erro) return aoRecusar(resposta.erro)
     const { autor_id: _autor, ...comentario } = resposta.comentario
+    rolar.current = 'fim'
     setLista((atual) => [...(atual ?? []), { ...comentario, autor: { id: perfil.id, nome: perfil.nome, foto: perfil.foto, cor: perfil.cor } }])
     setTotal((n) => n + 1)
     setTexto('')
@@ -110,7 +125,7 @@ export default function ComentariosDoCartao({ cartaoId, perfil, podeMexer, podeG
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {lista?.length === 0 && <p className="text-corpo text-muted-foreground">Nenhum comentário ainda.</p>}
       {lista?.length > 0 && (
-        <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+        <div ref={area} data-rolagem className="max-h-96 space-y-2 overflow-y-auto pr-1">
           {haMais && (
             <Button type="button" variant="ghost" size="sm" className="w-full" disabled={carregandoMais} onClick={verAnteriores}>
               <ChevronsUp /> Ver comentários anteriores

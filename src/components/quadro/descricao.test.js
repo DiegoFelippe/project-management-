@@ -117,6 +117,28 @@ describe('criarAssinador (as imagens de uma descrição num pedido só)', () => 
     expect(assinarVarios).toHaveBeenCalledTimes(1)
   })
 
+  it('o link guardado vence antes da hora do link (1 h): depois da validade, pede de novo', async () => {
+    let agora = 0
+    const assinarVarios = vi.fn(async (caminhos) => ({ urls: Object.fromEntries(caminhos.map((c) => [c, `https://assinado/${c}?v=${agora}`])) }))
+    const assinar = criarAssinador(assinarVarios, { validade: 50 * 60 * 1000, agora: () => agora })
+    expect(await assinar('a')).toBe('https://assinado/a?v=0')
+    agora = 49 * 60 * 1000
+    expect(await assinar('a')).toBe('https://assinado/a?v=0')
+    expect(assinarVarios).toHaveBeenCalledTimes(1)
+    agora = 51 * 60 * 1000
+    expect(await assinar('a')).toBe(`https://assinado/a?v=${51 * 60 * 1000}`)
+    expect(assinarVarios).toHaveBeenCalledTimes(2)
+  })
+
+  it('esquecer(caminho) tira o link guardado (a imagem não abriu: pede um novo)', async () => {
+    const assinarVarios = vi.fn(async (caminhos) => ({ urls: Object.fromEntries(caminhos.map((c) => [c, `https://assinado/${c}`])) }))
+    const assinar = criarAssinador(assinarVarios)
+    await assinar('a')
+    assinar.esquecer('a')
+    await assinar('a')
+    expect(assinarVarios).toHaveBeenCalledTimes(2)
+  })
+
   it('o caminho sem link (ou com erro) dá null e é pedido de novo depois', async () => {
     const assinarVarios = vi.fn()
       .mockResolvedValueOnce({ urls: {} })
