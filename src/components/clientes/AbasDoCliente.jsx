@@ -20,7 +20,7 @@ export default function AbasDoCliente({ abas }) {
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <div>
         <AbasSegmentadas comoAbas idBase={base} rotulo="Seções do cliente" valor={atual.id} aoMudar={escolher}
           abas={abas.map((a) => ({ valor: a.id, rotulo: a.rotulo }))} />

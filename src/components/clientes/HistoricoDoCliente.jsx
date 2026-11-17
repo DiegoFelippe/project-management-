@@ -29,7 +29,7 @@ export default function HistoricoDoCliente({ clienteId, versao }) {
 
   const itens = resultado?.itens ?? null
   return (
-    <section aria-labelledby="titulo-historico" className="grid gap-2">
+    <section aria-labelledby="titulo-historico" className="grid grid-cols-1 gap-2">
       <h2 id="titulo-historico" className="text-janela font-bold">Histórico</h2>
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && itens === null && <GraficoCarregando texto="Carregando o histórico…" className="py-8" />}

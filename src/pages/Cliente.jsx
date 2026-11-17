@@ -129,7 +129,7 @@ export default function Cliente() {
             </Campo>
           </dl>
         </section>
-        <div className="mb-6 grid gap-4 md:grid-cols-3">
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
           <Bloco titulo="Empresa">
             <Campo rotulo="CNPJ">{cliente.cnpj && formatarCnpj(cliente.cnpj)}</Campo>
             <Campo rotulo="Cidade">{cliente.cidade && `${cliente.cidade}${cliente.uf ? `/${cliente.uf}` : ''}`}</Campo>

@@ -20,6 +20,11 @@ const tela = (endereco = '/c/1') =>
   renderizarTela(<><AbasDoCliente abas={ABAS} /><Endereco /></>, { perfil: {}, endereco })
 
 describe('AbasDoCliente', () => {
+  it('a grade tem coluna encolhível (grid-cols-1): a barra de abas rola dentro dela, não alarga a página', () => {
+    const { container } = tela()
+    expect(container.querySelector('[role="tablist"]').closest('.grid')).toHaveClass('grid-cols-1')
+  })
+
   it('mostra as abas na ordem, com Geral aberta por padrão', () => {
     tela()
     const abas = screen.getAllByRole('tab')

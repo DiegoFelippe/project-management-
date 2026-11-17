@@ -113,7 +113,7 @@ export default function GraficosDoCliente({ cliente, versao = 0 }) {
   const semSemanas = porSemana.dados?.every((s) => s.quantidade === 0)
 
   return (
-    <section aria-label="Gráficos" className="mb-6 grid gap-4">
+    <section aria-label="Gráficos" className="mb-6 grid grid-cols-1 gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <NavegacaoDoMes mes={mes} aoMudar={setMes} maximo={atual} />
       </div>

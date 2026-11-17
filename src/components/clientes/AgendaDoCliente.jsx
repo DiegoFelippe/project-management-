@@ -162,7 +162,7 @@ export default function AgendaDoCliente({ clienteId, versao }) {
   }
 
   return (
-    <section aria-label="Agenda" className="grid gap-3">
+    <section aria-label="Agenda" className="grid grid-cols-1 gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <NavegacaoDoMes mes={mes} aoMudar={mudarMes} />
         {eventosAlemDosCarregados > 0 && (
