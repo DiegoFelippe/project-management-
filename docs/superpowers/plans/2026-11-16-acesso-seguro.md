@@ -27,25 +27,24 @@ que for necessário"), inclusive reiniciar o Supabase local para ligar o TOTP.
 
 ---
 
-### Task 1: Campo de senha forte, validar e gerador
+### Task 1: Campo de senha forte, validar e gerador (+ reinício único do Supabase)
 
 **Arquivos:** `src/components/campos/CampoSenha.jsx` (+ teste), `src/lib/senha.js` (+ teste: força, regras, gerar),
 usos em `src/components/usuarios/FichaDoConsultor.jsx` (senha provisória), `src/components/perfil/MeuPerfil.jsx`
 (trocar senha), `src/components/auth/FormularioNovaSenha.jsx` (primeiro acesso); `supabase/config.toml` (política de
-senha: mínimo 10 e tipos), Edge Function que define senha confere a força de novo (`criar-acesso`, e a que define
-senha nova, se houver) (+ integração).
-- [ ] Testes (RED) → implementar → `npm test`, lint, build, `npm run test:integracao` → commit `Senha forte: medidor,
-  validar e gerador`.
+senha: mínimo 10 e tipos; e, já nesta etapa, `[auth.mfa.totp] enroll_enabled/verify_enabled = true` para a Task 2),
+com **um único reinício** do Supabase local (cópia completa antes, `stop` sem `--no-backup`, `start`); Edge Function que
+define senha confere a força de novo (`criar-acesso`, e a que define senha nova, se houver) (+ integração).
+- [ ] Testes (RED) → cópia completa + config + reinício → implementar → `npm test`, lint, build,
+  `npm run test:integracao` → commit `Senha forte: medidor, validar e gerador`.
 
 ### Task 2: Verificação em duas etapas
 
-**Arquivos:** `supabase/config.toml` (`[auth.mfa.totp] enroll_enabled = true`, `verify_enabled = true`) + reinício
-(com cópia antes); migração `exige_2fa` (`perfis.exige_2fa boolean not null default false`; `private.liberado()` passa a
+**Arquivos:** (o TOTP já foi ligado e o Supabase reiniciado na Task 1); migração `exige_2fa` (`perfis.exige_2fa boolean not null default false`; `private.liberado()` passa a
 exigir `aal2` quando a pessoa tem fator verificado ou `exige_2fa`; funções auxiliares em `private`), pgTAP;
 `supabase/functions/_shared/clientes.ts` (`quemChama` confere `aal`), `gerenciar-acesso` (`exige_2fa` e ação `zerar_2fa`
 com a API de admin), integração; telas: aba Acesso da ficha (chave, situação, Zerar), Meu perfil (ativar com QR/código
 e desativar), fluxo de entrar (tela do código; tela de configurar quando exigido), `src/auth/*` para o estado `aal`;
 README (como ligar na nuvem).
-- [ ] Testes (RED) → cópia + config + reinício + migração → implementar → todas as suítes → commit `Verificação em
-  duas etapas`. Conferência no navegador pelo controlador (configurar com um app autenticador de teste não é possível
+- [ ] Testes (RED) → cópia + migração → implementar → todas as suítes → commit `Verificação em duas etapas`. Conferência no navegador pelo controlador (configurar com um app autenticador de teste não é possível
   aqui: conferir as telas e o bloqueio do banco).
