@@ -39,6 +39,27 @@ Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na 
 - Os itens do trilho têm animação própria (seção acima) e são marcados com `data-item-trilho`.
 - `src/components/ui/button.test.jsx` varre o código e falha se algum `<button>` ficar sem animação.
 
+## Tela nova: o molde (pedido do Diego, 2026-11-17)
+
+Toda tela nova segue esta ordem e estes componentes (detalhes nas seções abaixo):
+
+1. **Menu** (se for item do trilho): `src/components/shell/menu.js` com uma `animacao` (seção Menu lateral).
+2. **Cabeçalho** (`Cabecalho`): título na escala (`text-titulo`), subtítulo e os botões do contexto (principal cheio,
+   os outros `outline`).
+3. **Barra de filtros** (`BarraDeFiltros`): começa sempre com o ícone e "Filtros"; depois abas
+   (`AbasSegmentadas`), busca, filtros e o botão principal no fim. Filtros rodam no banco e voltam para a página 1.
+4. **Cartões de números** logo abaixo da barra: até 4, com o componente comum dos cartões (o mesmo do Início e do
+   Calendário), contados no banco no recorte de quem vê e seguindo os filtros de consultoria/consultor da barra.
+5. **Conteúdo:** lista sempre em `Tabela` (paginação de 15 vinda do banco, `ListaVazia`, ações na última coluna);
+   Editar abre o formulário preenchido.
+6. **Formulário:** `JanelaFormulario` + `SecaoFormulario` (abas `AbasSegmentadas` e 2 colunas quando é grande, como
+   o Hub), rodapé Cancelar + botão principal com a ação em andamento ("Salvando…"), campos só de
+   `src/components/campos/`, apagar com confirmação dizendo o que some junto.
+7. **Layout:** largura toda (nada de `max-w-*` + `mx-auto` no conteúdo), claro e escuro, e a 360 px nada rola para o
+   lado (tabelas rolam dentro do cartão).
+8. **Sempre:** tipografia da escala (números em colunas com `tabular-nums`), botões animados, CRUD completo, banco com
+   RLS e testes (banco, integração e tela) como as telas que já existem.
+
 ## Padrão Hub: botões, formulários, campos e abas
 
 Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/2026-11-16-padrao-hub.md`.
