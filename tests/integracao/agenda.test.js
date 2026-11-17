@@ -150,17 +150,23 @@ describe('agenda: leituras contra o banco de verdade', () => {
     expect(await meuGoogle()).toEqual({ conectado: false, email: null, erro: null })
   })
 
-  it('ausências: sem filtro, por consultor e por consultoria (a relação não é ambígua)', async () => {
+  it('ausências: com nome, por consultor e por consultoria, mesmo para gestor sem time', async () => {
+    const pedir = (extra, de = '2026-11-01', ate = '2026-11-30') => ausenciasDoPeriodo({ de, ate, ...extra })
     entrar('gestor')
-    const todas = await ausenciasDoPeriodo({ de: '2026-11-01', ate: '2026-11-30' })
-    expect(todas.map((a) => a.motivo)).toContain('Férias')
-    // O nome vem pela leitura de perfis (RLS): gestor sem time não lê o perfil do consultor, então pode vir nulo.
-    expect(todas.find((a) => a.motivo === 'Férias').perfil_id).toBe(pessoaA.id)
-    expect(await ausenciasDoPeriodo({ de: '2026-11-01', ate: '2026-11-30', consultorId: pessoaA.id })).toHaveLength(1)
-    // O filtro por consultoria junta com perfis (inner) e, por isso, depende da leitura de perfis: a central lê todos.
+    const todas = await pedir()
+    expect(todas.haMais).toBe(false)
+    const ferias = todas.itens.find((a) => a.motivo === 'Férias')
+    expect(ferias.perfil_id).toBe(pessoaA.id)
+    // O nome vem da função do banco: não depende de o gestor ler o perfil do consultor.
+    expect(ferias.pessoa.nome).toBeTruthy()
+    expect((await pedir({ consultorId: pessoaA.id })).itens).toHaveLength(1)
+    expect((await pedir({ consultoriaId: A })).itens).toHaveLength(1)
+    expect((await pedir({ consultoriaId: B })).itens).toHaveLength(0)
+    entrar('pessoa')
+    expect((await pedir()).itens.map((a) => a.motivo)).toEqual(['Férias'])
     entrar('central')
-    expect(await ausenciasDoPeriodo({ de: '2026-11-01', ate: '2026-11-30', consultoriaId: A })).toHaveLength(1)
-    expect(await ausenciasDoPeriodo({ de: '2026-11-01', ate: '2026-11-30', consultoriaId: B })).toHaveLength(0)
-    expect(await ausenciasDoPeriodo({ de: '2026-12-01', ate: '2026-12-31', consultoriaId: A })).toHaveLength(0)
+    expect((await pedir({ consultoriaId: A })).itens).toHaveLength(1)
+    expect((await pedir({ consultoriaId: B })).itens).toHaveLength(0)
+    expect((await pedir({ consultoriaId: A }, '2026-12-01', '2026-12-31')).itens).toHaveLength(0)
   })
 })

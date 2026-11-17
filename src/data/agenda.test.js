@@ -97,24 +97,24 @@ describe('indicadoresDaAgenda e feriadosDoPeriodo', () => {
 describe('ausenciasDoPeriodo', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('pede as ausências que tocam o período e filtra por consultor', async () => {
-    const { proxy, chamadas } = consulta({ data: [{ id: 'a1' }], error: null })
-    vi.mocked(supabase.from).mockReturnValue(proxy)
-    expect(await ausenciasDoPeriodo({ de: '2026-11-01', ate: '2026-11-30', consultorId: 'p1' })).toEqual([{ id: 'a1' }])
-    expect(supabase.from).toHaveBeenCalledWith('ausencias')
-    // a tabela tem duas relações com perfis (perfil_id e criado_por): sem a dica o PostgREST recusa (PGRST201)
-    expect(chamadas.find(([nome]) => nome === 'select')[1]).toContain('perfis!perfil_id(')
-    expect(chamadas).toContainEqual(['lte', 'de', '2026-11-30'])
-    expect(chamadas).toContainEqual(['gte', 'ate', '2026-11-01'])
-    expect(chamadas).toContainEqual(['eq', 'perfil_id', 'p1'])
+  it('chama a função do banco e devolve { itens, haMais }', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: { itens: [{ id: 'a1' }], ha_mais: false }, error: null })
+    expect(await ausenciasDoPeriodo({ de: '2026-11-01', ate: '2026-11-30' })).toEqual({ itens: [{ id: 'a1' }], haMais: false })
+    expect(supabase.rpc).toHaveBeenCalledWith('ausencias_do_periodo', {
+      p_de: '2026-11-01', p_ate: '2026-11-30', p_consultor: null, p_consultoria: null,
+    })
   })
 
-  it('filtra por consultoria pela pessoa (junção interna, no banco)', async () => {
-    const { proxy, chamadas } = consulta({ data: [], error: null })
-    vi.mocked(supabase.from).mockReturnValue(proxy)
-    await ausenciasDoPeriodo({ de: '2026-11-01', ate: '2026-11-30', consultoriaId: 'c1' })
-    expect(chamadas.find(([nome]) => nome === 'select')[1]).toContain('perfis!perfil_id!inner')
-    expect(chamadas).toContainEqual(['eq', 'perfil.consultoria_id', 'c1'])
+  it('manda os filtros de consultor e consultoria; erro sobe; resposta vazia vira lista vazia', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null })
+    expect(await ausenciasDoPeriodo({ de: 'a', ate: 'b', consultorId: 'p1', consultoriaId: 'c1' })).toEqual({
+      itens: [], haMais: false,
+    })
+    expect(supabase.rpc).toHaveBeenCalledWith('ausencias_do_periodo', {
+      p_de: 'a', p_ate: 'b', p_consultor: 'p1', p_consultoria: 'c1',
+    })
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'x' } })
+    await expect(ausenciasDoPeriodo({ de: 'a', ate: 'b' })).rejects.toEqual({ message: 'x' })
   })
 })
 

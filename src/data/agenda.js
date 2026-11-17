@@ -1,9 +1,6 @@
 // Agenda (leituras). O banco (RLS) decide quem vê cada evento; quem grava é a Edge Function, que mexe no Google junto.
 import { supabase } from '@/lib/supabase'
 
-// Teto das ausências de um período.
-const LIMITE_DO_PERIODO = 2000
-
 // Eventos que tocam o período [de, ate) (ISO), com consultor, cliente e participantes (com nome) numa chamada só:
 // { itens, haMais }. O banco decide quem vê o quê e usa índice por papel; consultorId, consultoriaId e clienteId são
 // filtros opcionais rodados lá. haMais avisa que o período tem mais eventos do que o teto da chamada (1.000).
@@ -33,25 +30,18 @@ export async function indicadoresDaAgenda(dia) {
   return data
 }
 
-// Ausências (dias inteiros) que tocam o período (perfis!perfil_id: a tabela também aponta para perfis por
-// criado_por); de e ate: 'AAAA-MM-DD' (inclusive).
+// Ausências (dias inteiras) que tocam o período, com o nome de quem se ausenta: { itens, haMais }; de e ate:
+// 'AAAA-MM-DD' (inclusive). Vem de uma função do banco (o gestor lê as ausências da consultoria sem precisar ler o
+// perfil de cada consultor); cada item: { id, perfil_id, de, ate, motivo, pessoa: { id, nome, cor } }.
 export async function ausenciasDoPeriodo({ de, ate, consultorId, consultoriaId } = {}) {
-  let consulta = supabase
-    .from('ausencias')
-    .select(
-      consultoriaId
-        ? 'id, perfil_id, de, ate, motivo, perfil:perfis!perfil_id!inner(id, nome, cor, consultoria_id)'
-        : 'id, perfil_id, de, ate, motivo, perfil:perfis!perfil_id(id, nome, cor)',
-    )
-    .lte('de', ate)
-    .gte('ate', de)
-    .order('de', { ascending: true })
-    .limit(LIMITE_DO_PERIODO)
-  if (consultorId) consulta = consulta.eq('perfil_id', consultorId)
-  if (consultoriaId) consulta = consulta.eq('perfil.consultoria_id', consultoriaId)
-  const { data, error } = await consulta
+  const { data, error } = await supabase.rpc('ausencias_do_periodo', {
+    p_de: de,
+    p_ate: ate,
+    p_consultor: consultorId ?? null,
+    p_consultoria: consultoriaId ?? null,
+  })
   if (error) throw error
-  return data ?? []
+  return { itens: data?.itens ?? [], haMais: Boolean(data?.ha_mais) }
 }
 
 // Feriados nacionais entre duas datas ('AAAA-MM-DD', inclusive): lista de datas.

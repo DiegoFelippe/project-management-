@@ -2,7 +2,7 @@
 -- segredo do Google que o navegador nunca lê e os números do painel. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(80);
+select plan(94);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -368,6 +368,63 @@ select testes.como('a1', 'aal1');
 select throws_ok($$ select public.eventos_do_periodo(now(), now() + interval '1 day') $$, 'P0001', 'sem_permissao',
   'sessão aal1 de quem precisa do código não lê o período');
 select throws_ok($$ select public.evento_da_agenda(gen_random_uuid()) $$, 'P0001', 'sem_permissao', 'nem o detalhe');
+reset role;
+
+-- ── Ausências do período (RPC) ───────────────────────────────────────────────
+select set_config('request.jwt.claims', '', true);
+insert into public.ausencias (perfil_id, de, ate, motivo) values
+  (testes.id('a1'), date '2026-11-16', date '2026-11-18', 'Férias a1'),
+  (testes.id('a2'), date '2026-11-17', date '2026-11-20', 'Férias a2'),
+  (testes.id('b1'), date '2026-11-17', date '2026-11-17', 'Férias b1'),
+  (testes.id('a2'), date '2026-12-10', date '2026-12-12', 'Dezembro a2');
+create function testes.ausencias_vistas(p_json jsonb) returns text language sql immutable as $$
+  select coalesce(string_agg(i ->> 'motivo', ',' order by i ->> 'motivo'), '')
+  from jsonb_array_elements(p_json -> 'itens') i
+  where i ->> 'motivo' like '%a1' or i ->> 'motivo' like '%a2' or i ->> 'motivo' like '%b1'
+$$;
+grant execute on function testes.ausencias_vistas(jsonb) to authenticated;
+
+select testes.como('gestor_a');
+select is(testes.ausencias_vistas(public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30')),
+  'Férias a1,Férias a2', 'gestor sem time vê as ausências da consultoria toda do período, não as de outra');
+select is((select i #>> '{pessoa,nome}' from jsonb_array_elements(public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30') -> 'itens') i
+  where i ->> 'motivo' = 'Férias a1'), 'Pessoa a1', 'e com o nome (mesmo sem ler o perfil)');
+select is(testes.ausencias_vistas(public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30', testes.id('a2'))),
+  'Férias a2', 'filtro de consultor');
+select is(testes.ausencias_vistas(public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30', null, testes.id('A'))),
+  'Férias a1,Férias a2', 'filtro da própria consultoria');
+select is(testes.ausencias_vistas(public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30', null, testes.id('B'))),
+  '', 'filtro de outra consultoria não traz nada');
+select is(testes.ausencias_vistas(public.ausencias_do_periodo(date '2026-12-01', date '2026-12-31')),
+  'Dezembro a2', 'o período corta pelas datas');
+select is(testes.ausencias_vistas(public.ausencias_do_periodo(date '2026-11-18', date '2026-11-18')),
+  'Férias a1,Férias a2', 'ausência que atravessa o período entra');
+reset role;
+
+select testes.como('a1', 'aal2');
+select is(testes.ausencias_vistas(public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30')),
+  'Férias a1', 'consultor só vê as próprias');
+select is(testes.ausencias_vistas(public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30', testes.id('a2'))),
+  '', 'e pedir a do colega não traz nada');
+reset role;
+
+select testes.como('b1');
+select is(testes.ausencias_vistas(public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30')),
+  'Férias b1', 'outra consultoria só vê as dela');
+reset role;
+
+select testes.como('central1');
+select is(testes.ausencias_vistas(public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30')),
+  'Férias a1,Férias a2,Férias b1', 'central vê todas');
+select is(testes.ausencias_vistas(public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30', null, testes.id('B'))),
+  'Férias b1', 'central filtra por consultoria');
+select is(public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30', null, null, 1) -> 'ha_mais', 'true'::jsonb,
+  'o limite avisa que há mais');
+reset role;
+
+select testes.como('a1', 'aal1');
+select throws_ok($$ select public.ausencias_do_periodo(date '2026-11-01', date '2026-11-30') $$, 'P0001', 'sem_permissao',
+  'sessão aal1 de quem precisa do código não lê');
 reset role;
 
 select * from finish();
