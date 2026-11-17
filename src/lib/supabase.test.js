@@ -58,6 +58,18 @@ describe('aviso de recusa', () => {
   })
 })
 
+// O navegador nunca guarda resposta do Supabase no cache HTTP: uma resposta errada de um instante (como o 300 de um
+// esquema ambíguo, em 17/11) ficava guardada e o login lia o perfil do cache para sempre.
+describe('cache do navegador', () => {
+  it('toda chamada ao Supabase vai com cache: no-store', async () => {
+    const buscar = vi.fn().mockResolvedValue(resposta(200, []))
+    vi.stubGlobal('fetch', buscar)
+    await supabase.from('perfis').select('id')
+    expect(buscar).toHaveBeenCalled()
+    for (const [, opcoes] of buscar.mock.calls) expect(opcoes).toMatchObject({ cache: 'no-store' })
+  })
+})
+
 // A volta do "Conectar Google" do Calendário traz ?code=…&state=… (ou ?error=…) em /calendario: é do Google da pessoa,
 // não do login. O supabase-js não pode tomar isso como volta do login (o erro do Google pararia a sessão).
 describe('volta do login na URL', () => {

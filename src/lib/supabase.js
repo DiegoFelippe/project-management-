@@ -20,8 +20,10 @@ export function avisarRecusa(status) {
 
 const recusaNoCorpo = (corpo) => corpo?.code === 'P0001' || String(corpo?.statusCode ?? '') === '403'
 
-async function buscarAvisando(...argumentos) {
-  const resposta = await fetch(...argumentos)
+// cache: 'no-store': o navegador nunca guarda resposta do Supabase. Em 17/11 um 300 de um instante (esquema ambíguo)
+// ficou no cache do Chrome e o login lia o perfil de lá para sempre (a pessoa entrava e saía na hora).
+async function buscarAvisando(entrada, opcoes) {
+  const resposta = await fetch(entrada, { ...opcoes, cache: 'no-store' })
   avisarRecusa(resposta.status)
   // Lê uma cópia do corpo sem segurar a resposta: quem chamou recebe a original inteira.
   if (resposta.status === 400) {
