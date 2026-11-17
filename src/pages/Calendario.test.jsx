@@ -8,7 +8,7 @@ import { consultoresPorOcupacao } from '@/data/capacidade'
 import { buscarClientes } from '@/data/clientes'
 import { buscarConsultorias } from '@/data/consultorias'
 import {
-  ausenciasDoPeriodo, concluirGoogle, conectarGoogle, desconectarGoogle, eventosDoPeriodo, feriadosDoPeriodo,
+  ausenciasDoPeriodo, buscarEvento, concluirGoogle, conectarGoogle, desconectarGoogle, eventosDoPeriodo, feriadosDoPeriodo,
   indicadoresDaAgenda, meuGoogle,
 } from '@/data/agenda'
 import { escolherNoSeletor } from '@/test/campos'
@@ -176,6 +176,22 @@ describe('Calendário: consultor (visão privada)', () => {
     await user.click(await within(grade).findByRole('button', { name: /Kickoff Alfa/ }))
     const janela = await screen.findByRole('dialog', { name: 'Editar evento' })
     expect(within(janela).getByLabelText('Título')).toHaveValue('Kickoff Alfa')
+  })
+
+  it('/calendario?evento=<id> abre o evento e limpa o endereço', async () => {
+    vi.mocked(buscarEvento).mockResolvedValue(EVENTO)
+    tela(consultor, '/calendario?evento=e1')
+    const janela = await screen.findByRole('dialog', { name: 'Editar evento' })
+    expect(within(janela).getByLabelText('Título')).toHaveValue('Kickoff Alfa')
+    expect(buscarEvento).toHaveBeenCalledWith('e1')
+    await waitFor(() => expect(screen.getByTestId('endereco')).toHaveTextContent(/^\/calendario$/))
+  })
+
+  it('/calendario?evento=<id> de um evento que não existe avisa', async () => {
+    vi.mocked(buscarEvento).mockResolvedValue(null)
+    tela(consultor, '/calendario?evento=zzz')
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Este evento não existe mais ou você não o vê.'))
+    expect(screen.queryByRole('dialog', { name: 'Editar evento' })).not.toBeInTheDocument()
   })
 
   it('avisa quando o período tem mais eventos do que o calendário mostra', async () => {

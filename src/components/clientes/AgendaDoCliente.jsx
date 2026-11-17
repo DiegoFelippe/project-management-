@@ -1,7 +1,9 @@
 import { useEffect, useId, useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { eventosDoPeriodo } from '@/data/agenda'
 import { checkinsDoMes } from '@/data/checkins'
 import { eventosDoMes } from '@/data/clientes'
 import { formatarDuracao, formatarHoras, horasEntre } from '@/lib/horas'
@@ -17,6 +19,13 @@ const SEMANA = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom']
 const DIA_DE_SP = new Intl.DateTimeFormat('en-CA', { timeZone: FUSO, year: 'numeric', month: '2-digit', day: '2-digit' })
 const HORA = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, timeStyle: 'short' })
 const DIA_DA_SEMANA = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', weekday: 'long' })
+
+// Intervalo do mês em meia-noite de São Paulo, como o banco recebe (o fuso não tem horário de verão desde 2019).
+function limitesDoMes(mes) {
+  const [ano, numero] = mes.split('-').map(Number)
+  const proximo = numero === 12 ? `${ano + 1}-01` : `${ano}-${pad(numero + 1)}`
+  return { de: `${mes.slice(0, 7)}-01T00:00:00-03:00`, ate: `${proximo}-01T00:00:00-03:00` }
+}
 
 const diaDe = (instante) => DIA_DE_SP.format(new Date(instante))
 const pad = (n) => String(n).padStart(2, '0')
@@ -47,7 +56,7 @@ function semanasDoMes(mes) {
 }
 
 // Marcas e detalhes do dia, em ordem de horário: check-ins e eventos juntos.
-function agruparPorDia(checkins, eventos) {
+function agruparPorDia(checkins, eventos, reunioes) {
   const porDia = new Map()
   const guardar = (instante, item) => {
     const dia = diaDe(instante)
@@ -56,12 +65,14 @@ function agruparPorDia(checkins, eventos) {
   }
   checkins.forEach((c) => guardar(c.inicio, { tipo: 'checkin', id: c.id, checkin: c }))
   eventos.forEach((e) => guardar(e.em, { tipo: 'evento', id: e.id, evento: e }))
+  reunioes.forEach((r) => guardar(r.inicio, { tipo: 'reuniao', id: r.id, reuniao: r }))
   porDia.forEach((lista) => lista.sort((a, b) => a.instante - b.instante))
   return porDia
 }
 
 function textoDaMarca(item) {
   if (item.tipo === 'evento') return textoDoEvento(item.evento)
+  if (item.tipo === 'reuniao') return `Reunião: ${item.reuniao.titulo}`
   const c = item.checkin
   return `${nomeDe(c.consultor?.nome)} · ${c.fim ? duracaoDoCheckin(c) : 'em andamento'}`
 }
@@ -73,7 +84,7 @@ function DetalheDoDia({ dia, itens, aoFechar }) {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{data && `${DIA_DA_SEMANA.format(data)}, ${formatarDia(dia)}`}</DialogTitle>
-          <DialogDescription>{itens.length === 0 ? 'Nada neste dia.' : 'Check-ins e eventos do dia.'}</DialogDescription>
+          <DialogDescription>{itens.length === 0 ? 'Nada neste dia.' : 'Check-ins, reuniões e eventos do dia.'}</DialogDescription>
         </DialogHeader>
         <ul className="grid gap-3">
           {itens.map((item) => (
@@ -90,6 +101,20 @@ function DetalheDoDia({ dia, itens, aoFechar }) {
                   </p>
                   <p className="text-muted-foreground">{duracaoDoCheckin(item.checkin) ?? 'em andamento'}</p>
                   {item.checkin.descricao && <p className="mt-1">{item.checkin.descricao}</p>}
+                </>
+              ) : item.tipo === 'reuniao' ? (
+                <>
+                  <p className="font-medium">
+                    <span className="tabular-nums">
+                      {HORA.format(new Date(item.reuniao.inicio))}–{HORA.format(new Date(item.reuniao.fim))}
+                    </span>
+                    {' · '}
+                    <span>{item.reuniao.titulo}</span>
+                  </p>
+                  <p className="text-muted-foreground">{nomeDe(item.reuniao.consultor?.nome)}</p>
+                  <Link to={`/calendario?evento=${item.reuniao.id}`} className="mt-1 inline-block text-primary underline-offset-2 hover:underline">
+                    Abrir no Calendário
+                  </Link>
                 </>
               ) : (
                 <>
@@ -120,8 +145,10 @@ export default function AgendaDoCliente({ clienteId, versao }) {
 
   useEffect(() => {
     let ativo = true
-    Promise.all([checkinsDoMes(clienteId, mes), eventosDoMes(clienteId, mes)])
-      .then(([checkins, eventos]) => ativo && setEstado({ chave, checkins, eventos: eventos.itens, totalDeEventos: eventos.total }))
+    Promise.all([checkinsDoMes(clienteId, mes), eventosDoMes(clienteId, mes), eventosDoPeriodo({ ...limitesDoMes(mes), clienteId })])
+      .then(([checkins, eventos, reunioes]) => ativo && setEstado({
+        chave, checkins, eventos: eventos.itens, totalDeEventos: eventos.total, reunioes: reunioes.itens, haMaisReunioes: reunioes.haMais,
+      }))
       .catch(() => ativo && setEstado({ chave, erro: 'Não foi possível carregar a agenda.' }))
     return () => {
       ativo = false
@@ -131,7 +158,7 @@ export default function AgendaDoCliente({ clienteId, versao }) {
 
   const pronto = estado.chave === chave
   const porDia = useMemo(
-    () => (pronto && !estado.erro ? agruparPorDia(estado.checkins, estado.eventos) : new Map()),
+    () => (pronto && !estado.erro ? agruparPorDia(estado.checkins, estado.eventos, estado.reunioes) : new Map()),
     [pronto, estado],
   )
   const semanas = useMemo(() => semanasDoMes(mes), [mes])
@@ -169,6 +196,9 @@ export default function AgendaDoCliente({ clienteId, versao }) {
           <span className="text-corpo text-muted-foreground">
             e mais {eventosAlemDosCarregados} {eventosAlemDosCarregados === 1 ? 'evento' : 'eventos'}
           </span>
+        )}
+        {pronto && !estado.erro && estado.haMaisReunioes && (
+          <span className="text-corpo text-muted-foreground">Há mais reuniões neste mês do que a agenda mostra.</span>
         )}
       </div>
       {estado.erro && pronto && <p role="alert" className="text-corpo text-destructive">{estado.erro}</p>}

@@ -21,7 +21,7 @@ Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na 
   itens do menu, a bolinha da pessoa e o Sair. Pedido do Diego (2026-11-12). O menu não tem itens "em breve"
   (o Projetos saiu em 2026-11-16): só entra no trilho o que já funciona.
 - **Item novo no menu:** em `src/components/shell/menu.js`, preencha `animacao` com uma de
-  `ANIMACOES_DO_MENU` (`subir`, `balancar`, `pulsar`, `abrir`, `erguer`, `conectar`, `sair`). Prefira uma que
+  `ANIMACOES_DO_MENU` (`subir`, `balancar`, `pulsar`, `abrir`, `erguer`, `conectar`, `transmitir`, `folhear`, `sair`). Prefira uma que
   combine com o ícone e que ainda não esteja em uso no trilho.
 - **Animação nova:** keyframes `icone-<nome>` + a regra `.group:hover .anim-<nome>` (e `:focus-visible`)
   em `src/index.css`, e o nome em `ANIMACOES_DO_MENU`. O elemento clicável precisa da classe `group`
@@ -63,6 +63,8 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   `BotaoCheckin`) recebem `noCabecalho` e usam `estiloDaAcao` (`src/components/clientes/estiloDaAcao.js`).
 - **Mês sempre pela `NavegacaoDoMes`** (`maximo` trava o Próximo); nunca montar Anterior/Próximo de mês à mão.
   `src/components/comum/navegacaoDoMesVarredura.test.js` falha se `deslocarMes` aparecer fora dela.
+  **Exceção: o Calendário.** O "Hoje ‹ ›" dele anda por semana ou por mês, como o Hub, conforme a visão, e por isso
+  não usa a `NavegacaoDoMes`.
 - **Testes que guardam isto:** `src/components/campos/camposNativos.test.js` (varre `src/` atrás de campo nativo),
   `src/components/ui/button.test.jsx` e `src/components/comum/formulariosEnvio.test.jsx`.
 
@@ -120,6 +122,24 @@ Pedido do Diego (2026-11-16). Design: `docs/superpowers/specs/2026-11-16-tipogra
   `sm:`; sem o prefixo, a classe vence a `.texto-de-campo` e o iPhone volta a dar zoom.
 - `src/components/comum/tipografiaVarredura.test.js` varre `src/` e falha com arquivo:linha; `tamanhoNoCelular.test.jsx`
   guarda os campos.
+
+## Agenda (Calendário)
+
+Design: `docs/superpowers/specs/2026-11-16-calendario-design.md` (decisões da construção no fim).
+
+- **Quem vê o quê:** o consultor vê a própria agenda e os eventos para os quais foi convidado; gestão (admin e gestor)
+  vê a da consultoria; central e dono veem todas. Uma consultoria nunca vê eventos de outra. A visão é do banco
+  (RLS e `eventos_do_periodo`), nunca recortada na tela.
+- **Google da pessoa só no Vault.** O token de cada pessoa fica no Vault; o navegador nunca o vê (só "conectado" e o
+  e-mail da conta).
+- **Escrita só por Edge Function:** `agenda` (criar, editar, apagar, responder), `google-pessoa` (conectar e
+  desconectar) e `reunioes-depois` (pasta com gravação e transcrição, chamada pelo `pg_cron`). O navegador só lê.
+- **O núcleo fica em `supabase/functions/_shared/agenda/`, sem imports do Deno**, e é testado com o Google falso
+  (`npm test`), sem rede.
+- **Edge Function NOVA no Supabase local** exige `npx supabase stop && npx supabase start` (faça antes um backup com
+  `pg_dumpall`; os dados ficam). `npm run functions:reiniciar` só recarrega as que o runtime já conhece.
+- Na página do cliente, a aba Agenda mostra as reuniões do cliente (link para `/calendario?evento=<id>`) e o
+  Histórico traz "Reunião realizada" e "Pasta da reunião criada".
 
 ## Layout
 

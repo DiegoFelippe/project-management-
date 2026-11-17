@@ -1,10 +1,13 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { eventosDoPeriodo } from '@/data/agenda'
 import { checkinsDoMes } from '@/data/checkins'
 import { eventosDoMes } from '@/data/clientes'
 import AgendaDoCliente from './AgendaDoCliente'
 
+vi.mock('@/data/agenda', () => ({ eventosDoPeriodo: vi.fn() }))
 vi.mock('@/data/checkins', () => ({ checkinsDoMes: vi.fn() }))
 vi.mock('@/data/clientes', () => ({ eventosDoMes: vi.fn() }))
 
@@ -16,18 +19,28 @@ const EVENTO = {
   id: 'e1', tipo: 'enviado', em: '2026-11-16T18:30:00Z', para_consultoria: 'Consultoria Exemplo', autor: 'Bia Central',
 }
 
+const REUNIAO = {
+  id: 'r1', titulo: 'Kickoff Alfa', inicio: '2026-11-18T14:00:00-03:00', fim: '2026-11-18T15:00:00-03:00', cliente_id: 'k1',
+  consultor: { id: 'p1', nome: 'Ana Lima' },
+}
+
+function tela(versao) {
+  return render(<MemoryRouter><AgendaDoCliente clienteId="k1" versao={versao} /></MemoryRouter>)
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-16T15:00:00Z'))
   vi.clearAllMocks()
   vi.mocked(checkinsDoMes).mockResolvedValue([CHECKIN])
   vi.mocked(eventosDoMes).mockResolvedValue({ itens: [EVENTO], total: 1 })
+  vi.mocked(eventosDoPeriodo).mockResolvedValue({ itens: [REUNIAO], haMais: false })
 })
 afterEach(() => vi.useRealTimers())
 
 describe('AgendaDoCliente', () => {
   it('novembro/2026 começa no domingo: seis dias de outubro esmaecidos antes do dia 1', async () => {
-    render(<AgendaDoCliente clienteId="k1" />)
+    tela()
     await screen.findByText('Ana Lima · 1 h')
     expect(screen.getByText('Novembro de 2026')).toBeInTheDocument()
     const primeira = screen.getAllByRole('row')[1]
@@ -41,7 +54,7 @@ describe('AgendaDoCliente', () => {
   })
 
   it('mostra check-in e evento no dia 16, e destaca hoje', async () => {
-    render(<AgendaDoCliente clienteId="k1" />)
+    tela()
     const d16 = await screen.findByRole('gridcell', { name: /^16/ })
     expect(within(d16).getByText('Ana Lima · 1 h')).toBeInTheDocument()
     expect(within(d16).getByText('Mandado para Consultoria Exemplo')).toBeInTheDocument()
@@ -54,7 +67,7 @@ describe('AgendaDoCliente', () => {
       { ...CHECKIN, fim: '2026-11-16T12:25:00Z' },
       { ...CHECKIN, id: 'c2', inicio: '2026-11-17T12:00:00Z', fim: null },
     ])
-    render(<AgendaDoCliente clienteId="k1" />)
+    tela()
     expect(await screen.findByText('Ana Lima · 25 min')).toBeInTheDocument()
     expect(screen.getByText('Ana Lima · em andamento')).toBeInTheDocument()
   })
@@ -63,7 +76,7 @@ describe('AgendaDoCliente', () => {
     vi.mocked(checkinsDoMes).mockResolvedValue(
       [1, 2, 3, 4].map((i) => ({ ...CHECKIN, id: `c${i}`, inicio: `2026-11-16T${10 + i}:00:00Z`, fim: `2026-11-16T${10 + i}:30:00Z` })),
     )
-    render(<AgendaDoCliente clienteId="k1" />)
+    tela()
     const d16 = await screen.findByRole('gridcell', { name: /^16/ })
     await waitFor(() => expect(within(d16).getByText('+2')).toBeInTheDocument())
     expect(within(d16).getAllByText(/Ana Lima/)).toHaveLength(3)
@@ -71,7 +84,7 @@ describe('AgendaDoCliente', () => {
 
   it('clicar no dia abre o detalhe com check-ins e eventos', async () => {
     const usuario = userEvent.setup()
-    render(<AgendaDoCliente clienteId="k1" />)
+    tela()
     await usuario.click(await screen.findByRole('gridcell', { name: /^16/ }))
     const janela = await screen.findByRole('dialog')
     expect(within(janela).getByText(/16\/11\/2026/)).toBeInTheDocument()
@@ -84,7 +97,7 @@ describe('AgendaDoCliente', () => {
 
   it('setas movem o dia e Enter abre o detalhe', async () => {
     const usuario = userEvent.setup()
-    render(<AgendaDoCliente clienteId="k1" />)
+    tela()
     const d16 = await screen.findByRole('gridcell', { name: /^16/ })
     d16.focus()
     await usuario.keyboard('{ArrowRight}')
@@ -100,7 +113,7 @@ describe('AgendaDoCliente', () => {
 
   it('Próximo pede dezembro; Anterior volta a outubro', async () => {
     const usuario = userEvent.setup()
-    render(<AgendaDoCliente clienteId="k1" />)
+    tela()
     await screen.findByText('Ana Lima · 1 h')
     await usuario.click(screen.getByRole('button', { name: 'Próximo mês' }))
     await waitFor(() => expect(checkinsDoMes).toHaveBeenLastCalledWith('k1', '2026-12-01'))
@@ -113,21 +126,60 @@ describe('AgendaDoCliente', () => {
 
   it('avisa quando há mais eventos que o carregado', async () => {
     vi.mocked(eventosDoMes).mockResolvedValue({ itens: [EVENTO], total: 251 })
-    render(<AgendaDoCliente clienteId="k1" />)
+    tela()
     expect(await screen.findByText('e mais 250 eventos')).toBeInTheDocument()
   })
 
   it('recarrega quando a versão da página muda', async () => {
-    const { rerender } = render(<AgendaDoCliente clienteId="k1" versao={0} />)
+    const { rerender } = tela(0)
     await screen.findByText('Ana Lima · 1 h')
-    rerender(<AgendaDoCliente clienteId="k1" versao={1} />)
+    rerender(<MemoryRouter><AgendaDoCliente clienteId="k1" versao={1} /></MemoryRouter>)
     await waitFor(() => expect(checkinsDoMes).toHaveBeenCalledTimes(2))
     expect(eventosDoMes).toHaveBeenCalledTimes(2)
   })
 
   it('erro ao carregar avisa', async () => {
     vi.mocked(checkinsDoMes).mockRejectedValue(new Error('x'))
-    render(<AgendaDoCliente clienteId="k1" />)
+    tela()
     expect(await screen.findByText('Não foi possível carregar a agenda.')).toBeInTheDocument()
+  })
+
+  it('lê as reuniões do cliente no mês e mostra a marca no dia', async () => {
+    tela()
+    const d18 = await screen.findByRole('gridcell', { name: /^18/ })
+    expect(await within(d18).findByText('Reunião: Kickoff Alfa')).toBeInTheDocument()
+    expect(eventosDoPeriodo).toHaveBeenCalledWith({ de: '2026-11-01T00:00:00-03:00', ate: '2026-12-01T00:00:00-03:00', clienteId: 'k1' })
+  })
+
+  it('o detalhe do dia traz a reunião com horário, consultor e link para o Calendário', async () => {
+    const usuario = userEvent.setup()
+    tela()
+    const d18 = await screen.findByRole('gridcell', { name: /^18/ })
+    await within(d18).findByText('Reunião: Kickoff Alfa')
+    await usuario.click(d18)
+    const janela = await screen.findByRole('dialog')
+    expect(within(janela).getByText(/14:00–15:00/)).toBeInTheDocument()
+    expect(within(janela).getByText('Ana Lima')).toBeInTheDocument()
+    expect(within(janela).getByRole('link', { name: 'Abrir no Calendário' })).toHaveAttribute('href', '/calendario?evento=r1')
+  })
+
+  it('a reunião do cliente sobe em dezembro com o mês seguinte', async () => {
+    const usuario = userEvent.setup()
+    tela()
+    await screen.findByText('Ana Lima · 1 h')
+    await usuario.click(screen.getByRole('button', { name: 'Próximo mês' }))
+    await waitFor(() => expect(eventosDoPeriodo).toHaveBeenLastCalledWith({ de: '2026-12-01T00:00:00-03:00', ate: '2027-01-01T00:00:00-03:00', clienteId: 'k1' }))
+  })
+
+  it('mostra os eventos de reunião do histórico com nome de gente', async () => {
+    vi.mocked(eventosDoMes).mockResolvedValue({
+      itens: [
+        { id: 'h1', tipo: 'reuniao_realizada', em: '2026-11-18T18:00:00Z', autor: 'Ana Lima' },
+        { id: 'h2', tipo: 'pasta_da_reuniao_criada', em: '2026-11-18T18:10:00Z', autor: null },
+      ], total: 2,
+    })
+    tela()
+    expect(await screen.findByText('Reunião realizada')).toBeInTheDocument()
+    expect(screen.getByText('Pasta da reunião criada')).toBeInTheDocument()
   })
 })

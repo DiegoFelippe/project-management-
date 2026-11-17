@@ -186,7 +186,8 @@ vê apenas "conectado ou não" e o e-mail da conta. Edge Functions: `google-pess
 quem não conectou o Google fica com o evento só no app, sem Meet), com o núcleo em `supabase/functions/_shared/agenda/`.
 
 1. No Google Cloud, no mesmo app: ative também a **Google Meet REST API** (além da Calendar API) e, na tela de
-   consentimento, os escopos `calendar.events`, `meetings.space.settings` e `meetings.space.readonly`.
+   consentimento, os escopos `calendar.events`, `meetings.space.settings` e `meetings.space.readonly` (o app pede
+   ainda `openid` e `email`; lista exata em `ESCOPOS_DA_PESSOA`, `supabase/functions/_shared/agenda/google.ts`).
 2. Cadastre um **segundo endereço de retorno** no "ID do cliente OAuth": a tela do Calendário do app,
    `https://<endereço-da-vercel>/calendario` (no local: `http://localhost:5173/calendario`). O Google volta para a
    tela, e a tela termina a conexão com o login da pessoa (assim ninguém pendura o Google de outra pessoa na própria
@@ -208,7 +209,10 @@ no git); o endereço da função fica no Vault como `reunioes_depois_url` (no lo
 migração liga o `pg_cron` e o `pg_net` e agenda a rotina; falta só trocar o endereço pelo do projeto, no SQL Editor:
 `select vault.update_secret((select id from vault.secrets where name = 'reunioes_depois_url'),
 'https://<ref-do-projeto>.supabase.co/functions/v1/reunioes-depois');`. Confira em **Integrations → Cron** que o job
-`reunioes-depois` está ativo.
+`reunioes-depois` está ativo. Depois do deploy, confira se a rotina chega na função: no SQL Editor,
+`select id, status_code, content, created from net._http_response order by created desc limit 5;` deve mostrar
+`status_code` 200 a cada 10 minutos (401 = segredo do Vault diferente do da função; erro de conexão = endereço errado).
+Decisões e motivos: `docs/superpowers/specs/2026-11-16-calendario-design.md`.
 
 No Supabase local, uma Edge Function **nova** só passa a ser servida depois de recriar o runtime
 (`npx supabase stop && npx supabase start`; os dados ficam). `npm run functions:reiniciar` recarrega o código das

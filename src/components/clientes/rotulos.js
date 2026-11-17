@@ -37,6 +37,8 @@ export function textoDoEvento(e) {
     case 'previsao_ajustada': return `Previsão de ${formatarHoras(e.de_horas)} para ${formatarHoras(e.para_horas)}`
     case 'arquivado': return 'Arquivado'
     case 'reativado': return 'Reativado'
+    case 'reuniao_realizada': return 'Reunião realizada'
+    case 'pasta_da_reuniao_criada': return 'Pasta da reunião criada'
     default: return e.tipo
   }
 }
