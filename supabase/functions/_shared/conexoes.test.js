@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { criarIaFalsa, criarSlackFalso, criarWhatsappFalso } from './conexoes-falsas.ts'
 import {
+  avisoParaDigitarDeNovo,
   MENSAGEM_DE_TESTE,
   perguntarAIa,
   testarSlack,
@@ -236,5 +237,36 @@ describe('IA: pergunta curta ao modelo', () => {
     ia.falhar({ rede: true })
     await expect(perguntarAIa({ provedor: 'openai', modelo: 'gpt-5' }, 'sk-boa', ia.fetch)).rejects.toThrow('Não foi possível falar com a OpenAI.')
     await expect(perguntarAIa({ provedor: 'anthropic', modelo: 'claude-opus-5-5' }, null, ia.fetch)).rejects.toThrow('Falta a chave de API.')
+  })
+})
+
+describe('segredo guardado: só vale para o mesmo destino', () => {
+  const SMTP = { host: 'smtp.acme.test', porta: 587, seguranca: 'starttls', usuario: 'contato@acme.test', remetente: 'contato@acme.test' }
+
+  it('SMTP: outro servidor, porta, segurança ou usuário pede a senha de novo', () => {
+    const aviso = 'Digite a senha de novo: o servidor, a porta, a segurança ou o usuário mudou.'
+    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, host: 'smtp.outro.test' }, SMTP)).toBe(aviso)
+    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, porta: 465 }, SMTP)).toBe(aviso)
+    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, seguranca: 'nenhuma' }, SMTP)).toBe(aviso)
+    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, usuario: 'outro@acme.test' }, SMTP)).toBe(aviso)
+  })
+
+  it('SMTP: o mesmo destino (mudando só o remetente) usa a guardada; sem usuário a senha nem é enviada', () => {
+    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, remetente: 'avisos@acme.test', nome_remetente: 'Acme' }, SMTP)).toBeNull()
+    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, host: 'smtp.outro.test', usuario: undefined }, SMTP)).toBeNull()
+  })
+
+  it('IA: outro provedor pede a chave de novo; outro modelo no mesmo provedor, não', () => {
+    const ia = { provedor: 'anthropic', modelo: 'claude-opus-5-5' }
+    expect(avisoParaDigitarDeNovo('ia', { provedor: 'openai', modelo: 'gpt-5' }, ia)).toBe('Digite a chave de API de novo: o provedor mudou.')
+    expect(avisoParaDigitarDeNovo('ia', { provedor: 'anthropic', modelo: 'claude-sonnet-5-5' }, ia)).toBeNull()
+  })
+
+  it('WhatsApp: outro ID do número pede o token de novo; Slack: o token é o próprio destino', () => {
+    const w = { phone_number_id: '1234567890123', waba_id: '9876543210' }
+    expect(avisoParaDigitarDeNovo('whatsapp', { ...w, phone_number_id: '1112223334445' }, w))
+      .toBe('Digite o token de acesso de novo: o ID do número mudou.')
+    expect(avisoParaDigitarDeNovo('whatsapp', { ...w, waba_id: '5556667778' }, w)).toBeNull()
+    expect(avisoParaDigitarDeNovo('slack', { canal: '#outro' }, { canal: '#geral' })).toBeNull()
   })
 })

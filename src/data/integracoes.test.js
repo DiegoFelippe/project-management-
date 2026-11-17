@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { chamarFuncao } from '@/lib/supabase'
-import { testarRascunho } from './integracoes'
+import { salvarIntegracao, testarRascunho } from './integracoes'
 
 vi.mock('@/lib/supabase', () => ({ supabase: {}, chamarFuncao: vi.fn() }))
 
@@ -28,5 +28,17 @@ describe('Testar na janela (rascunho: testa o que foi digitado, sem gravar)', ()
     expect(await testarRascunho('slack', {}, 'xoxb-1')).toEqual({ erro: 'O Slack recusou o token.', mensagem: null })
     vi.mocked(chamarFuncao).mockResolvedValueOnce({ status: 403, corpo: { codigo: 'sem_permissao' } })
     expect(await testarRascunho('slack', {}, 'xoxb-1')).toEqual({ erro: 'Você não tem permissão para isso.', mensagem: null })
+  })
+})
+
+describe('recusa com a mensagem do servidor (ex.: segredo guardado em outro destino)', () => {
+  const RECUSA = { status: 400, corpo: { codigo: 'dados_invalidos', campo: 'segredo', mensagem: 'Digite a chave de API de novo: o provedor mudou.' } }
+
+  it('Testar e Salvar mostram a mensagem que o servidor mandou, no lugar da genérica', async () => {
+    vi.mocked(chamarFuncao).mockResolvedValue(RECUSA)
+    expect(await testarRascunho('ia', { provedor: 'openai', modelo: 'gpt-5' }, ''))
+      .toEqual({ erro: 'Digite a chave de API de novo: o provedor mudou.', mensagem: null })
+    expect(await salvarIntegracao('ia', { provedor: 'openai', modelo: 'gpt-5' }, ''))
+      .toMatchObject({ erro: 'Digite a chave de API de novo: o provedor mudou.', campo: 'segredo' })
   })
 })

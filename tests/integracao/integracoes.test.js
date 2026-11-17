@@ -157,6 +157,48 @@ describe('integracoes: testar o rascunho (antes de salvar)', () => {
       numero_teste: '11999998888' }, 'numero_teste')
   })
 
+  it('segredo em branco só vale para o mesmo destino: outro servidor ou provedor é recusado, o mesmo continua', async () => {
+    const D = await criarConsultoriaDeTeste()
+    const adminD = await criarPerfilDeTeste({ papel: 'admin', consultoriaId: D })
+    const comoAdminD = await entrarComo(adminD)
+    const smtp = { ...MAILPIT, usuario: 'contato@d.test' }
+    const ia = { provedor: 'anthropic', modelo: 'claude-opus-5-5' }
+    const gravar = (tipo, config, segredo) => admin.rpc('integracao_salvar', {
+      p_consultoria: D, p_tipo: tipo, p_config: config, p_segredo: segredo, p_quem: adminD.id,
+    })
+    await gravar('smtp', smtp, 'senha-guardada-d')
+    await gravar('ia', ia, 'sk-ant-guardada-d')
+    const antes = await admin.from('integracoes').select('*').eq('consultoria_id', D).order('tipo')
+
+    const outroServidor = await rascunho(comoAdminD, { tipo: 'smtp', config: { ...smtp, host: 'smtp.outro.test' } })
+    expect(outroServidor.status).toBe(400)
+    expect(outroServidor.corpo).toEqual({ codigo: 'dados_invalidos', campo: 'segredo',
+      mensagem: 'Digite a senha de novo: o servidor, a porta, a segurança ou o usuário mudou.' })
+    expect((await rascunho(comoAdminD, { tipo: 'smtp', config: { ...smtp, porta: 2525 } })).status).toBe(400)
+    const outroProvedor = await rascunho(comoAdminD, { tipo: 'ia', config: { provedor: 'openai', modelo: 'gpt-5' } })
+    expect(outroProvedor.status).toBe(400)
+    expect(outroProvedor.corpo.mensagem).toBe('Digite a chave de API de novo: o provedor mudou.')
+    // Salvar tem a mesma regra (salvar também testa com o segredo guardado).
+    const salvarOutro = await integracoes(comoAdminD, { acao: 'salvar', tipo: 'smtp', config: { ...smtp, host: 'smtp.outro.test' } })
+    expect(salvarOutro.status).toBe(400)
+    expect(salvarOutro.corpo.campo).toBe('segredo')
+
+    // Mesmo destino: usa o guardado e testa (o Mailpit não oferece login, então para aí; a IA chega à Anthropic).
+    const mesmoServidor = await rascunho(comoAdminD, { tipo: 'smtp', config: { ...smtp, nome_remetente: 'Outro nome' } })
+    expect(mesmoServidor.status).toBe(200)
+    expect(mesmoServidor.corpo).toEqual({ funcionou: false, erro: 'O servidor não pede login; deixe o usuário em branco.' })
+    const mesmoProvedor = await rascunho(comoAdminD, { tipo: 'ia', config: { ...ia, modelo: 'claude-sonnet-5-5' } })
+    expect(mesmoProvedor.status).toBe(200)
+    expect(mesmoProvedor.corpo.funcionou).toBe(false)
+    expect(mesmoProvedor.corpo.erro).toMatch(/Anthropic/)
+    expect(JSON.stringify(mesmoProvedor.corpo)).not.toContain('sk-ant-guardada-d')
+    // Com o segredo digitado, outro destino pode.
+    const digitado = await rascunho(comoAdminD, { tipo: 'smtp', config: { ...smtp, porta: 2525 }, segredo: 'outra-senha' })
+    expect(digitado.status).toBe(200)
+
+    expect((await admin.from('integracoes').select('*').eq('consultoria_id', D).order('tipo')).data).toEqual(antes.data)
+  })
+
   it('só o administrador da consultoria testa', async () => {
     expect((await rascunho(comoGestorA, { tipo: 'smtp', config: MAILPIT })).status).toBe(403)
     expect((await rascunho(comoDono, { tipo: 'smtp', config: MAILPIT })).status).toBe(403)

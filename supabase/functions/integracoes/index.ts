@@ -5,7 +5,7 @@
 // { acao: 'testar', id }; { acao: 'desconectar', id }; { acao: 'google_iniciar', volta } devolve a URL do Google.
 // Só o administrador da própria consultoria mexe. O dono só olha (pela tabela). O segredo nunca volta nem vai para log.
 import { clienteAdmin, type Perfil, quemChama } from '../_shared/clientes.ts'
-import { validarNumeroDeTeste, validarSegredo } from '../_shared/conexoes.ts'
+import { avisoParaDigitarDeNovo, validarNumeroDeTeste, validarSegredo } from '../_shared/conexoes.ts'
 import { Falha, lerJson, responder, servir } from '../_shared/http.ts'
 import {
   appDoGoogle,
@@ -48,6 +48,15 @@ servir(async (req) => {
   const corpo = await lerJson(req)
   const consultoriaId = consultoriaDoAdmin(quem)
 
+  // Segredo em branco: vale o guardado, mas só para o mesmo destino (outro servidor, provedor ou número pede o segredo
+  // de novo, com a mensagem para a tela). Vale para salvar (que já testa) e para o rascunho.
+  const guardadoPara = async (tipo: Tipo, config: Record<string, any>) => {
+    const guardada = await conexaoDa(admin, consultoriaId, tipo)
+    const aviso = guardada?.segredo ? avisoParaDigitarDeNovo(tipo, config, guardada.config) : null
+    if (aviso) throw new Falha(400, 'dados_invalidos', { campo: 'segredo', mensagem: aviso })
+    return guardada
+  }
+
   // Integração existente, só da consultoria de quem chama (de outra, "não existe").
   const daConsultoria = async (id: unknown) => {
     const { data } = await admin.from('integracoes').select('id, consultoria_id, tipo').eq('id', validarUuid(id, 'id')).maybeSingle()
@@ -59,9 +68,9 @@ servir(async (req) => {
     const tipo = tipoComJanela(corpo.tipo)
     const config = validarConfig(tipo, corpo.config)
     const segredo = segredoDoCorpo(tipo, corpo.segredo)
-    if (SEGREDO_OBRIGATORIO.includes(tipo) && !segredo) {
-      const { data: existente } = await admin.from('integracoes').select('id').eq('consultoria_id', consultoriaId).eq('tipo', tipo).maybeSingle()
-      if (!existente) throw new Falha(400, 'dados_invalidos', { campo: 'segredo' })
+    if (!segredo) {
+      const guardada = await guardadoPara(tipo, config)
+      if (!guardada && SEGREDO_OBRIGATORIO.includes(tipo)) throw new Falha(400, 'dados_invalidos', { campo: 'segredo' })
     }
     const { data: id, error } = await admin.rpc('integracao_salvar', {
       p_consultoria: consultoriaId, p_tipo: tipo, p_config: config, p_segredo: segredo, p_quem: quem.id,
@@ -74,7 +83,7 @@ servir(async (req) => {
     const tipo = tipoComJanela(corpo.tipo)
     const config = validarConfig(tipo, corpo.config)
     const numeroDeTeste = tipo === 'whatsapp' ? validarNumeroDeTeste(corpo.numero_teste) : null
-    const segredo = segredoDoCorpo(tipo, corpo.segredo) ?? (await conexaoDa(admin, consultoriaId, tipo))?.segredo ?? null
+    const segredo = segredoDoCorpo(tipo, corpo.segredo) ?? (await guardadoPara(tipo, config))?.segredo ?? null
     return responder(200, await testarRascunho(tipo, config, segredo, { destinatario: quem.email, numeroDeTeste }))
   }
 

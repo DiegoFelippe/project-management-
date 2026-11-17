@@ -66,6 +66,25 @@ export function validarNumeroDeTeste(bruto: unknown): string | null {
   return numero
 }
 
+// O segredo guardado só vale para o mesmo destino. Com outro servidor (SMTP: host, porta, segurança ou usuário), outro
+// provedor de IA ou outro número do WhatsApp, a pessoa digita o segredo de novo; senão a senha, a chave ou o token da
+// consultoria iria para um lugar que alguém só digitou. No Slack o token é o próprio destino (sempre slack.com).
+// Devolve o aviso para a tela, ou null quando pode usar o guardado.
+export function avisoParaDigitarDeNovo(tipo: string, nova: Record<string, any>, guardada: Record<string, any> | null): string | null {
+  const antes = guardada ?? {}
+  if (tipo === 'smtp') {
+    if (!nova.usuario) return null // sem usuário não há login: a senha não sai daqui
+    const mesmo = nova.host === antes.host && Number(nova.porta) === Number(antes.porta) &&
+      nova.seguranca === antes.seguranca && nova.usuario === (antes.usuario ?? '')
+    return mesmo ? null : 'Digite a senha de novo: o servidor, a porta, a segurança ou o usuário mudou.'
+  }
+  if (tipo === 'ia') return nova.provedor === antes.provedor ? null : 'Digite a chave de API de novo: o provedor mudou.'
+  if (tipo === 'whatsapp') {
+    return nova.phone_number_id === antes.phone_number_id ? null : 'Digite o token de acesso de novo: o ID do número mudou.'
+  }
+  return null
+}
+
 // ---------- Pedidos ----------
 
 // Um pedido com tempo máximo; a queda da rede (ou o tempo estourado) vira a mensagem `semResposta`.
