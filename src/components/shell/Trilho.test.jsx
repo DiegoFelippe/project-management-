@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '@/auth/useAuth'
+import { corDe } from '@/lib/cores'
 import Trilho from './Trilho'
 
 vi.mock('@/data/usuarios', () => ({ gerenciarAcesso: vi.fn() }))
@@ -24,6 +25,25 @@ describe('Trilho', () => {
     for (const item of itens) {
       expect(item.querySelector('[class*="anim-"]'), item.textContent).not.toBeNull()
     }
+  })
+
+  it('a bolinha usa a cor escolhida (ou a automática) quando não há foto, e mantém a animação', () => {
+    const base = { id: 'me', nome: 'Diego Felippe', email: 'diego@exemplo.test', papel: 'admin' }
+    const { rerender } = render(
+      <AuthContext.Provider value={{ perfil: { ...base, cor: '#db2777' }, sair: () => {} }}>
+        <MemoryRouter><Trilho /></MemoryRouter>
+      </AuthContext.Provider>,
+    )
+    const bolinha = screen.getByText('DF')
+    expect(bolinha).toHaveStyle({ backgroundColor: '#db2777' })
+    expect(bolinha.className).toContain('anim-pulsar')
+    expect(bolinha.closest('[data-item-trilho]')).not.toBeNull()
+    rerender(
+      <AuthContext.Provider value={{ perfil: { ...base, cor: null }, sair: () => {} }}>
+        <MemoryRouter><Trilho /></MemoryRouter>
+      </AuthContext.Provider>,
+    )
+    expect(screen.getByText('DF')).toHaveStyle({ backgroundColor: corDe('me') })
   })
 
   it('a bolinha da pessoa, acima do Sair, abre o Meu perfil', async () => {

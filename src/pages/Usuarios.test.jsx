@@ -207,6 +207,17 @@ describe('Usuários', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Nova pessoa' })).not.toBeInTheDocument())
   })
 
+  it('Automática no Editar grava null (limpa a cor)', async () => {
+    vi.mocked(listarUsuarios).mockResolvedValue({
+      itens: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [], consultoria_id: 'c1', cor: '#16a34a' }], total: 1,
+    })
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Editar' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Automática' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    await waitFor(() => expect(mudarCor).toHaveBeenCalledWith('p1', null))
+  })
+
   it('a cor escolhida no Editar é gravada junto', async () => {
     renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
     await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Editar' }))

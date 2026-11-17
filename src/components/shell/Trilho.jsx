@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import MeuPerfil from '@/components/perfil/MeuPerfil'
+import { corDaPessoa } from '@/lib/cores'
 import { urlPublica } from '@/lib/imagem'
 import { iniciais, primeiroNome } from '@/lib/nomes'
 import { cn } from '@/lib/utils'
@@ -67,7 +68,8 @@ export default function Trilho({ aoNavegar }) {
         <button type="button" title={`Meu perfil: ${perfil.nome} (${perfil.email})`} aria-label={`Meu perfil (${perfil.nome})`}
           data-item-trilho="" onClick={() => setPerfilAberto(true)}
           className="group flex w-16 flex-col items-center gap-1 py-0.5 outline-none focus-visible:[&>span:first-child]:ring-2 focus-visible:[&>span:first-child]:ring-ring">
-          <span className="anim-pulsar grid size-8 place-items-center overflow-hidden rounded-full bg-primary/10 text-[12px] font-bold text-primary ring-1 ring-primary/25 transition-shadow group-hover:ring-2 group-hover:ring-primary/50">
+          <span style={foto ? undefined : { backgroundColor: corDaPessoa(perfil) }}
+            className={cn('anim-pulsar grid size-8 place-items-center overflow-hidden rounded-full text-[12px] font-bold ring-1 ring-primary/25 transition-shadow group-hover:ring-2 group-hover:ring-primary/50', foto ? 'bg-primary/10 text-primary' : 'text-white')}>
             {foto ? <img src={foto} alt="" className="size-full object-cover" /> : iniciais(perfil.nome)}
           </span>
           <span className={rotulo(false)}>{primeiroNome(perfil.nome)}</span>

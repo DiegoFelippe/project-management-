@@ -331,6 +331,19 @@ describe('FichaDoConsultor: Novo acesso', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Colocar nos times marcados' }))
     expect(aoColocarNosTimes).toHaveBeenCalledWith('p1', ['t1'])
   })
+
+  it('e-mail que já tem acesso, vindo da aba Acesso: volta para Dados pessoais e foca as caixas de times', async () => {
+    montarNovo({
+      aoCriar: vi.fn().mockResolvedValue({ codigo: 'ja_na_consultoria', erro: 'Essa pessoa já tem acesso na sua consultoria.', pessoa: { id: 'p1', nome: 'João' } }),
+    })
+    await preencher({ senha: 'senha-forte-1' })
+    expect(screen.getByRole('tab', { name: 'Acesso' })).toHaveAttribute('aria-selected', 'true')
+    await userEvent.click(screen.getByRole('button', { name: 'Criar pessoa' }))
+    expect(await screen.findByText('Essa pessoa já tem acesso na sua consultoria.')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Dados pessoais' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('checkbox', { name: 'Implantação' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Colocar nos times marcados' })).toBeEnabled()
+  })
 })
 
 const PESSOA = {
@@ -467,13 +480,31 @@ describe('FichaDoConsultor: Editar', () => {
   it('a cor do avatar: sem foto, escolhe uma amostra, a prévia das iniciais muda na hora e a cor vai ao salvar', async () => {
     const { aoSalvar } = montarEditar()
     const grupo = screen.getByRole('radiogroup', { name: 'Cor do avatar' })
-    expect(within(grupo).getAllByRole('radio')).toHaveLength(8)
+    expect(within(grupo).getAllByRole('radio')).toHaveLength(9) // 8 cores + Automática
+    expect(within(grupo).getByRole('radio', { name: 'Automática' })).toBeChecked()
     expect(within(grupo).getAllByRole('radio').filter((r) => r.getAttribute('aria-checked') === 'true')).toHaveLength(1)
     await userEvent.click(within(grupo).getByRole('radio', { name: 'Violeta' }))
     expect(within(grupo).getByRole('radio', { name: 'Violeta' })).toBeChecked()
     expect(screen.getByText('AL')).toHaveStyle({ backgroundColor: '#7c3aed' })
     await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
     expect(aoSalvar).toHaveBeenCalledWith(expect.objectContaining({ cor: '#7c3aed' }))
+  })
+
+  it('Automática limpa a cor guardada: manda null e a prévia volta à cor automática', async () => {
+    const { aoSalvar } = montarEditar({ pessoa: { ...PESSOA, cor: '#16a34a' } })
+    await userEvent.click(screen.getByRole('radio', { name: 'Automática' }))
+    expect(screen.getByRole('radio', { name: 'Automática' })).toBeChecked()
+    expect(screen.queryByRole('radio', { name: 'Verde', checked: true })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar.mock.calls[0][0].cor).toBeNull()
+  })
+
+  it('escolher a cor e voltar para Automática sem cor guardada não manda nada', async () => {
+    const { aoSalvar } = montarEditar()
+    await userEvent.click(screen.getByRole('radio', { name: 'Rosa' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Automática' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar.mock.calls[0][0].cor).toBeUndefined()
   })
 
   it('a cor guardada da pessoa já vem marcada, e sem mexer nada não é enviada', async () => {

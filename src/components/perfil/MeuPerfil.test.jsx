@@ -70,6 +70,13 @@ describe('Meu perfil', () => {
     expect(recarregarPerfil).toHaveBeenCalled()
   })
 
+  it('Automática: sem cor guardada, escolher e voltar não grava nada', async () => {
+    await userEvent.click(screen.getByRole('radio', { name: 'Rosa' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Automática' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(mudarCor).not.toHaveBeenCalled()
+  })
+
   it('sem mexer na cor, não grava cor', async () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(mudarCor).not.toHaveBeenCalled()

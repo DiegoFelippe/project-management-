@@ -29,7 +29,7 @@ export default function MeuPerfil({ aberto, aoFechar }) {
   const { perfil, recarregarPerfil, definirSenha } = useAuth()
   const [nome, setNome] = useState(perfil.nome)
   const [foto, setFoto] = useState(null)
-  const [corEscolhida, setCorEscolhida] = useState(null)
+  const [corEscolhida, setCorEscolhida] = useState(undefined) // undefined = não mexeu; null = automática
   const [telefone, setTelefone] = useState(perfil.telefone ?? '')
   const [cidade, setCidade] = useState(perfil.cidade ?? '')
   const [uf, setUf] = useState(perfil.uf ?? '')
@@ -38,8 +38,8 @@ export default function MeuPerfil({ aberto, aoFechar }) {
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
 
-  const corAtual = corDaPessoa(perfil)
-  const corMostrada = corEscolhida ?? corAtual
+  const corMarcada = corEscolhida === undefined ? (perfil.cor ?? null) : corEscolhida
+  const corMostrada = corMarcada ?? corDaPessoa({ id: perfil.id })
   const semFoto = foto?.arquivo ? false : foto?.tirar ? true : !perfil.foto
   const naConsultoria = ['admin', 'gestor', 'pessoa'].includes(perfil.papel)
 
@@ -73,8 +73,8 @@ export default function MeuPerfil({ aberto, aoFechar }) {
       const { erro: falha } = foto.arquivo ? await trocarFoto(perfil.id, foto.arquivo, perfil.foto) : await tirarFoto(perfil.id, perfil.foto)
       if (falha) return falha
     }
-    if (corEscolhida && corEscolhida !== corAtual) {
-      const { erro: falha } = await mudarCor(perfil.id, corEscolhida)
+    if (corMarcada !== (perfil.cor ?? null)) {
+      const { erro: falha } = await mudarCor(perfil.id, corMarcada)
       if (falha) return falha
     }
     if (senha) {
@@ -114,7 +114,7 @@ export default function MeuPerfil({ aberto, aoFechar }) {
         <SecaoFormulario titulo="Dados">
           <CampoImagem rotulo="foto" atual={urlPublica('fotos', perfil.foto)} reserva={iniciais(nome || perfil.nome)}
             reservaCor={corMostrada} valor={foto} aoMudar={setFoto} />
-          {semFoto && <SeletorDeCor valor={corMostrada} aoMudar={setCorEscolhida} />}
+          {semFoto && <SeletorDeCor valor={corMarcada} aoMudar={setCorEscolhida} />}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="perfil-nome">Nome</Label>

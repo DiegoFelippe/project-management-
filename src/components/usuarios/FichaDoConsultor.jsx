@@ -52,8 +52,8 @@ function EscolhaDeTimes({ times, marcados, aoAlternar, aviso }) {
       <legend className="mb-2 text-sm font-medium">Times</legend>
       {times.length === 0 && aviso && <p className="text-xs text-muted-foreground">{aviso}</p>}
       <div className="grid gap-2 sm:grid-cols-2">
-        {times.map((t) => (
-          <Caixa key={t.id} rotulo={t.nome} marcado={marcados.includes(t.id)} aoMudar={() => aoAlternar(t.id)} />
+        {times.map((t, i) => (
+          <Caixa key={t.id} id={i === 0 ? 'ficha-times' : undefined} rotulo={t.nome} marcado={marcados.includes(t.id)} aoMudar={() => aoAlternar(t.id)} />
         ))}
       </div>
     </fieldset>
@@ -155,7 +155,7 @@ export default function FichaDoConsultor({
   const timesIniciais = (pessoa?.times ?? []).map((t) => t.id).filter((id) => times.some((t) => t.id === id))
   const [marcados, setMarcados] = useState(timesIniciais)
   const [foto, setFoto] = useState(null)
-  const [corEscolhida, setCorEscolhida] = useState(null)
+  const [corEscolhida, setCorEscolhida] = useState(undefined) // undefined = não mexeu; null = automática
   const focar = useRef(null)
   const [erros, setErros] = useState({})
   const [erro, setErro] = useState(null)
@@ -163,8 +163,9 @@ export default function FichaDoConsultor({
   const [enviando, setEnviando] = useState(false)
   const [abaEscolhida, setAbaEscolhida] = useState('dados')
   const idBase = `ficha${useId()}`
-  const corPadrao = pessoa?.cor ?? corDe(pessoa ? pessoa.id : 'nova-pessoa')
-  const reservaCor = corEscolhida ?? corPadrao
+  const corGuardada = pessoa?.cor ?? null
+  const corMarcada = corEscolhida === undefined ? corGuardada : corEscolhida
+  const reservaCor = corMarcada ?? corDe(pessoa ? pessoa.id : 'nova-pessoa')
 
   const mudar = (campo) => (evento) => setDados((d) => ({ ...d, [campo]: evento.target.value }))
   const definir = (campo) => (valor) => setDados((d) => ({ ...d, [campo]: valor }))
@@ -243,9 +244,9 @@ export default function FichaDoConsultor({
     return horas === antes ? undefined : horas
   }
 
-  // Cor a gravar: só se a pessoa escolheu uma e ela é diferente da que já vale (a salva ou a automática).
+  // Cor a gravar: undefined se não mudou; null volta para a automática (limpa a cor guardada).
   function corNova() {
-    return corEscolhida && corEscolhida !== corPadrao ? corEscolhida : undefined
+    return corMarcada !== corGuardada ? corMarcada : undefined
   }
 
   function avisarConsultoria(mensagem) {
@@ -278,6 +279,8 @@ export default function FichaDoConsultor({
     if (resposta?.codigo === 'ja_na_consultoria') {
       setErro(resposta.erro)
       setJaExiste(resposta.pessoa)
+      // "Colocar nos times marcados" depende das caixas de times: volta para Dados pessoais e foca a primeira.
+      if (mostraTimes) irParaOCampo('dados', 'ficha-times')
       return
     }
     if (resposta?.erro) return setErro(resposta.erro)
@@ -392,7 +395,7 @@ export default function FichaDoConsultor({
                   {estado && estado !== 'Ativo' && <Badge variant={estado === 'Desativado' ? 'outline' : estado === 'Senha provisória' ? 'secondary' : 'notice'}>{estado}</Badge>}
                   {dados.papel && <Badge variant="outline">{rotuloDoPapel(dados.papel)}</Badge>}
                 </div>
-                {semFoto && <SeletorDeCor valor={reservaCor} aoMudar={setCorEscolhida} />}
+                {semFoto && <SeletorDeCor valor={corMarcada} aoMudar={setCorEscolhida} />}
               </div>
             </div>
             <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { consultoresPorOcupacao } from '@/data/capacidade'
@@ -20,6 +20,14 @@ describe('FiltroConsultor', () => {
     await userEvent.click(screen.getByLabelText('Consultor'))
     expect(await screen.findByText('Não foi possível carregar as opções.')).toBeInTheDocument()
     expect(screen.queryByText('Nada encontrado')).not.toBeInTheDocument()
+  })
+
+  it('o avatar de cada consultor usa a cor escolhida que vem do banco', async () => {
+    vi.mocked(consultoresPorOcupacao).mockResolvedValue({ itens: [{ ...ANA, cor: '#16a34a' }], total: 1 })
+    render(<FiltroConsultor valor="" consultoriaId={null} comSemConsultor={false} aoMudar={() => {}} />)
+    await userEvent.click(screen.getByLabelText('Consultor'))
+    const opcao = await screen.findByRole('option', { name: /Ana/ })
+    expect(within(opcao).getByText('A')).toHaveStyle({ backgroundColor: '#16a34a' })
   })
 
   it('busca no banco, por ocupação, na consultoria pedida, e oferece Todos e Sem consultor', async () => {

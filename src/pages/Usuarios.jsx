@@ -217,7 +217,7 @@ export default function Usuarios() {
       const { erro: falha } = foto.arquivo ? await trocarFoto(pessoa.id, foto.arquivo, pessoa.foto) : await tirarFoto(pessoa.id, pessoa.foto)
       if (falha) return { erro: falha }
     }
-    if (cor) {
+    if (cor !== undefined) {
       const { erro: falha } = await mudarCor(pessoa.id, cor)
       if (falha) return { erro: falha }
     }
