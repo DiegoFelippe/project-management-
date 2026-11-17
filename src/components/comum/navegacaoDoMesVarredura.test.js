@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// Padrão Hub (CLAUDE.md): a navegação de mês é sempre a NavegacaoDoMes. Exceção permitida: o Calendário (pages/Calendario.jsx),
+// Padrão Hub (CLAUDE.md): a navegação de mês é sempre a NavegacaoDoMes. Exceção permitida: o Calendário (components/calendario/CalendarioDaAgenda.jsx, no menu e na aba Agenda do cliente),
 // cujo "Hoje ‹ ›" anda por semana ou mês como o Hub e não usa deslocarMes nem esses rótulos (por isso não está na lista abaixo). Quem usa deslocarMes (ou os rótulos "Mês anterior"/"Próximo mês") fora dela
 // (e do próprio lib/mes) está montando o "Anterior / Próximo" à mão. A paginação da Tabela não é mês.
 function arquivos(pasta) {

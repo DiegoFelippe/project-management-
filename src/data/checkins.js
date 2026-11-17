@@ -1,10 +1,7 @@
 // Check-ins (horas atendidas). O banco confere quem pode, sobreposição, futuro e tamanho.
 import { traduzirErroBanco } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
-import { limitesDoMesEmSP } from '@/lib/mes'
 import { buscarPagina } from './paginar'
-
-const TAMANHO_DO_BLOCO = 1000
 
 // consultor e cliente vêm das relações calculadas do banco: o gestor vê os check-ins da consultoria toda,
 // mas em perfis só enxerga quem criou e as pessoas dos times dele.
@@ -74,25 +71,4 @@ export async function listarCheckins({ clienteId, consultorId, pagina = 1 } = {}
   if (clienteId) consulta = consulta.eq('cliente_id', clienteId)
   if (consultorId) consulta = consulta.eq('consultor_id', consultorId)
   return buscarPagina(consulta, pagina)
-}
-
-// Todos os check-ins do cliente com início no mês, do mais antigo ao mais novo. Sem paginação na tela: busca em
-// blocos de 1000 (o limite da API) até acabar.
-export async function checkinsDoMes(clienteId, mes) {
-  const [de, ate] = limitesDoMesEmSP(mes)
-  const itens = []
-  for (let a = 0; ; a += TAMANHO_DO_BLOCO) {
-    const { data, error } = await supabase
-      .from('checkins')
-      .select(CAMPOS_DA_LISTA)
-      .eq('cliente_id', clienteId)
-      .gte('inicio', de)
-      .lt('inicio', ate)
-      .order('inicio')
-      .order('id')
-      .range(a, a + TAMANHO_DO_BLOCO - 1)
-    if (error) throw error
-    itens.push(...data)
-    if (data.length < TAMANHO_DO_BLOCO) return itens
-  }
 }

@@ -270,6 +270,55 @@ describe('JanelaEvento: novo', () => {
   })
 })
 
+describe('JanelaEvento: novo na agenda do cliente', () => {
+  const DA_AGENDA = { id: 'k1', nome: 'Provedor Alfa', consultoria_id: 's1', contato_nome: 'Carla Dias', contato_email: 'carla@alfa.com.br' }
+  const central = { id: 'c0', nome: 'Central', papel: 'central', consultoria_id: null }
+
+  it('o cliente vem escolhido e travado, com a legenda; nasce com Meet e gravação e sugere o contato', async () => {
+    const user = userEvent.setup()
+    janela({ perfil: consultora, evento: null, clienteDaAgenda: DA_AGENDA })
+    const cliente = screen.getByLabelText('Cliente')
+    expect(cliente).toBeDisabled()
+    expect(cliente).toHaveTextContent('Provedor Alfa')
+    expect(screen.getByText('Novo evento na agenda deste cliente. Para outro cliente, use o Calendário do menu.')).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Google Meet' })).toBeChecked()
+    expect(screen.getByRole('switch', { name: 'Gravar e transcrever' })).toBeChecked()
+    expect(screen.getByRole('group', { name: 'Sugestão de convidado' })).toHaveTextContent('carla@alfa.com.br')
+    await user.type(screen.getByLabelText('Título'), 'Kickoff')
+    await user.click(screen.getByRole('button', { name: 'Criar evento' }))
+    await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({
+      novo: true, consultor_id: 'p1', cliente_id: 'k1', com_meet: true, gravar: true,
+    })))
+  })
+
+  it('sem o meu Google, o cliente travado não liga o Meet', () => {
+    janela({ perfil: consultora, evento: null, clienteDaAgenda: DA_AGENDA, google: { conectado: false, email: null, erro: null } })
+    expect(screen.getByLabelText('Cliente')).toHaveTextContent('Provedor Alfa')
+    expect(screen.getByRole('switch', { name: 'Google Meet' })).not.toBeChecked()
+    expect(screen.getByRole('switch', { name: 'Google Meet' })).toBeDisabled()
+  })
+
+  it('a central escolhe o consultor só da consultoria do cliente, e o cliente não sai', async () => {
+    const user = userEvent.setup()
+    janela({ perfil: central, evento: null, google: null, clienteDaAgenda: DA_AGENDA })
+    expect(screen.getByLabelText('Cliente')).toHaveTextContent('Provedor Alfa')
+    await escolherNoSeletor(user, 'Consultor', 'Beto Lima')
+    expect(consultoresPorOcupacao).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1' }))
+    expect(screen.getByLabelText('Cliente')).toHaveTextContent('Provedor Alfa')
+    expect(screen.getByLabelText('Cliente')).toBeDisabled()
+    await user.type(screen.getByLabelText('Título'), 'Revisão')
+    await user.click(screen.getByRole('button', { name: 'Criar evento' }))
+    await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({ consultor_id: 'p2', cliente_id: 'k1' })))
+  })
+
+  it('editar um evento aberto na agenda do cliente segue o menu: o cliente não fica travado', () => {
+    janela({ evento: { ...EVENTO, pasta_id: null }, clienteDaAgenda: DA_AGENDA })
+    expect(screen.getByLabelText('Cliente')).toHaveTextContent('Provedor Alfa')
+    expect(screen.getByLabelText('Cliente')).not.toBeDisabled()
+    expect(screen.queryByText(/Novo evento na agenda deste cliente/)).not.toBeInTheDocument()
+  })
+})
+
 describe('JanelaEvento: só leitura e convite', () => {
   it('quem não edita vê o evento só para leitura; o participante confirma ou recusa', async () => {
     const user = userEvent.setup()

@@ -2,22 +2,33 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { apagarCheckin, checkinsDoMes, editarCheckin, listarCheckins, meuCheckinAberto } from '@/data/checkins'
+import { apagarCheckin, editarCheckin, listarCheckins, meuCheckinAberto } from '@/data/checkins'
+import { eventosDoPeriodo, feriadosDoPeriodo, indicadoresDaAgenda, meuGoogle } from '@/data/agenda'
 import { limparPastaDoCliente, listarArquivos, listarPastas } from '@/data/arquivos'
-import { apagarCliente, buscarCliente, checkinsPorSemana, eventosDoMes, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
+import { apagarCliente, buscarCliente, checkinsPorSemana, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
 import { renderizarTela } from '@/test/renderizar'
 import Cliente from './Cliente'
 
 vi.mock('@/data/clientes', () => ({
-  buscarCliente: vi.fn(), listarEventos: vi.fn(), eventosDoMes: vi.fn(),
+  buscarCliente: vi.fn(), listarEventos: vi.fn(), buscarClientes: vi.fn(),
   horasPorMes: vi.fn(), horasPorConsultor: vi.fn(), checkinsPorSemana: vi.fn(),
   criarCliente: vi.fn(), editarCliente: vi.fn(), arquivarCliente: vi.fn(), reativarCliente: vi.fn(), apagarCliente: vi.fn(),
   mandarParaConsultoria: vi.fn(), escolherConsultor: vi.fn(), ajustarPrevisao: vi.fn(),
 }))
 vi.mock('@/data/checkins', () => ({
   meuCheckinAberto: vi.fn(), fazerCheckin: vi.fn(), fazerCheckout: vi.fn(), lancarHoras: vi.fn(),
-  listarCheckins: vi.fn(), editarCheckin: vi.fn(), apagarCheckin: vi.fn(), checkinsDoMes: vi.fn(),
+  listarCheckins: vi.fn(), editarCheckin: vi.fn(), apagarCheckin: vi.fn(),
 }))
+vi.mock('@/data/agenda', async (importOriginal) => {
+  const real = await importOriginal()
+  return {
+    voltaDoGoogle: real.voltaDoGoogle,
+    eventosDoPeriodo: vi.fn(), buscarEvento: vi.fn(), indicadoresDaAgenda: vi.fn(), ausenciasDoPeriodo: vi.fn(),
+    feriadosDoPeriodo: vi.fn(), meuGoogle: vi.fn(), conectarGoogle: vi.fn(), concluirGoogle: vi.fn(),
+    desconectarGoogle: vi.fn(), salvarEvento: vi.fn(), apagarEvento: vi.fn(), responderConvite: vi.fn(),
+    novoIdDeEvento: vi.fn(), buscarAgora: vi.fn(), tentarDeNovo: vi.fn(), pessoasParaConvidar: vi.fn(),
+  }
+})
 vi.mock('@/data/arquivos', () => ({
   listarArquivos: vi.fn(), enviarArquivo: vi.fn(), linkParaBaixar: vi.fn(), apagarArquivo: vi.fn(), limparPastaDoCliente: vi.fn(),
   listarPastas: vi.fn(), criarPasta: vi.fn(), renomearPasta: vi.fn(), apagarPasta: vi.fn(),
@@ -58,8 +69,10 @@ beforeEach(() => {
   vi.mocked(buscarCliente).mockResolvedValue(CLIENTE)
   vi.mocked(listarCheckins).mockResolvedValue({ itens: CHECKINS, total: 2 })
   vi.mocked(listarEventos).mockResolvedValue({ itens: EVENTOS, total: 2 })
-  vi.mocked(checkinsDoMes).mockResolvedValue([])
-  vi.mocked(eventosDoMes).mockResolvedValue({ itens: [], total: 0 })
+  vi.mocked(eventosDoPeriodo).mockResolvedValue({ itens: [], haMais: false })
+  vi.mocked(indicadoresDaAgenda).mockResolvedValue({ semana: 0, mes: 0, aguardando: 0, pastas_no_mes: 0 })
+  vi.mocked(feriadosDoPeriodo).mockResolvedValue([])
+  vi.mocked(meuGoogle).mockResolvedValue({ conectado: false, email: null, erro: null })
   vi.mocked(horasPorMes).mockResolvedValue([])
   vi.mocked(horasPorConsultor).mockResolvedValue([])
   vi.mocked(checkinsPorSemana).mockResolvedValue([])
@@ -103,11 +116,19 @@ describe('Cliente (página)', () => {
     expect(await screen.findByText('Cliente não encontrado.')).toBeInTheDocument()
   })
 
-  it('a aba Agenda fica entre Geral e Check-ins e mostra a grade do mês', async () => {
-    tela(central, '/clientes/k1?aba=agenda')
-    await screen.findByRole('grid')
+  it('a aba Agenda (entre Geral e Check-ins) é o calendário do menu só com os compromissos do cliente', async () => {
+    tela(adminDaSti, '/clientes/k1?aba=agenda')
+    expect(await screen.findByRole('region', { name: 'Calendário' })).toBeInTheDocument()
     expect(screen.getAllByRole('tab').map((a) => a.textContent)).toEqual(['Geral', 'Agenda', 'Check-ins', 'Arquivos', 'Histórico'])
-    expect(checkinsDoMes).toHaveBeenCalledWith('k1', expect.stringMatching(/^\d{4}-\d{2}-01$/))
+    await waitFor(() => expect(eventosDoPeriodo).toHaveBeenCalledWith(expect.objectContaining({ clienteId: 'k1' })))
+    expect(eventosDoPeriodo.mock.calls.every(([filtros]) => filtros.clienteId === 'k1')).toBe(true)
+    expect(indicadoresDaAgenda).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), { clienteId: 'k1' })
+    expect(screen.getByRole('region', { name: 'Indicadores da agenda' })).toBeInTheDocument()
+    // Só compromissos: os check-ins ficam na aba Check-ins e o histórico na aba Histórico.
+    expect(listarCheckins).not.toHaveBeenCalled()
+    expect(listarEventos).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Consultor')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Novo evento' })).toBeInTheDocument()
   })
 
   it('o histórico mostra o que aconteceu, com quem fez', async () => {

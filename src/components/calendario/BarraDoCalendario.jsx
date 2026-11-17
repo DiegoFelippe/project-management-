@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { buscarClientes } from '@/data/clientes'
 import { cn } from '@/lib/utils'
-import { TIPOS, TUDO } from './cores'
+import { TIPOS } from './cores'
 
 // O "G" do Google (cores da marca no botão de conectar; verde no selo de conectado), como no Hub.
 function LogoDoGoogle({ conectado }) {
@@ -25,26 +25,27 @@ function LogoDoGoogle({ conectado }) {
   )
 }
 
-// "Mostrar: tudo" / "Mostrar: 3 de 4": caixas com a bolinha de cada tipo, numa lista que abre sobre o botão.
-function MostrarTipos({ mostrar, aoMudar }) {
+// "Mostrar: tudo" / "Mostrar: 3 de 4": caixas com a bolinha de cada tipo (os `tipos` que a barra oferece), numa lista
+// que abre sobre o botão.
+function MostrarTipos({ tipos, mostrar, aoMudar }) {
   const [aberto, setAberto] = useState(false)
   const botao = useRef(null)
-  const escondidos = TIPOS.filter((t) => !mostrar[t.chave]).length
+  const escondidos = tipos.filter((t) => !mostrar[t.chave]).length
   return (
     <>
       <Button ref={botao} type="button" variant="outline" size="sm" aria-expanded={aberto} aria-haspopup="dialog" onClick={() => setAberto((a) => !a)}
         className={cn(escondidos > 0 && 'border-primary/40 bg-accent text-accent-foreground')}>
         <span className="flex -space-x-1" aria-hidden="true">
-          {TIPOS.map((t) => <span key={t.chave} className={cn('size-2.5 rounded-full ring-2 ring-card', t.bolinha)} />)}
+          {tipos.map((t) => <span key={t.chave} className={cn('size-2.5 rounded-full ring-2 ring-card', t.bolinha)} />)}
         </span>
-        {escondidos === 0 ? 'Mostrar: tudo' : `Mostrar: ${TIPOS.length - escondidos} de ${TIPOS.length}`}
+        {escondidos === 0 ? 'Mostrar: tudo' : `Mostrar: ${tipos.length - escondidos} de ${tipos.length}`}
         <ChevronDown className={cn('size-3.5 transition-transform', aberto && 'rotate-180')} aria-hidden="true" />
       </Button>
       {aberto && (
         <Flutuante ancora={botao} aoFechar={() => setAberto(false)} largura={256} altura={220} rotulo="Mostrar no calendário" className="p-3">
           <p className="section-label mb-1 px-1">No calendário</p>
           <div className="grid gap-0.5">
-            {TIPOS.map((t) => (
+            {tipos.map((t) => (
               <Caixa key={t.chave} marcado={mostrar[t.chave]} aoMudar={(marcado) => aoMudar({ ...mostrar, [t.chave]: marcado })}
                 className="rounded-lg px-2 py-1.5 hover:bg-muted/60"
                 rotulo={(
@@ -56,7 +57,8 @@ function MostrarTipos({ mostrar, aoMudar }) {
             ))}
           </div>
           {escondidos > 0 && (
-            <Button type="button" variant="link" size="sm" className="mt-1 w-full border-t pt-2" onClick={() => aoMudar(TUDO)}>Mostrar tudo</Button>
+            <Button type="button" variant="link" size="sm" className="mt-1 w-full border-t pt-2"
+              onClick={() => aoMudar({ ...mostrar, ...Object.fromEntries(tipos.map((t) => [t.chave, true])) })}>Mostrar tudo</Button>
           )}
         </Flutuante>
       )}
@@ -118,28 +120,31 @@ function GoogleDaPessoa({ google, conectando, aoConectar, aoDesconectar }) {
 
 // Barra do Calendário (padrão BarraDeFiltros, como a do Hub): Mostrar, consultoria (central e dono), consultor
 // (gestão e central), cliente e Limpar filtros; no fim, o Google da pessoa (Conectar ou o selo; central e dono não têm:
-// nunca organizam eventos) e "Novo evento".
+// nunca organizam eventos) e "Novo evento" (sem `aoNovo`, não aparece). `doCliente` (a aba Agenda do cliente): sem
+// consultoria, consultor e cliente (o recorte já é o cliente). `tipos`: o que o "Mostrar" oferece.
 export default function BarraDoCalendario({
-  perfil, central, gestao, mostrar, aoMostrar, consultoria, aoConsultoria, consultor, aoConsultor, cliente, aoCliente, temFiltros, aoLimpar,
-  google, conectando, aoConectar, aoDesconectar, aoNovo,
+  perfil, central, gestao, doCliente = false, tipos = TIPOS, mostrar, aoMostrar, consultoria, aoConsultoria, consultor, aoConsultor,
+  cliente, aoCliente, temFiltros, aoLimpar, google, conectando, aoConectar, aoDesconectar, aoNovo,
 }) {
   return (
     <BarraDeFiltros className="gap-x-3 gap-y-2">
       <span className="inline-flex items-center gap-1.5 text-rotulo font-semibold text-foreground/80">
         <SlidersHorizontal className="size-3.5" aria-hidden="true" /> Filtros
       </span>
-      <MostrarTipos mostrar={mostrar} aoMudar={aoMostrar} />
-      {central && <FiltroConsultoria valor={consultoria} aoMudar={aoConsultoria} />}
-      {(central || gestao) && (
+      <MostrarTipos tipos={tipos} mostrar={mostrar} aoMudar={aoMostrar} />
+      {!doCliente && central && <FiltroConsultoria valor={consultoria} aoMudar={aoConsultoria} />}
+      {!doCliente && (central || gestao) && (
         <FiltroConsultor valor={consultor.valor} nome={consultor.nome} comSemConsultor={false}
           consultoriaId={central ? (consultoria || null) : perfil.consultoria_id} aoMudar={(valor, nome) => aoConsultor({ valor, nome })} />
       )}
-      <FiltroCliente valor={cliente.valor} nome={cliente.nome} consultoriaId={central ? consultoria : null}
-        aoMudar={(valor, nome) => aoCliente({ valor, nome })} />
+      {!doCliente && (
+        <FiltroCliente valor={cliente.valor} nome={cliente.nome} consultoriaId={central ? consultoria : null}
+          aoMudar={(valor, nome) => aoCliente({ valor, nome })} />
+      )}
       {temFiltros && <Button type="button" variant="link" size="sm" onClick={aoLimpar}>Limpar filtros</Button>}
       <AcaoPrincipal>
         {!central && <GoogleDaPessoa google={google} conectando={conectando} aoConectar={aoConectar} aoDesconectar={aoDesconectar} />}
-        <Button type="button" onClick={aoNovo}><Plus /> Novo evento</Button>
+        {aoNovo && <Button type="button" onClick={aoNovo}><Plus /> Novo evento</Button>}
       </AcaoPrincipal>
     </BarraDeFiltros>
   )

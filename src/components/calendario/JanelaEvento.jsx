@@ -210,10 +210,14 @@ function quandoDoEvento(evento) {
 
 // ── Criar e editar ──
 
-function FormularioDoEvento({ aberto, evento, diaInicial, perfil, google, aoFechar, aoSalvo, aoApagado, aoMudar, aoConectarGoogle }) {
+function FormularioDoEvento({
+  aberto, evento, diaInicial, perfil, google, clienteDaAgenda, aoFechar, aoSalvo, aoApagado, aoMudar, aoConectarGoogle,
+}) {
   const novo = !evento
   const central = veTudo(perfil)
   const gestao = !central && perfil.papel !== 'pessoa'
+  // Novo evento na agenda do cliente: já nasce nele, e o cliente não muda (o consultor sai da consultoria dele).
+  const clienteTravado = novo && Boolean(clienteDaAgenda)
   // O id nasce uma vez por janela: se a resposta de uma tentativa se perder, a próxima manda o mesmo (não duplica no Google).
   const [id] = useState(() => evento?.id ?? novoIdDeEvento())
   const [iniciais] = useState(() => camposIniciais(evento, diaInicial))
@@ -228,13 +232,19 @@ function FormularioDoEvento({ aberto, evento, diaInicial, perfil, google, aoFech
   const [consultor, setConsultor] = useState(() => (evento
     ? { id: evento.consultor_id, nome: evento.consultor?.nome ?? 'Consultor', consultoria_id: evento.consultoria_id }
     : central ? null : { id: perfil.id, nome: perfil.nome, consultoria_id: perfil.consultoria_id }))
-  const [cliente, setCliente] = useState(() => (evento?.cliente ? { id: evento.cliente.id, nome: evento.cliente.nome } : null))
+  const [cliente, setCliente] = useState(() => (evento?.cliente ? { id: evento.cliente.id, nome: evento.cliente.nome }
+    : clienteTravado ? clienteDaAgenda : null))
+  const souOrganizador = consultor?.id === perfil.id
+  // O meu Google pede para reconectar: como sem Google (o evento fica só no app, sem Meet).
+  const meuGoogleQuebrado = Boolean(google?.conectado && google.erro)
+  const semGoogleProprio = souOrganizador && (!google?.conectado || meuGoogleQuebrado)
   const [participantes, setParticipantes] = useState(() => separar(evento?.participantes).daCasa)
   const [convidados, setConvidados] = useState(() => separar(evento?.participantes).deFora)
   const [novoConvidado, setNovoConvidado] = useState('')
   const [erroConvidado, setErroConvidado] = useState(null)
-  const [comMeet, setComMeet] = useState(evento?.com_meet ?? false)
-  const [gravar, setGravar] = useState(evento?.gravar ?? false)
+  // Com cliente, a reunião nasce com Meet e gravação (como ao escolher o cliente), se o Google deixa.
+  const [comMeet, setComMeet] = useState(() => evento?.com_meet ?? (clienteTravado && !semGoogleProprio))
+  const [gravar, setGravar] = useState(() => evento?.gravar ?? (clienteTravado && !semGoogleProprio))
   const [meetTocado, setMeetTocado] = useState(false)
   const [erro, setErro] = useState(null)
   const [erroDoQuando, setErroDoQuando] = useState(null) // { erro, campo } do horário, mostrado junto dos campos
@@ -245,23 +255,21 @@ function FormularioDoEvento({ aberto, evento, diaInicial, perfil, google, aoFech
   // O erro do horário some quando a pessoa mexe em algum campo do Quando.
   const chaveDoQuando = [data, horaInicio, horaFim, outroDia ? dataFim : ''].join('|')
   const erroDoHorario = erroDoQuando?.chave === chaveDoQuando ? erroDoQuando : null
-  const souOrganizador = consultor?.id === perfil.id
   const meetFixo = !novo && Boolean(evento.com_meet)
-  // O meu Google pede para reconectar: como sem Google (o evento fica só no app, sem Meet).
-  const meuGoogleQuebrado = Boolean(google?.conectado && google.erro)
-  const semGoogleProprio = souOrganizador && (!google?.conectado || meuGoogleQuebrado)
   // A pasta da reunião já foi criada nos Arquivos do cliente: o cliente não muda mais.
   const clienteFixo = !novo && Boolean(evento.pasta_id)
   const meuConvite = evento?.participantes?.find((p) => p.perfil_id === perfil.id)
   const consultoriaDoEvento = consultor?.consultoria_id ?? null
 
+  // Na agenda do cliente, só os consultores da consultoria dele (o cliente travado continua valendo).
+  const consultoriaDosConsultores = clienteTravado ? clienteDaAgenda.consultoria_id : central ? null : perfil.consultoria_id
   const buscarConsultores = useCallback(async (termo) => {
-    const { itens, total } = await consultoresPorOcupacao({ consultoriaId: central ? null : perfil.consultoria_id, busca: termo || undefined, limite: 8 })
+    const { itens, total } = await consultoresPorOcupacao({ consultoriaId: consultoriaDosConsultores, busca: termo || undefined, limite: 8 })
     return {
       itens: itens.map((p) => ({ valor: p.id, rotulo: p.nome, detalhe: central ? p.consultoria_nome : p.email, avatar: p, consultoriaId: p.consultoria_id })),
       total,
     }
-  }, [central, perfil.consultoria_id])
+  }, [central, consultoriaDosConsultores])
 
   const buscarOsClientes = useCallback(async (termo) => {
     const { itens, total } = await buscarClientes({ termo, consultoriaId: consultoriaDoEvento ?? undefined, ativos: true, limite: 8 })
@@ -285,9 +293,10 @@ function FormularioDoEvento({ aberto, evento, diaInicial, perfil, google, aoFech
   function escolherConsultor(valor, opcao) {
     const mudouDeConsultoria = opcao.consultoriaId !== consultor?.consultoria_id
     setConsultor({ id: valor, nome: opcao.rotulo, consultoria_id: opcao.consultoriaId })
-    // Cliente e convidados da casa são da consultoria do evento: outra consultoria, outra escolha.
+    // Cliente e convidados da casa são da consultoria do evento: outra consultoria, outra escolha (o cliente travado
+    // fica: a busca só traz consultores da consultoria dele).
     if (mudouDeConsultoria) {
-      setCliente(null)
+      if (!clienteTravado) setCliente(null)
       setParticipantes([])
     } else {
       setParticipantes((lista) => lista.filter((p) => p.perfil_id !== valor))
@@ -417,9 +426,12 @@ function FormularioDoEvento({ aberto, evento, diaInicial, perfil, google, aoFech
             <div className="grid gap-2">
               <Label htmlFor="evento-cliente">Cliente</Label>
               <Seletor id="evento-cliente" valor={cliente?.id ?? ''} buscar={buscarOsClientes} rotuloTodos="Sem cliente"
-                desabilitado={!consultoriaDoEvento || clienteFixo} placeholder={consultoriaDoEvento ? 'Sem cliente' : 'Escolha o consultor primeiro'}
+                desabilitado={!consultoriaDoEvento || clienteFixo || clienteTravado} placeholder={consultoriaDoEvento ? 'Sem cliente' : 'Escolha o consultor primeiro'}
                 opcoes={cliente ? [{ valor: cliente.id, rotulo: cliente.nome }] : []} aoMudar={escolherCliente} />
               {clienteFixo && <p className="text-legenda text-muted-foreground">A pasta da reunião já está neste cliente.</p>}
+              {clienteTravado && (
+                <p className="text-legenda text-muted-foreground">Novo evento na agenda deste cliente. Para outro cliente, use o Calendário do menu.</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="evento-descricao">Descrição</Label>
@@ -632,8 +644,10 @@ function EventoSoLeitura({ aberto, evento, perfil, aoFechar, aoMudar }) {
 
 // Janela do evento (padrão Hub, larga, em 2 colunas como a do Hub): Novo evento, Editar (quem organiza, a gestão da
 // consultoria e a central) e só leitura para os outros (o participante responde Confirmar/Recusar). `evento` null =
-// novo, no `diaInicial`. `google`: o meu Google ({ conectado }). aoSalvo/aoApagado: a tela fecha e relê; aoMudar: a
-// tela relê e a janela continua aberta (resposta ao convite, Buscar agora).
+// novo, no `diaInicial`. `google`: o meu Google ({ conectado }). `clienteDaAgenda` ({ id, nome, consultoria_id,
+// contato_nome, contato_email }, a aba Agenda do cliente): o novo evento já nasce nesse cliente, travado; editar segue
+// como no menu. aoSalvo/aoApagado: a tela fecha e relê; aoMudar: a tela relê e a janela continua aberta (resposta ao
+// convite, Buscar agora).
 export default function JanelaEvento(props) {
   const podeEditar = !props.evento || cuidaDoEvento(props.perfil, props.evento)
   return podeEditar ? <FormularioDoEvento {...props} /> : <EventoSoLeitura {...props} />

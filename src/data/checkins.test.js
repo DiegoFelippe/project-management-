@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { checkinsDoMes, editarCheckin, fazerCheckout, listarCheckins } from './checkins'
+import { editarCheckin, fazerCheckout, listarCheckins } from './checkins'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn() } }))
 
@@ -19,15 +19,6 @@ describe('listarCheckins', () => {
     expect(selecionado()).toContain('consultor:consultor_do_checkin(nome)')
     expect(selecionado()).not.toContain('perfis(')
     expect(banco.chamou('eq', 'cliente_id', 'k1')).toBe(true)
-  })
-})
-
-describe('checkinsDoMes', () => {
-  it('filtra o início pelos limites do mês em São Paulo (o deslocamento vem do fuso)', async () => {
-    await checkinsDoMes('k1', '2019-02-01')
-    expect(banco.chamou('eq', 'cliente_id', 'k1')).toBe(true)
-    expect(banco.chamou('gte', 'inicio', '2019-02-01T00:00:00-02:00')).toBe(true)
-    expect(banco.chamou('lt', 'inicio', '2019-03-01T00:00:00-03:00')).toBe(true)
   })
 })
 
