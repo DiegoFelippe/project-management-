@@ -82,7 +82,7 @@ export default function CampoSenha({ id, valor, aoMudar, gerador = true, invalid
         )}
       </div>
 
-      <p role="status" className={cn('min-h-4 text-xs', validacao && (analise.forte ? 'text-positive' : 'text-destructive'))}>{validacao}</p>
+      <p role="status" className={cn('min-h-4 text-xs', validacao && (analise.forte && !validacao.startsWith('Não deu') ? 'text-positive' : 'text-destructive'))}>{validacao}</p>
     </div>
   )
 }

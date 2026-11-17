@@ -12,6 +12,7 @@ import {
   limparTudo,
   registrarEmail,
 } from './ambiente.js'
+import vetores from '../../src/lib/senha.vetores.json'
 
 const admin = clienteAdmin()
 let A, B, t1, t2
@@ -143,5 +144,14 @@ describe('criar-acesso', () => {
     expect(respostas.map((r) => r.status).sort()).toEqual([201, 409])
     const { count } = await admin.from('perfis').select('*', { count: 'exact', head: true }).eq('email', email)
     expect(count).toBe(1)
+  })
+})
+
+// Mesmos casos do teste de unidade da tela (src/lib/senha.vetores.json): tela e servidor não podem divergir.
+describe('criar-acesso: vetores de senha compartilhados com a tela', () => {
+  it.each(vetores.map((v) => [JSON.stringify(v.senha), v]))('%s', async (_n, v) => {
+    const r = await criar(comoGestor, { forma: 'senha', nome: 'Vetor Senha', email: emailDeTeste('vetor'), papel: 'pessoa', times: [], senha: v.senha })
+    expect(r.status === 400 ? 'fraca' : 'forte').toBe(v.forte ? 'forte' : 'fraca')
+    if (v.forte) expect(r.status).toBeLessThan(300)
   })
 })

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { avaliarSenha, gerarSenha, mensagemDeValidacao } from './senha'
+import { avaliarSenha, gerarSenha, mensagemDeValidacao, SIMBOLOS } from './senha'
+import vetores from './senha.vetores.json'
 
 describe('avaliarSenha', () => {
   it('lista as cinco regras e marca as cumpridas', () => {
@@ -8,7 +9,7 @@ describe('avaliarSenha', () => {
     expect(r.regras.filter((x) => x.ok).map((x) => x.id)).toEqual(['minuscula'])
   })
 
-  it('vazia ou só uma regra é Fraca; três ou quatro é Média; todas é Forte', () => {
+  it('menos de 4 regras é Fraca; 4 de 5 é Média; todas é Forte', () => {
     expect(avaliarSenha('').forca).toBe('fraca')
     expect(avaliarSenha('abcdefghijkl').forca).toBe('fraca')
     expect(avaliarSenha('abcdefghij1').forca).toBe('fraca')
@@ -32,6 +33,15 @@ describe('avaliarSenha', () => {
   it('letra com acento não conta como maiúscula nem minúscula (o servidor só aceita A-Z e a-z)', () => {
     expect(avaliarSenha('ÁÉÍÓÚ').regras.find((x) => x.id === 'maiuscula').ok).toBe(false)
     expect(avaliarSenha('áéíóú').regras.find((x) => x.id === 'minuscula').ok).toBe(false)
+  })
+})
+
+describe('vetores compartilhados com o servidor', () => {
+  it.each(vetores.map((v) => [JSON.stringify(v.senha), v]))('%s', (_n, v) => {
+    expect(avaliarSenha(v.senha).forte).toBe(v.forte)
+  })
+  it('símbolo é só o da lista do Auth (aspas, crase e barra contam; £ e ¡ não)', () => {
+    expect(SIMBOLOS).toBe('!@#$%^&*()_+-=[]{};\'\\:"|<>?,./`~')
   })
 })
 
@@ -63,6 +73,7 @@ describe('gerarSenha', () => {
       expect(s).toMatch(/[A-Z]/)
       expect(s).toMatch(/\d/)
       expect(s).not.toMatch(/\s/)
+      expect([...s].every((c) => /[A-Za-z0-9]/.test(c) || SIMBOLOS.includes(c))).toBe(true)
     }
   })
 

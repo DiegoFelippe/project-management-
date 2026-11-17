@@ -66,7 +66,7 @@ npm run exemplo:local                            # consultoria de exemplo, só l
 ```
 
 Logins de exemplo (só no Docker local): `admin@exemplo.test`, `gestor@exemplo.test`, `ana@exemplo.test`,
-`bruno@exemplo.test` e `central@exemplo.test` (a central, fora das consultorias), todos com a senha `exemplo-123`.
+`bruno@exemplo.test` e `central@exemplo.test` (a central, fora das consultorias), com a senha `exemplo-123` nas contas criadas antes de 16/11/2026; contas novas criadas pelo script usam `Exemplo-123!` (o Auth passou a exigir senha forte, e o script nunca muda a senha de uma conta que já existe).
 
 Abra http://localhost:5173. Embaixo do contador aparece "Banco: conectado…" quando o app fala com o Supabase.
 

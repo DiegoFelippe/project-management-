@@ -1,11 +1,13 @@
 // Dados de exemplo só para o Supabase local: npm run exemplo:local
 // Cria a "Consultoria Exemplo" com admin, gestor, duas pessoas e o time Implantação,
 // e a central de exemplo (central@exemplo.test, fora de qualquer consultoria).
-// Todos entram com a senha abaixo (logins @exemplo.test). Nunca rode isto na nuvem.
+// Contas NOVAS entram com a senha abaixo (logins @exemplo.test); o Auth exige senha forte desde 16/11.
+// Contas que já existem são puladas e não mudam: as criadas antes de 16/11 seguem com exemplo-123.
+// Nunca rode isto na nuvem.
 import { createClient } from '@supabase/supabase-js'
 import { lerStatusLocal } from './supabase-local.mjs'
 
-export const SENHA_EXEMPLO = 'exemplo-123'
+export const SENHA_EXEMPLO = 'Exemplo-123!'
 const NOME_CONSULTORIA = 'Consultoria Exemplo'
 const PESSOAS = [
   { chave: 'admin', email: 'admin@exemplo.test', nome: 'Alice Admin', papel: 'admin' },
@@ -55,12 +57,12 @@ if (centralExiste) {
     papel: 'central',
   })
   if (erroCentral) parar(`Não consegui criar o perfil de ${CENTRAL.email}: ${erroCentral.message}`)
-  console.log(`${CENTRAL.email} criada (central).`)
+  console.log(`${CENTRAL.email} criada (central), senha ${SENHA_EXEMPLO}.`)
 }
 
 const { data: jaExiste } = await admin.from('consultorias').select('id').eq('nome', NOME_CONSULTORIA).maybeSingle()
 if (jaExiste) {
-  console.log(`A ${NOME_CONSULTORIA} já existe. Logins @exemplo.test, senha ${SENHA_EXEMPLO}.`)
+  console.log(`A ${NOME_CONSULTORIA} já existe (nada foi alterado). Contas criadas antes de 16/11 seguem com a senha exemplo-123; contas novas usam ${SENHA_EXEMPLO}.`)
   process.exit(0)
 }
 

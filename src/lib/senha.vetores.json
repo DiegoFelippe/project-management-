@@ -1,0 +1,66 @@
+[
+ {
+  "senha": "Abcdefghi1!",
+  "forte": true
+ },
+ {
+  "senha": "Abcdefgh1!",
+  "forte": true
+ },
+ {
+  "senha": "Abcdefghi1'",
+  "forte": true
+ },
+ {
+  "senha": "Abcdefghi1\"",
+  "forte": true
+ },
+ {
+  "senha": "Abcdefghi1`",
+  "forte": true
+ },
+ {
+  "senha": "Abcdefghi1\\",
+  "forte": true
+ },
+ {
+  "senha": "Abcdefghi1~",
+  "forte": true
+ },
+ {
+  "senha": "Abcdefghi1£",
+  "forte": false
+ },
+ {
+  "senha": "Abcdefghi1¡",
+  "forte": false
+ },
+ {
+  "senha": "Abcdefghi1 ",
+  "forte": false
+ },
+ {
+  "senha": "Abcdefghi1é",
+  "forte": false
+ },
+ {
+  "senha": "Abcdefgh1",
+  "forte": false
+ },
+ {
+  "senha": "Abcde-12!",
+  "forte": false
+ },
+ {
+  "senha": "abcdefghi1!",
+  "forte": false
+ },
+ {
+  "senha": "ABCDEFGHI1!",
+  "forte": false
+ },
+ {
+  "senha": "Abcdefghij!",
+  "forte": false
+ }
+]

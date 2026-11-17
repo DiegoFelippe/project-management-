@@ -50,11 +50,14 @@ export function validarForma(valor: unknown, campo = 'forma'): Forma {
   return valor
 }
 
+// Lista exata de símbolos do GoTrue (igual a SIMBOLOS em src/lib/senha.js; src/lib/senha.vetores.json guarda os casos).
+const SIMBOLOS = '!@#$%^&*()_+-=[]{};\'\\:"|<>?,./`~'
+
 // Mesmas regras de src/lib/senha.js (só Forte vale): 10+ caracteres, A-Z, a-z, 0-9 e um símbolo; sem espaço nas pontas.
 export function senhaForte(valor: string): boolean {
   return valor.length >= 10 && valor === valor.trim() &&
     /[A-Z]/.test(valor) && /[a-z]/.test(valor) && /[0-9]/.test(valor) &&
-    /[^A-Za-z0-9\s\u00C0-\uFFFF]/.test(valor)
+    [...valor].some((c) => SIMBOLOS.includes(c))
 }
 
 export function validarSenha(forma: Forma, valor: unknown, campo = 'senha'): string | undefined {

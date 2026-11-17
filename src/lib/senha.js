@@ -1,6 +1,7 @@
 // Senha forte: as mesmas regras do servidor (política do Auth e Edge Functions). Só A-Z, a-z, 0-9 e os símbolos da
 // lista valem para cada tipo: letra acentuada e espaço não contam.
-const SIMBOLOS = '!@#$%^&*()_+-=[]{};:,.<>?/|~'
+// Lista exata do GoTrue (`lower_upper_letters_digits_symbols`): !@#$%^&*()_+-=[]{};'\:"|<>?,./`~
+export const SIMBOLOS = '!@#$%^&*()_+-=[]{};\'\\:"|<>?,./`~'
 const MINUSCULAS = 'abcdefghijklmnopqrstuvwxyz'
 const MAIUSCULAS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const NUMEROS = '0123456789'
@@ -13,7 +14,7 @@ const REGRAS = [
   { id: 'maiuscula', falta: 'uma letra maiúscula', ok: (s) => /[A-Z]/.test(s) },
   { id: 'minuscula', falta: 'uma letra minúscula', ok: (s) => /[a-z]/.test(s) },
   { id: 'numero', falta: 'um número', ok: (s) => /[0-9]/.test(s) },
-  { id: 'simbolo', falta: 'um símbolo', ok: (s) => /[^A-Za-z0-9\sÀ-￿]/.test(s) },
+  { id: 'simbolo', falta: 'um símbolo', ok: (s) => [...s].some((c) => SIMBOLOS.includes(c)) },
 ]
 
 const maiuscula1 = (t) => t[0].toUpperCase() + t.slice(1)

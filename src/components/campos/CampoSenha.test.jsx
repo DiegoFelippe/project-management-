@@ -75,6 +75,15 @@ describe('CampoSenha', () => {
     expect(await screen.findByRole('button', { name: 'Copiada' })).toBeInTheDocument()
   })
 
+  it('se copiar falhar, a mensagem não é verde', async () => {
+    const usuario = userEvent.setup()
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('negado'))
+    render(<Controlado inicial="Abcdefghij1!" />)
+    await usuario.click(screen.getByRole('button', { name: 'Copiar' }))
+    const aviso = await screen.findByText(/Não deu para copiar/)
+    expect(aviso.className).not.toMatch(/positive/)
+  })
+
   it('Copiar fica desligado com o campo vazio', () => {
     render(<Controlado />)
     expect(screen.getByRole('button', { name: 'Copiar' })).toBeDisabled()
