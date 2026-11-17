@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Users } from 'lucide-react'
 import { describe, expect, it, vi } from 'vitest'
+import CampoNumero from '@/components/campos/CampoNumero'
 import JanelaFormulario, { SecaoFormulario } from './JanelaFormulario'
 
 function montar(props = {}) {
@@ -30,6 +31,12 @@ describe('JanelaFormulario', () => {
   it('ao abrir, o foco vai para o primeiro campo do corpo (o X continua no cabeçalho)', () => {
     montar()
     expect(screen.getByLabelText('Nome')).toHaveFocus()
+  })
+
+  it('quando o primeiro campo é um CampoNumero, o foco vai para o número e não para o "Diminuir"', () => {
+    render(<JanelaFormulario aberto aoFechar={() => {}} titulo="Previsão"><CampoNumero id="n" valor="3" aoMudar={() => {}} min={0} max={10} /></JanelaFormulario>)
+    expect(document.getElementById('n')).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Diminuir' })).not.toHaveFocus()
   })
 
   it('sem campo no corpo, o foco cai no que o Radix escolher (não quebra)', () => {

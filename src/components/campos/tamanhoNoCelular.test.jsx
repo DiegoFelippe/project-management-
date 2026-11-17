@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -33,5 +34,25 @@ describe('campos de digitar no celular', () => {
     await userEvent.keyboard('{Escape}')
     await userEvent.click(document.getElementById('s'))
     expect(screen.getByLabelText('Buscar')).toHaveClass('text-base')
+  })
+})
+
+// Textarea escrito à mão também dá zoom no iPhone se tiver 14px: 16px no celular, 14px a partir de sm.
+describe('textareas no celular', () => {
+  it('todo <textarea> do código usa text-base e sm:text-sm', () => {
+    const arquivos = execSync("grep -rl '<textarea' src --include='*.jsx'", { encoding: 'utf8' })
+      .split('\n').filter((a) => a && !/\.test\.jsx$/.test(a))
+    expect(arquivos.length).toBeGreaterThan(0)
+    for (const arquivo of arquivos) {
+      const tags = readFileSync(arquivo, 'utf8').match(/<textarea[\s\S]*?\/>/g) ?? []
+      const usaConstante = /CAMPO_TEXTO/.test(readFileSync(arquivo, 'utf8'))
+      for (const tag of tags) {
+        const trecho = usaConstante && /className=\{CAMPO_TEXTO\}/.test(tag)
+          ? readFileSync(arquivo, 'utf8').match(/const CAMPO_TEXTO = '([^']*)'/)[1] : tag
+        expect(trecho, arquivo).toMatch(/(^|\s)text-base\b/)
+        expect(trecho, arquivo).toMatch(/sm:text-sm/)
+        expect(trecho, arquivo).not.toMatch(/(^|\s)text-sm\b/)
+      }
+    }
   })
 })

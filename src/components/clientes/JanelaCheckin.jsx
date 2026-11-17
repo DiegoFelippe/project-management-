@@ -129,7 +129,7 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
         <div className="grid gap-2">
           <Label htmlFor="checkin-descricao">O que foi feito</Label>
           <textarea id="checkin-descricao" rows={4} value={descricao} onChange={(e) => setDescricao(e.target.value)}
-            className="border-input bg-card focus-visible:border-ring focus-visible:ring-ring/30 w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none hover:border-primary/40 focus-visible:ring-4" />
+            className="border-input bg-card focus-visible:border-ring focus-visible:ring-ring/30 w-full rounded-md border px-3 py-2 text-base sm:text-sm shadow-xs outline-none hover:border-primary/40 focus-visible:ring-4" />
         </div>
         {erro && <Aviso>{erro}</Aviso>}
       </form>

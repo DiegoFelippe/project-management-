@@ -41,6 +41,13 @@ describe('FormularioCliente', () => {
     expect(salvar.form).toBe(screen.getByLabelText('Cidade').form)
   })
 
+  it('horas por mês acima de 744 avisam na tela e não chegam ao banco', async () => {
+    const { aoSalvar } = abrir({ cliente: { ...CLIENTE, horas_mes: 5000 } })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(screen.getByText('O mês tem no máximo 744 horas.')).toBeInTheDocument()
+    expect(aoSalvar).not.toHaveBeenCalled()
+  })
+
   it('nome com 1 letra', async () => {
     const { aoSalvar } = abrir({ cliente: { ...CLIENTE, nome: 'A' } })
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))

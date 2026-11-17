@@ -6,7 +6,9 @@ import { cn } from '@/lib/utils'
 
 const LARGURAS = { md: 'sm:max-w-[min(32rem,calc(100%-2rem))]', lg: 'sm:max-w-[min(42rem,calc(100%-2rem))]', xl: 'sm:max-w-[min(56rem,calc(100%-2rem))]' }
 
-// Primeiro foco do corpo da janela.
+// Primeiro foco do corpo da janela: de preferência um campo de digitar/escolher (no CampoNumero, o botão
+// "Diminuir" vem antes do número e um Enter nele diminuiria o valor); só então o primeiro focável.
+const CAMPO = 'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), [role="combobox"]:not([disabled]), [aria-haspopup]:not([disabled])'
 const FOCAVEL = 'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 // Padrão Hub: todo formulário é uma janela. Cabeçalho (ícone, título, descrição, fechar), corpo rolável e
@@ -18,7 +20,7 @@ export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, 
   const corpo = useRef(null)
   // Ao abrir, o foco vai para o primeiro campo do corpo (e não para o X do cabeçalho, onde um Enter fecharia a janela).
   function focarPrimeiroCampo(e) {
-    const campo = corpo.current?.querySelector(FOCAVEL)
+    const campo = corpo.current?.querySelector(CAMPO) ?? corpo.current?.querySelector(FOCAVEL)
     if (!campo) return
     e.preventDefault()
     campo.focus()

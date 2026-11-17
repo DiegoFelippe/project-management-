@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cnpjValido, formatarCnpj, normalizarCnpj } from '@/lib/cnpj'
-import { lerHoras } from './rotulos'
+import { lerHoras, MAXIMO_DE_HORAS_NO_MES } from './rotulos'
 
-const CAMPO_TEXTO = 'w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/30'
+const CAMPO_TEXTO = 'w-full rounded-md border border-input bg-card px-3 py-2 text-base sm:text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/30'
 
 function Campo({ id, rotulo, children }) {
   return (
@@ -43,6 +43,7 @@ export default function FormularioCliente({ aberto, aoFechar, cliente, aoSalvar 
     if (horasMes === null || horasMes <= 0) {
       return setErro('Informe a previsão de horas por mês.')
     }
+    if (horasMes > MAXIMO_DE_HORAS_NO_MES) return setErro(`O mês tem no máximo ${MAXIMO_DE_HORAS_NO_MES} horas.`)
     setErro(null)
     setEnviando(true)
     const resposta = await aoSalvar({
