@@ -241,7 +241,7 @@
   .form-label { @apply text-foreground/80 mb-1.5 block text-rotulo font-medium; }
   /* Campos de digitar: 16 px no celular (o iPhone dá zoom abaixo disso) e text-corpo a partir de sm.
      Vale para o .input e para todo campo escrito à mão (<textarea>, campos internos). */
-  .texto-de-campo { @apply text-base sm:text-corpo; }
+  .input, .texto-de-campo { @apply text-base sm:text-corpo; }
   .input {
     @apply bg-card border-input text-foreground placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 transition-[color,box-shadow,border-color] outline-none;
     @apply hover:border-primary/40 focus:border-primary/60 focus:ring-primary/15 focus:ring-2 disabled:bg-muted disabled:cursor-not-allowed disabled:opacity-60;

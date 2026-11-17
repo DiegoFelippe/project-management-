@@ -86,7 +86,7 @@ export default function CadastroDoAutenticador({ aoConcluir, aoCancelar, aoEnvia
           <img src={cadastro.qr} alt="QR code para o app autenticador" className="size-44 rounded-xl border bg-white p-2" />
           <p className="text-muted-foreground text-rotulo">Não dá para ler? Digite esta chave no app:</p>
           <div className="flex flex-wrap items-center gap-2">
-            <code className="bg-muted rounded-lg border px-2.5 py-1.5 font-mono text-corpo tracking-wider break-all">{agrupar(cadastro.segredo)}</code>
+            <code className="bg-muted rounded-lg border px-2.5 py-1.5 text-corpo font-medium tabular-nums tracking-wider break-all">{agrupar(cadastro.segredo)}</code>
             <Button type="button" variant="outline" size="sm" aria-label="Copiar a chave" onClick={copiar}>
               {copia === 'ok' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />} Copiar
             </Button>
