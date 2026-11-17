@@ -1,10 +1,11 @@
-import { CheckCircle2, KeyRound, MailCheck, Pencil, Power, RotateCcw, Send, ShieldCheck, UserPlus, UserX, User } from 'lucide-react'
+import { CheckCircle2, KeyRound, MailCheck, Pencil, Power, RotateCcw, RotateCcwKey, Send, ShieldAlert, ShieldCheck, ShieldOff, Smartphone, UserPlus, UserX, User } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import Caixa from '@/components/campos/Caixa'
 import CampoData from '@/components/campos/CampoData'
 import CampoNumero from '@/components/campos/CampoNumero'
 import CampoSenha from '@/components/campos/CampoSenha'
+import CartaoChave from '@/components/campos/CartaoChave'
 import { avaliarSenha } from '@/lib/senha'
 import Seletor from '@/components/campos/Seletor'
 import { GerirAusencias } from '@/components/capacidade/GerirAusencias'
@@ -24,6 +25,7 @@ import { iniciais } from '@/lib/nomes'
 import { UFS } from '@/lib/ufs'
 import { ehPapelDeConsultoria, papeisQuePodeDar, rotuloDoPapel, veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
+import { situacaoNaFicha } from '@/lib/verificacao'
 import { cn } from '@/lib/utils'
 
 const CARGA_PADRAO = 44
@@ -126,6 +128,36 @@ function CartaoDoAcesso({ pessoa, aoReenviar, podeReenviar }) {
   )
 }
 
+// Verificação em duas etapas da pessoa (aba Acesso), para quem pode editar o acesso dela: a chave "Exigir" (salva com
+// a ficha), a situação (Ativa desde…, Ainda não configurada, Desligada) e "Zerar" (celular perdido), que a página
+// confirma antes. Sem o app ativo não há o que zerar.
+const SITUACAO_DA_VERIFICACAO = {
+  ativa: { icone: ShieldCheck, cor: 'bg-positive-soft text-positive', linha: 'A pessoa entra com a senha e o código do app autenticador.' },
+  pendente: { icone: ShieldAlert, cor: 'bg-notice-soft text-notice', linha: 'No próximo acesso, a pessoa configura o app autenticador antes de entrar.' },
+  desligada: { icone: ShieldOff, cor: 'bg-muted text-muted-foreground', linha: 'A pessoa entra só com a senha (ou o Google). Ela pode ativar o app em Meu perfil.' },
+}
+
+function VerificacaoDaPessoa({ exigida, aoMudarExigida, verificacaoDesde, aoZerar }) {
+  const { estado, rotulo } = situacaoNaFicha({ verificacaoDesde, exigida })
+  const { icone: Icone, cor, linha } = SITUACAO_DA_VERIFICACAO[estado]
+  return (
+    <Bloco titulo="Verificação em duas etapas">
+      <CartaoChave titulo="Exigir verificação em duas etapas" icone={Smartphone} ligada={exigida} aoMudar={aoMudarExigida}
+        dica="A pessoa só entra com o código de 6 dígitos do app autenticador do celular (Google Authenticator, Microsoft Authenticator…)." />
+      <div data-slot="situacao-2fa" className="flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5">
+        <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', cor)}><Icone className="size-4" aria-hidden="true" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[12.5px] font-semibold">{rotulo}</p>
+          <p className="text-muted-foreground text-[11.5px]">{linha}</p>
+        </div>
+        {verificacaoDesde && aoZerar && (
+          <Button type="button" variant="outline" size="sm" onClick={aoZerar}><RotateCcwKey /> Zerar verificação em duas etapas</Button>
+        )}
+      </div>
+    </Bloco>
+  )
+}
+
 // A ficha do consultor: a mesma janela para criar (Novo acesso) e para editar (pessoa preenchida).
 // Layout do Hub (PersonWindow): duas abas no cabeçalho, Dados pessoais e Acesso (esta só quando há o que mostrar).
 // Papel e times e Capacidade são seções de Dados pessoais, nas mesmas condições de antes. Desativar/Reativar no
@@ -135,10 +167,13 @@ function CartaoDoAcesso({ pessoa, aoReenviar, podeReenviar }) {
 // Novo: aoCriar(pedido, { carga, foto, cor }) (a tela envia a foto e grava a cor depois de criar) e aoColocarNosTimes(pessoaId, timesIds). `buscarConsultorias(termo)` (só para
 // quem vê tudo criando um administrador) devolve { itens: [{ id, nome }], total } do banco: a lista nunca vem inteira.
 // Editar: aoSalvar({ mudancas, carga, timesAdicionar, timesRemover, foto, cor }), mais aoReenviar() e
-// aoPedirAtivo('desativar' | 'reativar') quando podeReenviar / podeDesativar.
+// aoPedirAtivo('desativar' | 'reativar') quando podeReenviar / podeDesativar. podeDesativar também é quem edita o
+// acesso: ganha a verificação em duas etapas (exige_2fa nas mudanças e aoPedirZerar2fa()). No Novo, a chave "Exigir"
+// aparece para quem vai editar o acesso da pessoa depois (dono, central, administrador) e vai no pedido de criar.
 export default function FichaDoConsultor({
   aberto, aoFechar, perfilDeQuem, pessoa = null, times = [], consultoriaId = '', buscarConsultorias,
   titulo, aoCriar, aoColocarNosTimes, aoSalvar, podeReenviar, podeDesativar, aoReenviar, aoPedirAtivo, aoMudarAusencias,
+  aoPedirZerar2fa,
 }) {
   const novo = !pessoa
   const opcoesDePapel = papeisQuePodeDar(perfilDeQuem)
@@ -153,6 +188,7 @@ export default function FichaDoConsultor({
     cidade: comoTexto(pessoa?.cidade),
     uf: comoTexto(pessoa?.uf),
     carga: String(Number(pessoa?.carga_semanal ?? CARGA_PADRAO)).replace('.', ','),
+    exige_2fa: !!pessoa?.exige_2fa,
   }))
   const timesIniciais = (pessoa?.times ?? []).map((t) => t.id).filter((id) => times.some((t) => t.id === id))
   const [marcados, setMarcados] = useState(timesIniciais)
@@ -187,6 +223,8 @@ export default function FichaDoConsultor({
   const mudaPapel = !novo && perfilDeQuem.papel === 'admin' && opcoesDePapel.length > 1
   const mostraTimes = naConsultoria && !quemVeTudo && (novo || times.length > 0)
   const escolheConsultoria = novo && buscarConsultorias && quemVeTudo && papelAtual === 'admin'
+  // Exigir a verificação em duas etapas: quem edita o acesso da pessoa (o gestor só cria e muda o nome).
+  const podeExigir2fa = novo ? ['dono', 'central', 'admin'].includes(perfilDeQuem.papel) : !!podeDesativar
 
   const mostraPapel = (opcoesDePapel.length > 0 && (novo || mudaPapel)) || mostraTimes
   const mostraAcesso = novo || (podeReenviar && pessoa.convite_pendente) || podeDesativar
@@ -274,6 +312,7 @@ export default function FichaDoConsultor({
       times: escolheTimes ? marcados : [],
     }
     if (dados.forma === 'senha') pedido.senha = dados.senha
+    if (podeExigir2fa && dados.exige_2fa) pedido.exige_2fa = true
     for (const campo of CAMPOS_DE_TEXTO) if (dados[campo].trim()) pedido[campo] = dados[campo].trim()
     if (papelAtual === 'admin') pedido.consultoria_id = consultoria
     const resposta = await aoCriar(pedido, { carga: cargaNova(), foto: foto ?? undefined, cor: corNova() })
@@ -293,6 +332,7 @@ export default function FichaDoConsultor({
     const mudancas = {}
     if (dados.nome.trim() !== pessoa.nome) mudancas.nome = dados.nome.trim()
     if (mudaPapel && dados.papel !== pessoa.papel) mudancas.papel = dados.papel
+    if (podeExigir2fa && dados.exige_2fa !== !!pessoa.exige_2fa) mudancas.exige_2fa = dados.exige_2fa
     for (const campo of CAMPOS_DE_TEXTO) {
       if (comoTexto(pessoa[campo]) !== dados[campo].trim()) mudancas[campo] = dados[campo].trim() || null
     }
@@ -482,10 +522,21 @@ export default function FichaDoConsultor({
                 </Campo>
               </div>
             )}
+            {podeExigir2fa && (
+              <CartaoChave titulo="Exigir verificação em duas etapas" icone={Smartphone} ligada={dados.exige_2fa}
+                aoMudar={definir('exige_2fa')}
+                dica="No primeiro acesso, a pessoa configura o app autenticador do celular antes de entrar." />
+            )}
             <p className="text-muted-foreground text-[11.5px]">O acesso é criado quando você clica em {dados.forma === 'convite' ? 'Enviar convite' : 'Criar pessoa'}.</p>
           </Bloco>
         ) : (
-          <CartaoDoAcesso pessoa={pessoa} podeReenviar={podeReenviar} aoReenviar={aoReenviar} />
+          <>
+            <CartaoDoAcesso pessoa={pessoa} podeReenviar={podeReenviar} aoReenviar={aoReenviar} />
+            {podeExigir2fa && (
+              <VerificacaoDaPessoa exigida={dados.exige_2fa} aoMudarExigida={definir('exige_2fa')}
+                verificacaoDesde={pessoa.verificacao_desde} aoZerar={aoPedirZerar2fa} />
+            )}
+          </>
         ))}
 
         {erro && <Aviso>{erro}</Aviso>}

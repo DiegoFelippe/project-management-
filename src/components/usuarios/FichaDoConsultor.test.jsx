@@ -612,3 +612,68 @@ describe('FichaDoConsultor: Editar', () => {
     expect(screen.queryByRole('tab', { name: 'Acesso' })).not.toBeInTheDocument()
   })
 })
+
+describe('FichaDoConsultor: verificação em duas etapas (aba Acesso)', () => {
+  const chave = () => screen.getByRole('switch', { name: /Exigir verificação em duas etapas/ })
+
+  it('quem edita o acesso liga "Exigir" e o salvar manda exige_2fa', async () => {
+    const { aoSalvar } = montarEditar({ podeDesativar: true })
+    await irPara('Acesso')
+    expect(chave()).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByText('Desligada')).toBeInTheDocument()
+    await userEvent.click(chave())
+    expect(chave()).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText('Ainda não configurada')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar).toHaveBeenCalledWith(expect.objectContaining({ mudancas: { exige_2fa: true } }))
+  })
+
+  it('desligar a exigência de quem já tinha manda exige_2fa: false; sem mexer, não manda', async () => {
+    const { aoSalvar } = montarEditar({ podeDesativar: true, pessoa: { ...PESSOA, exige_2fa: true } })
+    await irPara('Acesso')
+    expect(chave()).toHaveAttribute('aria-checked', 'true')
+    await userEvent.click(chave())
+    await userEvent.click(chave())
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar.mock.calls[0][0].mudancas).toEqual({})
+    await userEvent.click(chave())
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar.mock.calls[1][0].mudancas).toEqual({ exige_2fa: false })
+  })
+
+  it('com o app ativo: mostra desde quando e o Zerar pede confirmação à página', async () => {
+    const aoPedirZerar2fa = vi.fn()
+    montarEditar({ podeDesativar: true, aoPedirZerar2fa, pessoa: { ...PESSOA, verificacao_desde: '2026-11-10T15:00:00Z' } })
+    await irPara('Acesso')
+    expect(screen.getByText('Ativa desde 10/11/2026')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Zerar verificação em duas etapas/ }))
+    expect(aoPedirZerar2fa).toHaveBeenCalled()
+  })
+
+  it('sem o app ativo, não há o que zerar', async () => {
+    montarEditar({ podeDesativar: true, aoPedirZerar2fa: vi.fn() })
+    await irPara('Acesso')
+    expect(screen.queryByRole('button', { name: /Zerar verificação/ })).not.toBeInTheDocument()
+  })
+
+  it('quem não edita o acesso (gestor) não vê a chave nem o Zerar', () => {
+    montarEditar({ perfilDeQuem: GESTOR, pessoa: { ...PESSOA, verificacao_desde: '2026-11-10T15:00:00Z' } })
+    expect(screen.queryByRole('tab', { name: 'Acesso' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+  })
+
+  it('Novo (administrador): exigir já na criação manda exige_2fa: true', async () => {
+    const { aoCriar } = montarNovo({ perfilDeQuem: ADMIN })
+    await preencher()
+    await irPara('Acesso')
+    await userEvent.click(chave())
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
+    expect(aoCriar).toHaveBeenCalledWith(expect.objectContaining({ exige_2fa: true }), expect.anything())
+  })
+
+  it('Novo (gestor): sem a chave, porque depois ele não edita o acesso da pessoa', async () => {
+    montarNovo()
+    await irPara('Acesso')
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+  })
+})

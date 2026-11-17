@@ -16,6 +16,14 @@ const ERROS_AUTH = {
   weak_password: 'A senha precisa ter pelo menos 8 caracteres.',
   same_password: 'A senha nova precisa ser diferente da atual.',
   user_banned: 'Seu acesso está desativado. Fale com o administrador da sua consultoria.',
+  // Verificação em duas etapas (app autenticador)
+  mfa_verification_failed: 'Código incorreto ou vencido. Confira o app e tente de novo.',
+  mfa_challenge_expired: 'O código venceu. Digite o código novo que aparece no app.',
+  insufficient_aal: 'Digite antes o código do seu app autenticador.',
+  mfa_factor_not_found: 'Não achamos o app autenticador desta conta. Peça a quem administra o seu acesso para zerar a verificação.',
+  too_many_enrolled_mfa_factors: 'Muitos cadastros do app começados. Peça a quem administra o seu acesso para zerar a verificação.',
+  mfa_totp_enroll_not_enabled: 'A verificação em duas etapas não está ligada no Supabase (veja o README).',
+  mfa_totp_verify_not_enabled: 'A verificação em duas etapas não está ligada no Supabase (veja o README).',
 }
 
 const ERROS_FUNCAO = {
@@ -29,6 +37,7 @@ const ERROS_FUNCAO = {
   consultoria_arquivada: 'A consultoria dessa pessoa está arquivada. Reative a consultoria antes.',
   nome_em_uso: 'Já existe uma consultoria com esse nome.',
   google_nao_configurado: 'Falta configurar o app do Google na plataforma (veja o README).',
+  verificacao_pendente: 'Confirme o código do seu app autenticador para continuar.',
 }
 
 export function traduzirErroAuth(erro) {

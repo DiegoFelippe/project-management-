@@ -148,7 +148,7 @@ export default function Usuarios() {
 
   const meusTimes = useMemo(() => new Set(times.map((t) => t.id)), [times])
   // Desativar ou mover para a central: os clientes ativos da pessoa voltam a aguardar consultor (o banco conta).
-  const saindo = confirmando && confirmando.acao !== 'reativar' ? confirmando.pessoa : null
+  const saindo = confirmando && ['desativar', 'mover'].includes(confirmando.acao) ? confirmando.pessoa : null
   const clientesAtivos = useClientesAtivos(saindo ? { consultorId: saindo.id } : null)
   const sobreOsClientes = frase(clientesAtivos, {
     um: '1 cliente dela volta para Aguardando consultor.',
@@ -231,6 +231,17 @@ export default function Usuarios() {
     if (!resposta.erro) {
       toast.success(acao === 'desativar' ? `${pessoa.nome} foi desativado.` : `${pessoa.nome} foi reativado.`)
       setEditando(null)
+      recarregar()
+    }
+    return resposta
+  }
+
+  // Zerar a verificação em duas etapas: a ficha continua aberta, já sem o app ativo.
+  async function zerarVerificacao(pessoa) {
+    const resposta = await gerenciarAcesso('zerar_2fa', pessoa.id)
+    if (!resposta.erro) {
+      toast.success(`Verificação em duas etapas de ${pessoa.nome} zerada.`)
+      setEditando((atual) => (atual?.id === pessoa.id ? { ...atual, verificacao_desde: null } : atual))
       recarregar()
     }
     return resposta
@@ -386,6 +397,7 @@ export default function Usuarios() {
         <FichaDoConsultor key={editando.id} aberto pessoa={editando} perfilDeQuem={perfil} times={ehDono ? [] : times}
           podeReenviar={!ehDono || podeEditar(editando)} podeDesativar={podeDesativar(editando)}
           aoReenviar={() => reenviar(editando)} aoPedirAtivo={(acao) => setConfirmando({ pessoa: editando, acao })}
+          aoPedirZerar2fa={() => setConfirmando({ pessoa: editando, acao: 'zerar_2fa' })}
           aoFechar={() => setEditando(null)} aoSalvar={(dados) => salvarEdicao(editando, dados)}
           aoMudarAusencias={recarregarNumeros} />
       )}
@@ -401,7 +413,15 @@ export default function Usuarios() {
             return resposta
           }} />
       )}
-      {confirmando && (
+      {confirmando?.acao === 'zerar_2fa' && (
+        <ConfirmarAcao aberto aoFechar={() => setConfirmando(null)} perigo={false}
+          titulo={`Zerar a verificação em duas etapas de ${confirmando.pessoa.nome}?`}
+          descricao={confirmando.pessoa.exige_2fa
+            ? 'O app autenticador cadastrado deixa de valer (para quem perdeu ou trocou de celular). Como a verificação é exigida, no próximo acesso a pessoa configura o app de novo antes de entrar.'
+            : 'O app autenticador cadastrado deixa de valer (para quem perdeu ou trocou de celular) e a pessoa passa a entrar só com a senha. Ela pode ativar de novo em Meu perfil.'}
+          rotuloConfirmar="Zerar" aoConfirmar={() => zerarVerificacao(confirmando.pessoa)} />
+      )}
+      {confirmando && confirmando.acao !== 'zerar_2fa' && (
         <ConfirmarAcao aberto aoFechar={() => setConfirmando(null)} perigo={confirmando.acao === 'desativar'}
           titulo={confirmando.acao === 'mover' ? `Mover ${confirmando.pessoa.nome} para a central?`
             : confirmando.acao === 'desativar' ? `Desativar ${confirmando.pessoa.nome}?` : `Reativar ${confirmando.pessoa.nome}?`}

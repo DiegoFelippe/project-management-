@@ -4,7 +4,7 @@ import { chamarFuncao, supabase } from '@/lib/supabase'
 import { buscarPagina } from './paginar'
 
 const CAMPOS =
-  'id, nome, email, foto, cor, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ativo, ' +
+  'id, nome, email, foto, cor, papel, consultoria_id, convite_pendente, precisa_trocar_senha, ativo, exige_2fa, verificacao_desde, ' +
   'telefone, cidade, uf, cargo, data_entrada, carga_semanal, ' +
   'consultoria:consultorias(nome), ' +
   'times:time_membros!time_membros_pessoa_id_fkey(time:times(id, nome))'
@@ -44,7 +44,8 @@ export async function reenviarConvite(pessoaId) {
   return { erro: status === 200 ? null : traduzirErroFuncao(corpo.codigo) }
 }
 
-// editar ({ nome?, papel?, cargo?, telefone?, cidade?, uf?, data_entrada? }), desativar, reativar ou mover_para_central (Edge Function gerenciar-acesso).
+// editar ({ nome?, papel?, cargo?, telefone?, cidade?, uf?, data_entrada?, exige_2fa? }), desativar, reativar, mover_para_central ou
+// zerar_2fa (apaga o app autenticador da pessoa) (Edge Function gerenciar-acesso).
 export async function gerenciarAcesso(acao, pessoaId, extra = {}) {
   const { status, corpo } = await chamarFuncao('gerenciar-acesso', { acao, pessoa_id: pessoaId, ...extra })
   return { erro: status === 200 ? null : traduzirErroFuncao(corpo.codigo) }
