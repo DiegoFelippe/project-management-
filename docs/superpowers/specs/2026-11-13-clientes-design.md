@@ -133,6 +133,13 @@ qualquer momento: arquivar ↔ reativar (central)
 
 ### Capacidade, reserva, realizado e ocupação
 
+> **Nota de 16/11/2026:** o item de menu e a tela **Capacidade** (`/capacidade`) saíram; o que está descrito
+> abaixo (as regras e os números) continua valendo, mas mudou de lugar. **Usuários:** as colunas do mês
+> (Capacidade, Reservado, Realizado, Ocupação) com a navegação de mês, e a ação **Capacidade** da linha (carga
+> semanal e ausências). **Consultorias:** a aba "Ocupação do mês" (só central e dono), com o resumo por
+> consultoria e busca. **Ficha da pessoa (Editar):** o bloco Capacidade. Desenho:
+> `docs/superpowers/plans/2026-11-16-capacidade-em-usuarios.md`.
+
 - **Carga semanal** do consultor: horas por semana (0 a 60, padrão 44), definida pelo administrador ou gestor
   da consultoria (e pela central). Quem não atende clientes pode ficar com 0 e não entra na sugestão.
 - **Capacidade do mês** = dias úteis do mês (segunda a sexta) − feriados nacionais − dias de ausência, × carga
