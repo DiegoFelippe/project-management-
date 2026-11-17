@@ -200,6 +200,8 @@ function VerificacaoDaPessoa({ exigida, aoMudarExigida, verificacaoDesde, aoZera
 // Zerar e sem a chave "Exigir" (ninguém exige de si mesmo). Na aba Acesso, a troca de senha e a verificação em duas
 // etapas da própria pessoa (`aoMudarVerificacao()` depois de ativar ou desativar).
 // aoSalvar({ mudancas: { nome? }, contato?: { telefone, cidade, uf }, foto, cor, senha? }): contato só se mudou, inteiro.
+// Em qualquer modo, a resposta pode trazer `erros` ({ campo: motivo }, ex.: a senha recusada pelo servidor): a ficha
+// marca o campo e a aba dele e vai até lá, como na validação.
 export default function FichaDoConsultor({
   aberto, aoFechar, perfilDeQuem, pessoa = null, times = [], consultoriaId = '', buscarConsultorias,
   titulo, aoCriar, aoColocarNosTimes, aoSalvar, podeReenviar, podeDesativar, aoReenviar, aoPedirAtivo, aoMudarAusencias,
@@ -407,6 +409,10 @@ export default function FichaDoConsultor({
     setEnviando(true)
     const resposta = await aoSalvar(pedido)
     setEnviando(false)
+    if (resposta?.erros) {
+      setErros(resposta.erros)
+      irParaPrimeiraAbaComErro(resposta.erros)
+    }
     if (resposta?.erro) return setErro(resposta.erro)
     fechar()
   }
@@ -561,7 +567,11 @@ export default function FichaDoConsultor({
                   <Campo id="ficha-carga" rotulo="Carga semanal">
                     <Input id="ficha-carga" className="h-10" value={`${formatarHoras(Number(pessoa.carga_semanal))} por semana`} disabled readOnly />
                   </Campo>
-                  <p className="mt-2 text-rotulo text-muted-foreground">Só para consulta: a carga e as ausências quem muda é a gestão da consultoria.</p>
+                  <p className="mt-2 text-rotulo text-muted-foreground">
+                    {['admin', 'gestor'].includes(pessoa.papel)
+                      ? 'Só para consulta aqui. Para mudar a sua carga e as suas ausências, use Capacidade na sua linha em Usuários.'
+                      : 'Só para consulta: a carga e as ausências quem muda é a gestão da consultoria.'}
+                  </p>
                 </div>
               </Bloco>
             )}

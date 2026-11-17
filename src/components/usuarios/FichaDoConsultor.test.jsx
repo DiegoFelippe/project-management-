@@ -915,6 +915,32 @@ describe('FichaDoConsultor: modo próprio (Meu perfil)', () => {
     expect(screen.getByLabelText('Senha nova')).toHaveFocus()
   })
 
+  it('erro de um campo vindo de quem salva (ex.: a senha recusada pelo servidor) marca a aba e o campo', async () => {
+    montarPropria({ aoSalvar: vi.fn().mockResolvedValue({ erro: 'Nome salvo. A senha não mudou: Igual.', erros: { senha: 'Igual.' } }) })
+    await irPara('Acesso')
+    await userEvent.type(screen.getByLabelText('Senha nova'), 'Senha-nova-1!')
+    await userEvent.type(screen.getByLabelText('Repita a senha nova'), 'Senha-nova-1!')
+    await irPara('Dados pessoais')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(await screen.findByText('Nome salvo. A senha não mudou: Igual.')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Acesso, tem erro' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('Igual.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Senha nova')).toHaveFocus()
+  })
+
+  it('a carga só para ler diz onde ela muda: administração e gestão na própria linha de Usuários, o consultor com a gestão', () => {
+    montarPropria()
+    expect(screen.getByText(/use Capacidade na sua linha em Usuários/)).toBeInTheDocument()
+    expect(screen.queryByText(/quem muda é a gestão da consultoria/)).not.toBeInTheDocument()
+  })
+
+  it('consultor: a carga e as ausências quem muda é a gestão da consultoria', () => {
+    const consultor = { ...EU, id: 'p7', papel: 'pessoa' }
+    montarPropria({ pessoa: consultor, perfilDeQuem: consultor })
+    expect(screen.getByText(/quem muda é a gestão da consultoria/)).toBeInTheDocument()
+    expect(screen.queryByText(/Capacidade na sua linha/)).not.toBeInTheDocument()
+  })
+
   it('a ficha de outra pessoa não tem a troca de senha nem a verificação da própria pessoa', async () => {
     montarEditar({ podeDesativar: true })
     expect(screen.getByRole('dialog', { name: 'Ficha de Ana Lima' })).toBeInTheDocument()

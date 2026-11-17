@@ -118,6 +118,89 @@ describe('Meu perfil (a ficha de Usuários no modo próprio): gravar', () => {
   })
 })
 
+// Gravação pela metade: cada passo vai num caminho (Edge Function, função do banco, Storage, Auth). Se um falha
+// depois de outros terem ido, a tela diz o que foi salvo e o que não, recarrega quem está usando e, ao tentar de
+// novo, não manda outra vez o que já foi.
+describe('Meu perfil: quando só parte é salva', () => {
+  const MESMA = 'A senha nova precisa ser diferente da atual.'
+
+  async function digitarSenha(senha) {
+    await userEvent.click(screen.getByRole('tab', { name: /^Acesso/ }))
+    await userEvent.clear(screen.getByLabelText('Senha nova'))
+    await userEvent.type(screen.getByLabelText('Senha nova'), senha)
+    await userEvent.clear(screen.getByLabelText('Repita a senha nova'))
+    await userEvent.type(screen.getByLabelText('Repita a senha nova'), senha)
+  }
+
+  it('nome e foto vão, a senha é recusada: diz o que foi salvo, recarrega, fica aberta e marca a senha', async () => {
+    montar()
+    definirSenha.mockResolvedValueOnce({ erro: MESMA })
+    await userEvent.clear(screen.getByLabelText('Nome'))
+    await userEvent.type(screen.getByLabelText('Nome'), 'Diego F.')
+    const arquivo = new File(['x'], 'eu.png', { type: 'image/png' })
+    await userEvent.upload(screen.getByLabelText('Escolher foto'), arquivo)
+    await digitarSenha('Senha-atual-1!')
+    await salvar()
+    expect(await screen.findByText(`Nome e foto salvos. A senha não mudou: ${MESMA}`)).toBeInTheDocument()
+    expect(recarregarPerfil).toHaveBeenCalled()
+    expect(aoSalvo).toHaveBeenCalled()
+    expect(aoFechar).not.toHaveBeenCalled()
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(screen.getByRole('tab', { name: 'Acesso, tem erro' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(screen.getByRole('tabpanel', { name: /^Acesso/ })).getByText(MESMA)).toBeInTheDocument()
+
+    await digitarSenha('Outra-senha-2!')
+    await salvar()
+    await waitFor(() => expect(aoFechar).toHaveBeenCalled())
+    expect(gerenciarAcesso).toHaveBeenCalledTimes(1)
+    expect(trocarFoto).toHaveBeenCalledTimes(1)
+    expect(definirSenha).toHaveBeenLastCalledWith('Outra-senha-2!')
+    expect(toast.success).toHaveBeenCalledWith('Perfil atualizado.')
+  })
+
+  it('só a senha muda e é recusada: nada foi salvo, não recarrega, e o motivo aparece no aviso e no campo', async () => {
+    montar()
+    definirSenha.mockResolvedValueOnce({ erro: MESMA })
+    await digitarSenha('Senha-atual-1!')
+    await salvar()
+    expect(await screen.findAllByText(MESMA)).toHaveLength(2)
+    expect(recarregarPerfil).not.toHaveBeenCalled()
+    expect(aoSalvo).not.toHaveBeenCalled()
+    expect(aoFechar).not.toHaveBeenCalled()
+    expect(screen.getByRole('tab', { name: 'Acesso, tem erro' })).toBeInTheDocument()
+  })
+
+  it('o contato vai e a foto falha: diz o que falta salvar e, de novo, manda só a foto e a senha', async () => {
+    montar()
+    vi.mocked(trocarFoto).mockResolvedValueOnce({ erro: 'Não foi possível enviar a imagem. Tente de novo.' })
+    await userEvent.type(screen.getByLabelText('Telefone'), '9')
+    const arquivo = new File(['x'], 'eu.png', { type: 'image/png' })
+    await userEvent.upload(screen.getByLabelText('Escolher foto'), arquivo)
+    await digitarSenha('Senha-nova-1!')
+    await salvar()
+    expect(await screen.findByText('Contato salvo. A foto não mudou: Não foi possível enviar a imagem. Tente de novo. Falta salvar a senha.'))
+      .toBeInTheDocument()
+    expect(definirSenha).not.toHaveBeenCalled()
+    expect(recarregarPerfil).toHaveBeenCalled()
+    expect(screen.queryByRole('tab', { name: /tem erro/ })).not.toBeInTheDocument()
+
+    await salvar()
+    await waitFor(() => expect(aoFechar).toHaveBeenCalled())
+    expect(atualizarMeuContato).toHaveBeenCalledTimes(1)
+    expect(trocarFoto).toHaveBeenCalledTimes(2)
+    expect(definirSenha).toHaveBeenCalledWith('Senha-nova-1!')
+  })
+
+  it('tirar a foto no modo próprio apaga a foto atual da própria pessoa', async () => {
+    montar({ foto: 'me/antiga.webp' })
+    await userEvent.click(screen.getByRole('button', { name: 'Tirar foto' }))
+    await salvar()
+    await waitFor(() => expect(tirarFoto).toHaveBeenCalledWith('me', 'me/antiga.webp'))
+    expect(trocarFoto).not.toHaveBeenCalled()
+    expect(aoFechar).toHaveBeenCalled()
+  })
+})
+
 // A verificação em duas etapas da própria pessoa (antes no Meu perfil separado), agora na aba Acesso da ficha.
 async function abrirVerificacao(perfil) {
   montar(perfil)
