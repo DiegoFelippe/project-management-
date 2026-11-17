@@ -388,7 +388,7 @@ select throws_ok($$ select testes.ver('admin_a', 'public.indicadores_de_consulto
 -- ── Integrações (dono e administrador) ──────────────────────────────────────
 create temp table j as select testes.ver('admin_a', 'public.indicadores_de_integracoes()') as v;
 select is((select array[testes.n(v, 'conectadas'), testes.n(v, 'com_erro'), testes.n(v, 'nao_configuradas')] from j),
-  array[1, 1, 1]::numeric[], 'integrações, administrador A: 1 conectada, 1 com erro, 1 não configurada');
+  array[1, 1, 3]::numeric[], 'integrações, administrador A: 1 conectada, 1 com erro, 3 não configuradas (catálogo de 5)');
 select is((select (v ->> 'ultimo_teste')::timestamptz from j), '2026-11-12 10:00-03'::timestamptz,
   'administrador A: último teste = o mais recente (ultimo_teste_em)');
 drop table j;
@@ -397,21 +397,21 @@ select is((select testes.n(v, 'conectadas') from j), 1::numeric, 'administrador 
 drop table j;
 create temp table j as select testes.ver('admin_b', 'public.indicadores_de_integracoes()') as v;
 select is((select array[testes.n(v, 'conectadas'), testes.n(v, 'com_erro'), testes.n(v, 'nao_configuradas')] from j),
-  array[0, 0, 3]::numeric[], 'administrador B: nada conectado, a A não conta');
+  array[0, 0, 5]::numeric[], 'administrador B: nada conectado (as 5 do catálogo), a A não conta');
 select ok((select v -> 'ultimo_teste' = 'null'::jsonb from j), 'administrador B: sem teste');
 drop table j;
 create temp table j as select testes.ver('dono', format('public.indicadores_de_integracoes(%L)', testes.id('A'))) as v;
 select is((select array[testes.n(v, 'conectadas'), testes.n(v, 'com_erro'), testes.n(v, 'nao_configuradas')] from j),
-  array[1, 1, 1]::numeric[], 'dono + A: os números da A');
+  array[1, 1, 3]::numeric[], 'dono + A: os números da A');
 drop table j;
 create temp table j as select testes.ver('dono', 'public.indicadores_de_integracoes()') as v;
 select is((select testes.n(v, 'conectadas') from j),
   (select count(*)::numeric from public.integracoes i join public.consultorias c on c.id = i.consultoria_id
    where c.arquivada_em is null and i.situacao = 'conectada'), 'dono: conectadas de todas as consultorias ativas');
 select is((select testes.n(v, 'nao_configuradas') from j),
-  (select 3 * count(*)::numeric from public.consultorias where arquivada_em is null)
+  (select 5 * count(*)::numeric from public.consultorias where arquivada_em is null)
     - (select count(*) from public.integracoes i join public.consultorias c on c.id = i.consultoria_id where c.arquivada_em is null),
-  'dono: não configuradas = 3 por consultoria ativa menos as que existem');
+  'dono: não configuradas = 5 por consultoria ativa menos as que existem');
 drop table j;
 select throws_ok($$ select testes.ver('central', 'public.indicadores_de_integracoes()') $$, 'P0001', 'sem_permissao',
   'integrações: a central não vê');
