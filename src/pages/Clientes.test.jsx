@@ -194,6 +194,32 @@ describe('Clientes: distribuir e escolher consultor', () => {
   const gestor = { id: 'g1', papel: 'gestor', consultoria_id: 's1' }
   const NA_CONSULTORIA = CLIENTES.map((c) => ({ ...c, consultoria_id: 's1', consultoria: { id: 's1', nome: 'STI' } }))
 
+  // Padrão Hub: nas linhas da tabela as ações continuam ghost sm (cheio e outline são só do cabeçalho da página).
+  const ehGhostSm = (botao) => {
+    expect(botao).toHaveClass('text-muted-foreground', 'h-8')
+    expect(botao).not.toHaveClass('bg-primary')
+    expect(botao).not.toHaveClass('border')
+  }
+
+  it('as ações das linhas continuam ghost sm (central, gestor e consultor)', async () => {
+    const { unmount } = renderizarTela(<Clientes />, { perfil: central })
+    const linha = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    ehGhostSm(within(linha).getByRole('button', { name: 'Mandar para consultoria' }))
+    ehGhostSm(within(linha).getByRole('button', { name: 'Editar' }))
+    unmount()
+    vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA.map((c) => ({ ...c, consultor: { id: 'p9', nome: 'Zé', ativo: true } })), total: 2 })
+    const gestao = renderizarTela(<Clientes />, { perfil: gestor })
+    await userEvent.click(await screen.findByRole('button', { name: 'Em atendimento' }))
+    const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    ehGhostSm(within(alfa).getByRole('button', { name: 'Trocar consultor' }))
+    ehGhostSm(within(alfa).getByRole('button', { name: 'Ajustar previsão' }))
+    gestao.unmount()
+    renderizarTela(<Clientes />, { perfil: { id: 'p9', papel: 'pessoa', consultoria_id: 's1' } })
+    const minha = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    ehGhostSm(within(minha).getByRole('button', { name: 'Fazer check-in' }))
+    ehGhostSm(within(minha).getByRole('button', { name: 'Lançar horas' }))
+  })
+
   it('central: Mandar para consultoria abre a janela com a sugestão e confirma', async () => {
     renderizarTela(<Clientes />, { perfil: central })
     await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Mandar para consultoria' }))
