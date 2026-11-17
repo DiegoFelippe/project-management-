@@ -137,8 +137,8 @@ from unnest(array['p_central', 'p_pessoa', 'p_gestor', 'p_b', 'p_vazia', 'f_dent
 select has_column('public', 'cliente_pastas', 'evento_id', 'a pasta tem evento_id (a pasta da reunião)');
 select is((select count(*) from pg_constraint c
     join pg_attribute t on t.attrelid = c.conrelid and t.attnum = any (c.conkey)
-    where c.conrelid = 'public.cliente_pastas'::regclass and c.contype = 'f' and t.attname = 'evento_id'), 0::bigint,
-  'evento_id ainda não tem chave estrangeira (a tabela de eventos chega depois)');
+    where c.conrelid = 'public.cliente_pastas'::regclass and c.contype = 'f' and t.attname = 'evento_id'), 1::bigint,
+  'evento_id aponta para a agenda (chave estrangeira que entrou com a tabela de eventos)');
 
 -- ── Quem cria ────────────────────────────────────────────────────────────────
 
@@ -307,12 +307,17 @@ reset role;
 
 -- ── Rotina do sistema (service role, sem usuário logado) ─────────────────────
 
+-- A reunião da agenda dona da pasta (evento_id tem chave estrangeira para agenda_eventos).
+insert into public.agenda_eventos (id, consultoria_id, consultor_id, titulo, inicio, fim)
+values (gen_random_uuid(), testes.id('A'), testes.id('pessoa_a'), 'Reunião 20/11', now(), now() + interval '1 hour');
+insert into testes.fx select 'ev_sis', id from public.agenda_eventos where titulo = 'Reunião 20/11' and consultoria_id = testes.id('A');
+
 grant usage on schema testes to service_role;
 grant select on testes.fx to service_role;
 set local role service_role;
 select set_config('request.jwt.claims', '', true);
 select lives_ok($$insert into public.cliente_pastas (id, cliente_id, nome, evento_id)
-    values (testes.id('p_sis'), testes.id('c1'), 'Reunião 20/11', gen_random_uuid())$$,
+    values (testes.id('p_sis'), testes.id('c1'), 'Reunião 20/11', testes.id('ev_sis'))$$,
   'o sistema cria pasta com evento_id');
 select ok((select evento_id is not null and consultoria_id = testes.id('A') from public.cliente_pastas
     where id = testes.id('p_sis')), 'o evento_id fica e a consultoria é a do cliente');
