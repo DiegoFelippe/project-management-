@@ -117,8 +117,7 @@ Referência: o Kanban do Hub (Mochi, `~/Documents/Karina`, só leitura). Invent�
 Vários quadros por cliente, quadro pessoal, transferências, acompanhar/avisos (Slack ou no app), etiquetas, capa de
 cartão, menção (@), histórico de atividade do cartão, limite por coluna (o Mochi também não tem os seis últimos).
 
-## Perguntas para o Diego
+## Resposta do Diego (17/11)
 
-1. Um quadro por cliente está bom, ou você quer vários quadros dentro do mesmo cliente?
-2. A central e o dono só olham o quadro, ou também mexem nos cartões?
-3. Transferências e "acompanhar" com avisos podem ficar para depois?
+"Sim, seguir assim" — aprovadas as três propostas: **um quadro por cliente** (por consultoria que atende);
+**a central e o dono só olham**; **transferências e "acompanhar" com avisos ficam para depois**.
