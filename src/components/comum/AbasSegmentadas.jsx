@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils'
 
-// Abas em controle segmentado (trilho cinza, aba ativa branca e elevada). `abas`: [{ valor, rotulo, contador?, pendente? }].
+// Abas em controle segmentado (trilho cinza, aba ativa branca e elevada). `abas`: [{ valor, rotulo, icone?, erro?, contador?, pendente? }].
+// `icone` (componente lucide) vem antes do rótulo; `erro` põe um ponto vermelho (e "tem erro" para leitor de tela).
 // `contador` é o número na pílula ao lado do rótulo (só quando a tela já o tem do banco); `pendente` pinta a pílula de âmbar.
 // Nas listas, são botões de alternância (aria-pressed). Com `comoAbas` (página do cliente) viram role="tablist"/"tab":
 // aria-selected, aria-controls (`idBase`), tabindex móvel e setas. `idBase` combina os ids com os painéis:
@@ -27,12 +28,19 @@ export default function AbasSegmentadas({ rotulo, abas, valor, aoMudar, comoAbas
             }
           : { 'aria-pressed': ativa }
         return (
-          <button key={aba.valor} type="button" {...propriedades} onClick={() => aoMudar(aba.valor)}
+          <button key={aba.valor} type="button" {...propriedades} data-erro={aba.erro ? '' : undefined} onClick={() => aoMudar(aba.valor)}
             className={cn(
               'botao-animado inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 transition-[background-color,color,box-shadow,translate,scale] outline-none hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50',
               ativa ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
             )}>
+            {aba.icone && <aba.icone className="size-[13px]" aria-hidden="true" />}
             {aba.rotulo}
+            {aba.erro && (
+              <>
+                <span data-ponto-erro aria-hidden="true" className="bg-destructive size-1.5 rounded-full" />
+                <span className="sr-only">, tem erro</span>
+              </>
+            )}
             {aba.contador != null && (
               <span data-contador className={cn(
                 'rounded-full px-1.5 text-[11px] font-semibold tabular-nums',

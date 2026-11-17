@@ -81,3 +81,22 @@ describe('AbasSegmentadas (comoAbas)', () => {
     expect(screen.getByRole('tab', { name: /Pendentes/ })).toHaveFocus()
   })
 })
+
+describe('AbasSegmentadas (ícone e erro)', () => {
+  const Icone = (props) => <svg data-testid="icone" {...props} />
+  it('mostra o ícone antes do rótulo, sem entrar no nome', () => {
+    render(<AbasSegmentadas rotulo="Seções" comoAbas idBase="y" valor="a" aoMudar={() => {}}
+      abas={[{ valor: 'a', rotulo: 'Dados', icone: Icone }]} />)
+    const aba = screen.getByRole('tab', { name: 'Dados' })
+    expect(aba.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('aba com erro ganha o ponto vermelho e o aviso para leitor de tela', () => {
+    render(<AbasSegmentadas rotulo="Seções" comoAbas idBase="y" valor="a" aoMudar={() => {}}
+      abas={[{ valor: 'a', rotulo: 'Dados', erro: true }, { valor: 'b', rotulo: 'Acesso' }]} />)
+    const aba = screen.getByRole('tab', { name: 'Dados, tem erro' })
+    expect(aba).toHaveAttribute('data-erro')
+    expect(aba.querySelector('[data-ponto-erro]')).toHaveClass('bg-destructive')
+    expect(screen.getByRole('tab', { name: 'Acesso' })).not.toHaveAttribute('data-erro')
+  })
+})

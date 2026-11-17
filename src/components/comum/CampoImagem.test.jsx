@@ -36,4 +36,26 @@ describe('CampoImagem', () => {
     expect(aoMudar).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent('Escolha uma imagem PNG, JPG ou WebP.')
   })
+
+  it('aparência cartão: foto quadrada de 96 px com botão câmera "Trocar a foto" que abre o seletor de arquivo', async () => {
+    const aoMudar = vi.fn()
+    render(<CampoImagem rotulo="foto" aparencia="cartao" atual="http://x/foto.webp" reserva="AL" valor={null} aoMudar={aoMudar} />)
+    expect(screen.getByRole('img', { name: 'Prévia da foto' }).parentElement).toHaveClass('size-24', 'rounded-2xl')
+    const camera = screen.getByRole('button', { name: 'Trocar a foto' })
+    const clique = vi.spyOn(screen.getByLabelText('Escolher foto'), 'click')
+    await userEvent.click(camera)
+    expect(clique).toHaveBeenCalled()
+    const arquivo = foto()
+    await userEvent.upload(screen.getByLabelText('Escolher foto'), arquivo)
+    expect(aoMudar).toHaveBeenCalledWith({ arquivo })
+    await userEvent.click(screen.getByRole('button', { name: 'Tirar foto' }))
+    expect(aoMudar).toHaveBeenCalledWith({ tirar: true })
+  })
+
+  it('aparência cartão sem foto mostra a reserva na cor pedida, e o câmera continua lá', () => {
+    render(<CampoImagem rotulo="foto" aparencia="cartao" atual={null} reserva="AL" reservaCor="#7c3aed" valor={null} aoMudar={() => {}} />)
+    expect(screen.getByText('AL')).toHaveStyle({ backgroundColor: '#7c3aed' })
+    expect(screen.getByRole('button', { name: 'Trocar a foto' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Tirar foto' })).not.toBeInTheDocument()
+  })
 })
