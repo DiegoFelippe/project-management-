@@ -4,9 +4,10 @@ import CampoNumero from '@/components/campos/CampoNumero'
 import Seletor from '@/components/campos/Seletor'
 import { SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import Campo from './Campo'
 import { AVISO_DO_SEGREDO } from './constantes'
 import JanelaIntegracao from './JanelaIntegracao'
+import { useEnvioDaIntegracao } from './useEnvioDaIntegracao'
 
 const PORTA_DA_SEGURANCA = { starttls: 587, ssl: 465, nenhuma: 25 }
 const SEGURANCAS = [
@@ -15,16 +16,7 @@ const SEGURANCAS = [
   { valor: 'nenhuma', rotulo: 'Sem cifra (só para testes)' },
 ]
 
-function Campo({ id, rotulo, children }) {
-  return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{rotulo}</Label>
-      {children}
-    </div>
-  )
-}
-
-export default function FormularioSmtp({ integracao, aoFechar, aoSalvar }) {
+export default function FormularioSmtp({ integracao, aoFechar, aoSalvar, aoTestar }) {
   const atual = integracao?.config ?? {}
   const [host, setHost] = useState(atual.host ?? '')
   const [porta, setPorta] = useState(String(atual.porta ?? 587))
@@ -33,32 +25,30 @@ export default function FormularioSmtp({ integracao, aoFechar, aoSalvar }) {
   const [senha, setSenha] = useState('')
   const [remetente, setRemetente] = useState(atual.remetente ?? '')
   const [nomeRemetente, setNomeRemetente] = useState(atual.nome_remetente ?? '')
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  const { erro, enviando, salvar, testar } = useEnvioDaIntegracao(montar, aoSalvar, aoTestar)
 
   function trocarSeguranca(nova) {
     if (Number(porta) === PORTA_DA_SEGURANCA[seguranca]) setPorta(String(PORTA_DA_SEGURANCA[nova]))
     setSeguranca(nova)
   }
 
-  async function salvar(evento) {
-    evento.preventDefault()
-    if (!host.trim()) return setErro('Informe o servidor.')
+  // O Testar manda um e-mail de teste para quem testa (o e-mail do seu acesso).
+  function montar() {
+    if (!host.trim()) return { erro: 'Informe o servidor.' }
     const numero = Number(porta)
-    if (!Number.isInteger(numero) || numero < 1 || numero > 65535) return setErro('Informe uma porta válida.')
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(remetente.trim())) return setErro('Informe o e-mail do remetente.')
-    setErro(null)
-    setEnviando(true)
-    const resposta = await aoSalvar({
-      host: host.trim(), porta: numero, seguranca, usuario: usuario.trim(),
-      remetente: remetente.trim(), nome_remetente: nomeRemetente.trim(),
-    }, senha || null)
-    setEnviando(false)
-    if (resposta?.erro) setErro(resposta.erro)
+    if (!Number.isInteger(numero) || numero < 1 || numero > 65535) return { erro: 'Informe uma porta válida.' }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(remetente.trim())) return { erro: 'Informe o e-mail do remetente.' }
+    return {
+      config: {
+        host: host.trim(), porta: numero, seguranca, usuario: usuario.trim(),
+        remetente: remetente.trim(), nome_remetente: nomeRemetente.trim(),
+      },
+      segredo: senha || null,
+    }
   }
 
   return (
-    <JanelaIntegracao titulo="E-mail (SMTP)" aoFechar={aoFechar} aoSalvar={salvar} erro={erro} enviando={enviando}
+    <JanelaIntegracao titulo="E-mail (SMTP)" aoFechar={aoFechar} aoSalvar={salvar} aoTestar={testar} erro={erro} enviando={enviando}
       descricao="O servidor de e-mail que o sistema usa para mandar mensagens em nome da consultoria.">
       <SecaoFormulario titulo="Servidor">
         <div className="grid gap-4 sm:grid-cols-[1fr_auto]">

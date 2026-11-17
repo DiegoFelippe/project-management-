@@ -1,4 +1,4 @@
-// Integrações da consultoria (IA, e-mail SMTP e Google). O navegador só lê a tabela (sem segredo);
+// Integrações da consultoria (IA, e-mail SMTP, Google, Slack e WhatsApp). O navegador só lê a tabela (sem segredo);
 // salvar, testar, desconectar e conectar o Google passam pela Edge Function `integracoes`.
 import { traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
@@ -22,3 +22,13 @@ export const salvarIntegracao = (tipo, config, segredo) => acao({ acao: 'salvar'
 export const testarIntegracao = (id) => acao({ acao: 'testar', id })
 export const desconectarIntegracao = (id) => acao({ acao: 'desconectar', id })
 export const iniciarGoogle = (volta) => acao({ acao: 'google_iniciar', volta })
+
+// "Testar" dentro da janela: testa o que foi digitado, sem gravar nada (segredo em branco usa o guardado).
+// extras: o que só serve ao teste, como o número que recebe o modelo do WhatsApp ({ numero_teste }).
+// Devolve { erro, mensagem }: a mensagem diz o que funcionou; o erro, o que o serviço respondeu.
+export async function testarRascunho(tipo, config, segredo, extras = {}) {
+  const { status, corpo } = await chamarFuncao('integracoes', { acao: 'testar_rascunho', tipo, config, segredo: segredo || null, ...extras })
+  if (status !== 200) return { erro: traduzirErroFuncao(corpo.codigo), mensagem: null }
+  if (!corpo.funcionou) return { erro: corpo.erro ?? traduzirErroFuncao(), mensagem: null }
+  return { erro: null, mensagem: corpo.mensagem }
+}
