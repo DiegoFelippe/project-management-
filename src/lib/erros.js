@@ -70,6 +70,16 @@ const ERROS_MENSAGEM_BANCO = {
   consultoria_escolhe_consultor: 'Quem escolhe o consultor é a consultoria.',
   objeto_de_outra_pessoa: ERROS_FUNCAO.sem_permissao,
   sem_permissao: ERROS_FUNCAO.sem_permissao,
+  // Quadro do cliente
+  responsavel_invalido: 'Escolha alguém que atende este cliente: o consultor dele ou quem cuida da consultoria.',
+  coluna_com_cartoes: 'Esta coluna tem cartões. Escolha para qual coluna eles vão ou apague junto.',
+  ultima_coluna: 'O quadro precisa de pelo menos uma coluna.',
+  coluna_invalida: 'Essa coluna não está mais no quadro. Atualize o quadro e tente de novo.',
+  vizinho_invalido: 'O quadro mudou enquanto você arrastava. Atualize o quadro e tente de novo.',
+  cartao_arquivado: 'Este cartão foi arquivado. Restaure antes de mover.',
+  colunas_demais: 'O quadro chegou ao limite de 50 colunas.',
+  checklist_cheio: 'O checklist chegou ao limite de 200 itens.',
+  filtro_invalido: 'Esse filtro não existe. Limpe os filtros e tente de novo.',
 }
 
 // O Storage recusa (413) arquivo acima do limite do bucket "arquivos"; a tela confere o mesmo antes de enviar.
@@ -99,9 +109,9 @@ export function traduzirErroBanco(erro, { sobre = 'time' } = {}) {
       ? 'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).'
       : 'Já existe um time com esse nome.'
   }
-  // Check-ins e arquivos seguram o cliente (on delete restrict).
+  // Check-ins, arquivos e cartões do quadro seguram o cliente (on delete restrict).
   if (erro?.code === '23503' && sobre === 'cliente') {
-    return 'Este cliente tem horas ou arquivos registrados. Arquive em vez de apagar.'
+    return 'Este cliente tem horas, arquivos ou cartões registrados. Arquive em vez de apagar.'
   }
   if (erro?.code === '23514') return sobre === 'checkin' ? CHECKIN_DE_MAIS_DE_24H : 'Confira os campos destacados.'
   if (erro?.code === '23P01') return 'Esse horário se sobrepõe a outro check-in seu.'

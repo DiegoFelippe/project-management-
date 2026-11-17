@@ -135,7 +135,7 @@ export function useAcoesDoCliente({ aoMudar, aoApagar }) {
       )}
       {apagando && (
         <ConfirmarAcao aberto aoFechar={() => setApagando(null)} titulo={`Apagar o cliente ${apagando.nome}?`}
-          descricao="O cliente some de vez. Só dá para apagar cliente sem horas nem arquivos registrados; se tiver, arquive em vez de apagar."
+          descricao="O cliente some de vez. Só dá para apagar cliente sem horas, arquivos nem cartões registrados; se tiver, arquive em vez de apagar."
           rotuloConfirmar="Apagar cliente" aoConfirmar={() => apagar(apagando)} />
       )}
     </>

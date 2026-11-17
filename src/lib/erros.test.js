@@ -96,7 +96,7 @@ describe('traduzirErroBanco com contexto', () => {
       'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).',
     )
     expect(traduzirErroBanco({ code: '23503' }, { sobre: 'cliente' })).toBe(
-      'Este cliente tem horas ou arquivos registrados. Arquive em vez de apagar.',
+      'Este cliente tem horas, arquivos ou cartões registrados. Arquive em vez de apagar.',
     )
     expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')
     expect(traduzirErroBanco({ code: '23514' }, { sobre: 'checkin' })).toBe(
@@ -136,6 +136,21 @@ describe('traduzirErroBanco com contexto', () => {
     expect(msg('sem_permissao')).toBe('Você não tem permissão para isso.')
     expect(msg('consultoria_escolhe_consultor')).toBe('Quem escolhe o consultor é a consultoria.')
     expect(msg('outra_coisa')).toBe('Algo deu errado. Tente de novo.')
+  })
+
+  it('traduz as recusas do quadro do cliente', () => {
+    const msg = (message, code = 'P0001') => traduzirErroBanco({ code, message })
+    expect(msg('responsavel_invalido')).toBe(
+      'Escolha alguém que atende este cliente: o consultor dele ou quem cuida da consultoria.',
+    )
+    expect(msg('coluna_com_cartoes')).toBe('Esta coluna tem cartões. Escolha para qual coluna eles vão ou apague junto.')
+    expect(msg('ultima_coluna')).toBe('O quadro precisa de pelo menos uma coluna.')
+    expect(msg('coluna_invalida')).toBe('Essa coluna não está mais no quadro. Atualize o quadro e tente de novo.')
+    expect(msg('vizinho_invalido')).toBe('O quadro mudou enquanto você arrastava. Atualize o quadro e tente de novo.')
+    expect(msg('cartao_arquivado')).toBe('Este cartão foi arquivado. Restaure antes de mover.')
+    expect(msg('colunas_demais')).toBe('O quadro chegou ao limite de 50 colunas.')
+    expect(msg('checklist_cheio')).toBe('O checklist chegou ao limite de 200 itens.')
+    expect(msg('filtro_invalido', '22023')).toBe('Esse filtro não existe. Limpe os filtros e tente de novo.')
   })
 })
 

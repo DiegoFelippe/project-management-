@@ -80,4 +80,37 @@ describe('limparTudo', () => {
     expect((await admin.from('clientes').select('id').eq('id', cliente.id)).data).toEqual([])
     expect((await admin.from('consultorias').select('id').eq('id', consultoria)).data).toEqual([])
   })
+
+  it('apaga o quadro do cliente com os cartões (que seguram o cliente) e o que está neles', async () => {
+    const consultoria = await criarConsultoriaDeTeste()
+    const pessoa = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: consultoria })
+    const { data: cliente, error } = await admin
+      .from('clientes')
+      .insert({ nome: 'Limpeza do quadro', horas_mes: 1, consultoria_id: consultoria, consultor_id: pessoa.id })
+      .select('id')
+      .single()
+    expect(error).toBeNull()
+    registrarCliente(cliente.id)
+    const comoPessoa = await entrarComo(pessoa)
+    const { data: quadro, error: erroQuadro } = await comoPessoa.rpc('quadro_do_cliente', { p_cliente: cliente.id })
+    expect(erroQuadro).toBeNull()
+    const { data: cartao, error: erroCartao } = await comoPessoa
+      .from('cartoes')
+      .insert({ coluna_id: quadro.colunas[0].id, titulo: 'Cartão da limpeza' })
+      .select('id')
+      .single()
+    expect(erroCartao).toBeNull()
+    const { error: erroComentario } = await comoPessoa
+      .from('cartao_comentarios')
+      .insert({ cartao_id: cartao.id, texto: 'Some junto' })
+    expect(erroComentario).toBeNull()
+
+    await limparTudo()
+
+    expect((await admin.from('cartao_comentarios').select('id').eq('cartao_id', cartao.id)).data).toEqual([])
+    expect((await admin.from('cartoes').select('id').eq('id', cartao.id)).data).toEqual([])
+    expect((await admin.from('quadros').select('id').eq('id', quadro.id)).data).toEqual([])
+    expect((await admin.from('clientes').select('id').eq('id', cliente.id)).data).toEqual([])
+    expect((await admin.from('consultorias').select('id').eq('id', consultoria)).data).toEqual([])
+  })
 })

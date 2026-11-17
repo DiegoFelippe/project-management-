@@ -151,15 +151,35 @@ async function limparArquivos(clientes, consultorias) {
   }
 }
 
+// Quadros dos clientes e das consultorias de teste. Os cartões seguram as colunas (restrict, e por elas o cliente) e
+// saem antes; checklist, comentários e responsáveis saem com o cartão, e as colunas com o quadro.
+async function limparQuadros(clientes, consultorias) {
+  const quadros = new Set()
+  if (clientes.length) {
+    const resposta = await admin.from('quadros').select('id').in('cliente_id', clientes)
+    conferirLimpeza('ler os quadros dos clientes de teste', resposta)
+    for (const linha of resposta.data ?? []) quadros.add(linha.id)
+  }
+  if (consultorias.length) {
+    const resposta = await admin.from('quadros').select('id').in('consultoria_id', consultorias)
+    conferirLimpeza('ler os quadros das consultorias de teste', resposta)
+    for (const linha of resposta.data ?? []) quadros.add(linha.id)
+  }
+  if (!quadros.size) return
+  conferirLimpeza('apagar os cartões dos quadros de teste', await admin.from('cartoes').delete().in('quadro_id', [...quadros]))
+  conferirLimpeza('apagar os quadros de teste', await admin.from('quadros').delete().in('id', [...quadros]))
+}
+
 export async function limparTudo() {
   const consultorias = [...criados.consultorias]
-  // Arquivos, check-ins e clientes seguram consultorias e clientes (restrict): saem antes.
+  // Arquivos, check-ins, quadros e clientes seguram consultorias e clientes (restrict): saem antes.
   const clientes = new Set(criados.clientes)
   if (consultorias.length) {
     const resposta = await admin.from('clientes').select('id').in('consultoria_id', consultorias)
     conferirLimpeza('ler os clientes das consultorias de teste', resposta)
     for (const linha of resposta.data ?? []) clientes.add(linha.id)
   }
+  await limparQuadros([...clientes], consultorias)
   await limparArquivos([...clientes], consultorias)
   if (consultorias.length) {
     // Eventos da agenda seguram consultoria e consultor (restrict); os participantes saem com o evento.

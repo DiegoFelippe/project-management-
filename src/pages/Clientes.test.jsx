@@ -105,12 +105,12 @@ describe('Clientes (central)', () => {
   })
 
   it('Apagar pede confirmação; com horas ou arquivos registrados mostra o erro e mantém a janela', async () => {
-    vi.mocked(apagarCliente).mockResolvedValue({ erro: 'Este cliente tem horas ou arquivos registrados. Arquive em vez de apagar.' })
+    vi.mocked(apagarCliente).mockResolvedValue({ erro: 'Este cliente tem horas, arquivos ou cartões registrados. Arquive em vez de apagar.' })
     renderizarTela(<Clientes />, { perfil: central })
     await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Beta/ })).getByRole('button', { name: 'Apagar' }))
     await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar cliente' }))
     expect(apagarCliente).toHaveBeenCalledWith('k2')
-    expect(await screen.findByText('Este cliente tem horas ou arquivos registrados. Arquive em vez de apagar.')).toBeInTheDocument()
+    expect(await screen.findByText('Este cliente tem horas, arquivos ou cartões registrados. Arquive em vez de apagar.')).toBeInTheDocument()
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
   })
 

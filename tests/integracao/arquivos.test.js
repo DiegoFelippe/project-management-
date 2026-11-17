@@ -240,7 +240,7 @@ describe('objetos sem linha e cliente apagado', () => {
     expect(data).toBeNull()
     expect(error?.code).toBe('23503')
     expect(traduzirErroBanco(error, { sobre: 'cliente' }))
-      .toBe('Este cliente tem horas ou arquivos registrados. Arquive em vez de apagar.')
+      .toBe('Este cliente tem horas, arquivos ou cartões registrados. Arquive em vez de apagar.')
     expect((await admin.from('clientes').select('id').eq('id', clienteApagado)).data).toHaveLength(1)
     expect(await existe(comLinha.caminho)).toBe(true)
   })
