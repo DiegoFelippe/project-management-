@@ -126,6 +126,27 @@ Enviar arquivo de dentro da pasta já o coloca nela; mover arquivo entre pastas 
 - RLS pelo papel (tabela "Quem vê o quê") + participantes veem o evento em que foram convidados; escrita de eventos
   pelas Edge Functions (mexem no Google), leitura pelo navegador só do intervalo visível.
 
+## Decisões tomadas na construção (17/11, minhas — para o Diego conferir)
+
+- **Evento dura no máximo 31 dias** (mais longo, dividir em dois). É o que deixa a leitura do período rápida com
+  anos de histórico.
+- **Ao editar, o consultor dono da agenda não muda** (o evento está no Google dele; para passar a outro, apagar e
+  criar de novo). **O Meet, depois de criado, não se desliga.** As duas aparecem só para leitura na janela.
+- **Apagar quando o Google do organizador não tem volta** (acesso desativado, conexão quebrada, Google pede para
+  reconectar): o evento sai só do app, com o aviso de que pode continuar no Google Agenda dele. Outras recusas do
+  Google (instabilidade) não apagam: dá para tentar de novo.
+- **A central não é participante interna** de evento de consultoria (ela já vê todos os eventos).
+- **O convite de um consultor participante** vai para o e-mail da conta Google que ele conectou; sem conexão, para
+  o e-mail de login.
+- **A resposta ao convite (Confirmar/Recusar) fica no app**; a dos convidados de fora vem do Google quando ele
+  informar.
+- **Conectar o Google:** o Google devolve a pessoa para `/calendario` e é a tela, com o login dela, que conclui a
+  conexão (pedido de uso único, 10 minutos, preso a quem pediu). Recusar uma permissão não revoga nada no Google
+  (revogar derrubaria também a integração da consultoria se fosse a mesma conta).
+- **Cliente que muda de consultoria:** os eventos da consultoria antiga perdem o vínculo com o cliente e com a
+  pasta (a antiga fica com o título da reunião, sem o nome do cliente).
+- **Apagar pasta** só quando a pessoa poderia apagar cada arquivo dela (arquivo da central só a central apaga).
+
 ## Testes
 
 - pgTAP: quem vê e quem grava cada tabela (consultor, colega, gestor, outra consultoria, central); token nunca
