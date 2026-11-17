@@ -173,7 +173,8 @@ Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. 
      `GOOGLE_OAUTH_REDIRECT_URI` (o endereço acima). Na nuvem:
      `npx supabase secrets set GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... GOOGLE_OAUTH_REDIRECT_URI=...`.
      No local: em `[edge_runtime.secrets]` do `supabase/config.toml` (com `env(...)`), e reinicie com
-     `npx supabase stop && npx supabase start` (os dados ficam).
+     `npx supabase stop && npx supabase start` (os dados ficam; antes, faça a cópia do banco com `pg_dumpall`, como
+     no fim da seção "Google de cada pessoa").
   Sem isso, "Conectar" no Google avisa que falta configurar o app do Google.
 
 ## Google de cada pessoa (Calendário)
@@ -215,8 +216,11 @@ migração liga o `pg_cron` e o `pg_net` e agenda a rotina; falta só trocar o e
 Decisões e motivos: `docs/superpowers/specs/2026-11-16-calendario-design.md`.
 
 No Supabase local, uma Edge Function **nova** só passa a ser servida depois de recriar o runtime
-(`npx supabase stop && npx supabase start`; os dados ficam). `npm run functions:reiniciar` recarrega o código das
-funções que o runtime já conhece.
+(`npx supabase stop && npx supabase start`; os dados ficam). **Antes**, faça a cópia do banco inteiro (como no
+`CLAUDE.md`):
+`docker exec supabase_db_consultoria pg_dumpall -U postgres > supabase/.copias/<data>-antes-de-reiniciar.sql`
+(a pasta `supabase/.copias/` fica fora do git), e nunca rode o `stop` com `--no-backup`. `npm run functions:reiniciar`
+recarrega o código das funções que o runtime já conhece.
 
 ## Publicar (depois)
 

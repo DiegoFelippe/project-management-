@@ -131,15 +131,24 @@ Enviar arquivo de dentro da pasta já o coloca nela; mover arquivo entre pastas 
 - **Evento dura no máximo 31 dias** (mais longo, dividir em dois). É o que deixa a leitura do período rápida com
   anos de histórico.
 - **Ao editar, o consultor dono da agenda não muda** (o evento está no Google dele; para passar a outro, apagar e
-  criar de novo). **O Meet, depois de criado, não se desliga.** As duas aparecem só para leitura na janela.
+  criar de novo). **O Meet, depois de criado, não se desliga.** As duas aparecem só para leitura na janela. **Com a
+  pasta da reunião criada, o cliente também fica só para leitura** ("A pasta da reunião já está neste cliente.").
 - **Apagar quando o Google do organizador não tem volta** (acesso desativado, conexão quebrada, Google pede para
   reconectar): o evento sai só do app, com o aviso de que pode continuar no Google Agenda dele. Outras recusas do
   Google (instabilidade) não apagam: dá para tentar de novo.
+- **Salvar quando o Google do organizador não dá para usar** (acesso desativado, sem conexão, ou a conexão pede para
+  reconectar): o evento novo (ou que ainda está só no app) fica só no app, sem Meet, com o aviso do motivo; o evento
+  que já está no Google **não muda pelo app** ("Este evento está no Google de <nome>, que …. Para mudar, <nome>
+  reconecta ou a gestão apaga e cria de novo."), para o app e o Google não ficarem diferentes sem ninguém saber.
+  Evento novo na agenda de quem está desativado é recusado, e a credencial de quem saiu nunca é usada. Com a conexão
+  com erro, a barra mostra "Reconectar Google" e o ✕ para desconectar. Central e dono não conectam o Google (nunca
+  organizam eventos).
 - **A central não é participante interna** de evento de consultoria (ela já vê todos os eventos).
 - **O convite de um consultor participante** vai para o e-mail da conta Google que ele conectou; sem conexão, para
   o e-mail de login.
-- **A resposta ao convite (Confirmar/Recusar) fica no app**; a dos convidados de fora vem do Google quando ele
-  informar.
+- **A resposta ao convite (Confirmar/Recusar) fica no app**; a resposta de quem responde pelo Google (de fora ou da
+  casa) ainda não volta para o app (próximo passo: ler o evento no Google). Por isso a lista dos convidados de fora
+  mostra só "Convite enviado" (quando o evento está no Google), sem resposta.
 - **Conectar o Google:** o Google devolve a pessoa para `/calendario` e é a tela, com o login dela, que conclui a
   conexão (pedido de uso único, 10 minutos, preso a quem pediu). Recusar uma permissão não revoga nada no Google
   (revogar derrubaria também a integração da consultoria se fosse a mesma conta).
@@ -154,6 +163,15 @@ Enviar arquivo de dentro da pasta já o coloca nela; mover arquivo entre pastas 
   - recusas que tentar de novo não resolve (Google pede para reconectar, sem permissão, app do Google sem
     configurar, código do Meet inválido) viram "Erro" com o motivo e "Tentar de novo";
   - consultas espaçadas: a cada rodada (10 min) até 2 h depois do fim, depois de hora em hora até 48 h;
+  - a gravação e a transcrição vêm só das conferências do Meet que começaram entre 30 min antes do início e 6 h
+    depois do fim do evento (o mesmo Meet pode ter outras reuniões); numa reunião com queda (mais de uma conferência),
+    as falas das que têm transcrição são juntadas em ordem, e a gravação é a da parte mais longa;
+  - **remarcar** para depois de agora uma reunião que já passou ("aguardando", "sem gravação/transcrição" ou "erro")
+    volta a "agendada", e a rotina a pega depois do novo fim; a reunião que **perde o cliente** enquanto aguarda volta
+    a "agendada" (o indicador "Aguardando transcrição" conta só reunião com cliente);
+  - **conectar ou reconectar o Google** reabre as reuniões do organizador que pararam em "erro" por causa do Google
+    ("Conecte/Reconecte o Google") e terminaram há menos de 48 h;
+  - a reunião que gravou mas não transcreveu aparece como "Sem transcrição", com "Abrir gravação";
   - **ponto em aberto:** com ~1.000 consultores, nos horários de pico a pasta pode atrasar algumas rodadas (nada se
     perde); o próximo passo, quando houver esse volume, é trocar os lotes por uma fila contínua e separar a IA.
 - **Pasta da reunião sem autor:** hoje só a gestão e a central renomeiam ou apagam a pasta e os arquivos dela.
