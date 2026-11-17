@@ -1,11 +1,17 @@
 // Ajudantes dos testes de integração: falam com o Supabase local de verdade.
 // Tudo que um arquivo de teste cria é apagado no limparTudo() do afterAll.
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
 import { lerStatusLocal } from '../../scripts/supabase-local.mjs'
 import { caminhosNaPasta } from '../../src/lib/arquivos.js'
 
 export const status = lerStatusLocal()
+
+// Os contêineres do Supabase local se chamam supabase_<serviço>_<project_id do supabase/config.toml>; dentro da rede
+// do Docker, a Edge Function acha o Mailpit (SMTP na porta 1025) por esse nome.
+const PROJETO_LOCAL = readFileSync(new URL('../../supabase/config.toml', import.meta.url), 'utf8').match(/^project_id\s*=\s*"([^"]+)"/m)[1]
+export const MAILPIT_SMTP = `supabase_inbucket_${PROJETO_LOCAL}`
 const semSessao = { auth: { persistSession: false, autoRefreshToken: false } }
 const admin = createClient(status.API_URL, status.SECRET_KEY, semSessao)
 

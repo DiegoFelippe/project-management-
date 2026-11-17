@@ -1,7 +1,9 @@
 // Integrações da consultoria (desenho em docs/superpowers/specs/2026-11-12-integracoes-design.md):
-// IA, e-mail (SMTP) e Google. Aqui só se conecta; o resto do sistema usa a mesma conexão.
+// IA, e-mail (SMTP), Google, Slack e WhatsApp. Aqui só se conecta; o resto do sistema usa a mesma conexão.
 // O administrador conecta, edita, testa e desconecta; o dono escolhe a consultoria e só olha.
-import { Calendar, CircleAlert, CircleCheck, History, Mail, Pencil, Plug, PlugZap, RefreshCw, Sparkles, Unplug } from 'lucide-react'
+import {
+  Calendar, CircleAlert, CircleCheck, History, Mail, MessageCircle, MessageSquare, Pencil, Plug, PlugZap, RefreshCw, Sparkles, Unplug,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -16,7 +18,9 @@ import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import FormularioIa from '@/components/integracoes/FormularioIa'
+import FormularioSlack from '@/components/integracoes/FormularioSlack'
 import FormularioSmtp from '@/components/integracoes/FormularioSmtp'
+import FormularioWhatsapp from '@/components/integracoes/FormularioWhatsapp'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,6 +29,7 @@ import {
   listarIntegracoes,
   salvarIntegracao,
   testarIntegracao,
+  testarRascunho,
 } from '@/data/integracoes'
 import { indicadoresDeIntegracoes } from '@/data/indicadores'
 import { veTudo } from '@/lib/papeis'
@@ -34,14 +39,19 @@ const INTEGRACOES = [
   { tipo: 'ia', nome: 'Inteligência artificial', descricao: 'Claude (Anthropic) ou OpenAI, para os recursos de IA.', icone: Sparkles },
   { tipo: 'smtp', nome: 'E-mail (SMTP)', descricao: 'Servidor que manda as mensagens do sistema.', icone: Mail },
   { tipo: 'google', nome: 'Google', descricao: 'Agenda e Drive da conta da consultoria.', icone: Calendar },
+  { tipo: 'slack', nome: 'Slack', descricao: 'Mensagens num workspace do Slack, pelo app da consultoria.', icone: MessageSquare },
+  { tipo: 'whatsapp', nome: 'WhatsApp', descricao: 'Mensagens pelo WhatsApp Business (API oficial da Meta).', icone: MessageCircle },
 ]
 
-// Filtro da barra: o catálogo tem só três integrações fixas, então o recorte é feito aqui, sem ir ao banco.
+// Filtro da barra: o catálogo tem só cinco integrações fixas, então o recorte é feito aqui, sem ir ao banco.
 const ABAS = [
   { valor: 'todas', rotulo: 'Todas' },
   { valor: 'conectadas', rotulo: 'Conectadas' },
   { valor: 'nao_conectadas', rotulo: 'Não conectadas' },
 ]
+
+// Janela de cada integração (o Google não tem: conecta pelo OAuth). Testar na janela testa sem salvar.
+const JANELAS = { ia: FormularioIa, smtp: FormularioSmtp, slack: FormularioSlack, whatsapp: FormularioWhatsapp }
 
 const SITUACAO = {
   conectada: { rotulo: 'Conectada', variante: 'positive' },
@@ -52,6 +62,9 @@ function detalhes(tipo, config) {
   if (!config) return '—'
   if (tipo === 'ia') return `${config.provedor === 'openai' ? 'OpenAI' : 'Anthropic'} · ${config.modelo}`
   if (tipo === 'smtp') return `${config.host}:${config.porta} · ${config.remetente}`
+  // Slack e WhatsApp: o que o último teste que deu certo leu do serviço (workspace; número e nome verificado).
+  if (tipo === 'slack') return [config.workspace && `Workspace ${config.workspace}`, config.canal].filter(Boolean).join(' · ') || '—'
+  if (tipo === 'whatsapp') return [config.numero || `ID ${config.phone_number_id}`, config.nome_verificado].filter(Boolean).join(' · ')
   return config.email ?? '—'
 }
 
@@ -159,6 +172,7 @@ export default function Integracoes() {
     return situacaoFiltro === 'todas' || (situacaoFiltro === 'conectadas') === conectada
   })
   const abrir = (item) => (item.tipo === 'google' ? conectarGoogle() : setEditando(item.tipo))
+  const Janela = JANELAS[editando] ?? null
 
   return (
     <>
@@ -225,13 +239,10 @@ export default function Integracoes() {
           })}
         </Tabela>
       )}
-      {editando === 'ia' && (
-        <FormularioIa integracao={integracoes?.ia} aoFechar={() => setEditando(null)}
-          aoSalvar={(config, segredo) => salvar('ia', config, segredo)} />
-      )}
-      {editando === 'smtp' && (
-        <FormularioSmtp integracao={integracoes?.smtp} aoFechar={() => setEditando(null)}
-          aoSalvar={(config, segredo) => salvar('smtp', config, segredo)} />
+      {Janela && (
+        <Janela integracao={integracoes?.[editando]} aoFechar={() => setEditando(null)}
+          aoSalvar={(config, segredo) => salvar(editando, config, segredo)}
+          aoTestar={(config, segredo, extras) => testarRascunho(editando, config, segredo, extras)} />
       )}
       {desconectando && (
         <ConfirmarAcao aberto perigo aoFechar={() => setDesconectando(null)} titulo={`Desconectar ${desconectando.item.nome}?`}
