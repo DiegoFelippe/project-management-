@@ -3,7 +3,7 @@
 -- consultor" e a Capacidade. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(58);
+select plan(60);
 
 -- Ajudantes só do teste (somem no rollback do fim). O banco local tem dados de verdade do Diego: as contas
 -- abaixo olham só para o cenário (e-mails @ocupacao.test, consultorias "Ocupação Teste ...").
@@ -263,6 +263,15 @@ select ok((select f.reservado = 70
 select ok(exists (select 1 from public.consultores_por_ocupacao(testes.id('A'), null, 8, 0, testes.futuro()) f
     where f.id = testes.id('pessoa_zero')),
   'o gestor vê na sugestão quem está fora dos times dele');
+reset role;
+
+-- A cor do avatar vem junto (o seletor de consultor desenha o Avatar com ela); sem escolha, nula.
+update public.perfis set cor = '#7c3aed' where id = testes.id('pessoa_a2');
+select testes.como('central');
+select is((select f.cor from public.consultores_por_ocupacao(testes.id('A'), 'sugestao', 8, 0, testes.futuro()) f
+    where f.id = testes.id('pessoa_a2')), '#7c3aed', 'consultores_por_ocupacao devolve a cor escolhida');
+select is((select f.cor from public.consultores_por_ocupacao(testes.id('A'), 'sugestao', 8, 0, testes.futuro()) f
+    where f.id = testes.id('gestor_a2')), null, 'sem cor escolhida, a cor volta nula (vale a automática)');
 reset role;
 
 -- ── Capacidade com ausências e o mês de novembro/2026 ────────────────────────
