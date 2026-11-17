@@ -17,6 +17,7 @@ export type DadosAcesso = {
   redirectTo: string
   consultoria_id?: string
   ficha: Ficha
+  exige_2fa: boolean
 }
 
 export type Ficha = {
@@ -74,6 +75,11 @@ export function validarRedirect(valor: unknown): string {
   } catch {
     invalido('redirectTo')
   }
+  return valor
+}
+
+export function validarSimNao(valor: unknown, campo: string): boolean {
+  if (typeof valor !== 'boolean') invalido(campo)
   return valor
 }
 
@@ -142,5 +148,6 @@ export function validarAcesso(corpo: Record<string, unknown>): DadosAcesso {
     redirectTo: validarRedirect(corpo.redirectTo),
     consultoria_id: corpo.consultoria_id == null ? undefined : validarUuid(corpo.consultoria_id, 'consultoria_id'),
     ficha: validarFicha(corpo),
+    exige_2fa: corpo.exige_2fa === undefined ? false : validarSimNao(corpo.exige_2fa, 'exige_2fa'),
   }
 }

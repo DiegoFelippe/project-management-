@@ -1,6 +1,8 @@
 // POST /functions/v1/criar-acesso
 // Dono cria administradores de uma consultoria e acessos de central; central cria administradores; admin cria gestores e pessoas; gestor cria pessoas
 // nos times dele. O acesso é sempre da consultoria de quem cria (ou da escolhida pelo dono).
+// exige_2fa (opcional): a pessoa nova já entra com a verificação em duas etapas exigida. Só quem vai poder editar o
+// acesso dela depois (dono, central, admin); o gestor não.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
 import { clienteAdmin, quemChama, type Perfil } from '../_shared/clientes.ts'
 import { Falha, lerJson, responder, servir } from '../_shared/http.ts'
@@ -49,7 +51,7 @@ async function consultoriaDoPedido(admin: SupabaseClient, quem: Perfil, dados: D
       return quem.consultoria_id!
     }
     case 'gestor': {
-      if (dados.papel !== 'pessoa') throw new Falha(403, 'sem_permissao')
+      if (dados.papel !== 'pessoa' || dados.exige_2fa) throw new Falha(403, 'sem_permissao')
       await exigirTimes(admin, dados.times, { consultoriaId: quem.consultoria_id!, gestorId: quem.id })
       return quem.consultoria_id!
     }
@@ -74,6 +76,7 @@ servir(async (req) => {
     criadoPor: quem.id,
     times: dados.times,
     ficha: dados.ficha,
+    exige2fa: dados.exige_2fa,
   })
   return responder(201, { pessoa_id: pessoaId })
 })

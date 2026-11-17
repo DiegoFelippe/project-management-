@@ -78,6 +78,7 @@ export type NovoAcesso = {
   criadoPor: string
   times: string[]
   ficha?: Ficha
+  exige2fa?: boolean
 }
 
 // Devolve o id da pessoa criada. E-mail já usado → Falha 409 (ja_na_consultoria ou email_indisponivel).
@@ -116,6 +117,7 @@ export async function criarAcessoCompleto(admin: SupabaseClient, novo: NovoAcess
     precisa_trocar_senha: novo.forma === 'senha',
     convite_pendente: novo.forma === 'convite',
     criado_por: novo.criadoPor,
+    exige_2fa: novo.exige2fa ?? false,
     ...novo.ficha,
   })
   if (erroPerfil) {

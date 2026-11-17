@@ -14,6 +14,7 @@ export type Perfil = {
   convite_pendente: boolean
   criado_por: string | null
   ativo: boolean
+  exige_2fa: boolean
 }
 
 function chaveSecreta(): string {
@@ -37,8 +38,21 @@ export function clienteAdmin(): SupabaseClient {
   })
 }
 
+// Nível da sessão no token ('aal1' ou 'aal2'). Só é lido depois que o Auth validou o token (getUser).
+function nivelDoToken(token: string): string {
+  try {
+    const parte = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const carga = JSON.parse(atob(parte.padEnd(parte.length + ((4 - (parte.length % 4)) % 4), '=')))
+    return typeof carga.aal === 'string' ? carga.aal : 'aal1'
+  } catch {
+    return 'aal1'
+  }
+}
+
 // Valida o token de quem chama e carrega o perfil. Senha provisória não trocada não faz nada, nem perfil
 // desativado: o token de quem já estava logado continua valendo até expirar, mas a pessoa saiu.
+// Quem tem o app autenticador ativo ou a verificação exigida só age com a sessão confirmada pelo código (aal2),
+// a mesma regra do banco (private.liberado): sem ele, 403 verificacao_pendente (a tela pede o código).
 export async function quemChama(req: Request, admin: SupabaseClient): Promise<Perfil> {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim()
   if (!token) throw new Falha(401, 'nao_autenticado')
@@ -46,5 +60,7 @@ export async function quemChama(req: Request, admin: SupabaseClient): Promise<Pe
   if (error || !data.user) throw new Falha(401, 'nao_autenticado')
   const { data: perfil } = await admin.from('perfis').select('*').eq('id', data.user.id).maybeSingle()
   if (!perfil || perfil.precisa_trocar_senha || perfil.ativo === false) throw new Falha(403, 'sem_permissao')
+  const temApp = (data.user.factors ?? []).some((f) => f.status === 'verified')
+  if ((temApp || perfil.exige_2fa) && nivelDoToken(token) !== 'aal2') throw new Falha(403, 'verificacao_pendente')
   return perfil as Perfil
 }
