@@ -1,15 +1,16 @@
-// Cores do Calendário. As 8 cores do evento são as do Hub em tons que seguram texto branco (o azul é o --primary da
-// consultoria); o banco guarda o número (agenda_eventos.cor, 0 a 7).
+// Cores do Calendário. As 8 cores do evento são as do Hub em tons que seguram texto branco com contraste de pelo menos
+// 4,5:1 (âmbar, verde, turquesa e laranja no tom 700 do Tailwind; o azul é o --primary da consultoria; cores.test.js
+// confere). O banco guarda o número (agenda_eventos.cor, 0 a 7): a ordem não muda.
 import { corDaPessoa } from '@/lib/cores'
 
 export const CORES_DO_EVENTO = [
   { valor: '#2563eb', nome: 'Azul' },
-  { valor: '#d97706', nome: 'Âmbar' },
-  { valor: '#059669', nome: 'Verde' },
+  { valor: '#b45309', nome: 'Âmbar' },
+  { valor: '#047857', nome: 'Verde' },
   { valor: '#dc2626', nome: 'Vermelho' },
   { valor: '#7c3aed', nome: 'Violeta' },
-  { valor: '#0891b2', nome: 'Turquesa' },
-  { valor: '#ea580c', nome: 'Laranja' },
+  { valor: '#0e7490', nome: 'Turquesa' },
+  { valor: '#c2410c', nome: 'Laranja' },
   { valor: '#db2777', nome: 'Rosa' },
 ]
 

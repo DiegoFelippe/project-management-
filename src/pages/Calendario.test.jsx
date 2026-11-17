@@ -103,7 +103,7 @@ describe('Calendário: consultor (visão privada)', () => {
     tela(consultor)
     const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
     const chip = await within(grade).findByRole('button', { name: /Kickoff Alfa/ })
-    expect(chip).toHaveStyle({ backgroundColor: '#059669' })
+    expect(chip).toHaveStyle({ backgroundColor: '#047857' })
     expect(chip).toHaveAccessibleName(/com Meet/)
     expect(screen.queryByLabelText('Consultor')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Consultoria')).not.toBeInTheDocument()
@@ -256,7 +256,7 @@ describe('Calendário: gestão e central', () => {
     expect(ausenciasDoPeriodo).toHaveBeenLastCalledWith(expect.objectContaining({ consultorId: 'p2' }))
     expect(consultoresPorOcupacao).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1' }))
     // Com um consultor só, é a agenda dele: a cor volta a ser a do evento.
-    expect(await within(grade).findByRole('button', { name: /Kickoff Alfa/ })).toHaveStyle({ backgroundColor: '#059669' })
+    expect(await within(grade).findByRole('button', { name: /Kickoff Alfa/ })).toHaveStyle({ backgroundColor: '#047857' })
   })
 
   it('o filtro de cliente vai ao banco', async () => {
