@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EVENTO_CONFERIR_ACESSO } from '@/lib/supabase'
 import AuthProvider from './AuthProvider'
 import { useAuth } from './useAuth'
@@ -82,15 +82,43 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(screen.getByText('pronto Ana Lima configurar')).toBeInTheDocument())
   })
 
-  it('vários avisos seguidos fazem uma conferência só', async () => {
-    render(<AuthProvider><Sonda /></AuthProvider>)
-    act(() => controle.ouvinte('INITIAL_SESSION', sessaoCom('u1', 'aal1')))
-    await waitFor(() => expect(screen.getByText('pronto Ana Lima ok')).toBeInTheDocument())
-    const antes = controle.consultas
-    act(() => {
-      for (let i = 0; i < 5; i++) window.dispatchEvent(new Event(EVENTO_CONFERIR_ACESSO))
+  describe('janela de 2 s entre as conferências', () => {
+    beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }))
+    afterEach(() => vi.useRealTimers())
+    const avancar = (ms) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
+    const avisar = () => act(() => window.dispatchEvent(new Event(EVENTO_CONFERIR_ACESSO)))
+
+    async function entrar() {
+      render(<AuthProvider><Sonda /></AuthProvider>)
+      act(() => controle.ouvinte('INITIAL_SESSION', sessaoCom('u1', 'aal1')))
+      await waitFor(() => expect(screen.getByText('pronto Ana Lima ok')).toBeInTheDocument())
+    }
+
+    it('vários avisos seguidos: uma conferência na hora e só mais uma no fim da janela', async () => {
+      await entrar()
+      const antes = controle.consultas
+      act(() => {
+        for (let i = 0; i < 5; i++) window.dispatchEvent(new Event(EVENTO_CONFERIR_ACESSO))
+      })
+      await avancar(10)
+      expect(controle.consultas - antes).toBe(1)
+      await avancar(2000)
+      expect(controle.consultas - antes).toBe(2)
+      await avancar(5000)
+      expect(controle.consultas - antes).toBe(2)
     })
-    await new Promise((pronto) => setTimeout(pronto, 10))
-    expect(controle.consultas - antes).toBeLessThanOrEqual(1)
+
+    it('aviso que chega dentro da janela não se perde: a conferência fica para o fim dela', async () => {
+      await entrar()
+      avisar()
+      await avancar(10)
+      // Quem administra passou a exigir a verificação logo depois da primeira conferência.
+      controle.dados = { id: 'u1', nome: 'Ana Lima', papel: 'gestor', precisa_trocar_senha: false, exige_2fa: true, verificacao_desde: null }
+      avisar()
+      await avancar(10)
+      expect(screen.getByText('pronto Ana Lima ok')).toBeInTheDocument()
+      await avancar(2000)
+      expect(screen.getByText('pronto Ana Lima configurar')).toBeInTheDocument()
+    })
   })
 })

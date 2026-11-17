@@ -6,7 +6,7 @@ export default function BotaoSair() {
   const { sair } = useAuth()
   const navigate = useNavigate()
   return (
-    <button type="button" className="botao-animado mt-6 text-sm font-semibold text-muted-foreground transition-[color,translate] hover:-translate-y-px hover:text-foreground"
+    <button type="button" className="botao-animado mt-6 text-sm font-semibold text-muted-foreground transition-[color,translate,scale] hover:-translate-y-px hover:text-foreground active:scale-[0.97]"
       onClick={async () => { await sair(); navigate('/entrar', { replace: true }) }}>
       Sair
     </button>

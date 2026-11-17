@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import { useEffect, useState } from 'react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,6 +25,16 @@ function montar(valor = {}) {
   return auth
 }
 
+// A sessão vira aal2 assim que o primeiro código é aceito (o AuthProvider muda `verificacao` para 'ok' na hora).
+const controle = {}
+function ComEstado({ auth, children }) {
+  const [verificacao, setVerificacao] = useState('configurar')
+  useEffect(() => {
+    controle.mudar = setVerificacao
+  }, [])
+  return <AuthContext.Provider value={{ ...auth, verificacao }}>{children}</AuthContext.Provider>
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(iniciarCadastro).mockResolvedValue({ erro: null, fatorId: 'f1', qr: 'data:image/svg+xml;utf-8,<svg/>', segredo: 'ABCDEFGH', uri: 'otpauth://x' })
@@ -41,6 +52,30 @@ describe('Entrar: configurar a verificação exigida', () => {
     expect(concluirCadastro).toHaveBeenCalledWith('f1', '123456')
     await waitFor(() => expect(screen.getByText('tela início')).toBeInTheDocument())
     expect(auth.recarregarPerfil).toHaveBeenCalled()
+  })
+
+  it('primeiro código certo: o Início só aparece depois do perfil recarregado', async () => {
+    let terminar
+    const recarregarPerfil = vi.fn(() => new Promise((pronto) => { terminar = pronto }))
+    vi.mocked(concluirCadastro).mockImplementation(async () => {
+      controle.mudar('ok')
+      return { erro: null }
+    })
+    render(
+      <ComEstado auth={{ recarregarPerfil, sair: vi.fn() }}>
+        <MemoryRouter initialEntries={['/configurar-verificacao']}>
+          <Routes>
+            <Route path="/configurar-verificacao" element={<ConfigurarVerificacao />} />
+            <Route path="/" element={<p>tela início</p>} />
+          </Routes>
+        </MemoryRouter>
+      </ComEstado>,
+    )
+    await userEvent.type(await screen.findByLabelText('Código do app'), '123456{Enter}')
+    await waitFor(() => expect(recarregarPerfil).toHaveBeenCalled())
+    expect(screen.queryByText('tela início')).not.toBeInTheDocument()
+    await act(async () => terminar())
+    expect(await screen.findByText('tela início')).toBeInTheDocument()
   })
 
   it('não tem como pular: só Sair', async () => {

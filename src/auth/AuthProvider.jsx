@@ -22,6 +22,8 @@ export default function AuthProvider({ children }) {
   const [carregando, setCarregando] = useState(true)
   const usuarioAtual = useRef(undefined)
   const conferindo = useRef(false)
+  const pendente = useRef(false)
+  const agendada = useRef(null)
   const ultimaConferencia = useRef(0)
 
   const carregarPerfil = useCallback(async (s) => {
@@ -42,10 +44,23 @@ export default function AuthProvider({ children }) {
     setPerfil(data)
   }, [])
 
-  // Uma conferência por vez e no máximo uma a cada 2 s: a própria consulta recusada não dispara outra.
-  const conferirVerificacao = useCallback(async () => {
+  // Uma conferência por vez e no máximo uma a cada 2 s: a própria consulta recusada não dispara outra. O que chega
+  // dentro da janela (ou com uma conferência em andamento) não se perde: fica uma só marcada para o fim da janela.
+  const conferirVerificacao = useCallback(async function conferir() {
     const id = usuarioAtual.current
-    if (!id || conferindo.current || Date.now() - ultimaConferencia.current < INTERVALO_ENTRE_CONFERENCIAS) return
+    if (!id) return
+    if (conferindo.current) {
+      pendente.current = true
+      return
+    }
+    const espera = ultimaConferencia.current + INTERVALO_ENTRE_CONFERENCIAS - Date.now()
+    if (espera > 0) {
+      agendada.current ??= setTimeout(() => {
+        agendada.current = null
+        conferir()
+      }, espera)
+      return
+    }
     conferindo.current = true
     ultimaConferencia.current = Date.now()
     try {
@@ -58,6 +73,10 @@ export default function AuthProvider({ children }) {
       })
     } finally {
       conferindo.current = false
+      if (pendente.current) {
+        pendente.current = false
+        conferir()
+      }
     }
   }, [])
 
@@ -71,6 +90,8 @@ export default function AuthProvider({ children }) {
       window.removeEventListener(EVENTO_CONFERIR_ACESSO, conferir)
       window.removeEventListener('focus', conferir)
       document.removeEventListener('visibilitychange', aoVoltar)
+      clearTimeout(agendada.current)
+      agendada.current = null
     }
   }, [conferirVerificacao])
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import TelaDeAcesso, { Titulo } from '@/components/auth/TelaDeAcesso'
@@ -9,12 +10,15 @@ import FormularioCodigo from '@/components/verificacao/FormularioCodigo'
 export default function VerificarCodigo() {
   const { verificacao, recarregarPerfil } = useAuth()
   const navigate = useNavigate()
-  if (verificacao !== 'codigo') return <Navigate to="/" replace />
+  // Com o código certo a sessão vira aal2 na hora (verificacao 'ok'), mas o Início só abre depois do perfil
+  // recarregado: antes disso ele apareceria um instante sem o nome da consultoria.
+  const [entrando, setEntrando] = useState(false)
+  if (verificacao !== 'codigo' && !entrando) return <Navigate to="/" replace />
 
   return (
     <TelaDeAcesso>
       <Titulo titulo="Verificação em duas etapas">Digite o código do seu app autenticador.</Titulo>
-      <FormularioCodigo aoConfirmar={async () => {
+      <FormularioCodigo aoEnviando={setEntrando} aoConfirmar={async () => {
         // Com o código, o banco libera o resto do perfil (a consultoria, a logo).
         await recarregarPerfil()
         navigate('/', { replace: true })

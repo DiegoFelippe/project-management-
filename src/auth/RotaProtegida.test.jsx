@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import userEvent from '@testing-library/user-event'
+import { Link, MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import RotaProtegida from './RotaProtegida'
 import { AuthContext } from './useAuth'
@@ -16,7 +17,8 @@ function montar({ valor, rota }) {
             <Route path="/trocar-senha" element={<p>tela trocar</p>} />
             <Route path="/verificar" element={<p>tela código</p>} />
             <Route path="/configurar-verificacao" element={<p>tela configurar</p>} />
-            <Route path="/" element={<p>tela início</p>} />
+            <Route path="/" element={<><p>tela início</p><Link to="/clientes">ir para clientes</Link></>} />
+            <Route path="/clientes" element={<p>tela clientes</p>} />
             <Route element={<RotaProtegida papeis={['dono', 'admin', 'gestor']} />}>
               <Route path="/times" element={<p>tela times</p>} />
             </Route>
@@ -81,10 +83,13 @@ describe('RotaProtegida', () => {
       expect(screen.getByText('tela times')).toBeInTheDocument()
     })
 
-    it('a cada tela, confere de novo (sessão antiga de quem passou a precisar do código)', () => {
+    it('a cada tela, confere de novo (sessão antiga de quem passou a precisar do código)', async () => {
       const conferirVerificacao = vi.fn()
-      montar({ valor: { sessao, perfil, verificacao: 'ok', conferirVerificacao }, rota: '/times' })
+      montar({ valor: { sessao, perfil, verificacao: 'ok', conferirVerificacao }, rota: '/' })
       expect(conferirVerificacao).toHaveBeenCalledTimes(1)
+      await userEvent.click(screen.getByRole('link', { name: 'ir para clientes' }))
+      expect(screen.getByText('tela clientes')).toBeInTheDocument()
+      expect(conferirVerificacao).toHaveBeenCalledTimes(2)
     })
   })
 })

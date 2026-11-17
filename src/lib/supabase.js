@@ -6,18 +6,27 @@ import { createClient } from '@supabase/supabase-js'
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
-// Recusa (401/403) do banco, do Storage, do Auth ou de uma Edge Function: pode ser a sessão antiga (aal1) de quem
-// passou a precisar do código do app autenticador. O AuthProvider ouve este aviso e confere de novo (uma conferência
-// por vez), e a tela do código aparece no lugar de um erro solto.
+// Recusa do banco, do Storage, do Auth ou de uma Edge Function: pode ser a sessão antiga (aal1) de quem passou a
+// precisar do código do app autenticador. O AuthProvider ouve este aviso e confere de novo (uma conferência por vez),
+// e a tela do código aparece no lugar de um erro solto. Recusa é 401/403 ou um 400 que, no corpo, é recusa: função do
+// banco que levantou erro (P0001, como `sem_permissao`) ou o Storage dizendo 403.
 export const EVENTO_CONFERIR_ACESSO = 'consultoria:conferir-acesso'
 
+const avisar = () => window.dispatchEvent(new Event(EVENTO_CONFERIR_ACESSO))
+
 export function avisarRecusa(status) {
-  if (status === 401 || status === 403) window.dispatchEvent(new Event(EVENTO_CONFERIR_ACESSO))
+  if (status === 401 || status === 403) avisar()
 }
+
+const recusaNoCorpo = (corpo) => corpo?.code === 'P0001' || String(corpo?.statusCode ?? '') === '403'
 
 async function buscarAvisando(...argumentos) {
   const resposta = await fetch(...argumentos)
   avisarRecusa(resposta.status)
+  // Lê uma cópia do corpo sem segurar a resposta: quem chamou recebe a original inteira.
+  if (resposta.status === 400) {
+    resposta.clone().json().then((corpo) => recusaNoCorpo(corpo) && avisar(), () => {})
+  }
   return resposta
 }
 

@@ -13,7 +13,8 @@ const agrupar = (chave) => chave.match(/.{1,4}/g)?.join(' ') ?? chave
 // Cadastro do app autenticador (Meu perfil e a tela de configurar no entrar): QR code (a imagem SVG que o Auth
 // devolve), a chave para digitar ou copiar e o primeiro código de 6 dígitos. O segredo só passa pela tela: quem
 // guarda é o Auth do Supabase. `aoConcluir()` depois do código certo (a sessão já é aal2); `aoCancelar()` opcional.
-export default function CadastroDoAutenticador({ aoConcluir, aoCancelar, rotuloConfirmar = 'Confirmar e ativar', idCodigo = 'codigo-do-app', focar = false }) {
+// `aoEnviando(true | false)` (opcional) avisa quando o código vai para o Auth e quando volta recusado.
+export default function CadastroDoAutenticador({ aoConcluir, aoCancelar, aoEnviando, rotuloConfirmar = 'Confirmar e ativar', idCodigo = 'codigo-do-app', focar = false }) {
   const [cadastro, setCadastro] = useState(null)
   const [erroInicio, setErroInicio] = useState(null)
   const [codigo, setCodigo] = useState('')
@@ -44,9 +45,13 @@ export default function CadastroDoAutenticador({ aoConcluir, aoCancelar, rotuloC
     if (!codigoCompleto(codigo)) return setErro('Digite os 6 dígitos que aparecem no app.')
     setErro(null)
     setEnviando(true)
+    aoEnviando?.(true)
     const { erro: falha } = await concluirCadastro(cadastro.fatorId, codigo)
     setEnviando(false)
-    if (falha) return setErro(falha)
+    if (falha) {
+      aoEnviando?.(false)
+      return setErro(falha)
+    }
     aoConcluir()
   }
 

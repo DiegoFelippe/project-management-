@@ -7,8 +7,9 @@ import { codigoCompleto } from '@/lib/verificacao'
 import CampoCodigo from './CampoCodigo'
 
 // Código do app autenticador ao entrar (e antes de criar senha nova, para quem tem o app). Certo, a sessão passa a
-// aal2 e `aoConfirmar()` segue.
-export default function FormularioCodigo({ aoConfirmar }) {
+// aal2 e `aoConfirmar()` segue. `aoEnviando(true | false)` (opcional) avisa quando o código vai para o Auth e quando
+// volta recusado: a tela segura a troca de página enquanto entra.
+export default function FormularioCodigo({ aoConfirmar, aoEnviando }) {
   const [codigo, setCodigo] = useState('')
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
@@ -19,9 +20,11 @@ export default function FormularioCodigo({ aoConfirmar }) {
     if (!codigoCompleto(codigo)) return setErro('Digite os 6 dígitos que aparecem no app.')
     setErro(null)
     setEnviando(true)
+    aoEnviando?.(true)
     const { erro: falha } = await confirmarCodigo(codigo)
     if (falha) {
       setEnviando(false)
+      aoEnviando?.(false)
       return setErro(falha)
     }
     await aoConfirmar()

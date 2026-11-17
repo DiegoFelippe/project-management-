@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import { useEffect, useState } from 'react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,6 +25,16 @@ function montar(valor = {}) {
   return auth
 }
 
+// A sessão vira aal2 assim que o código é aceito (o AuthProvider muda `verificacao` para 'ok' na hora).
+const controle = {}
+function ComEstado({ auth, children }) {
+  const [verificacao, setVerificacao] = useState('codigo')
+  useEffect(() => {
+    controle.mudar = setVerificacao
+  }, [])
+  return <AuthContext.Provider value={{ ...auth, verificacao }}>{children}</AuthContext.Provider>
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(confirmarCodigo).mockResolvedValue({ erro: null })
@@ -45,6 +56,30 @@ describe('Entrar: tela do código do app autenticador', () => {
     expect(auth.recarregarPerfil).toHaveBeenCalled()
   })
 
+  it('código certo: o Início só aparece depois do perfil recarregado (nada de um instante sem o nome da consultoria)', async () => {
+    let terminar
+    const recarregarPerfil = vi.fn(() => new Promise((pronto) => { terminar = pronto }))
+    vi.mocked(confirmarCodigo).mockImplementation(async () => {
+      controle.mudar('ok')
+      return { erro: null }
+    })
+    render(
+      <ComEstado auth={{ recarregarPerfil, sair: vi.fn() }}>
+        <MemoryRouter initialEntries={['/verificar']}>
+          <Routes>
+            <Route path="/verificar" element={<VerificarCodigo />} />
+            <Route path="/" element={<p>tela início</p>} />
+          </Routes>
+        </MemoryRouter>
+      </ComEstado>,
+    )
+    await userEvent.type(screen.getByLabelText('Código de 6 dígitos'), '123456{Enter}')
+    await waitFor(() => expect(recarregarPerfil).toHaveBeenCalled())
+    expect(screen.queryByText('tela início')).not.toBeInTheDocument()
+    await act(async () => terminar())
+    expect(await screen.findByText('tela início')).toBeInTheDocument()
+  })
+
   it('código errado: diz o motivo e continua na tela', async () => {
     vi.mocked(confirmarCodigo).mockResolvedValue({ erro: 'Código incorreto ou vencido. Confira o app e tente de novo.' })
     montar()
@@ -63,6 +98,8 @@ describe('Entrar: tela do código do app autenticador', () => {
   it('perdeu o celular: diz a quem pedir; Sair volta para o entrar', async () => {
     const auth = montar()
     expect(screen.getByText(/Perdeu o celular\?/)).toBeInTheDocument()
+    // Botão escrito à mão: sobe no hover e afunda ao apertar, como o Button (regra do CLAUDE.md).
+    expect(screen.getByRole('button', { name: 'Sair' }).className).toMatch(/botao-animado.*hover:-translate-y-px.*active:scale-\[0\.97\]/)
     await userEvent.click(screen.getByRole('button', { name: 'Sair' }))
     expect(auth.sair).toHaveBeenCalled()
     await waitFor(() => expect(screen.getByText('tela entrar')).toBeInTheDocument())

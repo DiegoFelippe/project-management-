@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import TelaDeAcesso, { Titulo } from '@/components/auth/TelaDeAcesso'
@@ -8,7 +9,9 @@ import CadastroDoAutenticador from '@/components/verificacao/CadastroDoAutentica
 export default function ConfigurarVerificacao() {
   const { verificacao, recarregarPerfil } = useAuth()
   const navigate = useNavigate()
-  if (verificacao !== 'configurar') return <Navigate to="/" replace />
+  // Com o primeiro código a sessão vira aal2 na hora; o Início só abre depois do perfil recarregado.
+  const [entrando, setEntrando] = useState(false)
+  if (verificacao !== 'configurar' && !entrando) return <Navigate to="/" replace />
 
   return (
     <TelaDeAcesso>
@@ -16,7 +19,7 @@ export default function ConfigurarVerificacao() {
         A verificação em duas etapas é exigida para o seu acesso: além da senha, você vai usar um código do app
         autenticador do celular.
       </Titulo>
-      <CadastroDoAutenticador rotuloConfirmar="Confirmar e entrar" idCodigo="codigo-configurar" focar
+      <CadastroDoAutenticador rotuloConfirmar="Confirmar e entrar" idCodigo="codigo-configurar" focar aoEnviando={setEntrando}
         aoConcluir={async () => {
           await recarregarPerfil()
           navigate('/', { replace: true })
