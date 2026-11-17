@@ -146,6 +146,18 @@ Enviar arquivo de dentro da pasta já o coloca nela; mover arquivo entre pastas 
 - **Cliente que muda de consultoria:** os eventos da consultoria antiga perdem o vínculo com o cliente e com a
   pasta (a antiga fica com o título da reunião, sem o nome do cliente).
 - **Apagar pasta** só quando a pessoa poderia apagar cada arquivo dela (arquivo da central só a central apaga).
+- **Rotina depois da reunião:**
+  - reunião **sem cliente** fica fora da rotina (sem pasta, sem consulta ao Google, sem "erro"); se um cliente for
+    escolhido depois, a rotina pega a reunião;
+  - instabilidade do Google (sem resposta, limite de pedidos, erro do lado dele) e falha ao guardar a pasta **não
+    viram erro**: a rotina tenta de novo nas rodadas seguintes, até as 48 h;
+  - recusas que tentar de novo não resolve (Google pede para reconectar, sem permissão, app do Google sem
+    configurar, código do Meet inválido) viram "Erro" com o motivo e "Tentar de novo";
+  - consultas espaçadas: a cada rodada (10 min) até 2 h depois do fim, depois de hora em hora até 48 h;
+  - **ponto em aberto:** com ~1.000 consultores, nos horários de pico a pasta pode atrasar algumas rodadas (nada se
+    perde); o próximo passo, quando houver esse volume, é trocar os lotes por uma fila contínua e separar a IA.
+- **Pasta da reunião sem autor:** hoje só a gestão e a central renomeiam ou apagam a pasta e os arquivos dela.
+  **Para o Diego decidir:** o organizador aparecer como autor (e poder renomear/apagar).
 
 ## Testes
 
