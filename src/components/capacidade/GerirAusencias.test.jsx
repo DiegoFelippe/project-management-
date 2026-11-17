@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { escolherData } from '@/test/campos'
 import { apagarAusencia, criarAusencia, editarAusencia, listarAusencias } from '@/data/capacidade'
-import { GerirAusencias } from './JanelaAusencias'
+import { GerirAusencias } from './GerirAusencias'
 
 vi.mock('@/data/capacidade', () => ({
   listarAusencias: vi.fn(), criarAusencia: vi.fn(), editarAusencia: vi.fn(), apagarAusencia: vi.fn(),
