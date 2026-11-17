@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { criarIaFalsa, criarSlackFalso, criarWhatsappFalso } from './conexoes-falsas.ts'
 import {
-  avisoParaDigitarDeNovo,
+  decidirSegredoGuardado,
   MENSAGEM_DE_TESTE,
   perguntarAIa,
   testarSlack,
@@ -240,33 +240,42 @@ describe('IA: pergunta curta ao modelo', () => {
   })
 })
 
-describe('segredo guardado: só vale para o mesmo destino', () => {
+describe('segredo em branco: usar o guardado, descartar ou pedir de novo', () => {
   const SMTP = { host: 'smtp.acme.test', porta: 587, seguranca: 'starttls', usuario: 'contato@acme.test', remetente: 'contato@acme.test' }
+  const SENHA = { aviso: 'Digite a senha de novo: o servidor, a porta, a segurança ou o usuário mudou.' }
 
-  it('SMTP: outro servidor, porta, segurança ou usuário pede a senha de novo', () => {
-    const aviso = 'Digite a senha de novo: o servidor, a porta, a segurança ou o usuário mudou.'
-    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, host: 'smtp.outro.test' }, SMTP)).toBe(aviso)
-    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, porta: 465 }, SMTP)).toBe(aviso)
-    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, seguranca: 'nenhuma' }, SMTP)).toBe(aviso)
-    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, usuario: 'outro@acme.test' }, SMTP)).toBe(aviso)
+  it('SMTP com login: outro servidor, porta, segurança ou usuário pede a senha de novo', () => {
+    expect(decidirSegredoGuardado('smtp', { ...SMTP, host: 'smtp.outro.test' }, SMTP)).toEqual(SENHA)
+    expect(decidirSegredoGuardado('smtp', { ...SMTP, porta: 465 }, SMTP)).toEqual(SENHA)
+    expect(decidirSegredoGuardado('smtp', { ...SMTP, seguranca: 'nenhuma' }, SMTP)).toEqual(SENHA)
+    expect(decidirSegredoGuardado('smtp', { ...SMTP, usuario: 'outro@acme.test' }, SMTP)).toEqual(SENHA)
   })
 
-  it('SMTP: o mesmo destino (mudando só o remetente) usa a guardada; sem usuário a senha nem é enviada', () => {
-    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, remetente: 'avisos@acme.test', nome_remetente: 'Acme' }, SMTP)).toBeNull()
-    expect(avisoParaDigitarDeNovo('smtp', { ...SMTP, host: 'smtp.outro.test', usuario: undefined }, SMTP)).toBeNull()
+  it('SMTP: usuário vazio também é mudança de destino; o guardado era sem usuário e agora tem, pede a senha', () => {
+    const semLogin = { ...SMTP, usuario: undefined }
+    expect(decidirSegredoGuardado('smtp', SMTP, semLogin)).toEqual(SENHA)
   })
 
-  it('IA: outro provedor pede a chave de novo; outro modelo no mesmo provedor, não', () => {
+  it('SMTP sem login num destino novo: descarta a senha guardada (não sobra senha "de antes" para outro servidor)', () => {
+    expect(decidirSegredoGuardado('smtp', { ...SMTP, usuario: undefined }, SMTP)).toEqual({ descartar: true })
+    expect(decidirSegredoGuardado('smtp', { ...SMTP, host: 'smtp.outro.test', usuario: undefined }, SMTP)).toEqual({ descartar: true })
+  })
+
+  it('SMTP no mesmo destino (mudando só o remetente) usa a guardada', () => {
+    expect(decidirSegredoGuardado('smtp', { ...SMTP, remetente: 'avisos@acme.test', nome_remetente: 'Acme' }, SMTP)).toEqual({ usar: true })
+  })
+
+  it('IA: outro provedor pede a chave de novo; outro modelo no mesmo provedor usa a guardada', () => {
     const ia = { provedor: 'anthropic', modelo: 'claude-opus-5-5' }
-    expect(avisoParaDigitarDeNovo('ia', { provedor: 'openai', modelo: 'gpt-5' }, ia)).toBe('Digite a chave de API de novo: o provedor mudou.')
-    expect(avisoParaDigitarDeNovo('ia', { provedor: 'anthropic', modelo: 'claude-sonnet-5-5' }, ia)).toBeNull()
+    expect(decidirSegredoGuardado('ia', { provedor: 'openai', modelo: 'gpt-5' }, ia)).toEqual({ aviso: 'Digite a chave de API de novo: o provedor mudou.' })
+    expect(decidirSegredoGuardado('ia', { provedor: 'anthropic', modelo: 'claude-sonnet-5-5' }, ia)).toEqual({ usar: true })
   })
 
   it('WhatsApp: outro ID do número pede o token de novo; Slack: o token é o próprio destino', () => {
     const w = { phone_number_id: '1234567890123', waba_id: '9876543210' }
-    expect(avisoParaDigitarDeNovo('whatsapp', { ...w, phone_number_id: '1112223334445' }, w))
-      .toBe('Digite o token de acesso de novo: o ID do número mudou.')
-    expect(avisoParaDigitarDeNovo('whatsapp', { ...w, waba_id: '5556667778' }, w)).toBeNull()
-    expect(avisoParaDigitarDeNovo('slack', { canal: '#outro' }, { canal: '#geral' })).toBeNull()
+    expect(decidirSegredoGuardado('whatsapp', { ...w, phone_number_id: '1112223334445' }, w))
+      .toEqual({ aviso: 'Digite o token de acesso de novo: o ID do número mudou.' })
+    expect(decidirSegredoGuardado('whatsapp', { ...w, waba_id: '5556667778' }, w)).toEqual({ usar: true })
+    expect(decidirSegredoGuardado('slack', { canal: '#outro' }, { canal: '#geral' })).toEqual({ usar: true })
   })
 })

@@ -5,7 +5,7 @@
 // { acao: 'testar', id }; { acao: 'desconectar', id }; { acao: 'google_iniciar', volta } devolve a URL do Google.
 // Só o administrador da própria consultoria mexe. O dono só olha (pela tabela). O segredo nunca volta nem vai para log.
 import { clienteAdmin, type Perfil, quemChama } from '../_shared/clientes.ts'
-import { avisoParaDigitarDeNovo, validarNumeroDeTeste, validarSegredo } from '../_shared/conexoes.ts'
+import { decidirSegredoGuardado, validarNumeroDeTeste, validarSegredo } from '../_shared/conexoes.ts'
 import { Falha, lerJson, responder, servir } from '../_shared/http.ts'
 import {
   appDoGoogle,
@@ -48,13 +48,14 @@ servir(async (req) => {
   const corpo = await lerJson(req)
   const consultoriaId = consultoriaDoAdmin(quem)
 
-  // Segredo em branco: vale o guardado, mas só para o mesmo destino (outro servidor, provedor ou número pede o segredo
-  // de novo, com a mensagem para a tela). Vale para salvar (que já testa) e para o rascunho.
+  // Segredo em branco: o guardado só vale para o mesmo destino (decidirSegredoGuardado). Outro destino pede o segredo de
+  // novo (400, com a mensagem para a tela); SMTP sem login num servidor novo segue sem a senha guardada (`descartar`:
+  // quem grava a apaga). Vale para salvar (que já testa) e para o rascunho.
   const guardadoPara = async (tipo: Tipo, config: Record<string, any>) => {
     const guardada = await conexaoDa(admin, consultoriaId, tipo)
-    const aviso = guardada?.segredo ? avisoParaDigitarDeNovo(tipo, config, guardada.config) : null
-    if (aviso) throw new Falha(400, 'dados_invalidos', { campo: 'segredo', mensagem: aviso })
-    return guardada
+    const decisao = guardada?.segredo ? decidirSegredoGuardado(tipo, config, guardada.config) : { usar: true as const }
+    if ('aviso' in decisao) throw new Falha(400, 'dados_invalidos', { campo: 'segredo', mensagem: decisao.aviso })
+    return { guardada, descartar: 'descartar' in decisao }
   }
 
   // Integração existente, só da consultoria de quem chama (de outra, "não existe").
@@ -69,8 +70,13 @@ servir(async (req) => {
     const config = validarConfig(tipo, corpo.config)
     const segredo = segredoDoCorpo(tipo, corpo.segredo)
     if (!segredo) {
-      const guardada = await guardadoPara(tipo, config)
+      const { guardada, descartar } = await guardadoPara(tipo, config)
       if (!guardada && SEGREDO_OBRIGATORIO.includes(tipo)) throw new Falha(400, 'dados_invalidos', { campo: 'segredo' })
+      // A senha "de antes" não fica guardada para o servidor novo (apagada antes de gravar a configuração nova).
+      if (descartar && guardada) {
+        const { error } = await admin.rpc('integracao_apagar_segredo', { p_id: guardada.id })
+        if (error) throw error
+      }
     }
     const { data: id, error } = await admin.rpc('integracao_salvar', {
       p_consultoria: consultoriaId, p_tipo: tipo, p_config: config, p_segredo: segredo, p_quem: quem.id,
@@ -83,7 +89,11 @@ servir(async (req) => {
     const tipo = tipoComJanela(corpo.tipo)
     const config = validarConfig(tipo, corpo.config)
     const numeroDeTeste = tipo === 'whatsapp' ? validarNumeroDeTeste(corpo.numero_teste) : null
-    const segredo = segredoDoCorpo(tipo, corpo.segredo) ?? (await guardadoPara(tipo, config))?.segredo ?? null
+    let segredo = segredoDoCorpo(tipo, corpo.segredo)
+    if (!segredo) {
+      const { guardada, descartar } = await guardadoPara(tipo, config)
+      segredo = descartar ? null : guardada?.segredo ?? null
+    }
     return responder(200, await testarRascunho(tipo, config, segredo, { destinatario: quem.email, numeroDeTeste }))
   }
 

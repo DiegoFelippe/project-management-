@@ -66,23 +66,35 @@ export function validarNumeroDeTeste(bruto: unknown): string | null {
   return numero
 }
 
-// O segredo guardado só vale para o mesmo destino. Com outro servidor (SMTP: host, porta, segurança ou usuário), outro
-// provedor de IA ou outro número do WhatsApp, a pessoa digita o segredo de novo; senão a senha, a chave ou o token da
-// consultoria iria para um lugar que alguém só digitou. No Slack o token é o próprio destino (sempre slack.com).
-// Devolve o aviso para a tela, ou null quando pode usar o guardado.
-export function avisoParaDigitarDeNovo(tipo: string, nova: Record<string, any>, guardada: Record<string, any> | null): string | null {
-  const antes = guardada ?? {}
+// O segredo guardado só vale para o mesmo destino. Com o segredo em branco e outro destino (SMTP: host, porta,
+// segurança ou usuário, e usuário vazio também conta; IA: provedor; WhatsApp: ID do número), a senha, a chave ou o token
+// da consultoria iria para um lugar que alguém só digitou. Então: no mesmo destino, `usar` o guardado; SMTP sem usuário
+// (servidor sem login) num destino novo, `descartar` (quem grava apaga a senha guardada, para não sobrar senha "de
+// antes" para outro servidor); nos outros casos, o `aviso` para a pessoa digitar de novo. No Slack o token é o próprio
+// destino (sempre slack.com).
+export type DecisaoDoGuardado = { usar: true } | { descartar: true } | { aviso: string }
+
+function mesmoDestino(tipo: string, nova: Record<string, any>, antes: Record<string, any>): boolean {
   if (tipo === 'smtp') {
-    if (!nova.usuario) return null // sem usuário não há login: a senha não sai daqui
-    const mesmo = nova.host === antes.host && Number(nova.porta) === Number(antes.porta) &&
-      nova.seguranca === antes.seguranca && nova.usuario === (antes.usuario ?? '')
-    return mesmo ? null : 'Digite a senha de novo: o servidor, a porta, a segurança ou o usuário mudou.'
+    return nova.host === antes.host && Number(nova.porta) === Number(antes.porta) && nova.seguranca === antes.seguranca &&
+      (nova.usuario ?? '') === (antes.usuario ?? '')
   }
-  if (tipo === 'ia') return nova.provedor === antes.provedor ? null : 'Digite a chave de API de novo: o provedor mudou.'
-  if (tipo === 'whatsapp') {
-    return nova.phone_number_id === antes.phone_number_id ? null : 'Digite o token de acesso de novo: o ID do número mudou.'
-  }
-  return null
+  if (tipo === 'ia') return nova.provedor === antes.provedor
+  if (tipo === 'whatsapp') return nova.phone_number_id === antes.phone_number_id
+  return true
+}
+
+const DIGITE_DE_NOVO: Record<string, string> = {
+  smtp: 'Digite a senha de novo: o servidor, a porta, a segurança ou o usuário mudou.',
+  ia: 'Digite a chave de API de novo: o provedor mudou.',
+  whatsapp: 'Digite o token de acesso de novo: o ID do número mudou.',
+}
+
+export function decidirSegredoGuardado(tipo: string, nova: Record<string, any>, guardada: Record<string, any> | null):
+DecisaoDoGuardado {
+  if (mesmoDestino(tipo, nova, guardada ?? {})) return { usar: true }
+  if (tipo === 'smtp' && !nova.usuario) return { descartar: true }
+  return { aviso: DIGITE_DE_NOVO[tipo] }
 }
 
 // ---------- Pedidos ----------

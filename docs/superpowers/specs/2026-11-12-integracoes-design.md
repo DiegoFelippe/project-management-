@@ -66,6 +66,10 @@ apenas a conexão, depois eu defino para onde vai."
   teste para o e-mail de quem testa; Slack e WhatsApp: como acima. Rodapé: Cancelar · Testar ("Testando…") · Salvar
   ("Salvando…"). Salvar continua testando no servidor (a situação da linha), sem mandar mensagem; o Testar da linha
   testa a conexão salva e, no Slack, posta no canal salvo.
+- **Segredo em branco só vale para o mesmo destino** (Testar e Salvar): SMTP com o mesmo host, porta, segurança e
+  usuário; IA com o mesmo provedor; WhatsApp com o mesmo ID do número; no Slack o token é o próprio destino. Outro
+  destino pede o segredo de novo. SMTP sem usuário num servidor novo segue sem senha, e o Salvar apaga a senha guardada
+  (`integracao_apagar_segredo`), para ela nunca ir parar num servidor escolhido depois.
 - **O que fala só por HTTP fica sem Deno** em `supabase/functions/_shared/conexoes.ts` (Slack, WhatsApp e a pergunta à
   IA), testado com o Slack, a Meta e a IA falsos de `conexoes-falsas.ts` (`npm test`), sem rede.
 - **Banco:** a regra da coluna `tipo` aceita `slack` e `whatsapp`; os cartões contam 5 integrações por consultoria

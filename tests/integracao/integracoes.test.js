@@ -182,6 +182,12 @@ describe('integracoes: testar o rascunho (antes de salvar)', () => {
     const salvarOutro = await integracoes(comoAdminD, { acao: 'salvar', tipo: 'smtp', config: { ...smtp, host: 'smtp.outro.test' } })
     expect(salvarOutro.status).toBe(400)
     expect(salvarOutro.corpo.campo).toBe('segredo')
+    const salvarOutroProvedor = await integracoes(comoAdminD, { acao: 'salvar', tipo: 'ia', config: { provedor: 'openai', modelo: 'gpt-5' } })
+    expect(salvarOutroProvedor.status).toBe(400)
+    expect(salvarOutroProvedor.corpo.mensagem).toBe('Digite a chave de API de novo: o provedor mudou.')
+    // Sem usuário não há login: o Testar segue sem a senha guardada (o Mailpit aceita sem login).
+    const semLogin = await rascunho(comoAdminD, { tipo: 'smtp', config: { ...smtp, usuario: '' } })
+    expect(semLogin.corpo).toEqual({ funcionou: true, mensagem: `E-mail de teste enviado para ${adminD.email}.` })
 
     // Mesmo destino: usa o guardado e testa (o Mailpit não oferece login, então para aí; a IA chega à Anthropic).
     const mesmoServidor = await rascunho(comoAdminD, { tipo: 'smtp', config: { ...smtp, nome_remetente: 'Outro nome' } })
@@ -197,6 +203,32 @@ describe('integracoes: testar o rascunho (antes de salvar)', () => {
     expect(digitado.status).toBe(200)
 
     expect((await admin.from('integracoes').select('*').eq('consultoria_id', D).order('tipo')).data).toEqual(antes.data)
+  })
+
+  it('o desvio em dois passos não leva a senha guardada para outro servidor', async () => {
+    const E = await criarConsultoriaDeTeste()
+    const adminE = await criarPerfilDeTeste({ papel: 'admin', consultoriaId: E })
+    const comoAdminE = await entrarComo(adminE)
+    const smtp = { ...MAILPIT, usuario: 'contato@e.test' }
+    await admin.rpc('integracao_salvar', { p_consultoria: E, p_tipo: 'smtp', p_config: smtp, p_segredo: 'senha-antiga-e', p_quem: adminE.id })
+    const { id } = await linha('smtp', E)
+    expect(await segredo(id)).toBe('senha-antiga-e')
+
+    // Passo 1: salvar outro servidor sem usuário, com a senha em branco. É aceito, e a senha antiga sai do Vault.
+    const novo = { ...MAILPIT, porta: 2525, usuario: '' }
+    const passo1 = await integracoes(comoAdminE, { acao: 'salvar', tipo: 'smtp', config: novo })
+    expect(passo1.status).toBe(200)
+    expect(await segredo(id)).toBeNull()
+    expect((await linha('smtp', E)).config).toMatchObject({ porta: 2525 })
+
+    // Passo 2: o mesmo servidor, agora com usuário e a senha em branco. Não há mais senha guardada para mandar.
+    const comLogin = { ...novo, usuario: 'contato@e.test' }
+    const testar = await rascunho(comoAdminE, { tipo: 'smtp', config: comLogin })
+    expect(testar.status).toBe(200)
+    expect(JSON.stringify(testar.corpo)).not.toContain('senha-antiga-e')
+    const salvar = await integracoes(comoAdminE, { acao: 'salvar', tipo: 'smtp', config: comLogin })
+    expect(salvar.status).toBe(200)
+    expect(await segredo(id)).toBeNull()
   })
 
   it('só o administrador da consultoria testa', async () => {
