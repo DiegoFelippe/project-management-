@@ -3,7 +3,7 @@
 -- consultores_por_ocupacao e consultorias_por_ocupacao. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(73);
+select plan(87);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -72,6 +72,20 @@ language sql stable as $$
   select c.id, c.nome, c.capacidade, c.reservado, c.realizado, c.ocupacao
   from generate_series(0, 2000, 50) o
   cross join lateral public.consultorias_por_ocupacao(null, 50, o, p_mes) c
+$$;
+
+-- Segundos fechados (soma direta dos check-ins, sem o resumo) no mês de p_mes, das consultorias não arquivadas.
+create function testes.realizado_segundos(p_mes date) returns numeric language sql stable as $$
+  select coalesce(sum(extract(epoch from k.fim - k.inicio)), 0)
+  from public.checkins k
+  join public.consultorias co on co.id = k.consultoria_id and co.arquivada_em is null
+  where k.fim is not null
+    and date_trunc('month', k.inicio at time zone 'America/Sao_Paulo')::date = p_mes
+$$;
+
+-- Segundos no resumo de uma consultoria e mês.
+create function testes.resumo(p_consultoria text, p_mes date) returns numeric language sql stable as $$
+  select coalesce(sum(segundos), 0) from public.checkins_horas_mes where consultoria_id = testes.id(p_consultoria) and mes = p_mes
 $$;
 
 select testes.consultoria('A');
@@ -164,9 +178,9 @@ select ok((select not exists (
   'central: ranking do mais ocupado ao menos ocupado');
 select ok((select (j -> 'indicadores' ->> 'capacidade')::numeric = (select sum(c.capacidade) from testes.todas_consultorias(testes.futuro()) c)
     and (j -> 'indicadores' ->> 'reservado')::numeric = (select sum(c.reservado) from testes.todas_consultorias(testes.futuro()) c)
-    and (j -> 'indicadores' ->> 'realizado')::numeric = (select sum(c.realizado) from testes.todas_consultorias(testes.futuro()) c)
+    and (j -> 'indicadores' ->> 'realizado')::numeric = round(testes.realizado_segundos(testes.futuro()) / 3600, 1)
     from p_central),
-  'central: capacidade, reservado e realizado somam as consultorias de consultorias_por_ocupacao');
+  'central: capacidade e reservado somam as consultorias de consultorias_por_ocupacao; realizado = soma em segundos, arredondada uma vez');
 select ok((select (j ->> 'passado')::boolean is false from p_central), 'mês futuro: passado = false');
 select ok((select not exists (
     select 1 from p_central, jsonb_array_elements(j -> 'extremos' -> 'acima') e where (e ->> 'ocupacao')::numeric <= 1)
@@ -183,8 +197,8 @@ select testes.como('central');
 create temp table p_central_passado as select public.painel_do_inicio(testes.passado()) as j;
 grant select on p_central_passado to authenticated;
 select ok((select (j ->> 'passado')::boolean from p_central_passado), 'mês passado: passado = true');
-select ok((select (j -> 'indicadores' ->> 'realizado')::numeric = (select sum(c.realizado) from testes.todas_consultorias(testes.passado()) c)
-    from p_central_passado), 'central, mês passado: realizado = soma de consultorias_por_ocupacao');
+select ok((select (j -> 'indicadores' ->> 'realizado')::numeric = round(testes.realizado_segundos(testes.passado()) / 3600, 1)
+    from p_central_passado), 'central, mês passado: realizado = soma em segundos dos check-ins, arredondada uma vez');
 select ok((select j -> 'indicadores' -> 'reservado' = 'null'::jsonb from p_central_passado), 'mês passado: reservado nulo');
 reset role;
 
@@ -345,6 +359,84 @@ select is((select coalesce(sum(segundos), 0) from public.checkins_horas_mes wher
 select testes.como('pessoa_a');
 select throws_ok($$ select * from public.checkins_horas_mes $$, '42501', null, 'resumo de horas: sem acesso direto para quem está logado');
 reset role;
+
+-- ── Gatilho do resumo: mudanças que mexem no mês, na consultoria ou no fechamento ──
+-- Meses de 2025 (sem outros dados). Tudo feito pela pessoa_a (cliente a40, consultoria A); depois, como o sistema,
+-- mexemos nas colunas do check-in.
+select testes.como('pessoa_a');
+insert into public.checkins (cliente_id, inicio, fim, descricao) values
+  (testes.id('a40'), '2025-04-10 08:00-03', '2025-04-10 10:00-03', 'Abril');
+reset role;
+update public.checkins set inicio = '2025-03-10 08:00-03', fim = '2025-03-10 10:00-03' where inicio = '2025-04-10 08:00-03' and cliente_id = testes.id('a40');
+select is(testes.resumo('A', '2025-03-01'), 7200::numeric, 'resumo: mudar o início para outro mês soma no mês novo');
+select is(testes.resumo('A', '2025-04-01'), 0::numeric, 'resumo: mudar o início para outro mês tira do mês antigo');
+update public.checkins set consultoria_id = testes.id('B') where inicio = '2025-03-10 08:00-03' and cliente_id = testes.id('a40');
+select is(testes.resumo('B', '2025-03-01'), 7200::numeric, 'resumo: mudar a consultoria soma na nova');
+select is(testes.resumo('A', '2025-03-01'), 0::numeric, 'resumo: mudar a consultoria tira da antiga');
+delete from public.checkins where inicio = '2025-03-10 08:00-03' and cliente_id = testes.id('a40');
+
+-- Aberto não conta; fechar soma; reabrir desfaz. (Pela pessoa_c: o aberto vai até o infinito e a pessoa_a tem check-ins depois.)
+select testes.como('pessoa_c');
+insert into public.checkins (cliente_id, inicio, descricao) values (testes.id('c200'), '2025-05-10 08:00-03', 'Maio');
+reset role;
+select is(testes.resumo('A', '2025-05-01'), 0::numeric, 'resumo: check-in aberto não entra');
+update public.checkins set fim = '2025-05-10 09:00-03' where inicio = '2025-05-10 08:00-03' and cliente_id = testes.id('c200');
+select is(testes.resumo('A', '2025-05-01'), 3600::numeric, 'resumo: fechar o check-in soma as horas');
+update public.checkins set fim = null where inicio = '2025-05-10 08:00-03' and cliente_id = testes.id('c200');
+select is(testes.resumo('A', '2025-05-01'), 0::numeric, 'resumo: reabrir o check-in desfaz a soma');
+delete from public.checkins where inicio = '2025-05-10 08:00-03' and cliente_id = testes.id('c200');
+
+-- Virada do mês em São Paulo: 22h de 30/06 (já é julho em UTC) é junho; 00h10 de 01/07 é julho.
+select testes.como('pessoa_a');
+insert into public.checkins (cliente_id, inicio, fim, descricao) values
+  (testes.id('a40'), '2025-06-30 22:00-03', '2025-06-30 23:00-03', 'Virada'),
+  (testes.id('a40'), '2025-07-01 00:10-03', '2025-07-01 01:10-03', 'Virada');
+reset role;
+select is(testes.resumo('A', '2025-06-01'), 3600::numeric, 'resumo: 22h de 30/06 em São Paulo conta em junho');
+select is(testes.resumo('A', '2025-07-01'), 3600::numeric, 'resumo: 00h10 de 01/07 em São Paulo conta em julho');
+delete from public.checkins where cliente_id = testes.id('a40') and inicio in ('2025-06-30 22:00-03', '2025-07-01 00:10-03');
+
+-- Editar só a descrição não mexe no resumo (o gatilho nem dispara): um resumo desajustado de propósito continua assim.
+select testes.como('pessoa_a');
+insert into public.checkins (cliente_id, inicio, fim, descricao) values (testes.id('a40'), '2025-08-10 08:00-03', '2025-08-10 09:00-03', 'Agosto');
+reset role;
+update public.checkins_horas_mes set segundos = segundos + 1 where consultoria_id = testes.id('A') and mes = '2025-08-01';
+update public.checkins set descricao = 'Agosto editado' where inicio = '2025-08-10 08:00-03' and cliente_id = testes.id('a40');
+select is(testes.resumo('A', '2025-08-01'), 3601::numeric, 'resumo: editar só a descrição não mexe no resumo');
+delete from public.checkins where inicio = '2025-08-10 08:00-03' and cliente_id = testes.id('a40');
+select is(testes.resumo('A', '2025-08-01'), 1::numeric, 'resumo: apagar tira as horas do check-in (o 1 s desajustado fica)');
+
+-- Realizado do topo: 3 s + 3 s + 174 s em três consultorias dão 0,1 h somando segundos (arredondando antes: 0,0).
+select testes.como('pessoa_a');
+insert into public.checkins (cliente_id, inicio, fim, descricao) values
+  (testes.id('a40'), '2025-09-10 08:00-03', '2025-09-10 08:02:54-03', 'Setembro'),
+  (testes.id('a40'), '2025-09-11 08:00-03', '2025-09-11 08:00:03-03', 'Setembro'),
+  (testes.id('a40'), '2025-09-12 08:00-03', '2025-09-12 08:00:03-03', 'Setembro');
+reset role;
+update public.checkins set consultoria_id = testes.id('B') where inicio = '2025-09-11 08:00-03' and cliente_id = testes.id('a40');
+update public.checkins set consultoria_id = testes.id('Z') where inicio = '2025-09-12 08:00-03' and cliente_id = testes.id('a40');
+select testes.como('central');
+select is((select (j -> 'indicadores' ->> 'realizado')::numeric from (select public.painel_do_inicio('2025-09-01') as j) x),
+  round(testes.realizado_segundos('2025-09-01') / 3600, 1),
+  'realizado do topo: soma em segundos e arredonda uma vez (3 s + 3 s + 174 s = 0,1 h)');
+reset role;
+
+-- O recálculo da migração (private.recalcular_horas_mes) refaz o resumo igual à recontagem direta, mesmo
+-- com o resumo estragado.
+update public.checkins_horas_mes set segundos = segundos + 999 where consultoria_id = testes.id('A') and mes = '2025-09-01';
+delete from public.checkins_horas_mes where consultoria_id = testes.id('B') and mes = '2025-09-01';
+insert into public.checkins_horas_mes (consultoria_id, mes, segundos) values (testes.id('Z'), '2020-01-01', 5);
+select private.recalcular_horas_mes();
+select ok((select not exists (
+    select 1 from (
+      select k.consultoria_id, date_trunc('month', k.inicio at time zone 'America/Sao_Paulo')::date as mes,
+        sum(extract(epoch from k.fim - k.inicio)) as segundos
+      from public.checkins k where k.fim is not null group by 1, 2) d
+    full join public.checkins_horas_mes r on r.consultoria_id = d.consultoria_id and r.mes = d.mes
+    where d.segundos is distinct from r.segundos)),
+  'resumo: o recálculo da migração bate com a recontagem direta');
+select ok((select exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'checkins_horas_mes'
+    and indexdef like '%(mes)%')), 'resumo: índice por mês');
 
 -- ── Sem recorte ──────────────────────────────────────────────────────────────
 select testes.como('inativo_a');
