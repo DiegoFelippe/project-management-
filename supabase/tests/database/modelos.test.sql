@@ -6,7 +6,7 @@
 -- permissões da API. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(156);
+select plan(158);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -349,12 +349,23 @@ select is(testes.ver('gestor_a', format('public.modelo_completo(%L)', testes.id(
   'o gestor de A não abre o modelo da Central só para B');
 select is(testes.ver('gestor_a', format($$(select count(*) from public.modelos where id in (%L, %L))
     + (select count(*) from public.modelo_etapas where modelo_id in (%L, %L))
-    + (select count(*) from public.modelo_tarefas where modelo_id in (%L, %L))
-    + (select count(*) from public.modelo_dependencias d join public.modelo_tarefas t on t.id = d.depende_de
-       where t.modelo_id in (%L, %L))$$,
-    testes.id('m_gb'), testes.id('m_cb'), testes.id('m_gb'), testes.id('m_cb'), testes.id('m_gb'), testes.id('m_cb'),
-    testes.id('m_gb'), testes.id('m_cb'))), '0'::jsonb,
-  'pela API, o gestor de A não lê modelo, etapa, tarefa nem dependência dos modelos de B e da Central só para B');
+    + (select count(*) from public.modelo_tarefas where modelo_id in (%L, %L))$$,
+    testes.id('m_gb'), testes.id('m_cb'), testes.id('m_gb'), testes.id('m_cb'), testes.id('m_gb'), testes.id('m_cb'))),
+  '0'::jsonb, 'pela API, o gestor de A não lê modelo, etapa nem tarefa dos modelos de B e da Central só para B');
+-- As tarefas desses modelos, guardadas pelo dono do banco: a leitura das dependências vai direto pelos ids (sem passar
+-- por modelo_tarefas, que a regra já recorta), para pegar a regra de leitura das dependências sozinha.
+select testes.sistema();
+create table testes.tarefas_alheias (id uuid primary key);
+grant select on testes.tarefas_alheias to authenticated;
+insert into testes.tarefas_alheias
+select id from public.modelo_tarefas where modelo_id in (testes.id('m_gb'), testes.id('m_cb'));
+select is((select count(*)::int from public.modelo_dependencias
+    where tarefa_id in (select id from testes.tarefas_alheias) or depende_de in (select id from testes.tarefas_alheias)),
+  6, 'controle: os dois modelos têm 6 dependências (3 cada)');
+select is(testes.ver('gestor_a', $$(select count(*) from public.modelo_dependencias
+    where tarefa_id in (select id from testes.tarefas_alheias)
+       or depende_de in (select id from testes.tarefas_alheias))$$), '0'::jsonb,
+  'pela API, o gestor de A não lê as dependências desses modelos, nem buscando pelos ids das tarefas');
 select is(testes.ver('gestor_a', format($$jsonb_build_array(
     (select count(*) from public.modelos where id = %L),
     (select count(*) from public.modelo_etapas where modelo_id = %L),

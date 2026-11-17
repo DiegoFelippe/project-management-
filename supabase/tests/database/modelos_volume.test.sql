@@ -154,12 +154,14 @@ insert into testes.fx select 'central', id from v_pessoas where n = 0;
 insert into testes.fx select 'gestor1', id from v_pessoas where n = 1;
 insert into testes.fx select 'consultor1', id from v_pessoas where n = 51;
 insert into testes.fx select 'c1', id from v_consultorias where n = 1;
--- Quantos ativos a consultoria 1 vê: os da Central para todas e para ela, os dela e o grande.
+-- Quantos ativos a consultoria 1 vê: os da Central para todas e para ela e os dela (o grande incluso), contados em
+-- public.modelos inteira, como o dono do banco: o banco local pode já ter modelos "para todas" de verdade, e eles
+-- também aparecem para ela.
 create table testes.esperado (nome text primary key, n int not null);
 grant select on testes.esperado to authenticated;
 insert into testes.esperado
-select 'ativos_c1', count(*) + 1 from v_modelos v join public.modelos m on m.id = v.id
-where m.arquivado_em is null and (v.consultoria is null or v.consultoria = 1);
+select 'ativos_c1', count(*) from public.modelos m
+where m.arquivado_em is null and (m.consultoria_id = testes.id('c1') or m.consultoria_id is null);
 
 -- ── Respostas e tempo ────────────────────────────────────────────────────────
 
@@ -237,8 +239,11 @@ select ok(not testes.varre('modelos', format($$
   'a lista e os números da gestão (e da Central filtrada) vão pelo índice da consultoria');
 select ok(not testes.varre('modelos', format($$
   select m.id from public.modelos m
+  where m.arquivado_em is not null and (m.consultoria_id = %L or m.consultoria_id is null) $$, testes.id('c1')))
+  and testes.usa('modelos_consultoria_idx', format($$
+  select m.id from public.modelos m
   where m.arquivado_em is not null and (m.consultoria_id = %L or m.consultoria_id is null) $$, testes.id('c1'))),
-  'a aba Arquivados também vai por índice');
+  'a aba Arquivados também vai pelo índice da consultoria');
 select ok(testes.usa('modelos_busca_idx', $$
   select m.id from public.modelos m where m.arquivado_em is null and m.busca like '%analise volume 7%' $$),
   'a busca vai pelo índice trigram');
