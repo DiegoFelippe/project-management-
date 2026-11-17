@@ -3,19 +3,16 @@ import { GraficoCarregando } from '@/components/comum/Carregando'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import { checkinsPorSemana, horasPorConsultor, horasPorMes } from '@/data/clientes'
 import { formatarHoras } from '@/lib/horas'
-import { TAMANHO } from '@/lib/tipografia'
 import { mesAtual, rotuloCurto, rotuloDoMes } from '@/lib/mes'
 
 // Gráficos da aba Geral, em SVG próprio (cores do tema, sem animação): horas por mês com a previsão atual,
 // horas por consultor e check-ins por semana. Os dois últimos seguem o mês escolhido. O banco soma só o que
 // cada pessoa enxerga.
-const LARGURA = 300 // menor que a coluna de um celular de 390 px: o gráfico não encolhe e o texto (11 px) fica legível
+const COLUNA = 60 // largura de cada mês no viewBox; os textos em HTML usam o mesmo grid de colunas
+const ALTURA = 100
 const rotuloDaSemana = (semana) => `sem. de ${semana.slice(8, 10)}/${semana.slice(5, 7)}`
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`
 const cortar = (texto, max) => (texto.length > max ? `${texto.slice(0, max - 1)}…` : texto)
-
-const TEXTO = { fill: 'var(--foreground)' }
-const TEXTO_SUAVE = { fill: 'var(--muted-foreground)' }
 
 function Cartao({ titulo, subtitulo, children }) {
   return (
@@ -34,61 +31,56 @@ function Estado({ erro, vazio, carregando, texto }) {
 }
 
 // Barras verticais por mês e, se houver, a linha tracejada da previsão.
+// Os textos dos gráficos são HTML (text-legenda), não <text> do SVG: o SVG estica com a largura do cartão e o texto
+// dele junto; assim os rótulos ficam do mesmo tamanho em qualquer tela. O SVG guarda só as barras e a linha.
 function GraficoDeMeses({ meses, previsao }) {
-  const base = 150
-  const topo = 24
   const maximo = Math.max(1, previsao ?? 0, ...meses.map((m) => m.realizado))
-  const alturaDe = (v) => ((base - topo) * v) / maximo
-  const faixa = (LARGURA - 16) / meses.length
-  const largura = Math.min(32, faixa - 12)
+  const alturaDe = (v) => (ALTURA * v) / maximo
+  const largura = COLUNA * meses.length
+  const colunas = { gridTemplateColumns: `repeat(${meses.length}, minmax(0, 1fr))` }
   const descricao = meses.map((m) => `${rotuloCurto(m.mes)}: ${formatarHoras(m.realizado)}`).join('; ')
   const rotulo = `Horas por mês, últimos ${meses.length} meses. ${descricao}.${previsao ? ` Previsão: ${formatarHoras(previsao)}.` : ''}`
-  const yPrevisao = base - alturaDe(previsao ?? 0)
+  const yPrevisao = ALTURA - alturaDe(previsao ?? 0)
   return (
-    <svg role="img" aria-label={rotulo} viewBox={`0 0 ${LARGURA} 172`} className="h-auto w-full">
-      <line x1="8" x2={LARGURA - 8} y1={base} y2={base} stroke="var(--input)" />
-      {meses.map((m, i) => {
-        const x = 8 + i * faixa + (faixa - largura) / 2
-        const h = alturaDe(m.realizado)
-        return (
-          <g key={m.mes}>
-            {m.realizado > 0 && <rect x={x} y={base - h} width={largura} height={h} rx="4" fill="var(--primary)" fillOpacity={i === meses.length - 1 ? 1 : 0.6} />}
-            <text x={x + largura / 2} y={base - h - 5} textAnchor="middle" fontSize={TAMANHO.legenda} style={TEXTO}>{formatarHoras(m.realizado)}</text>
-            <text x={x + largura / 2} y={base + 15} textAnchor="middle" fontSize={TAMANHO.legenda} style={TEXTO_SUAVE}>{rotuloCurto(m.mes)}</text>
-          </g>
-        )
-      })}
-      {previsao > 0 && (
-        <g data-previsao="">
-          <line x1="8" x2={LARGURA - 8} y1={yPrevisao} y2={yPrevisao} stroke="var(--muted-foreground)" strokeDasharray="5 4" />
-          <text x={LARGURA - 8} y={yPrevisao - 4} textAnchor="end" fontSize={TAMANHO.legenda} style={{ ...TEXTO_SUAVE, stroke: 'var(--card)', strokeWidth: 3, paintOrder: 'stroke' }}>
-            {`Previsão: ${formatarHoras(previsao)}`}
-          </text>
-        </g>
-      )}
-    </svg>
+    <div role="img" aria-label={rotulo}>
+      {previsao > 0 && <p className="mb-1 text-right text-legenda text-muted-foreground">{`Previsão: ${formatarHoras(previsao)}`}</p>}
+      <ul className="grid text-center text-legenda tabular-nums" style={colunas}>
+        {meses.map((m) => <li key={m.mes}>{formatarHoras(m.realizado)}</li>)}
+      </ul>
+      <svg aria-hidden="true" viewBox={`0 0 ${largura} ${ALTURA}`} preserveAspectRatio="none" className="mt-1 h-32 w-full">
+        <line x1="0" x2={largura} y1={ALTURA} y2={ALTURA} stroke="var(--input)" vectorEffect="non-scaling-stroke" />
+        {previsao > 0 && (
+          <line data-previsao="" x1="0" x2={largura} y1={yPrevisao} y2={yPrevisao} stroke="var(--muted-foreground)" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
+        )}
+        {meses.map((m, i) => m.realizado > 0 && (
+          <rect key={m.mes} x={i * COLUNA + 12} y={ALTURA - alturaDe(m.realizado)} width={COLUNA - 24} height={alturaDe(m.realizado)} rx="4"
+            fill="var(--primary)" fillOpacity={i === meses.length - 1 ? 1 : 0.6} />
+        ))}
+      </svg>
+      <ul className="mt-1 grid text-center text-legenda text-muted-foreground" style={colunas}>
+        {meses.map((m) => <li key={m.mes}>{rotuloCurto(m.mes)}</li>)}
+      </ul>
+    </div>
   )
 }
 
-// Uma linha por item: rótulo à esquerda, número à direita e a barra embaixo.
+// Uma linha por item: rótulo à esquerda, número à direita (HTML) e a barra embaixo.
 function GraficoDeBarras({ itens, rotuloGeral }) {
-  const linha = 34
   const maximo = Math.max(...itens.map((i) => i.valor), 1)
   return (
-    <svg role="img" aria-label={`${rotuloGeral}. ${itens.map((i) => `${i.rotulo}: ${i.detalhe.replace(' · ', ', ')}`).join('; ')}.`}
-      viewBox={`0 0 ${LARGURA} ${itens.length * linha + 4}`} className="h-auto w-full">
-      {itens.map((item, i) => {
-        const y = i * linha
-        return (
-          <g key={item.chave}>
-            <text x="8" y={y + 13} fontSize={TAMANHO.legenda} style={TEXTO}>{cortar(item.rotulo, 24)}</text>
-            <text x={LARGURA - 8} y={y + 13} textAnchor="end" fontSize={TAMANHO.legenda} style={TEXTO_SUAVE}>{item.detalhe}</text>
-            <rect x="8" y={y + 19} width={LARGURA - 16} height="8" rx="4" fill="var(--input)" fillOpacity="0.5" />
-            {item.valor > 0 && <rect x="8" y={y + 19} width={Math.max(8, ((LARGURA - 16) * item.valor) / maximo)} height="8" rx="4" fill="var(--primary)" />}
-          </g>
-        )
-      })}
-    </svg>
+    <ul role="img" aria-label={`${rotuloGeral}. ${itens.map((i) => `${i.rotulo}: ${i.detalhe.replace(' · ', ', ')}`).join('; ')}.`} className="grid gap-2.5">
+      {itens.map((item) => (
+        <li key={item.chave}>
+          <div className="flex items-baseline justify-between gap-3 text-legenda">
+            <span className="min-w-0 truncate">{cortar(item.rotulo, 24)}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">{item.detalhe}</span>
+          </div>
+          <div aria-hidden="true" className="mt-1 h-2 overflow-hidden rounded-full bg-input/50">
+            {item.valor > 0 && <div className="h-full min-w-2 rounded-full bg-primary" style={{ width: `${(item.valor * 100) / maximo}%` }} />}
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }
 

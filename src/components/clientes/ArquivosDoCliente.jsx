@@ -124,7 +124,7 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
   const itens = resultado?.itens ?? null
   return (
     <section aria-labelledby="titulo-arquivos" className="grid gap-3">
-      <h2 id="titulo-arquivos" className="text-janela font-semibold">Arquivos</h2>
+      <h2 id="titulo-arquivos" className="text-janela font-bold">Arquivos</h2>
       {pode && (
         <div data-testid="area-de-soltar" aria-busy={!!enviando}
           onDragOver={(e) => { e.preventDefault(); if (!enviando) setArrastando(true) }}

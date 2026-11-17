@@ -56,6 +56,16 @@ describe('GraficosDoCliente', () => {
     expect(screen.getByText('sem. de 16/11')).toBeInTheDocument()
   })
 
+  it('os rótulos são HTML na escala (text-legenda), não <text> de SVG', async () => {
+    const { container } = render(<GraficosDoCliente cliente={CLIENTE} />)
+    await screen.findByRole('img', { name: /Horas por consultor/ })
+    expect(container.querySelectorAll('svg text')).toHaveLength(0)
+    expect(screen.getByText('nov/26').parentElement).toHaveClass('text-legenda')
+    expect(screen.getByText('Previsão: 32,5 h')).toHaveClass('text-legenda')
+    expect(screen.getByText('Ana Souza')).toBeInTheDocument()
+    expect(screen.getByText('Ana Souza').parentElement).toHaveClass('text-legenda')
+  })
+
   it('sem horas nos 6 meses: estado vazio no primeiro gráfico', async () => {
     vi.mocked(horasPorMes).mockResolvedValue(MESES.map((m) => ({ ...m, realizado: 0 })))
     render(<GraficosDoCliente cliente={CLIENTE} />)

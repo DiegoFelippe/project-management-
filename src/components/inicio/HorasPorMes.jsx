@@ -15,12 +15,12 @@ export default function HorasPorMes({ meses, previsao }) {
   return (
     <section aria-label="Horas por mês" className="card min-w-0 p-4">
       <h2 className="text-subtitulo font-semibold text-muted-foreground">Horas por mês</h2>
-      <p className="mb-2 text-rotulo text-muted-foreground">Realizado nos últimos {meses.length} meses</p>
+      <p className="mb-2 text-legenda text-muted-foreground">Realizado nos últimos {meses.length} meses</p>
       <div className="mx-auto w-full max-w-xl">
-        {previsao > 0 && <p className="mb-1 text-right text-rotulo text-notice">previsão atual {formatarHoras(previsao)}</p>}
+        {previsao > 0 && <p className="mb-1 text-right text-legenda text-notice">previsão atual {formatarHoras(previsao)}</p>}
         <div role="img" aria-label={`Horas por mês. ${descricao}.${previsao ? ` Previsão atual: ${formatarHoras(previsao)}.` : ''}`}>
-          <ul className="grid text-center text-rotulo tabular-nums" style={colunas}>
-            {meses.map((m) => <li key={m.mes} className="text-rotulo">{formatarHoras(m.realizado)}</li>)}
+          <ul className="grid text-center text-legenda tabular-nums" style={colunas}>
+            {meses.map((m) => <li key={m.mes} className="text-legenda">{formatarHoras(m.realizado)}</li>)}
           </ul>
           <svg aria-hidden="true" viewBox={`0 0 ${largura} ${ALTURA}`} preserveAspectRatio="none" className="mt-1 h-32 w-full">
             <line x1="0" x2={largura} y1={ALTURA} y2={ALTURA} stroke="var(--input)" vectorEffect="non-scaling-stroke" />
@@ -30,8 +30,8 @@ export default function HorasPorMes({ meses, previsao }) {
                 fill="var(--primary)" fillOpacity={i === meses.length - 1 ? 1 : 0.6} />
             ))}
           </svg>
-          <ul className="mt-1 grid text-center text-rotulo text-muted-foreground" style={colunas}>
-            {meses.map((m) => <li key={m.mes} className="text-rotulo">{rotuloCurto(m.mes)}</li>)}
+          <ul className="mt-1 grid text-center text-legenda text-muted-foreground" style={colunas}>
+            {meses.map((m) => <li key={m.mes} className="text-legenda">{rotuloCurto(m.mes)}</li>)}
           </ul>
         </div>
       </div>

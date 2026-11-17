@@ -66,7 +66,7 @@ export default function CheckinsDoCliente({ cliente, perfil, versao, aoMudar }) 
   const itens = resultado?.itens ?? null
   return (
     <section aria-labelledby="titulo-checkins" className="grid gap-2">
-      <h2 id="titulo-checkins" className="text-janela font-semibold">Check-ins</h2>
+      <h2 id="titulo-checkins" className="text-janela font-bold">Check-ins</h2>
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && itens === null && <GraficoCarregando texto="Carregando os check-ins…" className="py-8" />}
       {itens?.length === 0 && <ListaVazia>Nenhum check-in neste cliente ainda.</ListaVazia>}

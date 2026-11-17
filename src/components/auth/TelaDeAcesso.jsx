@@ -44,7 +44,7 @@ export function Titulo({ titulo, children }) {
   return (
     <div className="mb-6 grid gap-1.5">
       <h1 className="text-titulo font-bold">{titulo}</h1>
-      {children && <p className="text-corpo text-muted-foreground">{children}</p>}
+      {children && <p className="text-subtitulo text-muted-foreground">{children}</p>}
     </div>
   )
 }

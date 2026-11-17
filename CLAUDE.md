@@ -111,10 +111,13 @@ Pedido do Diego (2026-11-16). Design: `docs/superpowers/specs/2026-11-16-tipogra
   nomes do trilho). Escolha pelo **papel** do texto, não pelo tamanho mais próximo. Peso e `tabular-nums`
   (números comparados em coluna) vão na classe, ao lado.
 - **Proibido fora de `src/index.css`:** `text-[Npx]`, `text-xs/sm/base/lg/xl/2xl/3xl`, `font-stretch` e
-  `font-family`. Texto de SVG (gráficos) usa `fontSize={TAMANHO.legenda}` etc. de `src/lib/tipografia.js` e nunca
+  `font-family` (nem `font-mono`). Texto de SVG (gráficos) usa `fontSize={TAMANHO.legenda}` etc. de `src/lib/tipografia.js` e nunca
   fica abaixo de 11 px na tela. Escala nova: token em `src/index.css`, `src/lib/tipografia.js` e `src/lib/utils.js`.
-- **Campos de digitar** (`<textarea>`, campos internos) usam a classe `.texto-de-campo`: 16 px no celular (o iPhone não
-  dá zoom) e `text-corpo` a partir de `sm`.
+- **Peso de cada papel** (tabela do design): `titulo` 700, `destaque` 700, `janela` 700, `subtitulo` 600 (400 no
+  subtítulo da página), `corpo` 400 (600 nos botões), `rotulo` 500, `legenda` 400–500, `mini` 600.
+- **Campos de digitar** (`<textarea>`, campos internos) usam a classe `.texto-de-campo` (o `.input` tem a mesma regra):
+  16 px no celular (o iPhone não dá zoom) e `text-corpo` a partir de `sm`. Em campo de digitar, tamanho da escala só com
+  `sm:`; sem o prefixo, a classe vence a `.texto-de-campo` e o iPhone volta a dar zoom.
 - `src/components/comum/tipografiaVarredura.test.js` varre `src/` e falha com arquivo:linha; `tamanhoNoCelular.test.jsx`
   guarda os campos.
 
