@@ -51,7 +51,7 @@ export default function Usuarios() {
   const [capacidade, setCapacidade] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
   const [mes, setMes] = useState(mesAtual)
-  const [numeros, setNumeros] = useState({ mes: null, porId: {} })
+  const [numeros, setNumeros] = useState({ mes: null, passado: false, porId: {} })
   const [erroNumeros, setErroNumeros] = useState(false)
   const [versao, setVersao] = useState(0)
   const [versaoNumeros, setVersaoNumeros] = useState(0)
@@ -78,23 +78,25 @@ export default function Usuarios() {
   // Mudar o mês não muda a página. Se falhar, a lista segue com "—" e um aviso.
   useEffect(() => {
     const ids = (resultado?.itens ?? []).map((p) => p.id)
-    if (ids.length === 0) return
+    if (filtro !== 'ativos' || ids.length === 0) return
     let ativo = true
+    // `passado` é decidido junto com o pedido: o rótulo (Utilização) não vira de repente na virada do mês.
+    const passadoNoPedido = mes < mesAtual()
     ocupacaoDasPessoas({ ids, mes })
       .then((porId) => {
         if (!ativo) return
-        setNumeros({ mes, porId })
+        setNumeros({ mes, passado: passadoNoPedido, porId })
         setErroNumeros(false)
       })
       .catch(() => {
         if (!ativo) return
-        setNumeros({ mes, porId: {} })
+        setNumeros({ mes, passado: passadoNoPedido, porId: {} })
         setErroNumeros(true)
       })
     return () => {
       ativo = false
     }
-  }, [resultado, mes, versaoNumeros])
+  }, [resultado, filtro, mes, versaoNumeros])
 
   // Times que aparecem no "Novo acesso": o gestor só os dele; o administrador, todos da consultoria.
   useEffect(() => {
@@ -113,7 +115,9 @@ export default function Usuarios() {
     varios: '{n} clientes dela voltam para Aguardando consultor.',
     semNumero: 'Os clientes dela voltam para Aguardando consultor.',
   })
-  const passado = mes < mesAtual()
+  // Só nos ativos há números do mês (desativados não têm capacidade a mostrar).
+  const comNumeros = filtro === 'ativos'
+  const passado = numeros.mes === mes ? numeros.passado : mes < mesAtual()
   const lista = resultado?.itens ?? []
   const total = resultado?.total ?? 0
 
@@ -217,8 +221,8 @@ export default function Usuarios() {
       <Cabecalho titulo="Usuários"
         descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'pessoa' : 'pessoas'}` : null} />
       <BarraDeFiltros>
-        <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1) }} />
-        <NavegacaoDoMes mes={mes} aoMudar={setMes} />
+        <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1); setResultado(null) }} />
+        {comNumeros && <NavegacaoDoMes mes={mes} aoMudar={setMes} />}
         {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />}
         {(!ehDono || ehAdminGeral) && (
           <AcaoPrincipal>
@@ -229,14 +233,17 @@ export default function Usuarios() {
         )}
       </BarraDeFiltros>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
-      {erroNumeros && !erro && <p role="status" className="mb-3 text-sm text-muted-foreground">Não foi possível carregar a capacidade do mês.</p>}
+      {comNumeros && erroNumeros && !erro && <p role="status" className="mb-3 text-sm text-muted-foreground">Não foi possível carregar a capacidade do mês.</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as pessoas…" className="py-12" />}
       {resultado && lista.length === 0 && (
         <ListaVazia>{filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}</ListaVazia>
       )}
       {lista.length > 0 && (
-        <Tabela rotulo="Usuários" larguraMinima={ehDono ? 1260 : 1120}
-          colunas={ehDono ? ['Nome', 'Cargo', 'Telefone', 'Papel', 'Consultoria', 'Times', ...colunasDoMes(passado), 'Situação'] : ['Nome', 'Cargo', 'Telefone', 'Papel', 'Times', ...colunasDoMes(passado), 'Situação']}
+        <Tabela rotulo="Usuários" larguraMinima={comNumeros ? (ehDono ? 1260 : 1120) : (ehDono ? 960 : 840)}
+          colunas={[
+            'Nome', 'Cargo', 'Telefone', 'Papel', ...(ehDono ? ['Consultoria'] : []), 'Times',
+            ...(comNumeros ? colunasDoMes(passado) : []), 'Situação',
+          ]}
           paginacao={{ pagina, total, aoMudar: setPagina }}>
           {lista.map((p) => {
             const s = situacao(p)
@@ -266,10 +273,14 @@ export default function Usuarios() {
                     ))}
                   </div>
                 </Celula>
-                <Celula className="tabular-nums">{formatarHoras(n?.capacidade)}</Celula>
-                {!passado && <Celula className="tabular-nums">{formatarHoras(n?.reservado)}</Celula>}
-                <Celula className="tabular-nums">{formatarHoras(n?.realizado)}</Celula>
-                <Celula className="tabular-nums font-semibold">{formatarOcupacao(n?.ocupacao)}</Celula>
+                {comNumeros && (
+                  <>
+                    <Celula className="tabular-nums">{formatarHoras(n?.capacidade)}</Celula>
+                    {!passado && <Celula className="tabular-nums">{formatarHoras(n?.reservado)}</Celula>}
+                    <Celula className="tabular-nums">{formatarHoras(n?.realizado)}</Celula>
+                    <Celula className="tabular-nums font-semibold">{formatarOcupacao(n?.ocupacao)}</Celula>
+                  </>
+                )}
                 <Celula><Badge variant={COR_DA_SITUACAO[s]}>{s}</Badge></Celula>
                 <CelulaAcoes>
                   {podeEditar(p) && p.ativo !== false && (

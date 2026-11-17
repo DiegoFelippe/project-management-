@@ -188,6 +188,25 @@ describe('Usuários', () => {
     expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: false, pagina: 1 })
   })
 
+  it('a aba Desativados não tem barra do mês, nem as colunas do mês, nem chama ocupacaoDasPessoas', async () => {
+    vi.mocked(listarUsuarios).mockImplementation(async ({ ativos }) => ({
+      itens: [{ id: 'p1', nome: ativos ? 'Ana' : 'Dora', email: 'x@x.test', papel: 'pessoa', ativo: ativos, times: [], consultoria_id: 'c1' }], total: 1,
+    }))
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await screen.findByRole('row', { name: /Ana/ })
+    expect(screen.getByRole('group', { name: 'Mês' })).toBeInTheDocument()
+    await waitFor(() => expect(ocupacaoDasPessoas).toHaveBeenCalled())
+    vi.mocked(ocupacaoDasPessoas).mockClear()
+    await userEvent.click(screen.getByRole('button', { name: 'Desativados' }))
+    const tabela = await screen.findByRole('table', { name: 'Usuários' })
+    await within(tabela).findByRole('row', { name: /Dora/ })
+    expect(screen.queryByRole('group', { name: 'Mês' })).toBeNull()
+    for (const nome of ['Capacidade', 'Reservado', 'Realizado', 'Ocupação', 'Utilização']) {
+      expect(within(tabela).queryByRole('columnheader', { name: nome })).toBeNull()
+    }
+    expect(ocupacaoDasPessoas).not.toHaveBeenCalled()
+  })
+
   describe('o que acontece com os clientes', () => {
     const admin = { id: 'a1', papel: 'admin', consultoria_id: 'c1' }
     beforeEach(() => vi.mocked(gerenciarAcesso).mockResolvedValue({ erro: null }))
@@ -336,7 +355,7 @@ describe('Usuários', () => {
       const tabela = await screen.findByRole('table', { name: 'Usuários' })
       expect(within(tabela).getByRole('columnheader', { name: 'Reservado' })).toBeInTheDocument()
       expect(within(tabela).getByRole('columnheader', { name: 'Ocupação' })).toBeInTheDocument()
-      await userEvent.click(screen.getByRole('button', { name: /Anterior/ }))
+      await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
       await waitFor(() => expect(within(tabela).getByRole('columnheader', { name: 'Utilização' })).toBeInTheDocument())
       expect(within(tabela).queryByRole('columnheader', { name: 'Reservado' })).toBeNull()
       expect(within(tabela).queryByRole('columnheader', { name: 'Ocupação' })).toBeNull()
