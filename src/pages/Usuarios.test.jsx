@@ -145,7 +145,7 @@ describe('Usuários', () => {
       total: 1,
     })
 
-    it('Zerar pela ficha pede confirmação (âmbar), diz o que acontece e chama zerar_2fa', async () => {
+    it('Zerar pela ficha pede confirmação (botão de perigo), diz o que acontece e chama zerar_2fa', async () => {
       comApp()
       vi.mocked(gerenciarAcesso).mockResolvedValue({ erro: null })
       renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
@@ -155,9 +155,11 @@ describe('Usuários', () => {
       await userEvent.click(within(ficha).getByRole('button', { name: /Zerar verificação em duas etapas/ }))
       const confirmar = await screen.findByRole('alertdialog')
       expect(confirmar).toHaveTextContent('Zerar a verificação em duas etapas de Ana?')
+      expect(confirmar).toHaveTextContent(/sai de todos os aparelhos/)
       expect(confirmar).toHaveTextContent(/no próximo acesso.*configura o app de novo/)
+      expect(confirmar).not.toHaveTextContent(/ainda não foi salva/)
       const botao = within(confirmar).getByRole('button', { name: 'Zerar' })
-      expect(botao).not.toHaveClass('bg-destructive')
+      expect(botao).toHaveClass('bg-destructive')
       await userEvent.click(botao)
       expect(gerenciarAcesso).toHaveBeenCalledWith('zerar_2fa', 'p1')
       expect(toast.success).toHaveBeenCalledWith('Verificação em duas etapas de Ana zerada.')
@@ -165,6 +167,29 @@ describe('Usuários', () => {
       // A ficha continua aberta e já mostra a situação nova.
       expect(within(screen.getByRole('dialog', { name: 'Ficha de Ana' })).getByText('Ainda não configurada')).toBeInTheDocument()
       expect(contarClientesAtivos).not.toHaveBeenCalled()
+    })
+
+    it('a confirmação do Zerar segue a chave Exigir como está na ficha, mesmo sem salvar', async () => {
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        itens: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [], consultoria_id: 'c1',
+          exige_2fa: false, verificacao_desde: '2026-11-10T15:00:00Z' }],
+        total: 1,
+      })
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+      await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Editar' }))
+      const ficha = screen.getByRole('dialog', { name: 'Ficha de Ana' })
+      await userEvent.click(within(ficha).getByRole('tab', { name: 'Acesso' }))
+      await userEvent.click(within(ficha).getByRole('button', { name: /Zerar verificação em duas etapas/ }))
+      let confirmar = await screen.findByRole('alertdialog')
+      expect(confirmar).toHaveTextContent(/sai de todos os aparelhos/)
+      expect(confirmar).toHaveTextContent(/volta a entrar só com a senha/)
+      await userEvent.click(within(confirmar).getByRole('button', { name: 'Cancelar' }))
+
+      await userEvent.click(within(ficha).getByRole('switch', { name: /Exigir verificação em duas etapas/ }))
+      await userEvent.click(within(ficha).getByRole('button', { name: /Zerar verificação em duas etapas/ }))
+      confirmar = await screen.findByRole('alertdialog')
+      expect(confirmar).toHaveTextContent(/no próximo acesso.*configura o app de novo/)
+      expect(confirmar).toHaveTextContent(/ainda não foi salva/)
     })
 
     it('a chave Exigir vai junto no salvar da ficha', async () => {

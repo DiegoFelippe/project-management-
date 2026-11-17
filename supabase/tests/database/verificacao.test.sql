@@ -1,14 +1,16 @@
 -- Verificação em duas etapas: quem tem o app autenticador ativo (fator verificado) ou tem a verificação exigida
 -- (perfis.exige_2fa) só usa o banco com a sessão confirmada pelo código (aal2). Sem 2FA, nada muda para ninguém.
+-- Token com session_id: a sessão precisa existir (o Zerar e o Sair encerram as sessões) e, para quem precisa do
+-- código, ser aal2 também na tabela de sessões do Auth.
 -- Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(37);
+select plan(59);
 
 create schema testes;
-grant usage on schema testes to authenticated, anon;
+grant usage on schema testes to authenticated, anon, service_role;
 create table testes.fx (nome text primary key, id uuid not null);
-grant select on testes.fx to authenticated, anon;
+grant select on testes.fx to authenticated, anon, service_role;
 create function testes.id(p_nome text) returns uuid language sql stable as $$
   select id from testes.fx where nome = p_nome
 $$;
@@ -45,6 +47,22 @@ begin
   perform set_config('request.jwt.claims',
     (jsonb_build_object('sub', testes.id(p_nome), 'role', 'authenticated')
       || case when p_aal is null then '{}'::jsonb else jsonb_build_object('aal', p_aal) end)::text, true);
+end $$;
+
+-- Sessão do Auth (o token de verdade traz o session_id dela).
+create function testes.sessao(p_nome text, p_aal text) returns uuid language plpgsql as $$
+declare v uuid := gen_random_uuid();
+begin
+  insert into auth.sessions (id, user_id, created_at, updated_at, aal)
+  values (v, testes.id(p_nome), now(), now(), p_aal::auth.aal_level);
+  return v;
+end $$;
+-- Entra como a pessoa com um token que traz o session_id (p_sessao texto: '' testa o campo vazio).
+create function testes.como_na_sessao(p_nome text, p_aal text, p_sessao text) returns void language plpgsql as $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims',
+    jsonb_build_object('sub', testes.id(p_nome), 'role', 'authenticated', 'aal', p_aal, 'session_id', p_sessao)::text, true);
 end $$;
 
 -- Cenário: consultoria A com admin, gestor e pessoas; B separada.
@@ -164,6 +182,70 @@ reset role;
 select testes.como('pessoa_exigida', 'aal2');
 select throws_ok(format('update public.perfis set exige_2fa = false where id = %L', testes.id('pessoa_exigida')),
   '42501', null, 'a pessoa não tira a própria exigência direto no banco');
+reset role;
+
+-- A sessão do token precisa existir (para todos, não só para quem tem 2FA)
+create temp table sessoes (nome text primary key, id uuid not null);
+grant select on sessoes to authenticated;
+insert into sessoes values
+  ('livre', testes.sessao('pessoa_livre', 'aal1')),
+  ('livre_outra', testes.sessao('pessoa_livre', 'aal1')),
+  ('gestor', testes.sessao('gestor_a', 'aal1')),
+  ('app_aal2', testes.sessao('pessoa_com_app', 'aal2')),
+  ('app_aal1', testes.sessao('pessoa_com_app', 'aal1')),
+  ('exigida_aal2', testes.sessao('pessoa_exigida', 'aal2')),
+  ('exigida_aal1', testes.sessao('pessoa_exigida', 'aal1'));
+
+select testes.como_na_sessao('pessoa_livre', 'aal1', (select id from sessoes where nome = 'livre')::text);
+select ok(private.liberado(), 'sem 2FA, sessão do token existe: liberado');
+select is((select count(*) from public.times), 1::bigint, 'sem 2FA, sessão do token existe: vê o time');
+reset role;
+select testes.como_na_sessao('pessoa_livre', 'aal1', (select id from sessoes where nome = 'gestor')::text);
+select ok(not private.liberado(), 'session_id de outra pessoa: não liberado');
+reset role;
+select testes.como_na_sessao('pessoa_livre', 'aal1', '');
+select ok(private.liberado(), 'session_id vazio vale como sem session_id (como antes)');
+reset role;
+select testes.como_na_sessao('pessoa_livre', 'aal1', gen_random_uuid()::text);
+select ok(not private.liberado(), 'sem 2FA, sessão que não existe: não liberado');
+select is((select count(*) from public.times), 0::bigint, 'sem 2FA, sessão que não existe: não vê o time');
+select is((select count(*) from public.consultorias), 0::bigint, 'sem 2FA, sessão que não existe: não vê a consultoria');
+reset role;
+
+-- Com o app ou a exigência: token aal2 e sessão aal2
+select testes.como_na_sessao('pessoa_com_app', 'aal2', (select id from sessoes where nome = 'app_aal2')::text);
+select ok(private.liberado(), 'com app, token aal2 e sessão aal2: liberado');
+reset role;
+select testes.como_na_sessao('pessoa_com_app', 'aal2', (select id from sessoes where nome = 'app_aal1')::text);
+select ok(not private.liberado(), 'com app, token aal2 mas sessão aal1: não liberado');
+select is((select count(*) from public.times), 0::bigint, 'com app, token aal2 mas sessão aal1: não vê times');
+reset role;
+select testes.como_na_sessao('pessoa_com_app', 'aal1', (select id from sessoes where nome = 'app_aal2')::text);
+select ok(not private.liberado(), 'com app, token aal1 (mesmo com a sessão aal2): não liberado');
+reset role;
+select testes.como_na_sessao('pessoa_exigida', 'aal2', (select id from sessoes where nome = 'exigida_aal2')::text);
+select ok(private.liberado(), 'exigida, token aal2 e sessão aal2: liberado');
+reset role;
+select testes.como_na_sessao('pessoa_exigida', 'aal2', (select id from sessoes where nome = 'exigida_aal1')::text);
+select ok(not private.liberado(), 'exigida, token aal2 mas sessão aal1: não liberado');
+reset role;
+
+-- Encerrar as sessões (Zerar): só a chave secreta (service_role), e só as da pessoa
+select ok(not has_function_privilege('authenticated', 'public.encerrar_sessoes_de(uuid)', 'execute'), 'authenticated não encerra sessões');
+select ok(not has_function_privilege('anon', 'public.encerrar_sessoes_de(uuid)', 'execute'), 'anon não encerra sessões');
+select ok(has_function_privilege('service_role', 'public.encerrar_sessoes_de(uuid)', 'execute'), 'service_role encerra sessões');
+select ok(not has_function_privilege('authenticated', 'private.encerrar_sessoes(uuid)', 'execute'), 'authenticated não chama private.encerrar_sessoes');
+select testes.como('admin_a', 'aal2');
+select throws_ok(format('select public.encerrar_sessoes_de(%L)', testes.id('pessoa_livre')), '42501', null,
+  'o administrador não encerra sessões pelo navegador');
+reset role;
+set local role service_role;
+select is(public.encerrar_sessoes_de(testes.id('pessoa_livre')), 2, 'service_role encerra as duas sessões da pessoa');
+reset role;
+select is((select count(*) from auth.sessions where user_id = testes.id('pessoa_livre')), 0::bigint, 'as sessões da pessoa somem');
+select is((select count(*) from auth.sessions where user_id = testes.id('gestor_a')), 1::bigint, 'as sessões dos outros ficam');
+select testes.como_na_sessao('pessoa_livre', 'aal1', (select id from sessoes where nome = 'livre')::text);
+select ok(not private.liberado(), 'depois de encerrar, o token antigo não libera nada');
 reset role;
 
 select * from finish();

@@ -141,6 +141,32 @@ describe('zerar a verificação (gerenciar-acesso, zerar_2fa)', () => {
     expect((await acesso(sessao, { acao: 'editar', pessoa_id: comApp.id, nome: 'Depois de Zerar' })).status).toBe(200)
   })
 
+  it('o Zerar tira a pessoa de todos os aparelhos: o token antigo não serve mais e não renova', async () => {
+    const alvo = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: A })
+    const celular = await entrarComo(alvo)
+    const { fatorId, segredo } = await ativarVerificacao(celular)
+    const computador = await entrarComo(alvo)
+    await confirmarCodigo(computador, fatorId, segredo)
+    for (const sessao of [celular, computador]) {
+      expect((await sessao.from('consultorias').select('id')).data).toEqual([{ id: A }])
+    }
+
+    expect((await acesso(comoAdminA, { acao: 'zerar_2fa', pessoa_id: alvo.id })).status).toBe(200)
+    expect(await fatores(alvo.id)).toEqual([])
+    for (const sessao of [celular, computador]) {
+      // O token ainda não venceu, mas a sessão dele acabou: o banco não entrega nada e as funções recusam.
+      expect((await sessao.from('consultorias').select('id')).data).toEqual([])
+      expect((await sessao.from('perfis').select('id').neq('id', alvo.id)).data).toEqual([])
+      const r = await acesso(sessao, { acao: 'editar', pessoa_id: alvo.id, nome: 'Depois do Zerar' })
+      expect(r).toMatchObject({ status: 401, corpo: { codigo: 'nao_autenticado' } })
+      const { error } = await sessao.auth.refreshSession()
+      expect(error).toBeTruthy()
+    }
+    // Entrando de novo (só com a senha: o app foi zerado), tudo volta.
+    const depois = await entrarComo(alvo)
+    expect((await depois.from('consultorias').select('id')).data).toEqual([{ id: A }])
+  })
+
   it('zerar quem tem a verificação exigida: no próximo acesso ela configura de novo', async () => {
     expect((await acesso(comoAdminA, { acao: 'zerar_2fa', pessoa_id: exigida.id })).status).toBe(200)
     expect(await fatores(exigida.id)).toEqual([])
@@ -158,6 +184,32 @@ describe('zerar a verificação (gerenciar-acesso, zerar_2fa)', () => {
     expect(r).toMatchObject({ status: 403, corpo: { codigo: 'verificacao_pendente' } })
     await confirmarCodigo(sessao, fatorId, segredo)
     expect((await acesso(sessao, { acao: 'zerar_2fa', pessoa_id: exigida.id })).status).toBe(200)
+  })
+})
+
+// O Auth do Supabase (GoTrue) é quem guarda o app autenticador: com a sessão só da senha (aal1), quem tem o app
+// ativo não cadastra outro, não tira o app nem troca a senha. A tela conta com isso (Meu perfil pede o código).
+describe('o Auth recusa mexer no app e na senha com a sessão aal1 de quem tem o app', () => {
+  it('cadastrar outro app, tirar o app e trocar a senha: recusados; com o código (aal2), desativar funciona', async () => {
+    const alvo = await criarPerfilDeTeste({ papel: 'pessoa', consultoriaId: A })
+    const { fatorId, segredo } = await ativarVerificacao(await entrarComo(alvo))
+    const sessao = await entrarComo(alvo)
+    expect(await nivelDaSessao(sessao)).toBe('aal1')
+
+    const cadastro = await sessao.auth.mfa.enroll({ factorType: 'totp', issuer: 'IXC Consult', friendlyName: 'Outro celular' })
+    expect(cadastro.error?.code).toBe('insufficient_aal')
+    const tirar = await sessao.auth.mfa.unenroll({ factorId: fatorId })
+    expect(tirar.error?.code).toBe('insufficient_aal')
+    const senha = await sessao.auth.updateUser({ password: 'Outra-Senha-123!' })
+    expect(senha.error?.code).toBe('insufficient_aal')
+    expect((await fatores(alvo.id)).map((f) => [f.id, f.status])).toEqual([[fatorId, 'verified']])
+    await expect(entrarComo(alvo)).resolves.toBeTruthy() // a senha continua a mesma
+
+    // Desativar (Meu perfil): o código atual leva a sessão a aal2 e então o app sai.
+    await confirmarCodigo(sessao, fatorId, segredo)
+    expect(await nivelDaSessao(sessao)).toBe('aal2')
+    expect((await sessao.auth.mfa.unenroll({ factorId: fatorId })).error).toBeNull()
+    expect(await fatores(alvo.id)).toEqual([])
   })
 })
 

@@ -2,8 +2,9 @@
 // Dono cuida dos administradores e da central; a central, dos administradores; só o dono move alguém para a central; administrador, de gestores e pessoas da consultoria dele;
 // gestor só muda o nome e a ficha (telefone, cidade, uf, cargo, data_entrada) das pessoas que vê. Em si mesmo ("Meu perfil"), cada um muda só o próprio nome:
 // não troca o próprio papel nem se desativa. E-mail não muda.
-// Verificação em duas etapas: exigir (editar com exige_2fa) e zerar (apaga os fatores do app autenticador, para quem
-// perdeu o celular) são de quem pode editar o acesso da pessoa (poder 'tudo'); nunca em si mesmo por aqui.
+// Verificação em duas etapas: exigir (editar com exige_2fa) e zerar (apaga os fatores do app autenticador e encerra as
+// sessões da pessoa em todos os aparelhos, para quem perdeu o celular) são de quem pode editar o acesso da pessoa
+// (poder 'tudo'); nunca em si mesmo por aqui.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
 import { clienteAdmin, type Perfil, quemChama } from '../_shared/clientes.ts'
 import { Falha, lerJson, responder, servir } from '../_shared/http.ts'
@@ -55,8 +56,10 @@ async function moverParaCentral(admin: SupabaseClient, quem: Perfil, pessoaId: s
   return responder(200, { ok: true })
 }
 
-// Apaga todos os fatores da pessoa (confirmados ou não) pela API de admin do Auth. Se a verificação for exigida,
-// ela configura de novo no próximo acesso; as sessões dela caem para aal1 ao renovar o token.
+// Apaga todos os fatores da pessoa (confirmados ou não) pela API de admin do Auth e depois encerra todas as sessões
+// dela (public.encerrar_sessoes_de): o aparelho perdido sai na hora (o banco confere a sessão do token) e não renova.
+// Se a verificação for exigida, ela configura de novo no próximo acesso. Qualquer passo que falhe vira erro: nada de
+// "zerado" pela metade respondido como sucesso.
 async function zerarVerificacao(admin: SupabaseClient, pessoaId: string) {
   const { data, error } = await admin.auth.admin.mfa.listFactors({ userId: pessoaId })
   if (error) throw error
@@ -64,6 +67,8 @@ async function zerarVerificacao(admin: SupabaseClient, pessoaId: string) {
     const { error: erroApagar } = await admin.auth.admin.mfa.deleteFactor({ userId: pessoaId, id: fator.id })
     if (erroApagar) throw erroApagar
   }
+  const { error: erroSessoes } = await admin.rpc('encerrar_sessoes_de', { p_pessoa: pessoaId })
+  if (erroSessoes) throw erroSessoes
   return responder(200, { ok: true })
 }
 

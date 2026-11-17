@@ -168,7 +168,8 @@ function VerificacaoDaPessoa({ exigida, aoMudarExigida, verificacaoDesde, aoZera
 // quem vê tudo criando um administrador) devolve { itens: [{ id, nome }], total } do banco: a lista nunca vem inteira.
 // Editar: aoSalvar({ mudancas, carga, timesAdicionar, timesRemover, foto, cor }), mais aoReenviar() e
 // aoPedirAtivo('desativar' | 'reativar') quando podeReenviar / podeDesativar. podeDesativar também é quem edita o
-// acesso: ganha a verificação em duas etapas (exige_2fa nas mudanças e aoPedirZerar2fa()). No Novo, a chave "Exigir"
+// acesso: ganha a verificação em duas etapas (exige_2fa nas mudanças e aoPedirZerar2fa({ exigida }), com a chave "Exigir"
+// como está na ficha, mesmo antes de salvar). No Novo, a chave "Exigir"
 // aparece para quem vai editar o acesso da pessoa depois (dono, central, administrador) e vai no pedido de criar.
 export default function FichaDoConsultor({
   aberto, aoFechar, perfilDeQuem, pessoa = null, times = [], consultoriaId = '', buscarConsultorias,
@@ -534,7 +535,8 @@ export default function FichaDoConsultor({
             <CartaoDoAcesso pessoa={pessoa} podeReenviar={podeReenviar} aoReenviar={aoReenviar} />
             {podeExigir2fa && (
               <VerificacaoDaPessoa exigida={dados.exige_2fa} aoMudarExigida={definir('exige_2fa')}
-                verificacaoDesde={pessoa.verificacao_desde} aoZerar={aoPedirZerar2fa} />
+                verificacaoDesde={pessoa.verificacao_desde}
+                aoZerar={aoPedirZerar2fa && (() => aoPedirZerar2fa({ exigida: dados.exige_2fa }))} />
             )}
           </>
         ))}

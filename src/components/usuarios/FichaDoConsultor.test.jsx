@@ -647,7 +647,16 @@ describe('FichaDoConsultor: verificação em duas etapas (aba Acesso)', () => {
     await irPara('Acesso')
     expect(screen.getByText('Ativa desde 10/11/2026')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Zerar verificação em duas etapas/ }))
-    expect(aoPedirZerar2fa).toHaveBeenCalled()
+    expect(aoPedirZerar2fa).toHaveBeenCalledWith({ exigida: false })
+  })
+
+  it('o Zerar leva a chave Exigir como está na ficha, mesmo antes de salvar', async () => {
+    const aoPedirZerar2fa = vi.fn()
+    montarEditar({ podeDesativar: true, aoPedirZerar2fa, pessoa: { ...PESSOA, verificacao_desde: '2026-11-10T15:00:00Z' } })
+    await irPara('Acesso')
+    await userEvent.click(screen.getByRole('switch', { name: /Exigir verificação em duas etapas/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Zerar verificação em duas etapas/ }))
+    expect(aoPedirZerar2fa).toHaveBeenCalledWith({ exigida: true })
   })
 
   it('sem o app ativo, não há o que zerar', async () => {

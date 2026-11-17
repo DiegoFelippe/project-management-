@@ -42,6 +42,16 @@ function larguraDaTabela({ comNumeros, ehDono }) {
   return ehDono ? base + 110 : base
 }
 
+// Confirmação do Zerar: segue a chave "Exigir" como está na ficha (`exigida`), mesmo antes de salvar.
+function textoDoZerar({ pessoa, exigida }) {
+  const inicio = 'O app autenticador cadastrado deixa de valer (para quem perdeu ou trocou de celular) e a pessoa sai de todos os aparelhos em que estava conectada.'
+  const depois = exigida
+    ? 'Como a verificação é exigida, no próximo acesso ela configura o app de novo antes de entrar.'
+    : 'Ela volta a entrar só com a senha e pode ativar de novo em Meu perfil.'
+  const naoSalva = exigida !== Boolean(pessoa.exige_2fa) ? ' A chave Exigir ainda não foi salva: salve a ficha para ela valer.' : ''
+  return `${inicio} ${depois}${naoSalva}`
+}
+
 // Ação da linha: só o ícone (Padrão Hub), com o nome da ação em aria-label e title.
 function AcaoDaLinha({ nome, className, children, ...props }) {
   return (
@@ -397,7 +407,7 @@ export default function Usuarios() {
         <FichaDoConsultor key={editando.id} aberto pessoa={editando} perfilDeQuem={perfil} times={ehDono ? [] : times}
           podeReenviar={!ehDono || podeEditar(editando)} podeDesativar={podeDesativar(editando)}
           aoReenviar={() => reenviar(editando)} aoPedirAtivo={(acao) => setConfirmando({ pessoa: editando, acao })}
-          aoPedirZerar2fa={() => setConfirmando({ pessoa: editando, acao: 'zerar_2fa' })}
+          aoPedirZerar2fa={({ exigida }) => setConfirmando({ pessoa: editando, acao: 'zerar_2fa', exigida })}
           aoFechar={() => setEditando(null)} aoSalvar={(dados) => salvarEdicao(editando, dados)}
           aoMudarAusencias={recarregarNumeros} />
       )}
@@ -414,11 +424,9 @@ export default function Usuarios() {
           }} />
       )}
       {confirmando?.acao === 'zerar_2fa' && (
-        <ConfirmarAcao aberto aoFechar={() => setConfirmando(null)} perigo={false}
+        <ConfirmarAcao aberto aoFechar={() => setConfirmando(null)}
           titulo={`Zerar a verificação em duas etapas de ${confirmando.pessoa.nome}?`}
-          descricao={confirmando.pessoa.exige_2fa
-            ? 'O app autenticador cadastrado deixa de valer (para quem perdeu ou trocou de celular). Como a verificação é exigida, no próximo acesso a pessoa configura o app de novo antes de entrar.'
-            : 'O app autenticador cadastrado deixa de valer (para quem perdeu ou trocou de celular) e a pessoa passa a entrar só com a senha. Ela pode ativar de novo em Meu perfil.'}
+          descricao={textoDoZerar(confirmando)}
           rotuloConfirmar="Zerar" aoConfirmar={() => zerarVerificacao(confirmando.pessoa)} />
       )}
       {confirmando && confirmando.acao !== 'zerar_2fa' && (
