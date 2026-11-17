@@ -307,8 +307,9 @@ de consultorias anteriores.
 - **Cliente movido encerra o check-list**; se voltar, não ressuscita (diferente do Quadro, que reaparece). Assim cada
   cliente tem no máximo um check-list ativo, sempre da consultoria que o atende.
 - **Tarefas do check-list do cliente não se criam nem se apagam uma a uma** (vêm do modelo); a edição do check-list é
-  mudar o início dos prazos, e para mudar as tarefas edita-se o modelo e troca. É uma exceção ao CRUD completo que
-  precisa do aval do Diego.
+  mudar o início dos prazos, e para mudar as tarefas edita-se o modelo e troca. É uma exceção ao CRUD completo:
+  **aprovada pelo Diego em 17/11** ("Pode ser assim"), junto com o check-list fora de `Tabela` e os filtros
+  Todas/Pendentes/Feitas na tela (itens abaixo).
 - **Check-list nunca se apaga de vez**: "Tirar o modelo" o encerra e ele fica como histórico; ele segura o cliente
   (apagar cliente com check-list → arquivar).
 - **O check-in guarda o título das tarefas marcadas nele** (cópia). Apagar um check-in não desmarca as tarefas.
