@@ -8,6 +8,9 @@ Data: 2026-11-16. Projeto: `~/Documents/consultoria`. Branch: `feat/clientes` (P
 - Viu o esboço (central, números de exemplo) e escolheu: **"Todos, cada um no seu"** — todo papel vê o painel, no
   recorte que já enxerga no resto do app.
 - Antes ele tinha dito: "A central vai precisar de dashboards estratégicas depois."
+- Decisão do Diego (16/11), depois que a tela Capacidade saiu: **o gestor vê a capacidade da consultoria inteira no
+  painel do Início** (ranking por consultor e extremos), não em Usuários — lá ele continua vendo só as pessoas dele.
+  Por isso o ranking e os extremos do gestor cobrem todos os consultores da consultoria, como os do administrador.
 
 ## Objetivo, e o que seria falhar
 
