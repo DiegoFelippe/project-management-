@@ -8,6 +8,9 @@ import FichaDoConsultor from './FichaDoConsultor'
 vi.mock('@/data/capacidade', () => ({
   listarAusencias: vi.fn(), criarAusencia: vi.fn(), editarAusencia: vi.fn(), apagarAusencia: vi.fn(),
 }))
+vi.mock('@/data/verificacao', () => ({
+  iniciarCadastro: vi.fn(), concluirCadastro: vi.fn(), cancelarCadastro: vi.fn(), desativarVerificacao: vi.fn(),
+}))
 
 beforeAll(() => {
   URL.createObjectURL = vi.fn(() => 'blob:previa')
@@ -744,5 +747,180 @@ describe('FichaDoConsultor: verificação em duas etapas (aba Acesso)', () => {
     montarNovo()
     await irPara('Acesso')
     expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+  })
+})
+
+// Modo próprio (Meu perfil): a mesma ficha, aberta por quem é a própria pessoa (pela bolinha do trilho ou pela
+// própria linha em Usuários). Só muda o que o banco aceita dela: nome, foto, cor e contato; senha e app autenticador
+// na aba Acesso. O resto aparece com o valor, só para ler.
+const EU = {
+  id: 'a1', nome: 'Diego Felippe', email: 'diego@exemplo.test', papel: 'admin', consultoria_id: 'c1', consultoria: { nome: 'Acme' },
+  telefone: '(11) 97777-0000', cidade: 'Santos', uf: 'SP', cargo: 'Consultor sênior', data_entrada: '2026-01-10', carga_semanal: 40,
+  tipos_de_consultoria: ['gestao', 'sucesso_do_cliente'], exige_2fa: false, verificacao_desde: null,
+}
+
+function montarPropria(props = {}) {
+  const funcoes = { aoSalvar: vi.fn().mockResolvedValue({ erro: null }), aoFechar: vi.fn(), ...props }
+  render(<FichaDoConsultor aberto perfilDeQuem={EU} pessoa={EU} times={TIMES} {...props} {...funcoes} />)
+  return funcoes
+}
+
+const rodape = () => document.querySelector('[data-slot="janela-rodape"]')
+
+describe('FichaDoConsultor: modo próprio (Meu perfil)', () => {
+  it('a própria ficha se chama Meu perfil e tem as abas Dados pessoais e Acesso', () => {
+    montarPropria()
+    expect(screen.getByRole('dialog', { name: 'Meu perfil' })).toBeInTheDocument()
+    expect(nomesDasAbas()).toEqual(['Dados pessoais', 'Acesso'])
+    expect(screen.getByRole('button', { name: 'Salvar alterações' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
+  })
+
+  it('muda nome, foto, cor, telefone, cidade e UF; e-mail, papel, consultoria, cargo, entrada, carga e tipos só para ler', () => {
+    montarPropria()
+    for (const campo of ['Nome', 'Telefone', 'Cidade', 'UF']) expect(screen.getByLabelText(campo), campo).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Trocar a foto' })).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Cor do avatar' })).toBeInTheDocument()
+
+    expect(screen.getByLabelText('E-mail')).toBeDisabled()
+    expect(screen.getByLabelText('E-mail')).toHaveValue('diego@exemplo.test')
+    expect(screen.getByLabelText('Papel')).toBeDisabled()
+    expect(screen.getByLabelText('Papel')).toHaveValue('Administrador')
+    expect(screen.getByLabelText('Consultoria')).toBeDisabled()
+    expect(screen.getByLabelText('Consultoria')).toHaveValue('Acme')
+    expect(screen.getByLabelText('Cargo')).toBeDisabled()
+    expect(screen.getByLabelText('Cargo')).toHaveValue('Consultor sênior')
+    expect(screen.getByLabelText('Data de entrada')).toBeDisabled()
+    expect(screen.getByLabelText('Data de entrada')).toHaveTextContent('10 de jan de 2026')
+    expect(screen.getByLabelText('Carga semanal')).toBeDisabled()
+    expect(screen.getByLabelText('Carga semanal')).toHaveValue('40 h por semana')
+    expect(screen.getByRole('checkbox', { name: 'Gestão' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Gestão' })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: 'Assessoria Jurídica' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Assessoria Jurídica' })).toBeDisabled()
+  })
+
+  it('administrador na própria ficha: sem escolher papel, sem times, sem carga para mudar, sem ausências e sem Desativar', () => {
+    montarPropria({ podeDesativar: true, podeReenviar: true, aoPedirAtivo: vi.fn() })
+    expect(screen.queryByRole('checkbox', { name: 'Implantação' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Carga semanal (horas)')).not.toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Ausências' })).not.toBeInTheDocument()
+    expect(listarAusencias).not.toHaveBeenCalled()
+    expect(within(rodape()).queryByRole('button', { name: /Desativar|Reativar/ })).not.toBeInTheDocument()
+  })
+
+  it('o dono vê o papel com o nome dele (Administrador geral) e nenhuma consultoria', () => {
+    const dono = { ...EU, id: 'd1', papel: 'dono', consultoria_id: null, consultoria: null, carga_semanal: null }
+    montarPropria({ pessoa: dono, perfilDeQuem: dono })
+    expect(screen.getByLabelText('Papel')).toHaveValue('Administrador geral')
+    expect(screen.queryByLabelText('Consultoria')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Carga semanal')).not.toBeInTheDocument()
+  })
+
+  it('salvar manda só o que a pessoa pode: o nome, o contato inteiro, a foto e a cor', async () => {
+    const { aoSalvar } = montarPropria()
+    await userEvent.clear(screen.getByLabelText('Nome'))
+    await userEvent.type(screen.getByLabelText('Nome'), 'Diego F.')
+    await userEvent.clear(screen.getByLabelText('Telefone'))
+    await userEvent.type(screen.getByLabelText('Telefone'), '(13) 3333-4444')
+    await userEvent.clear(screen.getByLabelText('Cidade'))
+    await escolherNoSeletor(userEvent, 'UF', 'RJ')
+    await userEvent.click(screen.getByRole('radio', { name: 'Rosa' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar).toHaveBeenCalledWith({
+      mudancas: { nome: 'Diego F.' }, contato: { telefone: '(13) 3333-4444', cidade: '', uf: 'RJ' }, foto: null, cor: '#db2777',
+    })
+    const pedido = aoSalvar.mock.calls[0][0]
+    expect(Object.keys(pedido.mudancas)).toEqual(['nome'])
+    expect(pedido).not.toHaveProperty('carga')
+    expect(pedido).not.toHaveProperty('timesAdicionar')
+  })
+
+  it('só o telefone mudou: o contato vai inteiro, e sem mexer em nada não vai nome nem contato', async () => {
+    const { aoSalvar } = montarPropria()
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar.mock.calls[0][0].mudancas).toEqual({})
+    expect(aoSalvar.mock.calls[0][0].contato).toBeUndefined()
+    expect(aoSalvar.mock.calls[0][0].senha).toBeUndefined()
+    await userEvent.type(screen.getByLabelText('Telefone'), '9')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar.mock.calls[1][0].contato).toEqual({ telefone: '(11) 97777-00009', cidade: 'Santos', uf: 'SP' })
+  })
+
+  it('a data de entrada não é da pessoa: mesmo no futuro (vinda do cadastro), não impede salvar', async () => {
+    const { aoSalvar } = montarPropria({ pessoa: { ...EU, data_entrada: '2099-01-01' } })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar).toHaveBeenCalled()
+  })
+
+  it('aba Acesso: trocar a senha (medidor, Validar, Gerar), a exigência só para ler, sem Zerar e sem cartão do convite', async () => {
+    montarPropria({ podeDesativar: true, aoPedirZerar2fa: vi.fn(), pessoa: { ...EU, verificacao_desde: '2026-11-10T15:00:00Z' } })
+    await irPara('Acesso')
+    const painel = screen.getByRole('tabpanel', { name: 'Acesso' })
+    expect(within(painel).getByLabelText('Senha nova')).toBeInTheDocument()
+    expect(within(painel).getByLabelText('Repita a senha nova')).toBeInTheDocument()
+    expect(within(painel).getByRole('meter', { name: 'Força da senha' })).toBeInTheDocument()
+    expect(within(painel).getByRole('button', { name: 'Validar' })).toBeInTheDocument()
+    expect(within(painel).getByRole('button', { name: 'Gerar senha' })).toBeInTheDocument()
+    const exigir = within(painel).getByRole('switch', { name: /Exigir verificação em duas etapas/ })
+    expect(exigir).toBeDisabled()
+    expect(exigir).toHaveAttribute('aria-checked', 'false')
+    expect(within(painel).getByText('Ativa desde 10/11/2026')).toBeInTheDocument()
+    expect(within(painel).getByRole('button', { name: /Desativar/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Zerar/ })).not.toBeInTheDocument()
+    expect(within(painel).queryByText('Pode entrar no app.')).not.toBeInTheDocument()
+    expect(within(rodape()).queryByRole('button', { name: /Desativar/ })).not.toBeInTheDocument()
+  })
+
+  it('com a verificação exigida e ativa, não há Desativar e a tela diz por quê', async () => {
+    montarPropria({ pessoa: { ...EU, exige_2fa: true, verificacao_desde: '2026-11-10T15:00:00Z' } })
+    await irPara('Acesso')
+    const secao = screen.getByRole('region', { name: 'Verificação em duas etapas' })
+    expect(within(secao).getByRole('switch', { name: /Exigir verificação/ })).toHaveAttribute('aria-checked', 'true')
+    expect(within(secao).queryByRole('button', { name: /Desativar/ })).not.toBeInTheDocument()
+    expect(within(secao).getByText(/exigida para o seu acesso/)).toBeInTheDocument()
+  })
+
+  it('senha fraca ou diferente não vai; forte e repetida vai no salvar', async () => {
+    const { aoSalvar } = montarPropria()
+    await irPara('Acesso')
+    await userEvent.type(screen.getByLabelText('Senha nova'), 'senha-nova-1')
+    await userEvent.type(screen.getByLabelText('Repita a senha nova'), 'senha-nova-1')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar).not.toHaveBeenCalled()
+    expect(screen.getByText('A senha precisa ser forte: confira as regras abaixo do campo.')).toBeInTheDocument()
+
+    await userEvent.clear(screen.getByLabelText('Senha nova'))
+    await userEvent.type(screen.getByLabelText('Senha nova'), 'Senha-nova-1!')
+    await userEvent.clear(screen.getByLabelText('Repita a senha nova'))
+    await userEvent.type(screen.getByLabelText('Repita a senha nova'), 'Senha-outra-1!')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar).not.toHaveBeenCalled()
+    expect(screen.getByText('As senhas não são iguais.')).toBeInTheDocument()
+
+    await userEvent.clear(screen.getByLabelText('Repita a senha nova'))
+    await userEvent.type(screen.getByLabelText('Repita a senha nova'), 'Senha-nova-1!')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar).toHaveBeenCalledWith(expect.objectContaining({ mudancas: {}, senha: 'Senha-nova-1!' }))
+  })
+
+  it('erro na senha, salvando de Dados pessoais, leva para a aba Acesso e foca a senha', async () => {
+    const { aoSalvar } = montarPropria()
+    await irPara('Acesso')
+    await userEvent.type(screen.getByLabelText('Senha nova'), 'fraca')
+    await irPara('Dados pessoais')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(aoSalvar).not.toHaveBeenCalled()
+    expect(screen.getByRole('tab', { name: 'Acesso, tem erro' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByLabelText('Senha nova')).toHaveFocus()
+  })
+
+  it('a ficha de outra pessoa não tem a troca de senha nem a verificação da própria pessoa', async () => {
+    montarEditar({ podeDesativar: true })
+    expect(screen.getByRole('dialog', { name: 'Ficha de Ana Lima' })).toBeInTheDocument()
+    await irPara('Acesso')
+    expect(screen.queryByLabelText('Senha nova')).not.toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: /Exigir verificação/ })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: /^Ativar/ })).not.toBeInTheDocument()
   })
 })

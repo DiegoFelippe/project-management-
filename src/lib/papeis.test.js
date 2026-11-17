@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ehCentral, ehPapelDeConsultoria, papeisQuePodeDar, veTudo } from './papeis'
+import { ehCentral, ehPapelDeConsultoria, papeisQuePodeDar, rotuloDoPapel, veTudo } from './papeis'
 
 describe('papéis', () => {
   it('veTudo: dono e central', () => {
@@ -22,6 +22,12 @@ describe('papéis', () => {
     expect(valores('gestor')).toEqual(['pessoa'])
     expect(valores('pessoa')).toEqual([])
     expect(papeisQuePodeDar({ papel: 'admin' })[1]).toEqual({ valor: 'gestor', rotulo: 'Gestor' })
+  })
+
+  it('rotuloDoPapel: o nome de cada papel na tela, inclusive o do dono', () => {
+    expect(rotuloDoPapel('pessoa')).toBe('Consultor')
+    expect(rotuloDoPapel('admin')).toBe('Administrador')
+    expect(rotuloDoPapel('dono')).toBe('Administrador geral')
   })
 
   it('ehPapelDeConsultoria: administrador, gestor e pessoa', () => {

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -49,8 +49,11 @@ describe('Trilho', () => {
     expect(screen.getByText('DF')).toHaveStyle({ backgroundColor: corDe('me') })
   })
 
-  it('a bolinha da pessoa, acima do Sair, abre o Meu perfil', async () => {
-    const perfil = { id: 'me', nome: 'Diego Felippe', email: 'diego@exemplo.test', papel: 'admin', consultoria: { nome: 'Acme' } }
+  it('a bolinha da pessoa, acima do Sair, abre o Meu perfil: a mesma ficha de Usuários, no modo próprio', async () => {
+    const perfil = {
+      id: 'me', nome: 'Diego Felippe', email: 'diego@exemplo.test', papel: 'admin', consultoria_id: 'c1', consultoria: { nome: 'Acme' },
+      cargo: 'Consultor sênior',
+    }
     render(
       <AuthContext.Provider value={{ perfil, sair: () => {} }}>
         <MemoryRouter>
@@ -59,6 +62,13 @@ describe('Trilho', () => {
       </AuthContext.Provider>,
     )
     await userEvent.click(screen.getByRole('button', { name: /Meu perfil/ }))
-    expect(screen.getByRole('dialog', { name: 'Meu perfil' })).toBeInTheDocument()
+    const janela = screen.getByRole('dialog', { name: 'Meu perfil' })
+    expect(within(janela).getAllByRole('tab').map((aba) => aba.textContent)).toEqual(['Dados pessoais', 'Acesso'])
+    expect(within(janela).getByRole('group', { name: 'Identificação' })).toBeInTheDocument()
+    expect(within(janela).getByLabelText('Nome')).toHaveValue('Diego Felippe')
+    expect(within(janela).getByLabelText('Nome')).toBeEnabled()
+    expect(within(janela).getByLabelText('E-mail')).toBeDisabled()
+    expect(within(janela).getByLabelText('Cargo')).toBeDisabled()
+    expect(within(janela).getByLabelText('Cargo')).toHaveValue('Consultor sênior')
   })
 })

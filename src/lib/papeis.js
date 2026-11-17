@@ -5,7 +5,7 @@ export const veTudo = (perfil) => perfil?.papel === 'dono' || perfil?.papel === 
 export const ehCentral = (perfil) => perfil?.papel === 'central'
 
 // O papel "pessoa" (valor guardado no banco) aparece na tela como "Consultor" (pedido do Diego, 16/11).
-const ROTULOS = { central: 'Central', admin: 'Administrador', gestor: 'Gestor', pessoa: 'Consultor' }
+const ROTULOS = { dono: 'Administrador geral', central: 'Central', admin: 'Administrador', gestor: 'Gestor', pessoa: 'Consultor' }
 export const rotuloDoPapel = (papel) => ROTULOS[papel] ?? papel
 const opcao = (valor) => ({ valor, rotulo: ROTULOS[valor] })
 

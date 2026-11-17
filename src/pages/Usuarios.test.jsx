@@ -6,7 +6,7 @@ import { mudarCor, trocarFoto } from '@/data/imagens'
 import { toast } from 'sonner'
 import { apagarAusencia, definirCarga, listarAusencias, ocupacaoDasPessoas } from '@/data/capacidade'
 import { buscarConsultorias, buscarConsultoriasAtivas } from '@/data/consultorias'
-import { buscarUsuario, criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
+import { atualizarMeuContato, buscarUsuario, criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
 import { escolherNoSeletor } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
@@ -14,6 +14,7 @@ import Usuarios from './Usuarios'
 
 vi.mock('@/data/usuarios', () => ({
   listarUsuarios: vi.fn(), buscarUsuario: vi.fn(), criarAcesso: vi.fn(), gerenciarAcesso: vi.fn(), reenviarConvite: vi.fn(),
+  atualizarMeuContato: vi.fn(),
 }))
 vi.mock('@/data/capacidade', () => ({
   definirCarga: vi.fn(), listarAusencias: vi.fn(), ocupacaoDasPessoas: vi.fn(), criarAusencia: vi.fn(), editarAusencia: vi.fn(), apagarAusencia: vi.fn(),
@@ -314,6 +315,36 @@ describe('Usuários', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
     await waitFor(() => expect(mudarCor).toHaveBeenCalledWith('p1', '#db2777'))
     expect(gerenciarAcesso).not.toHaveBeenCalled()
+  })
+
+  it('na própria linha, Editar abre o Meu perfil (a ficha no modo próprio) e salvar grava só o que a pessoa pode', async () => {
+    vi.mocked(gerenciarAcesso).mockResolvedValue({ erro: null })
+    vi.mocked(atualizarMeuContato).mockResolvedValue({ erro: null })
+    const eu = {
+      id: 'a1', nome: 'Eu Admin', email: 'eu@x.test', papel: 'admin', ativo: true, times: [], consultoria_id: 'c1',
+      consultoria: { nome: 'Acme' }, cargo: 'Diretor', telefone: '(11) 90000-0000', carga_semanal: 40,
+    }
+    vi.mocked(listarUsuarios).mockResolvedValue({ itens: [eu], total: 1 })
+    renderizarTela(<Usuarios />, { perfil: eu })
+    const linha = await screen.findByRole('row', { name: /Eu Admin/ })
+    expect(within(linha).queryByRole('button', { name: /Desativar/ })).not.toBeInTheDocument()
+    await userEvent.click(within(linha).getByRole('button', { name: 'Editar' }))
+    const janela = screen.getByRole('dialog', { name: 'Meu perfil' })
+    expect(within(janela).getByLabelText('Cargo')).toBeDisabled()
+    expect(within(janela).getByLabelText('Papel')).toBeDisabled()
+    expect(within(janela).queryByLabelText('Carga semanal (horas)')).not.toBeInTheDocument()
+    expect(within(janela).queryByRole('button', { name: /Desativar/ })).not.toBeInTheDocument()
+    const chamadas = vi.mocked(listarUsuarios).mock.calls.length
+    await userEvent.clear(within(janela).getByLabelText('Nome'))
+    await userEvent.type(within(janela).getByLabelText('Nome'), 'Eu Mesmo')
+    await userEvent.type(within(janela).getByLabelText('Telefone'), '1')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar alterações' }))
+    await waitFor(() => expect(gerenciarAcesso).toHaveBeenCalledWith('editar', 'a1', { nome: 'Eu Mesmo' }))
+    expect(gerenciarAcesso).toHaveBeenCalledTimes(1)
+    expect(atualizarMeuContato).toHaveBeenCalledWith({ telefone: '(11) 90000-00001', cidade: '', uf: '' })
+    expect(definirCarga).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Meu perfil' })).not.toBeInTheDocument())
+    await waitFor(() => expect(vi.mocked(listarUsuarios).mock.calls.length).toBeGreaterThan(chamadas))
   })
 
   it('a foto escolhida no Editar vai para o Storage', async () => {

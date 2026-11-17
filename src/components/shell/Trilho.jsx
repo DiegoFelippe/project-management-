@@ -1,10 +1,11 @@
 // Trilho de ícones (conceito do app de música e do Hub): ícone num quadrado arredondado e o nome
-// pequeno embaixo; o item aberto acende no azul. Embaixo, quem está usando (abre o Meu perfil) e o Sair.
+// pequeno embaixo; o item aberto acende no azul. Embaixo, quem está usando (abre o Meu perfil: a mesma ficha de
+// Usuários, no modo próprio) e o Sair.
 import { LogOut } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
-import MeuPerfil from '@/components/perfil/MeuPerfil'
+import MinhaFicha from '@/components/usuarios/MinhaFicha'
 import { corDaPessoa } from '@/lib/cores'
 import { urlPublica } from '@/lib/imagem'
 import { iniciais, primeiroNome } from '@/lib/nomes'
@@ -81,7 +82,7 @@ export default function Trilho({ aoNavegar }) {
           <span className="text-mini leading-none font-semibold text-muted-foreground group-hover:text-destructive">Sair</span>
         </button>
       </div>
-      {perfilAberto && <MeuPerfil key={perfil.id} aberto aoFechar={() => setPerfilAberto(false)} />}
+      {perfilAberto && <MinhaFicha key={perfil.id} aoFechar={() => setPerfilAberto(false)} />}
     </div>
   )
 }

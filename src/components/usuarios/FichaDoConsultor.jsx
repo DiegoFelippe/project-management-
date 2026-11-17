@@ -1,4 +1,4 @@
-import { CheckCircle2, KeyRound, MailCheck, Pencil, Power, RotateCcw, RotateCcwKey, Send, ShieldAlert, ShieldCheck, ShieldOff, Smartphone, UserPlus, UserX, User } from 'lucide-react'
+import { CheckCircle2, KeyRound, MailCheck, Pencil, Power, RotateCcw, RotateCcwKey, Send, ShieldAlert, ShieldCheck, ShieldOff, Smartphone, UserPlus, UserRound, UserX, User } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import Caixa from '@/components/campos/Caixa'
@@ -18,7 +18,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import VerificacaoDoPerfil from '@/components/verificacao/VerificacaoDoPerfil'
 import { corDe } from '@/lib/cores'
+import { formatarHoras } from '@/lib/horas'
 import { urlPublica } from '@/lib/imagem'
 import { hoje } from '@/lib/mes'
 import { iniciais } from '@/lib/nomes'
@@ -31,10 +33,14 @@ import { cn } from '@/lib/utils'
 
 const CARGA_PADRAO = 44
 const CAMPOS_DE_TEXTO = ['cargo', 'telefone', 'cidade', 'uf', 'data_entrada']
+const CAMPOS_DE_CONTATO = ['telefone', 'cidade', 'uf']
 
 // Em que aba aparece o erro de cada campo (ponto vermelho na aba) e qual campo recebe o foco ao pular para ela.
-const ABA_DO_ERRO = { nome: 'dados', email: 'dados', data_entrada: 'dados', consultoria: 'dados', carga: 'dados', senha: 'acesso' }
-const CAMPO_DO_ERRO = { nome: 'ficha-nome', email: 'ficha-email', data_entrada: 'ficha-entrada', consultoria: 'ficha-consultoria', carga: 'ficha-carga', senha: 'ficha-senha' }
+const ABA_DO_ERRO = { nome: 'dados', email: 'dados', data_entrada: 'dados', consultoria: 'dados', carga: 'dados', senha: 'acesso', repetida: 'acesso' }
+const CAMPO_DO_ERRO = {
+  nome: 'ficha-nome', email: 'ficha-email', data_entrada: 'ficha-entrada', consultoria: 'ficha-consultoria', carga: 'ficha-carga',
+  senha: 'ficha-senha', repetida: 'ficha-senha-repetida',
+}
 
 const OPCOES_DE_UF = UFS.map((uf) => ({ valor: uf, rotulo: uf }))
 const comoTexto = (valor) => String(valor ?? '')
@@ -66,13 +72,14 @@ function EscolhaDeTimes({ times, marcados, aoAlternar, aviso }) {
 }
 
 // Tipo de consultoria: pode ter mais de um (ou nenhum); desmarcar tudo é o "apagar".
-function EscolhaDeTipos({ marcados, aoAlternar }) {
+function EscolhaDeTipos({ marcados, aoAlternar, desabilitado }) {
   return (
     <fieldset className="grid gap-2">
       <legend className="sr-only">Tipo de consultoria</legend>
       <div className="grid gap-2 sm:grid-cols-2">
         {TIPOS_DE_CONSULTORIA.map((t, i) => (
-          <Caixa key={t.valor} id={i === 0 ? 'ficha-tipos' : undefined} rotulo={t.rotulo} marcado={marcados.includes(t.valor)} aoMudar={() => aoAlternar(t.valor)} />
+          <Caixa key={t.valor} id={i === 0 ? 'ficha-tipos' : undefined} rotulo={t.rotulo} marcado={marcados.includes(t.valor)} aoMudar={() => aoAlternar(t.valor)}
+            desabilitado={desabilitado} />
         ))}
       </div>
     </fieldset>
@@ -173,7 +180,8 @@ function VerificacaoDaPessoa({ exigida, aoMudarExigida, verificacaoDesde, aoZera
   )
 }
 
-// A ficha do consultor: a mesma janela para criar (Novo acesso) e para editar (pessoa preenchida).
+// A ficha do consultor: a mesma janela para criar (Novo acesso), para editar (pessoa preenchida) e para a própria pessoa
+// (Meu perfil, quando `pessoa.id === perfilDeQuem.id`: pela bolinha do trilho ou pela própria linha em Usuários).
 // Layout do Hub (PersonWindow): duas abas no cabeçalho, Dados pessoais e Acesso (esta só quando há o que mostrar).
 // Papel e times e Capacidade são seções de Dados pessoais, nas mesmas condições de antes. Desativar/Reativar no
 // rodapé à esquerda. Quem pode o quê vem de `perfilDeQuem`
@@ -186,16 +194,23 @@ function VerificacaoDaPessoa({ exigida, aoMudarExigida, verificacaoDesde, aoZera
 // acesso: ganha a verificação em duas etapas (exige_2fa nas mudanças e aoPedirZerar2fa({ exigida }), com a chave "Exigir"
 // como está na ficha, mesmo antes de salvar). No Novo, a chave "Exigir"
 // aparece para quem vai editar o acesso da pessoa depois (dono, central, administrador) e vai no pedido de criar.
+// Modo próprio (título "Meu perfil"): muda só o que o banco aceita da própria pessoa (gerenciar-acesso em si mesmo
+// muda só o nome; contato por atualizar_meu_contato; foto e cor pelo Storage; senha pelo Auth). E-mail, papel,
+// consultoria, cargo, data de entrada, carga semanal e tipos aparecem só para ler; sem times, ausências, Desativar,
+// Zerar e sem a chave "Exigir" (ninguém exige de si mesmo). Na aba Acesso, a troca de senha e a verificação em duas
+// etapas da própria pessoa (`aoMudarVerificacao()` depois de ativar ou desativar).
+// aoSalvar({ mudancas: { nome? }, contato?: { telefone, cidade, uf }, foto, cor, senha? }): contato só se mudou, inteiro.
 export default function FichaDoConsultor({
   aberto, aoFechar, perfilDeQuem, pessoa = null, times = [], consultoriaId = '', buscarConsultorias,
   titulo, aoCriar, aoColocarNosTimes, aoSalvar, podeReenviar, podeDesativar, aoReenviar, aoPedirAtivo, aoMudarAusencias,
-  aoPedirZerar2fa,
+  aoPedirZerar2fa, aoMudarVerificacao,
 }) {
   const novo = !pessoa
+  const propria = !novo && pessoa.id === perfilDeQuem?.id
   const opcoesDePapel = papeisQuePodeDar(perfilDeQuem)
   const quemVeTudo = veTudo(perfilDeQuem)
   const [dados, setDados] = useState(() => ({
-    forma: 'convite', senha: '', email: '', consultoria: consultoriaId ?? '',
+    forma: 'convite', senha: '', repetida: '', email: '', consultoria: consultoriaId ?? '',
     nome: pessoa?.nome ?? '',
     papel: pessoa?.papel ?? opcoesDePapel[0]?.valor,
     cargo: comoTexto(pessoa?.cargo),
@@ -240,15 +255,16 @@ export default function FichaDoConsultor({
   // Capacidade: só consultores, e só para a central/dono e a administração daquela consultoria.
   const poderDaConsultoria = ['admin', 'gestor'].includes(perfilDeQuem.papel) &&
     (novo || pessoa.consultoria_id === perfilDeQuem.consultoria_id)
-  const mostraCapacidade = naConsultoria && (quemVeTudo || poderDaConsultoria)
-  const mudaPapel = !novo && perfilDeQuem.papel === 'admin' && opcoesDePapel.length > 1
-  const mostraTimes = naConsultoria && !quemVeTudo && (novo || times.length > 0)
+  // Na própria ficha a carga e as ausências não mudam (aparecem só para ler); papel e times também não.
+  const mostraCapacidade = !propria && naConsultoria && (quemVeTudo || poderDaConsultoria)
+  const mudaPapel = !novo && !propria && perfilDeQuem.papel === 'admin' && opcoesDePapel.length > 1
+  const mostraTimes = !propria && naConsultoria && !quemVeTudo && (novo || times.length > 0)
   const escolheConsultoria = novo && buscarConsultorias && quemVeTudo && papelAtual === 'admin'
   // Exigir a verificação em duas etapas: quem edita o acesso da pessoa (o gestor só cria e muda o nome).
-  const podeExigir2fa = novo ? ['dono', 'central', 'admin'].includes(perfilDeQuem.papel) : !!podeDesativar
+  const podeExigir2fa = novo ? ['dono', 'central', 'admin'].includes(perfilDeQuem.papel) : !propria && !!podeDesativar
 
   const mostraPapel = (opcoesDePapel.length > 0 && (novo || mudaPapel)) || mostraTimes
-  const mostraAcesso = novo || (podeReenviar && pessoa.convite_pendente) || podeDesativar
+  const mostraAcesso = novo || propria || (podeReenviar && pessoa.convite_pendente) || podeDesativar
   const abas = [
     { valor: 'dados', rotulo: 'Dados pessoais', icone: User },
     ...(mostraAcesso ? [{ valor: 'acesso', rotulo: 'Acesso', icone: ShieldCheck }] : []),
@@ -284,7 +300,12 @@ export default function FichaDoConsultor({
       const horas = lerHoras(dados.carga)
       if (horas === null || horas > 60) achados.carga = 'Use de 0 a 60 horas.'
     }
-    if (dados.data_entrada && dados.data_entrada > hoje()) achados.data_entrada = 'A data de entrada não pode ser no futuro.'
+    // A data de entrada da própria pessoa é só para ler (e não vai no pedido): não barra o salvar.
+    if (!propria && dados.data_entrada && dados.data_entrada > hoje()) achados.data_entrada = 'A data de entrada não pode ser no futuro.'
+    if (propria && (dados.senha || dados.repetida)) {
+      if (!avaliarSenha(dados.senha).forte) achados.senha = 'A senha precisa ser forte: confira as regras abaixo do campo.'
+      else if (dados.senha !== dados.repetida) achados.repetida = 'As senhas não são iguais.'
+    }
     setErros(achados)
     return achados
   }
@@ -350,7 +371,8 @@ export default function FichaDoConsultor({
     fechar()
   }
 
-  async function editar() {
+  // Quem administra: só o que mudou (o nome, o papel, a exigência, os tipos e os campos da ficha), a carga e os times.
+  function pedidoDaFicha() {
     const mudancas = {}
     if (dados.nome.trim() !== pessoa.nome) mudancas.nome = dados.nome.trim()
     if (mudaPapel && dados.papel !== pessoa.papel) mudancas.papel = dados.papel
@@ -359,16 +381,31 @@ export default function FichaDoConsultor({
     for (const campo of CAMPOS_DE_TEXTO) {
       if (comoTexto(pessoa[campo]) !== dados[campo].trim()) mudancas[campo] = dados[campo].trim() || null
     }
-    setErro(null)
-    setEnviando(true)
-    const resposta = await aoSalvar({
+    return {
       mudancas,
       carga: cargaNova(),
       timesAdicionar: marcados.filter((id) => !timesIniciais.includes(id)),
       timesRemover: timesIniciais.filter((id) => !marcados.includes(id)),
       foto,
       cor: corNova(),
-    })
+    }
+  }
+
+  // A própria pessoa: o nome (se mudou), o contato inteiro (se algum dos três mudou; vazio limpa), a foto, a cor e a
+  // senha nova (se digitada). Nada do que só a administração muda.
+  function pedidoProprio() {
+    const mudancas = {}
+    if (dados.nome.trim() !== pessoa.nome) mudancas.nome = dados.nome.trim()
+    const contato = { telefone: dados.telefone.trim(), cidade: dados.cidade.trim(), uf: dados.uf }
+    const contatoMudou = CAMPOS_DE_CONTATO.some((campo) => contato[campo] !== comoTexto(pessoa[campo]))
+    return { mudancas, contato: contatoMudou ? contato : undefined, foto, cor: corNova(), senha: dados.senha || undefined }
+  }
+
+  async function editar() {
+    const pedido = propria ? pedidoProprio() : pedidoDaFicha()
+    setErro(null)
+    setEnviando(true)
+    const resposta = await aoSalvar(pedido)
     setEnviando(false)
     if (resposta?.erro) return setErro(resposta.erro)
     fechar()
@@ -407,7 +444,7 @@ export default function FichaDoConsultor({
     <div role="tabpanel" id={`${idBase}-painel-${valor}`} aria-labelledby={`${idBase}-aba-${valor}`} className="space-y-5">{children}</div>
   )
 
-  const acaoEsquerda = !novo && podeDesativar ? (
+  const acaoEsquerda = !novo && !propria && podeDesativar ? (
     pessoa.ativo === false
       ? (
         <Button type="button" variant="ghost" className="text-positive hover:bg-positive-soft hover:text-positive" disabled={enviando}
@@ -420,14 +457,17 @@ export default function FichaDoConsultor({
   ) : null
 
   return (
-    <JanelaFormulario aberto={aberto} aoFechar={fechar} titulo={titulo ?? (novo ? 'Nova pessoa' : `Ficha de ${pessoa.nome}`)} icone={novo ? UserPlus : Pencil}
+    <JanelaFormulario aberto={aberto} aoFechar={fechar} titulo={titulo ?? (novo ? 'Nova pessoa' : propria ? 'Meu perfil' : `Ficha de ${pessoa.nome}`)}
+      icone={novo ? UserPlus : propria ? UserRound : Pencil}
       largura="5xl" alturaFixa enviando={enviando} acaoEsquerda={acaoEsquerda}
       abas={<AbasSegmentadas rotulo="Seções da ficha" comoAbas idBase={idBase} abas={abas} valor={aba} aoMudar={setAbaEscolhida} />}
-      descricao={!novo
-        ? 'Os dados, o papel, a capacidade e o acesso.'
-        : dados.forma === 'convite'
-          ? 'A pessoa recebe um e-mail para criar a senha (ou entrar com o Google, se o e-mail for o mesmo).'
-          : 'Você passa a senha provisória para a pessoa. No primeiro acesso ela troca por uma senha só dela.'}
+      descricao={propria
+        ? 'Sua foto, seu nome, seu contato, sua senha e a verificação em duas etapas. O que aparece apagado quem muda é a administração.'
+        : !novo
+          ? 'Os dados, o papel, a capacidade e o acesso.'
+          : dados.forma === 'convite'
+            ? 'A pessoa recebe um e-mail para criar a senha (ou entrar com o Google, se o e-mail for o mesmo).'
+            : 'Você passa a senha provisória para a pessoa. No primeiro acesso ela troca por uma senha só dela.'}
       rodape={(
         <>
           <Button type="button" variant="outline" onClick={fechar} disabled={enviando}>Cancelar</Button>
@@ -471,7 +511,9 @@ export default function FichaDoConsultor({
                   : (
                     <>
                       <Input id="ficha-email" className="h-10" value={pessoa.email ?? ''} disabled readOnly />
-                      <p className="text-muted-foreground text-legenda">O e-mail não muda. Para trocar, crie um acesso novo e desative este.</p>
+                      <p className="text-muted-foreground text-legenda">
+                        {propria ? 'O e-mail não muda. Para trocar, fale com a administração.' : 'O e-mail não muda. Para trocar, crie um acesso novo e desative este.'}
+                      </p>
                     </>
                   )}
               </Campo>
@@ -486,16 +528,43 @@ export default function FichaDoConsultor({
                 <Seletor id="ficha-uf" valor={dados.uf} aoMudar={definir('uf')} rotuloTodos="—" opcoes={OPCOES_DE_UF} />
               </Campo>
               <Campo id="ficha-cargo" rotulo="Cargo">
-                <Input id="ficha-cargo" autoComplete="off" maxLength={80} className="h-10" value={dados.cargo} onChange={mudar('cargo')} />
+                <Input id="ficha-cargo" autoComplete="off" maxLength={80} className="h-10" value={dados.cargo} onChange={mudar('cargo')}
+                  disabled={propria} readOnly={propria} />
               </Campo>
               <Campo id="ficha-entrada" rotulo="Data de entrada" erro={erros.data_entrada}>
-                <CampoData id="ficha-entrada" valor={dados.data_entrada} aoMudar={definir('data_entrada')} max={hoje()} />
+                <CampoData id="ficha-entrada" valor={dados.data_entrada} aoMudar={definir('data_entrada')} max={hoje()} desabilitado={propria} />
               </Campo>
             </div>
 
             <Bloco titulo="Tipo de consultoria">
-              <EscolhaDeTipos marcados={tipos} aoAlternar={alternarTipo} />
+              <EscolhaDeTipos marcados={tipos} aoAlternar={alternarTipo} desabilitado={propria} />
             </Bloco>
+
+            {propria && (
+              <Bloco titulo={pessoa.consultoria?.nome ? 'Papel e consultoria' : 'Papel'}>
+                <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                  <Campo id="ficha-papel" rotulo="Papel">
+                    <Input id="ficha-papel" className="h-10" value={rotuloDoPapel(pessoa.papel)} disabled readOnly />
+                  </Campo>
+                  {pessoa.consultoria?.nome && (
+                    <Campo id="ficha-consultoria" rotulo="Consultoria">
+                      <Input id="ficha-consultoria" className="h-10" value={pessoa.consultoria.nome} disabled readOnly />
+                    </Campo>
+                  )}
+                </div>
+              </Bloco>
+            )}
+
+            {propria && consultoriaDaPessoa && pessoa.carga_semanal != null && (
+              <Bloco titulo="Capacidade">
+                <div className="max-w-xs">
+                  <Campo id="ficha-carga" rotulo="Carga semanal">
+                    <Input id="ficha-carga" className="h-10" value={`${formatarHoras(Number(pessoa.carga_semanal))} por semana`} disabled readOnly />
+                  </Campo>
+                  <p className="mt-2 text-rotulo text-muted-foreground">Só para consulta: a carga e as ausências quem muda é a gestão da consultoria.</p>
+                </div>
+              </Bloco>
+            )}
 
             {mostraPapel && (
               <Bloco titulo="Papel e times">
@@ -556,6 +625,22 @@ export default function FichaDoConsultor({
             )}
             <p className="text-muted-foreground text-legenda">O acesso é criado quando você clica em {dados.forma === 'convite' ? 'Enviar convite' : 'Criar pessoa'}.</p>
           </Bloco>
+        ) : propria ? (
+          <>
+            <Bloco titulo="Trocar senha (opcional)">
+              <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                <Campo id="ficha-senha" rotulo="Senha nova" erro={erros.senha}>
+                  <CampoSenha id="ficha-senha" valor={dados.senha} invalido={!!erros.senha} aoMudar={definir('senha')} />
+                </Campo>
+                <Campo id="ficha-senha-repetida" rotulo="Repita a senha nova" erro={erros.repetida}>
+                  <Input id="ficha-senha-repetida" type="password" autoComplete="new-password" className="h-10"
+                    aria-invalid={erros.repetida ? true : undefined} value={dados.repetida} onChange={mudar('repetida')} />
+                </Campo>
+              </div>
+              <p className="text-rotulo text-muted-foreground">Só senha forte é aceita. Deixe em branco para manter a atual; ela muda quando você salva.</p>
+            </Bloco>
+            <VerificacaoDoPerfil perfil={pessoa} aoMudar={aoMudarVerificacao} />
+          </>
         ) : (
           <>
             <CartaoDoAcesso pessoa={pessoa} podeReenviar={podeReenviar} aoReenviar={aoReenviar} />

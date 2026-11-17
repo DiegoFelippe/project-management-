@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import CapacidadeDaPessoa from '@/components/usuarios/CapacidadeDaPessoa'
 import FichaDoConsultor from '@/components/usuarios/FichaDoConsultor'
+import MinhaFicha from '@/components/usuarios/MinhaFicha'
 import { definirCarga, ocupacaoDasPessoas } from '@/data/capacidade'
 import { buscarConsultoriasAtivas } from '@/data/consultorias'
 import { mudarCor, tirarFoto, trocarFoto } from '@/data/imagens'
@@ -176,7 +177,8 @@ export default function Usuarios() {
   const total = resultado?.total ?? 0
 
   // Quem mexe em quem (as Edge Functions conferem de novo): dono → administradores; administrador →
-  // gestores e pessoas; gestor → só o nome e os times dele das pessoas que vê. Ninguém mexe em si mesmo.
+  // gestores e pessoas; gestor → só o nome e os times dele das pessoas que vê. Em si mesmo, ninguém administra: a própria
+  // linha abre o Meu perfil (a ficha no modo próprio, só com o que a pessoa muda de si).
   const papeisQueGerencio = ehAdminGeral ? ['admin', 'central'] : ['admin']
   const podeEditar = (p) =>
     p.id !== perfil.id &&
@@ -397,7 +399,7 @@ export default function Usuarios() {
                   </>
                 )}
                 <CelulaAcoes>
-                  {podeEditar(p) && p.ativo !== false && (
+                  {(podeEditar(p) || p.id === perfil.id) && p.ativo !== false && (
                     <AcaoDaLinha nome="Editar" onClick={() => setEditando(p)}><Pencil /></AcaoDaLinha>
                   )}
                   {podeCapacidade(p) && (
@@ -422,7 +424,8 @@ export default function Usuarios() {
           })}
         </Tabela>
       )}
-      {editando && (
+      {editando?.id === perfil.id && <MinhaFicha aoFechar={() => setEditando(null)} aoSalvo={recarregar} />}
+      {editando && editando.id !== perfil.id && (
         <FichaDoConsultor key={editando.id} aberto pessoa={editando} perfilDeQuem={perfil} times={ehDono ? [] : times}
           podeReenviar={!ehDono || podeEditar(editando)} podeDesativar={podeDesativar(editando)}
           aoReenviar={() => reenviar(editando)} aoPedirAtivo={(acao) => setConfirmando({ pessoa: editando, acao })}
