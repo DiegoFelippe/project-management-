@@ -8,6 +8,7 @@ import CalendarioDaAgenda from '@/components/calendario/CalendarioDaAgenda'
 import AbasDoCliente from '@/components/clientes/AbasDoCliente'
 import ArquivosDoCliente from '@/components/clientes/ArquivosDoCliente'
 import { AcoesDaLinha } from '@/components/clientes/AcoesDoCliente'
+import { abaDoCliente } from '@/components/clientes/rotulos'
 import { useAcoesDoCliente } from '@/components/clientes/useAcoesDoCliente'
 import CheckinsDoCliente from '@/components/clientes/CheckinsDoCliente'
 import GraficosDoCliente from '@/components/clientes/GraficosDoCliente'
@@ -26,14 +27,6 @@ function situacaoDe(c) {
   if (!c.consultoria_id) return 'Aguardando distribuição'
   if (!c.consultor_id) return 'Aguardando consultor'
   return 'Em atendimento'
-}
-
-// A aba da lista em que o cliente estaria: define quais ações da linha valem para ele.
-function abaDoCliente(c, central) {
-  if (c.arquivado) return 'arquivados'
-  if (!c.consultoria_id) return 'distribuir'
-  if (central) return 'nas_consultorias'
-  return c.consultor_id ? 'atendimento' : 'aguardando'
 }
 
 function Campo({ rotulo, children }) {

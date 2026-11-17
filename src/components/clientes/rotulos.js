@@ -42,3 +42,11 @@ export function textoDoEvento(e) {
     default: return e.tipo
   }
 }
+
+// A situação em que o cliente está: define quais ações da linha e da página valem para ele, não importa o filtro escolhido.
+export function abaDoCliente(c, central) {
+  if (c.arquivado) return 'arquivados'
+  if (!c.consultoria_id) return 'distribuir'
+  if (central) return 'nas_consultorias'
+  return c.consultor_id ? 'atendimento' : 'aguardando'
+}

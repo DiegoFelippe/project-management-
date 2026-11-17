@@ -3,7 +3,7 @@ import { useEffect, useId, useState } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { GraficoCarregando } from '@/components/comum/Carregando'
-import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
+import Seletor from '@/components/campos/Seletor'
 import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
@@ -11,9 +11,10 @@ import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/com
 import { AcoesDaLinha } from '@/components/clientes/AcoesDoCliente'
 import { useAcoesDoCliente } from '@/components/clientes/useAcoesDoCliente'
 import FiltroConsultor from '@/components/clientes/FiltroConsultor'
-import MeusCheckins from '@/components/clientes/MeusCheckins'
+import { abaDoCliente } from '@/components/clientes/rotulos'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { listarClientes } from '@/data/clientes'
 import { meuCheckinAberto } from '@/data/checkins'
 import { formatarCnpj } from '@/lib/cnpj'
@@ -21,29 +22,23 @@ import { formatarHoras } from '@/lib/horas'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
 
-// Abas por papel. Quem atende (pessoa, gestor e admin) também tem Meus clientes e Meus check-ins;
-// a central e o dono nunca fazem check-in.
-const ABAS_DA_CENTRAL = [
-  { valor: 'distribuir', rotulo: 'A distribuir' }, { valor: 'nas_consultorias', rotulo: 'Nas consultorias' },
+// Situação (filtro) por papel. A central e o dono veem tudo e começam pelo que espera a central; admin e gestor
+// começam pelo que está em atendimento. A pessoa não tem filtro: só vê os clientes dela.
+const SITUACOES_DA_CENTRAL = [
+  { valor: 'todas', rotulo: 'Todas' }, { valor: 'distribuir', rotulo: 'Aguardando consultoria' },
+  { valor: 'aguardando', rotulo: 'Aguardando consultor' }, { valor: 'atendimento', rotulo: 'Em atendimento' },
   { valor: 'arquivados', rotulo: 'Arquivados' },
 ]
-const ABAS_DO_CONSULTOR = [{ valor: 'meus', rotulo: 'Meus clientes' }, { valor: 'checkins', rotulo: 'Meus check-ins' }]
-const ABAS_DA_CONSULTORIA = [
-  { valor: 'aguardando', rotulo: 'Aguardando consultor' }, { valor: 'atendimento', rotulo: 'Em atendimento' }, ...ABAS_DO_CONSULTOR,
+const SITUACOES_DA_CONSULTORIA = [
+  { valor: 'todas', rotulo: 'Todas' }, { valor: 'aguardando', rotulo: 'Aguardando consultor' },
+  { valor: 'atendimento', rotulo: 'Em atendimento' },
 ]
-const ABAS_DA_PESSOA = ABAS_DO_CONSULTOR
 
 const HORA = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' })
 
-function abasDoPapel(perfil) {
-  if (veTudo(perfil)) return ABAS_DA_CENTRAL
-  if (perfil.papel === 'pessoa') return ABAS_DA_PESSOA
-  return ABAS_DA_CONSULTORIA
-}
-
 const VAZIO = {
-  distribuir: 'Nenhum cliente esperando distribuição.',
-  nas_consultorias: 'Nenhum cliente nas consultorias ainda.',
+  distribuir: 'Nenhum cliente aguardando consultoria.',
+  todas: 'Nenhum cliente cadastrado.',
   arquivados: 'Nenhum cliente arquivado.',
   aguardando: 'Nenhum cliente aguardando consultor.',
   atendimento: 'Nenhum cliente em atendimento.',
@@ -65,8 +60,10 @@ export default function Clientes() {
   const { perfil } = useAuth()
   const central = veTudo(perfil)
   const gestao = !central && perfil.papel !== 'pessoa'
-  const abas = abasDoPapel(perfil)
-  const [aba, setAba] = useState(abas[0].valor)
+  const doConsultor = perfil.papel === 'pessoa' // só vê os clientes dele: sem filtro de situação
+  const situacoes = central ? SITUACOES_DA_CENTRAL : SITUACOES_DA_CONSULTORIA
+  const [situacao, setSituacao] = useState(doConsultor ? 'meus' : central ? 'distribuir' : 'atendimento')
+  const aba = situacao
   const [busca, setBusca] = useState('')
   const buscaAtrasada = useAtraso(busca.trim(), 300)
   const [consultoriaId, setConsultoriaId] = useState('')
@@ -78,9 +75,8 @@ export default function Clientes() {
   const [aberto, setAberto] = useState(null) // meu check-in aberto
   const idDoAviso = useId()
   const consultorQueAtende = !central
-  const emCheckins = aba === 'checkins'
   // O filtro de consultor só faz sentido onde já há consultor (e não nas listas só minhas).
-  const mostraFiltroConsultor = perfil.papel !== 'pessoa' && !['distribuir', 'aguardando', 'meus', 'checkins'].includes(aba)
+  const mostraFiltroConsultor = !doConsultor && !['distribuir', 'aguardando'].includes(aba)
   // Em atendimento todo cliente tem consultor: lá não existe "Sem consultor".
   const semConsultorVale = aba !== 'atendimento'
   const consultorFiltrado = mostraFiltroConsultor && (semConsultorVale || consultor.valor !== 'sem') ? consultor.valor : ''
@@ -89,7 +85,6 @@ export default function Clientes() {
 
   // Uma página por vez, filtrada e paginada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
-    if (emCheckins) return undefined
     let ativo = true
     listarClientes({
       aba,
@@ -108,7 +103,7 @@ export default function Clientes() {
     return () => {
       ativo = false
     }
-  }, [aba, emCheckins, buscaAtrasada, consultoriaId, consultorFiltrado, pagina, versao, perfil.id])
+  }, [aba, buscaAtrasada, consultoriaId, consultorFiltrado, pagina, versao, perfil.id])
 
   // O check-in que ficou aberto (no máximo um); recarregado depois de cada check-in, check-out ou lançamento.
   useEffect(() => {
@@ -130,18 +125,36 @@ export default function Clientes() {
     setPagina(1)
   }
 
+  // As ações vêm da situação do próprio cliente (não do filtro). Quem atende ainda faz check-in e lança horas
+  // nos clientes dele; a gestão também escolhe/troca consultor e ajusta a previsão.
+  const acoesDoCliente = (cliente) => {
+    const comuns = { cliente, central, gestao, aberto, idDoAviso, abrir, aoMudar: recarregar }
+    const meu = doConsultor || (!central && cliente.consultor_id === perfil.id)
+    return (
+      <>
+        {meu && <AcoesDaLinha {...comuns} aba="meus" />}
+        {!doConsultor && <AcoesDaLinha {...comuns} aba={abaDoCliente(cliente, central)} />}
+      </>
+    )
+  }
+
   const clientes = resultado?.itens ?? null
   const total = resultado?.total ?? 0
 
   return (
     <>
       <Cabecalho titulo="Clientes"
-        descricao={resultado && !emCheckins ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'cliente' : 'clientes'}` : null} />
+        descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'cliente' : 'clientes'}` : null} />
       <BarraDeFiltros>
-        {abas.length > 1 && <AbasSegmentadas rotulo="Mostrar" abas={abas} valor={aba} aoMudar={setAba} />}
-        {!emCheckins && (
-          <CampoBusca rotulo="Buscar clientes" placeholder="Buscar por nome, cidade ou CNPJ" valor={busca} aoMudar={setBusca} />
+        {!doConsultor && (
+          <div className="flex items-center gap-2">
+            <Label htmlFor="filtro-situacao" className="shrink-0 text-muted-foreground">Situação</Label>
+            <div className="w-52">
+              <Seletor id="filtro-situacao" tamanho="sm" valor={situacao} aoMudar={setSituacao} opcoes={situacoes.map((o) => ({ valor: o.valor, rotulo: o.rotulo }))} />
+            </div>
+          </div>
         )}
+        <CampoBusca rotulo="Buscar clientes" placeholder="Buscar por nome, cidade ou CNPJ" valor={busca} aoMudar={setBusca} />
         {central && (
           <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setConsultor({ valor: '', nome: null }) }} />
         )}
@@ -157,17 +170,16 @@ export default function Clientes() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
-      {aba === 'meus' && aberto && clientes?.some((c) => c.id !== aberto.cliente_id) && (
+      {doConsultor && aberto && clientes?.some((c) => c.id !== aberto.cliente_id) && (
         <p id={idDoAviso} className="mb-3 text-corpo text-muted-foreground">
           Você está com check-in aberto em {aberto.cliente?.nome ?? 'outro cliente'} desde {HORA.format(new Date(aberto.inicio))}.
           {' '}Faça o check-out para começar outro.
         </p>
       )}
-      {emCheckins && <MeusCheckins consultorId={perfil.id} consultoriaId={perfil.consultoria_id} aoMudar={recarregar} />}
-      {!emCheckins && erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
-      {!emCheckins && !erro && clientes === null && <GraficoCarregando texto="Carregando os clientes…" className="py-12" />}
-      {!emCheckins && clientes?.length === 0 && <ListaVazia>{buscaAtrasada ? 'Nenhum cliente encontrado.' : VAZIO[aba]}</ListaVazia>}
-      {!emCheckins && clientes?.length > 0 && (
+      {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
+      {!erro && clientes === null && <GraficoCarregando texto="Carregando os clientes…" className="py-12" />}
+      {clientes?.length === 0 && <ListaVazia>{buscaAtrasada ? 'Nenhum cliente encontrado.' : VAZIO[aba]}</ListaVazia>}
+      {clientes?.length > 0 && (
         <Tabela rotulo="Clientes" colunas={['Cliente', 'CNPJ', 'Cidade', 'Previsão', 'Consultoria', 'Consultor']}
           paginacao={{ pagina, total, aoMudar: setPagina }}>
           {clientes.map((c) => (
@@ -175,13 +187,13 @@ export default function Clientes() {
               <Celula>
                 <p className="flex items-center gap-2 font-semibold">
                   <Link to={`/clientes/${c.id}`} className="hover:underline">{c.nome}</Link>
-                  {aba === 'aguardando' && <Badge variant="notice">Novo</Badge>}
+                  {!c.arquivado && c.consultoria_id && !c.consultor_id && <Badge variant="notice">Novo</Badge>}
                 </p>
                 {c.razao_social && <p className="truncate text-rotulo text-muted-foreground">{c.razao_social}</p>}
               </Celula>
               <Celula className="tabular-nums text-muted-foreground">{c.cnpj ? formatarCnpj(c.cnpj) : '—'}</Celula>
               <Celula className="text-muted-foreground">{c.cidade ? `${c.cidade}${c.uf ? `/${c.uf}` : ''}` : '—'}</Celula>
-              <Celula><Previsao cliente={c} comRealizado={aba === 'meus'} /></Celula>
+              <Celula><Previsao cliente={c} comRealizado={doConsultor} /></Celula>
               <Celula className="text-muted-foreground">{c.consultoria?.nome ?? '—'}</Celula>
               <Celula className="text-muted-foreground">
                 {c.consultor ? (
@@ -191,7 +203,7 @@ export default function Clientes() {
                   </>
                 ) : '—'}
               </Celula>
-              <CelulaAcoes><AcoesDaLinha cliente={c} aba={aba} central={central} gestao={gestao} aberto={aberto} idDoAviso={idDoAviso} abrir={abrir} aoMudar={recarregar} /></CelulaAcoes>
+              <CelulaAcoes>{acoesDoCliente(c)}</CelulaAcoes>
             </Linha>
           ))}
         </Tabela>
