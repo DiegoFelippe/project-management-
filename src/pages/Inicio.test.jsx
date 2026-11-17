@@ -19,7 +19,7 @@ const CENTRAL = {
   ...base, recorte: 'tudo',
   ranking: [{ id: 'k1', nome: 'Consultoria Exemplo', ocupacao: 1.2, capacidade: 100 }],
   esperando: [{ id: 'c1', nome: 'Cliente Novo', desde: new Date(Date.now() - 9 * 86_400_000).toISOString(), situacao: 'a_distribuir', consultoria_nome: null }],
-  extremos: { acima: [{ id: 'p1', nome: 'Ana Acima', ocupacao: 1.3, capacidade: 100, consultoria_nome: 'Consultoria Exemplo' }], folga: [] },
+  extremos: { acima: [{ id: 'p1', nome: 'Ana Acima', ocupacao: 1.3, capacidade: 100, consultoria_nome: 'Consultoria Exemplo', visivel: true }], folga: [] },
 }
 const ADMIN = {
   ...base, recorte: 'consultoria', indicadores: { ...base.indicadores, a_distribuir: 0, aguardando: 1, sem_consultor: 1 },
@@ -40,12 +40,12 @@ describe('Início (painel)', () => {
     renderizarTela(<Inicio />, { perfil: perfil('central') })
     expect(screen.getByRole('heading', { name: 'Olá, Ana.' })).toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'Ocupação por consultoria' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Ver todas' })).toHaveAttribute('href', '/consultorias?aba=ocupacao')
+    expect(screen.getByRole('link', { name: 'Ver todas' })).toHaveAttribute('href', `/consultorias?aba=ocupacao&mes=${MES}`)
     expect(screen.getByText(/3 a distribuir/)).toBeInTheDocument()
     const fila = screen.getByRole('table', { name: 'Clientes esperando' })
     expect(within(fila).getByRole('link', { name: 'Cliente Novo' })).toHaveAttribute('href', '/clientes/c1')
     expect(within(fila).getByText('A distribuir')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Ana Acima/ })).toHaveAttribute('href', '/usuarios')
+    expect(screen.getByRole('link', { name: /Ana Acima/ })).toHaveAttribute('href', `/usuarios?pessoa=p1&mes=${MES}`)
     expect(screen.getByText('Ocupação', { selector: 'p' })).toBeInTheDocument()
     expect(screen.queryByText('Seus projetos vão aparecer aqui')).not.toBeInTheDocument()
   })
@@ -85,6 +85,34 @@ describe('Início (painel)', () => {
     expect(within(tabela).getByText('Realizado')).toBeInTheDocument()
   })
 
+  it('mês passado: clientes ativos, aguardando e a fila são rotulados como de hoje', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue({ ...CENTRAL, passado: true })
+    renderizarTela(<Inicio />, { perfil: perfil('central') })
+    expect(await screen.findByText('Clientes ativos hoje')).toBeInTheDocument()
+    expect(screen.getByText('Aguardando consultor hoje')).toBeInTheDocument()
+    expect(screen.getByText('Situação de hoje, não do mês.')).toBeInTheDocument()
+  })
+  it('mês atual: sem o rótulo "hoje"', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue(CENTRAL)
+    renderizarTela(<Inicio />, { perfil: perfil('central') })
+    expect(await screen.findByText('Clientes ativos')).toBeInTheDocument()
+    expect(screen.queryByText(/Situação de hoje/)).not.toBeInTheDocument()
+  })
+  it('trocar de mês limpa o erro e mostra o carregando', async () => {
+    vi.mocked(painelDoInicio).mockRejectedValueOnce(new Error('x')).mockReturnValueOnce(new Promise(() => {}))
+    renderizarTela(<Inicio />, { perfil: perfil('admin') })
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByText('Carregando o painel…')).toBeInTheDocument()
+  })
+  it('os nomes levam o mês do painel e só abrem a pessoa quando ela é visível', async () => {
+    vi.mocked(painelDoInicio).mockResolvedValue({ ...ADMIN, ranking: [{ ...ADMIN.ranking[0], visivel: false }],
+      extremos: { acima: [{ id: 'p9', nome: 'Caio Cheio', ocupacao: 1.4, capacidade: 100, consultoria_nome: 'X', visivel: true }], folga: [] } })
+    renderizarTela(<Inicio />, { perfil: perfil('admin') })
+    expect(await screen.findByRole('link', { name: /Caio Cheio/ })).toHaveAttribute('href', `/usuarios?pessoa=p9&mes=${MES}`)
+    expect(screen.queryByRole('link', { name: 'Beto Consultor' })).not.toBeInTheDocument()
+  })
   it('trocar de mês chama o painel uma vez com o mês novo', async () => {
     vi.mocked(painelDoInicio).mockResolvedValue(CENTRAL)
     renderizarTela(<Inicio />, { perfil: perfil('central') })

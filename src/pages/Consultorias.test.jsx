@@ -111,6 +111,21 @@ describe('Consultorias', () => {
       renderizarTela(<Consultorias />, { perfil: dono, endereco: '/consultorias?aba=ocupacao' })
       expect(await screen.findByRole('table', { name: 'Ocupação do mês' })).toBeInTheDocument()
     })
+    it('?mes= abre a aba no mês pedido; mês inválido cai no atual', async () => {
+      renderizarTela(<Consultorias />, { perfil: dono, endereco: '/consultorias?aba=ocupacao&mes=2026-03-01' })
+      await screen.findByRole('table', { name: 'Ocupação do mês' })
+      expect(consultoriasPorOcupacao).toHaveBeenLastCalledWith(expect.objectContaining({ mes: '2026-03-01' }))
+    })
+    it('?mes= inválido cai no mês atual', async () => {
+      renderizarTela(<Consultorias />, { perfil: dono, endereco: '/consultorias?aba=ocupacao&mes=abc' })
+      await screen.findByRole('table', { name: 'Ocupação do mês' })
+      expect(consultoriasPorOcupacao).toHaveBeenLastCalledWith(expect.objectContaining({ mes: mesAtual() }))
+    })
+    it('?mes= é ignorado para quem não vê a aba', async () => {
+      renderizarTela(<Consultorias />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' }, endereco: '/consultorias?aba=ocupacao&mes=2026-03-01' })
+      await screen.findByRole('table', { name: 'Consultorias' })
+      expect(consultoriasPorOcupacao).not.toHaveBeenCalled()
+    })
     it('?aba=ocupacao é ignorado para quem não vê todas', async () => {
       renderizarTela(<Consultorias />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' }, endereco: '/consultorias?aba=ocupacao' })
       expect(await screen.findByRole('table', { name: 'Consultorias' })).toBeInTheDocument()

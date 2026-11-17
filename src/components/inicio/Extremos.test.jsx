@@ -14,6 +14,13 @@ describe('Extremos', () => {
     ver({ recorte: 'consultoria', extremos: { acima: [item], folga: [] } })
     expect(screen.queryByText(/Consultoria Exemplo/)).not.toBeInTheDocument()
   })
+  it('o nome abre a pessoa no mês só quando ela é visível', () => {
+    const outro = { ...item, id: 'q', nome: 'Beto', visivel: false }
+    ver({ recorte: 'consultoria', mes: '2026-09-01', extremos: { acima: [{ ...item, visivel: true }], folga: [outro] } })
+    expect(screen.getByRole('link', { name: /Ana/ })).toHaveAttribute('href', '/usuarios?pessoa=p&mes=2026-09-01')
+    expect(screen.queryByRole('link', { name: /Beto/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Beto')).toBeInTheDocument()
+  })
   it('vazio: frases curtas', () => {
     ver({ recorte: 'consultoria', extremos: { acima: [], folga: [] } })
     expect(screen.getByText('Ninguém acima da capacidade.')).toBeInTheDocument()

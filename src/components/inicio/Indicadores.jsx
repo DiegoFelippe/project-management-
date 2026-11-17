@@ -24,7 +24,7 @@ export default function Indicadores({ painel }) {
   if (recorte === 'pessoa') {
     return (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Indicador rotulo="Meus clientes" valor={i.clientes_ativos.toLocaleString('pt-BR')} />
+        <Indicador rotulo={passado ? 'Meus clientes hoje' : 'Meus clientes'} valor={i.clientes_ativos.toLocaleString('pt-BR')} />
         <Indicador rotulo="Minha capacidade" valor={formatarHoras(i.capacidade)} detalhe={passado ? null : `Reservado ${formatarHoras(i.reservado)}`} />
         <Indicador rotulo={rotuloOcupacao} valor={formatarOcupacao(i.ocupacao)} tom={acima ? 'acima' : null} />
         <Indicador rotulo="Realizado" valor={formatarHoras(i.realizado)} />
@@ -33,9 +33,9 @@ export default function Indicadores({ painel }) {
   }
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <Indicador rotulo="Clientes ativos" valor={i.clientes_ativos.toLocaleString('pt-BR')}
+      <Indicador rotulo={passado ? 'Clientes ativos hoje' : 'Clientes ativos'} valor={i.clientes_ativos.toLocaleString('pt-BR')}
         detalhe={`${plural(i.clientes_novos, 'novo', 'novos')} no mês`} />
-      <Indicador rotulo="Aguardando consultor" valor={i.aguardando.toLocaleString('pt-BR')} tom={i.aguardando > 0 ? 'atencao' : null}
+      <Indicador rotulo={passado ? 'Aguardando consultor hoje' : 'Aguardando consultor'} valor={i.aguardando.toLocaleString('pt-BR')} tom={i.aguardando > 0 ? 'atencao' : null}
         detalhe={recorte === 'tudo' ? `${i.a_distribuir.toLocaleString('pt-BR')} a distribuir · ${i.sem_consultor.toLocaleString('pt-BR')} sem consultor` : null} />
       <Indicador rotulo={rotuloOcupacao} valor={formatarOcupacao(i.ocupacao)} tom={acima ? 'acima' : null} detalhe={capacidade} />
       <Indicador rotulo="Realizado" valor={formatarHoras(i.realizado)} />

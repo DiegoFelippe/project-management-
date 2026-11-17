@@ -41,7 +41,7 @@ export default function Inicio() {
   }, [mes])
 
   const atualizando = painel && painel.mes !== mes && !erro
-  const dono = painel && painel.recorte !== 'pessoa'
+  const veEquipe = painel && painel.recorte !== 'pessoa'
 
   return (
     <section className="grid grid-cols-[minmax(0,1fr)] gap-5">
@@ -50,7 +50,7 @@ export default function Inicio() {
           <h1 className="text-2xl font-bold tracking-tight">Olá, {primeiroNome(perfil.nome)}.</h1>
           <p className="text-muted-foreground">{NOME_DO_PAPEL[perfil.papel]} {onde}.</p>
         </div>
-        <NavegacaoDoMes mes={mes} aoMudar={setMes} />
+        <NavegacaoDoMes mes={mes} aoMudar={(novo) => { setErro(false); setMes(novo) }} />
       </div>
 
       {erro && <p role="alert" className="card border-destructive/40 p-4 text-sm text-destructive">Não foi possível carregar o painel. Tente novamente em instantes.</p>}
@@ -61,10 +61,10 @@ export default function Inicio() {
           <Indicadores painel={painel} />
           <div className="grid grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[repeat(2,minmax(0,1fr))]">
             <HorasPorMes meses={painel.horas_por_mes} previsao={painel.previsao_atual} />
-            {dono ? <RankingDeOcupacao recorte={painel.recorte} passado={painel.passado} ranking={painel.ranking} />
+            {veEquipe ? <RankingDeOcupacao recorte={painel.recorte} passado={painel.passado} ranking={painel.ranking} mes={painel.mes} />
               : <MeusClientes passado={painel.passado} clientes={painel.meus_clientes} />}
-            {dono && <ClientesEsperando recorte={painel.recorte} esperando={painel.esperando} />}
-            {dono && <Extremos recorte={painel.recorte} extremos={painel.extremos} passado={painel.passado} />}
+            {veEquipe && <ClientesEsperando recorte={painel.recorte} esperando={painel.esperando} passado={painel.passado} />}
+            {veEquipe && <Extremos recorte={painel.recorte} extremos={painel.extremos} passado={painel.passado} mes={painel.mes} />}
           </div>
         </div>
       )}

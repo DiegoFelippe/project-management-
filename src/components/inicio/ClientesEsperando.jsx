@@ -15,7 +15,7 @@ function haQuantoTempo(iso, agora = new Date()) {
 }
 
 // Os que esperam há mais tempo (até 5, já ordenados pelo banco). Cada nome leva à página do cliente.
-export default function ClientesEsperando({ recorte, esperando }) {
+export default function ClientesEsperando({ recorte, esperando, passado }) {
   return (
     <section aria-label="Clientes esperando há mais tempo">
       {esperando.length === 0 ? (
@@ -24,6 +24,8 @@ export default function ClientesEsperando({ recorte, esperando }) {
           <p className="text-sm text-muted-foreground">Nenhum cliente esperando. Tudo distribuído.</p>
         </div>
       ) : (
+        <>
+        {passado && <p className="mb-1 text-xs text-muted-foreground">Situação de hoje, não do mês.</p>}
         <Tabela rotulo="Clientes esperando" titulo="Clientes esperando há mais tempo" semAcoes colunas={['Cliente', 'Situação', 'Esperando']} larguraMinima={420}>
           {esperando.map((c) => (
             <Linha key={c.id}>
@@ -36,6 +38,7 @@ export default function ClientesEsperando({ recorte, esperando }) {
             </Linha>
           ))}
         </Tabela>
+        </>
       )}
     </section>
   )

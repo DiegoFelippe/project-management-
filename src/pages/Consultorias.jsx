@@ -33,7 +33,12 @@ const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um :
 export default function Consultorias() {
   const { perfil } = useAuth()
   const abas = veTudo(perfil) ? [...ABAS, ABA_OCUPACAO] : ABAS
-  const [mes, setMes] = useState(mesAtual)
+  // ?mes=AAAA-MM-01 (vindo do painel do Início) só vale para quem vê a aba de ocupação; mês inválido cai no atual.
+  const [parametros] = useSearchParams()
+  const [mes, setMes] = useState(() => {
+    const pedido = parametros.get('mes')
+    return veTudo(perfil) && /^\d{4}-(0[1-9]|1[0-2])-01$/.test(pedido ?? '') ? pedido : mesAtual()
+  })
   const [busca, setBusca] = useState('')
   const buscaAtrasada = useAtraso(busca.trim(), 300)
   const [resultado, setResultado] = useState(null)
@@ -42,7 +47,6 @@ export default function Consultorias() {
   const [nova, setNova] = useState(false)
   const [novoAdminEm, setNovoAdminEm] = useState(null)
   // ?aba=ocupacao abre direto a aba do mês (só quem vê todas as consultorias; os outros caem em Ativas).
-  const [parametros] = useSearchParams()
   const [filtro, setFiltro] = useState(() => (parametros.get('aba') === 'ocupacao' && veTudo(perfil) ? 'ocupacao' : 'ativas'))
   const [editando, setEditando] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
