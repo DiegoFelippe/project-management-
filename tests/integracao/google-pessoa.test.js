@@ -194,6 +194,51 @@ describe('concluir (volta do Google)', () => {
     expect((await lerTokenDaPessoa(admin, pessoa.id)).refresh_token).not.toBe(tokenAntes.refresh_token)
   })
 
+  it('reconectar reabre as reuniões que pararam por causa do Google e terminaram há menos de 48 h', async () => {
+    const pessoa = await novaPessoa()
+    const colega = await novaPessoa()
+    const { data: cliente, error: erroCliente } = await admin.from('clientes')
+      .insert({ nome: 'Cliente da reconexão', horas_mes: 10, consultoria_id: consultoria, consultor_id: pessoa.id })
+      .select('id').single()
+    if (erroCliente) throw erroCliente
+    const hora = 3_600_000
+    const reunioes = {}
+    // Reunião com Meet e cliente em "erro", que terminou `horas` atrás.
+    async function reuniao(nome, horas, reuniaoErro, { consultor = pessoa.id, comCliente = true } = {}) {
+      const fim = Date.now() - horas * hora
+      const { data, error } = await admin.from('agenda_eventos').insert({
+        consultoria_id: consultoria, consultor_id: consultor, cliente_id: comCliente ? cliente.id : null,
+        titulo: `Reunião ${nome}`, inicio: new Date(fim - hora).toISOString(), fim: new Date(fim).toISOString(),
+        com_meet: true, meet_codigo: 'abc-defg-hij', reuniao: 'erro', reuniao_erro: reuniaoErro,
+      }).select('id').single()
+      if (error) throw error
+      reunioes[nome] = data.id
+    }
+    const CONECTE = 'Conecte o Google para buscar a gravação'
+    const RECONECTE = 'O Google não aceita mais esta conexão. Reconecte o Google.'
+    await reuniao('conecte', 2, CONECTE)
+    await reuniao('reconecte', 47, RECONECTE)
+    await reuniao('velha', 49, RECONECTE)
+    await reuniao('permissao', 2, 'O Google não deu permissão para ler a gravação e a transcrição do Meet nesta conta.')
+    await reuniao('interna', 2, CONECTE, { comCliente: false })
+    await reuniao('da_colega', 2, CONECTE, { consultor: colega.id })
+
+    const { estado, codigo } = await conectarDoComeco(pessoa)
+    await concluir({ banco: admin, app: APP, fetch: google.fetch, quem: pessoa, estado, codigo })
+
+    const { data } = await admin.from('agenda_eventos').select('id, reuniao, reuniao_erro').in('id', Object.values(reunioes))
+    const situacao = Object.fromEntries(Object.entries(reunioes)
+      .map(([nome, id]) => [nome, data.find((e) => e.id === id)]).map(([nome, e]) => [nome, `${e.reuniao}${e.reuniao_erro ? ' / ' + e.reuniao_erro : ''}`]))
+    expect(situacao).toEqual({
+      conecte: 'aguardando',
+      reconecte: 'aguardando',
+      velha: `erro / ${RECONECTE}`,
+      permissao: 'erro / O Google não deu permissão para ler a gravação e a transcrição do Meet nesta conta.',
+      interna: `erro / ${CONECTE}`,
+      da_colega: `erro / ${CONECTE}`,
+    })
+  })
+
   it('reconectar sem todas as permissões mantém a conexão que já existia e não revoga nada', async () => {
     const pessoa = await novaPessoa()
     const primeira = await conectarDoComeco(pessoa, { email: 'mantida@gmail.test' })

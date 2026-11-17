@@ -2,7 +2,7 @@
 -- segredo do Google que o navegador nunca lê e os números do painel. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(103);
+select plan(106);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -244,14 +244,42 @@ select ok(testes.eventos_vistos() <> '', 'sessão aal2 volta a ler');
 reset role;
 
 -- ── Indicadores e feriados ───────────────────────────────────────────────────
--- Cenário: e2 saiu. a1: e5 (dia 14/11, com cliente, aguardando) e e3 (convidado, 12/11, aguardando).
+-- Cenário (semana de 08 a 14/11): A tem e1 (10/11, com cliente), e5 (14/11, com cliente, aguardando), e3 (12/11, sem
+-- cliente, aguardando; a1 convidado), e2 (11/11, sem cliente) e e7 (17/11, com cliente). B ganha e8 (11/11, com
+-- cliente, aguardando, com pasta), que a gestão de A nunca conta.
+select set_config('request.jwt.claims', '', true);
+insert into public.clientes (id, nome, horas_mes, consultoria_id, consultor_id)
+values (gen_random_uuid(), 'Cliente indicadores B', 10, testes.id('B'), testes.id('b1'));
+insert into testes.fx select 'clienteIndB', id from public.clientes where nome = 'Cliente indicadores B';
+select testes.evento('e8', 'B', 'b1', 1, testes.id('clienteIndB'), 'aguardando');
+insert into public.cliente_pastas (cliente_id, nome, evento_id) values (testes.id('clienteIndB'), 'Reunião e8', testes.id('e8'));
+update public.agenda_eventos set pasta_id = (select id from public.cliente_pastas where evento_id = testes.id('e8'))
+where id = testes.id('e8');
+
 select testes.como('central1');
 select is((public.indicadores_da_agenda(date '2026-11-10') ->> 'aguardando')::int >= 2, true, 'central: aguardando conta as reuniões do cenário');
 reset role;
+-- "Aguardando" é só reunião com cliente (a rotina ignora a sem cliente): o e3 não conta.
 select testes.como('a1', 'aal2');
-select is(public.indicadores_da_agenda(date '2026-11-10'), '{"semana": 2, "mes": 2, "aguardando": 2, "pastas_no_mes": 0}'::jsonb,
-  'consultor: semana, mês, aguardando e pastas no recorte dele (próprios e convidado)');
+select is(public.indicadores_da_agenda(date '2026-11-10'), '{"semana": 2, "mes": 2, "aguardando": 1, "pastas_no_mes": 0}'::jsonb,
+  'consultor: semana, mês, aguardando (só com cliente) e pastas no recorte dele (próprios e convidado)');
 reset role;
+select testes.como('gestor_a');
+select is(public.indicadores_da_agenda(date '2026-11-10'), '{"semana": 2, "mes": 3, "aguardando": 1, "pastas_no_mes": 0}'::jsonb,
+  'gestor: os números só da consultoria dele (a reunião, o aguardando e a pasta de B não contam)');
+reset role;
+select testes.como('admin_a');
+select is(public.indicadores_da_agenda(date '2026-11-10'), '{"semana": 2, "mes": 3, "aguardando": 1, "pastas_no_mes": 0}'::jsonb,
+  'administrador: também só a consultoria dele');
+reset role;
+select testes.como('gestor_b');
+select is(public.indicadores_da_agenda(date '2026-11-10'), '{"semana": 1, "mes": 1, "aguardando": 1, "pastas_no_mes": 1}'::jsonb,
+  'e a gestão de B conta só a de B');
+reset role;
+-- O e8 só serve aos indicadores: sai para não mudar as listas de eventos que vêm depois.
+delete from public.agenda_eventos where id = testes.id('e8');
+delete from public.clientes where id = testes.id('clienteIndB');
+delete from testes.fx where nome in ('e8', 'clienteIndB');
 
 select testes.como('gestor_a');
 select is((select count(*) from public.feriados_do_periodo(date '2026-11-01', date '2026-11-30')), 3::bigint,

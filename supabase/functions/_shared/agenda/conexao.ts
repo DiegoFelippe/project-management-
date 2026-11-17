@@ -16,7 +16,8 @@ import {
   tokenDoGoogle,
 } from '../google-oauth.ts'
 import { Falha } from '../http.ts'
-import { ESCOPOS_DA_PESSOA, escoposConcedidos, escoposQueFaltam } from './google.ts'
+import { ESCOPOS_DA_PESSOA, escoposConcedidos, escoposQueFaltam, MENSAGEM_RECONECTAR } from './google.ts'
+import { SEM_GOOGLE } from './reuniao.ts'
 import { type Banco, gravarTokenDaPessoa, lerTokenDaPessoa } from './tokens.ts'
 
 export const VALIDADE_DO_ESTADO_MS = 10 * 60_000
@@ -67,8 +68,24 @@ export async function conectar({ banco, app, quem, agora = Date.now }: {
   return { url: url.toString() }
 }
 
+// Os motivos que a rotina grava quando a reunião parou por causa do Google da pessoa ("Conecte o Google…",
+// "Reconecte o Google…"): conectar de novo resolve.
+const PAROU_POR_CAUSA_DO_GOOGLE = [SEM_GOOGLE, MENSAGEM_RECONECTAR]
+
+// Com o Google conectado, as reuniões da pessoa que pararam por causa dele (terminadas há menos de 48 h) voltam a
+// esperar a transcrição, e a rotina as olha já. Melhor esforço: a conexão já está feita, e "Tentar de novo" na
+// reunião faz o mesmo.
+async function reabrirReunioes(banco: Banco, perfilId: string) {
+  try {
+    const { error } = await banco.rpc('reabrir_reunioes_do_google', { p_perfil: perfilId, p_motivos: PAROU_POR_CAUSA_DO_GOOGLE })
+    if (error) throw error
+  } catch (erro) {
+    console.error(`google-pessoa: não foi possível reabrir as reuniões de ${perfilId}`, erro)
+  }
+}
+
 // A volta do Google: confere o estado (de quem chama, dentro de 10 minutos, uma vez só), troca o código, confere os
-// escopos e guarda o token no Vault. Devolve só o e-mail da conta.
+// escopos e guarda o token no Vault; reabre as reuniões que pararam por falta do Google. Devolve só o e-mail da conta.
 export async function concluir({ banco, app, fetch: buscar, quem, estado, codigo, agora = Date.now }: {
   banco: Banco
   app: AppDoGoogle | null
@@ -127,6 +144,7 @@ export async function concluir({ banco, app, fetch: buscar, quem, estado, codigo
     access_token: tokens.access_token,
     expira_em: agora() + (tokens.expires_in ?? 3600) * 1000,
   }, { email, escopos: ESCOPOS_DA_PESSOA.filter((e) => escopos.includes(e)) })
+  await reabrirReunioes(banco, quem.id)
   return { email }
 }
 

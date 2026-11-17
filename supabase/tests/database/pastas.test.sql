@@ -2,7 +2,7 @@
 -- arquivos dentro dela. Segue as regras de cliente_arquivos. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(55);
+select plan(60);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -326,6 +326,34 @@ select lives_ok($$insert into public.cliente_pastas (id, cliente_id, nome) value
   'o sistema cria pasta em outro cliente');
 select throws_ok($$select testes.enviar_na_pasta('f_fora', 'c1', 'p_sis_b')$$, '42501', null,
   'mas arquivo não entra em pasta de outro cliente, nem para o sistema');
+reset role;
+
+-- ── Cliente muda de consultoria: a antiga deixa de ver as pastas dele ────────
+
+select testes.como('gestor_a');
+select is(testes.pastas(array['p_gestor', 'p_sis']), 2::bigint,
+  'antes da mudança, a gestão de A vê as pastas do cliente (a do gestor e a da reunião)');
+reset role;
+
+select testes.como_sistema();
+update public.clientes set consultoria_id = testes.id('B'), consultor_id = null where id = testes.id('c1');
+
+select testes.como('gestor_a');
+select is(testes.pastas(array['p_gestor', 'p_sis']), 0::bigint,
+  'cliente movido para B: a gestão de A não vê mais as pastas dele (nem a da reunião)');
+reset role;
+
+select testes.como('pessoa_a');
+select is(testes.pastas(array['p_gestor', 'p_sis']), 0::bigint, 'nem a consultora que cuidava dele');
+reset role;
+
+select testes.como('admin_b');
+select is(testes.pastas(array['p_gestor', 'p_sis']), 0::bigint,
+  'a consultoria nova não vê as pastas que a antiga criou (como os arquivos)');
+reset role;
+
+select testes.como('central');
+select is(testes.pastas(array['p_gestor', 'p_sis']), 2::bigint, 'a central continua vendo as duas');
 reset role;
 
 select * from finish();
