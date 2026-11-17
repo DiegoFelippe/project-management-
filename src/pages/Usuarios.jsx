@@ -1,4 +1,4 @@
-import { Pencil, Plus, Send, UserCheck, UserX, Landmark } from 'lucide-react'
+import { Gauge, Pencil, Plus, Send, UserCheck, UserX, Landmark } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
@@ -15,6 +15,7 @@ import { frase, juntar, useClientesAtivos } from '@/components/clientes/useClien
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import CapacidadeDaPessoa from '@/components/usuarios/CapacidadeDaPessoa'
 import FichaDoConsultor from '@/components/usuarios/FichaDoConsultor'
 import { definirCarga, ocupacaoDasPessoas } from '@/data/capacidade'
 import { buscarConsultoriasAtivas } from '@/data/consultorias'
@@ -23,7 +24,7 @@ import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/time
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { colunasDoMes, formatarHoras, formatarOcupacao } from '@/lib/horas'
 import { mesAtual } from '@/lib/mes'
-import { veTudo } from '@/lib/papeis'
+import { ehPapelDeConsultoria, veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
 
 const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'desativados', rotulo: 'Desativados' }]
@@ -47,12 +48,15 @@ export default function Usuarios() {
   const [reenviando, setReenviando] = useState(null)
   const [filtro, setFiltro] = useState('ativos')
   const [editando, setEditando] = useState(null)
+  const [capacidade, setCapacidade] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
   const [mes, setMes] = useState(mesAtual)
   const [numeros, setNumeros] = useState({ mes: null, porId: {} })
   const [erroNumeros, setErroNumeros] = useState(false)
   const [versao, setVersao] = useState(0)
+  const [versaoNumeros, setVersaoNumeros] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
+  const recarregarNumeros = () => setVersaoNumeros((v) => v + 1)
 
   // Uma página por vez, filtrada no banco (regra "Escala" no CLAUDE.md).
   useEffect(() => {
@@ -90,7 +94,7 @@ export default function Usuarios() {
     return () => {
       ativo = false
     }
-  }, [resultado, mes])
+  }, [resultado, mes, versaoNumeros])
 
   // Times que aparecem no "Novo acesso": o gestor só os dele; o administrador, todos da consultoria.
   useEffect(() => {
@@ -121,6 +125,10 @@ export default function Usuarios() {
     (ehDono ? papeisQueGerencio.includes(p.papel) : perfil.papel === 'admin' ? p.papel !== 'admin' : p.papel === 'pessoa')
   const podeDesativar = (p) =>
     p.id !== perfil.id && (ehDono ? papeisQueGerencio.includes(p.papel) : perfil.papel === 'admin' && p.papel !== 'admin')
+  // Carga e ausências (espelha o banco: central/dono, ou admin/gestor da mesma consultoria, inclusive em si mesmo).
+  const podeCapacidade = (p) =>
+    ehPapelDeConsultoria(p.papel) && p.ativo !== false &&
+    (ehDono || (['admin', 'gestor'].includes(perfil.papel) && p.consultoria_id === perfil.consultoria_id))
   // Só o administrador geral move para a central (admin, gestor ou pessoa ativos).
   const podeMover = (p) => ehAdminGeral && p.id !== perfil.id && p.ativo !== false && ['admin', 'gestor', 'pessoa'].includes(p.papel)
 
@@ -269,6 +277,11 @@ export default function Usuarios() {
                       <Pencil /> Editar
                     </Button>
                   )}
+                  {podeCapacidade(p) && (
+                    <Button variant="ghost" size="sm" onClick={() => setCapacidade(p)}>
+                      <Gauge /> Capacidade
+                    </Button>
+                  )}
                   {podeDesativar(p) && (
                     <Button variant="ghost" size="sm" onClick={() => setConfirmando({ pessoa: p, acao: p.ativo === false ? 'reativar' : 'desativar' })}
                       className={p.ativo === false ? '' : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'}>
@@ -296,6 +309,18 @@ export default function Usuarios() {
           podeReenviar={!ehDono || podeEditar(editando)} podeDesativar={podeDesativar(editando)}
           aoReenviar={() => reenviar(editando)} aoPedirAtivo={(acao) => setConfirmando({ pessoa: editando, acao })}
           aoFechar={() => setEditando(null)} aoSalvar={(dados) => salvarEdicao(editando, dados)} />
+      )}
+      {capacidade && (
+        <CapacidadeDaPessoa key={capacidade.id} pessoa={capacidade} aoFechar={() => setCapacidade(null)}
+          aoMudarAusencias={recarregarNumeros}
+          aoSalvar={async (horas) => {
+            const resposta = await definirCarga(capacidade.id, horas)
+            if (!resposta.erro) {
+              toast.success(`Carga de ${capacidade.nome} atualizada.`)
+              recarregar()
+            }
+            return resposta
+          }} />
       )}
       {confirmando && (
         <ConfirmarAcao aberto aoFechar={() => setConfirmando(null)} perigo={confirmando.acao === 'desativar'}

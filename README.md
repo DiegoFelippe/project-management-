@@ -25,8 +25,10 @@ O design e o plano estão em `docs/superpowers/`.
    a janela já sugere a de menor ocupação.
 2. O **administrador ou gestor** da consultoria escolhe o consultor, também pela menor ocupação.
 3. O **consultor** faz check-in e check-out no cliente (ou lança as horas depois). O check-in é de quem trabalhou.
-4. Em **Usuários**, no **Editar** da pessoa, ficam a carga semanal e as ausências (férias, feriados municipais); os
-   nacionais o sistema calcula. O resumo do mês (com ‹ Anterior · Próximo ›) são as colunas Capacidade, Reservado,
+4. Em **Usuários**, a ação **Capacidade** da linha abre a carga semanal e as ausências (férias, feriados
+   municipais) de quem é de consultoria e está ativo; os nacionais o sistema calcula. Quem pode: a central e o dono
+   (em qualquer consultoria) e o administrador ou gestor da própria consultoria, inclusive em si mesmo. A ficha
+   (Editar) traz o mesmo bloco Capacidade para quem já podia editar a pessoa. O resumo do mês (com ‹ Anterior · Próximo ›) são as colunas Capacidade, Reservado,
    Realizado e Ocupação da própria lista (em mês passado, sem Reservado e como Utilização). O resumo por
    consultoria (só central) fica em **Consultorias**, na aba "Ocupação do mês".
 5. Os números: **capacidade do mês** = dias úteis (sem sábado) x carga, menos ausências; **reservado** = previsão

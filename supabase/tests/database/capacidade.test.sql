@@ -2,7 +2,7 @@
 -- Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(24);
+select plan(26);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -117,6 +117,10 @@ reset role;
 select testes.como('gestor_a2');
 select lives_ok($$select public.definir_carga(testes.id('pessoa_a2'), 40)$$, 'gestor define a carga da pessoa');
 select throws_ok($$select public.definir_carga(testes.id('pessoa_a2'), 61)$$, '23514', null, 'carga acima de 60 h');
+select lives_ok($$select public.definir_carga(testes.id('gestor_a2'), 38)$$, 'gestor define a própria carga');
+reset role;
+select testes.como('admin_b');
+select lives_ok($$select public.definir_carga(testes.id('admin_b'), 36)$$, 'administrador define a própria carga');
 reset role;
 select testes.como('pessoa_a');
 select throws_ok($$select public.definir_carga(testes.id('pessoa_a2'), 30)$$, 'P0001', 'sem_permissao', 'pessoa não define carga');

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { contarClientesAtivos } from '@/data/clientes'
 import { trocarFoto } from '@/data/imagens'
-import { definirCarga, listarAusencias, ocupacaoDasPessoas } from '@/data/capacidade'
+import { apagarAusencia, definirCarga, listarAusencias, ocupacaoDasPessoas } from '@/data/capacidade'
 import { buscarConsultorias, buscarConsultoriasAtivas } from '@/data/consultorias'
 import { criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
@@ -361,6 +361,92 @@ describe('Usuários', () => {
       expect(await screen.findByText('Não foi possível carregar a capacidade do mês.')).toBeInTheDocument()
       expect(screen.getByRole('table', { name: 'Usuários' })).toBeInTheDocument()
       expect(screen.getByRole('row', { name: /Ana/ })).toBeInTheDocument()
+    })
+  })
+
+  describe('ação "Capacidade" da linha (carga e ausências)', () => {
+    const linha = (id, nome, papel, extra = {}) => ({
+      id, nome, email: `${nome.toLowerCase()}@x.test`, papel, ativo: true, times: [], consultoria_id: 'c1', carga_semanal: 40, ...extra,
+    })
+    const com = (...itens) => vi.mocked(listarUsuarios).mockImplementation(async () => ({ itens: [...itens], total: itens.length }))
+    const botao = async (nome) => within(await screen.findByRole('row', { name: new RegExp(nome) })).queryByRole('button', { name: 'Capacidade' })
+
+    it('a central abre a janela de uma pessoa, muda a carga e os números são buscados de novo', async () => {
+      com(linha('p1', 'Ana', 'pessoa'))
+      vi.mocked(definirCarga).mockResolvedValue({ erro: null })
+      renderizarTela(<Usuarios />, { perfil: { id: 'c9', papel: 'central', consultoria_id: null } })
+      await userEvent.click(await botao('Ana'))
+      const janela = screen.getByRole('dialog', { name: 'Capacidade de Ana' })
+      const campo = within(janela).getByLabelText('Carga semanal (horas)')
+      expect(campo).toHaveValue('40')
+      expect(await within(janela).findByText('Nenhuma ausência registrada.')).toBeInTheDocument()
+      const chamadas = vi.mocked(ocupacaoDasPessoas).mock.calls.length
+      await userEvent.clear(campo)
+      await userEvent.type(campo, '32,5')
+      await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
+      await waitFor(() => expect(definirCarga).toHaveBeenCalledWith('p1', 32.5))
+      await waitFor(() => expect(ocupacaoDasPessoas.mock.calls.length).toBeGreaterThan(chamadas))
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Capacidade de Ana' })).toBeNull())
+    })
+
+    it('recusa carga acima de 60 sem chamar o banco', async () => {
+      com(linha('p1', 'Ana', 'pessoa'))
+      renderizarTela(<Usuarios />, { perfil: { id: 'c9', papel: 'central', consultoria_id: null } })
+      await userEvent.click(await botao('Ana'))
+      const janela = screen.getByRole('dialog', { name: 'Capacidade de Ana' })
+      const campo = within(janela).getByLabelText('Carga semanal (horas)')
+      await userEvent.clear(campo)
+      await userEvent.type(campo, '61')
+      await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
+      expect(within(janela).getByText('Use de 0 a 60 horas.')).toBeInTheDocument()
+      expect(definirCarga).not.toHaveBeenCalled()
+    })
+
+    it('mexer nas ausências na janela busca os números de novo', async () => {
+      com(linha('p1', 'Ana', 'pessoa'))
+      vi.mocked(listarAusencias).mockResolvedValue({ itens: [{ id: 'a1', perfil_id: 'p1', de: '2026-12-20', ate: '2027-01-05', motivo: 'Férias' }], total: 1 })
+      vi.mocked(apagarAusencia).mockResolvedValue({ erro: null })
+      renderizarTela(<Usuarios />, { perfil: { id: 'c9', papel: 'central', consultoria_id: null } })
+      await userEvent.click(await botao('Ana'))
+      const janela = screen.getByRole('dialog', { name: 'Capacidade de Ana' })
+      await userEvent.click(await within(janela).findByRole('button', { name: 'Apagar' }))
+      const chamadas = vi.mocked(ocupacaoDasPessoas).mock.calls.length
+      await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar' }))
+      await waitFor(() => expect(apagarAusencia).toHaveBeenCalledWith('a1'))
+      await waitFor(() => expect(ocupacaoDasPessoas.mock.calls.length).toBeGreaterThan(chamadas))
+    })
+
+    it('o administrador tem a ação em si mesmo, em outro administrador e nas pessoas da consultoria', async () => {
+      com(linha('a1', 'Eu', 'admin'), linha('a2', 'Outro', 'admin'), linha('p1', 'Ana', 'pessoa'))
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+      expect(await botao('Eu')).toBeInTheDocument()
+      expect(await botao('Outro')).toBeInTheDocument()
+      expect(await botao('Ana')).toBeInTheDocument()
+    })
+
+    it('o gestor tem a ação em si mesmo e nas pessoas da consultoria', async () => {
+      com(linha('g1', 'Gil', 'gestor'), linha('p1', 'Ana', 'pessoa'))
+      renderizarTela(<Usuarios />, { perfil: { id: 'g1', papel: 'gestor', consultoria_id: 'c1' } })
+      expect(await botao('Gil')).toBeInTheDocument()
+      expect(await botao('Ana')).toBeInTheDocument()
+    })
+
+    it('pessoa de outra consultoria, desativada, da central ou o próprio perfil de "pessoa" ficam sem a ação', async () => {
+      com(
+        linha('p2', 'Zeca', 'pessoa', { consultoria_id: 'c2' }),
+        linha('p3', 'Dora', 'pessoa', { ativo: false }),
+        linha('c5', 'Cida', 'central', { consultoria_id: null }),
+      )
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+      expect(await botao('Zeca')).toBeNull()
+      expect(await botao('Dora')).toBeNull()
+      expect(await botao('Cida')).toBeNull()
+    })
+
+    it('a pessoa comum não tem a ação', async () => {
+      com(linha('p1', 'Ana', 'pessoa'))
+      renderizarTela(<Usuarios />, { perfil: { id: 'p1', papel: 'pessoa', consultoria_id: 'c1' } })
+      expect(await botao('Ana')).toBeNull()
     })
   })
 })
