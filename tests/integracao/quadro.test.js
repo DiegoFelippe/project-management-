@@ -379,7 +379,7 @@ describe('anexos e imagens dos cartões no balde quadros', () => {
     quadroAnexos = await quadroDoCliente(clienteAnexos)
     colunaAnexos = quadroAnexos.colunas[0].id
     const cartaoId = await novoCartao('anexos', colunaAnexos)
-    pasta = { clienteId: clienteAnexos, cartaoId }
+    pasta = { pasta: clienteAnexos, cartaoId }
   })
 
   it('a consultora anexa; a gestão e a central baixam pelo link assinado; quem não vê o quadro, não', async () => {
@@ -501,8 +501,8 @@ describe('anexos e imagens dos cartões no balde quadros', () => {
     entrar('pessoa')
     const lixo = (await criarColuna({ quadroId: quadroAnexos.id, nome: 'Lixo com anexos' })).coluna
     const cartaoId = await novoCartao('lixo com anexos', lixo.id)
-    const anexo = (await enviarAnexo({ clienteId: clienteAnexos, cartaoId }, texto('l', 'lixo.txt'))).anexo
-    const { caminho: imagem } = await enviarImagemDaDescricao({ clienteId: clienteAnexos, cartaoId }, png())
+    const anexo = (await enviarAnexo({ pasta: clienteAnexos, cartaoId }, texto('l', 'lixo.txt'))).anexo
+    const { caminho: imagem } = await enviarImagemDaDescricao({ pasta: clienteAnexos, cartaoId }, png())
     entrar('gestor')
     expect(await apagarColuna(lixo.id, { apagarCartoes: true })).toEqual({
       erro: null, movidos: 0, apagados: 1, idsApagados: [cartaoId],
@@ -516,8 +516,8 @@ describe('anexos e imagens dos cartões no balde quadros', () => {
     entrar('pessoa')
     const quadroSai = await quadroDoCliente(clienteSai)
     const cartaoId = await novoCartao('sobra', quadroSai.colunas[0].id)
-    const anexo = (await enviarAnexo({ clienteId: clienteSai, cartaoId }, texto('s', 'sobra.txt'))).anexo
-    const { caminho: imagem } = await enviarImagemDaDescricao({ clienteId: clienteSai, cartaoId }, png())
+    const anexo = (await enviarAnexo({ pasta: clienteSai, cartaoId }, texto('s', 'sobra.txt'))).anexo
+    const { caminho: imagem } = await enviarImagemDaDescricao({ pasta: clienteSai, cartaoId }, png())
     // O cartão sai pelo banco, mas tirar os objetos falha (a conexão caiu): eles ficam no Storage.
     expect((await sessoes.pessoa.rpc('apagar_cartao', { p_cartao: cartaoId })).error).toBeNull()
     expect(await existe(anexo.caminho)).toBe(true)

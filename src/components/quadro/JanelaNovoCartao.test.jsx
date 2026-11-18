@@ -54,6 +54,7 @@ describe('JanelaNovoCartao', () => {
     await user.click(within(janela).getByRole('button', { name: 'Criar cartão' }))
     expect(criarCartao).toHaveBeenCalledWith({
       colunaId: 'col2', titulo: 'Mapear boletos', prioridade: 'alta', prazo: somarDias(hoje(), 1), responsaveis: ['g1'],
+      quadro: QUADRO,
     })
     expect(pessoasDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ quadroId: 'q1' }))
     await waitFor(() => expect(aoCriado).toHaveBeenCalledWith('novo', 'col2'))

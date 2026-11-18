@@ -25,7 +25,6 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: v
 
 const ana = { id: 'p1', nome: 'Ana Lima', foto: null, cor: null, papel: 'pessoa', consultoria_id: 's1' }
 const central = { id: 'c0', nome: 'Cora Central', papel: 'central', consultoria_id: null }
-const CLIENTE = { id: 'k1', nome: 'Provedor Alfa', consultoria_id: 's1', consultor_id: 'p1', arquivado: false }
 const COLUNAS = [
   { id: 'col1', nome: 'A fazer', cor: null, concluidos: false },
   { id: 'col2', nome: 'Em andamento', cor: null, concluidos: false },
@@ -69,10 +68,10 @@ beforeEach(() => {
   vi.mocked(urlsAssinadas).mockImplementation(async (caminhos) => ({ urls: Object.fromEntries(caminhos.map((c) => [c, `https://assinado.local/${c}`])) }))
 })
 
-function abrir({ perfil = ana, cliente = CLIENTE, quadro = QUADRO } = {}) {
+function abrir({ perfil = ana, quadro = QUADRO, motivoSomenteLeitura = null } = {}) {
   const aoFechar = vi.fn()
   const aoQuadroMudou = vi.fn()
-  renderizarTela(<JanelaDoCartao cartaoId="c1" quadro={quadro} cliente={cliente} perfil={perfil} aoFechar={aoFechar} aoQuadroMudou={aoQuadroMudou} />, { perfil })
+  renderizarTela(<JanelaDoCartao cartaoId="c1" quadro={quadro} perfil={perfil} motivoSomenteLeitura={motivoSomenteLeitura} aoFechar={aoFechar} aoQuadroMudou={aoQuadroMudou} />, { perfil })
   return { aoFechar, aoQuadroMudou }
 }
 
@@ -184,7 +183,8 @@ describe('janela do cartão: grava campo a campo', () => {
     abrir()
     await janela()
     await escolher(user, 'Responsáveis', 'Gabi Souza')
-    expect(adicionarResponsavel).toHaveBeenCalledWith('c1', 'g1')
+    // O quadro vai junto: o texto da recusa depende do tipo dele (do cliente, pessoal ou do time).
+    expect(adicionarResponsavel).toHaveBeenCalledWith('c1', 'g1', { quadro: QUADRO })
     expect(pessoasDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ quadroId: 'q1' }))
     await waitFor(() => expect(lateral().getByRole('list', { name: 'Responsáveis do cartão' })).toHaveTextContent('Gabi Souza'))
     await user.click(lateral().getByRole('button', { name: 'Tirar Ana Lima' }))
@@ -216,7 +216,7 @@ describe('janela do cartão: grava campo a campo', () => {
     const j = await janela()
     const foto = new File(['png'], 'foto.png', { type: 'image/png' })
     await user.upload(within(j).getByLabelText('Escolher imagem'), foto)
-    expect(enviarImagemDaDescricao).toHaveBeenCalledWith({ clienteId: 'k1', cartaoId: 'c1' }, foto)
+    expect(enviarImagemDaDescricao).toHaveBeenCalledWith({ pasta: 'k1', cartaoId: 'c1' }, foto)
     await waitFor(() => expect(within(j).getByRole('img', { name: 'Imagem da descrição' })).toHaveAttribute('src', `https://assinado.local/${NOSSA}`))
   })
 
@@ -486,7 +486,7 @@ describe('janela do cartão: só leitura', () => {
 
   it('cliente arquivado: o aviso diz por quê', async () => {
     vi.mocked(buscarCartao).mockResolvedValue({ ...CARTAO, pode_mexer: false, pode_apagar: false })
-    abrir({ cliente: { ...CLIENTE, arquivado: true } })
+    abrir({ motivoSomenteLeitura: 'Cliente arquivado: o cartão é só para ler.' })
     const j = await janela()
     expect(within(j).getByText('Cliente arquivado: o cartão é só para ler.')).toBeInTheDocument()
   })

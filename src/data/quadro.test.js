@@ -309,6 +309,30 @@ describe('cartões', () => {
     })
     expect(banco.chamou('insert', { cartao_id: 'c1', perfil_id: 'p9' })).toBe(true)
   })
+
+  it('responsável recusado: no quadro do cliente fala de quem atende o cliente; no pessoal e no do time, não', async () => {
+    const DO_CLIENTE = 'Escolha alguém que atende este cliente: o consultor dele ou quem cuida da consultoria.'
+    const NEUTRO = 'Essa pessoa não pode ser responsável neste quadro. Escolha outra.'
+    const doCliente = { id: 'q1', cliente_id: 'k1' }
+    const pessoal = { id: 'q9', cliente_id: null, tipo: 'pessoa' }
+    banco.resposta = { data: null, error: { code: 'P0001', message: 'responsavel_invalido' } }
+    expect(await adicionarResponsavel('c1', 'p9', { quadro: doCliente })).toEqual({ erro: DO_CLIENTE })
+    expect(await adicionarResponsavel('c1', 'p9', { quadro: pessoal })).toEqual({ erro: NEUTRO })
+    expect(await adicionarResponsavel('c1', 'p9', { quadro: { ...pessoal, tipo: 'time' } })).toEqual({ erro: NEUTRO })
+
+    // Ao criar o cartão, o responsável recusado volta junto com o cartão criado, com o mesmo texto.
+    let vez = 0
+    vi.mocked(supabase.from).mockImplementation((tabela) => {
+      const b = banco.from(tabela)
+      vez += 1
+      banco.resposta = vez % 2 ? { data: { id: 'c1' }, error: null } : { data: null, error: { code: 'P0001', message: 'responsavel_invalido' } }
+      return b
+    })
+    expect(await criarCartao({ colunaId: 'col1', titulo: 'X', responsaveis: ['p9'], quadro: pessoal }))
+      .toEqual({ erro: NEUTRO, cartao: { id: 'c1' } })
+    expect(await criarCartao({ colunaId: 'col1', titulo: 'X', responsaveis: ['p9'], quadro: doCliente }))
+      .toEqual({ erro: DO_CLIENTE, cartao: { id: 'c1' } })
+  })
 })
 
 describe('colunas, checklist e comentários', () => {
@@ -363,7 +387,7 @@ describe('colunas, checklist e comentários', () => {
 })
 
 describe('anexos do cartão (balde quadros)', () => {
-  const cartao = { clienteId: 'k1', cartaoId: 'c1' }
+  const cartao = { pasta: 'k1', cartaoId: 'c1' }
   const arquivo = (nome, tamanho = 10, tipo = 'application/pdf') => ({ name: nome, size: tamanho, type: tipo })
 
   it('enviarAnexo sobe o objeto na pasta do cartão e depois grava a linha', async () => {
@@ -377,6 +401,14 @@ describe('anexos do cartão (balde quadros)', () => {
     expect(banco.chamou('from', 'cartao_anexos')).toBe(true)
     expect(banco.chamou('insert', { cartao_id: 'c1', caminho, nome: 'Relatório final.pdf', tamanho: 10, tipo: 'application/pdf' }))
       .toBe(true)
+  })
+
+  it('enviarAnexo com pasta quadro/<q> (quadro pessoal ou do time) grava quadro/<q>/<c>/<uuid>-nome', async () => {
+    banco.resposta = { data: { id: 'x1' }, error: null }
+    await enviarAnexo({ pasta: 'quadro/q9', cartaoId: 'c1' }, arquivo('Ata.pdf'))
+    const caminho = balde.upload.mock.calls[0][0]
+    expect(caminho).toMatch(new RegExp(`^quadro/q9/c1/${UUID}-Ata\\.pdf$`))
+    expect(banco.chamou('insert', { cartao_id: 'c1', caminho, nome: 'Ata.pdf', tamanho: 10, tipo: 'application/pdf' })).toBe(true)
   })
 
   it('arquivo vazio ou acima de 25 MB nem sobe', async () => {
@@ -432,7 +464,7 @@ describe('anexos do cartão (balde quadros)', () => {
 })
 
 describe('imagens da descrição e links assinados', () => {
-  const cartao = { clienteId: 'k1', cartaoId: 'c1' }
+  const cartao = { pasta: 'k1', cartaoId: 'c1' }
 
   it('enviarImagemDaDescricao sobe na pasta de imagens do cartão e devolve o caminho para o nó', async () => {
     const r = await enviarImagemDaDescricao(cartao, { name: 'print.png', size: 100, type: 'image/png' })
@@ -441,6 +473,11 @@ describe('imagens da descrição e links assinados', () => {
     expect(balde.upload).toHaveBeenCalledWith(r.caminho, expect.anything(), { contentType: 'image/png' })
     const jpg = await enviarImagemDaDescricao(cartao, { name: 'foto.JPEG', size: 100, type: 'image/jpeg' })
     expect(jpg.caminho).toMatch(/\.jpg$/)
+  })
+
+  it('num quadro pessoal ou do time, a imagem vai para quadro/<q>/<c>/imagens/', async () => {
+    const r = await enviarImagemDaDescricao({ pasta: 'quadro/q9', cartaoId: 'c1' }, { name: 'print.png', size: 100, type: 'image/png' })
+    expect(r.caminho).toMatch(new RegExp(`^quadro/q9/c1/imagens/${UUID}\\.png$`))
   })
 
   it('só PNG, JPG, GIF e WEBP de até 25 MB; recusa do Storage vira mensagem', async () => {

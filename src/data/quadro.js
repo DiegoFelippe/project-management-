@@ -1,8 +1,10 @@
-// Quadro Kanban do cliente. O banco decide quem vê e quem mexe (as regras das tabelas e as funções do quadro, migrações
-// 20261117112951_quadro.sql e 20261117125011_quadro_anexos.sql); aqui só se chama e traduz. Leituras devolvem os dados
-// ({ itens, total } nas listas) e sobem o erro do banco; escritas devolvem { erro } (o texto para a pessoa, ou null) e,
-// quando criam algo, o que foi criado. Anexos e imagens da descrição ficam no balde privado "quadros", na pasta do
-// cliente e do cartão; a linha (ou o cartão) sai primeiro e o objeto depois, e o que não sair vira um aviso.
+// Quadro Kanban (o do cliente e, por dentro, os do menu: pessoal e do time). O banco decide quem vê e quem mexe (as
+// regras das tabelas e as funções do quadro, migrações 20261117112951_quadro.sql, 20261117125011_quadro_anexos.sql e
+// 20261118013057_quadros_pessoais_e_de_time.sql); aqui só se chama e traduz. Leituras devolvem os dados ({ itens, total }
+// nas listas) e sobem o erro do banco; escritas devolvem { erro } (o texto para a pessoa, ou null) e, quando criam algo,
+// o que foi criado. Anexos e imagens da descrição ficam no balde privado "quadros", na pasta do quadro (pastaDoQuadro:
+// a do cliente ou quadro/<id>) e do cartão; a linha (ou o cartão) sai primeiro e o objeto depois, e o que não sair vira
+// um aviso.
 import { caminhoDaImagem, caminhoDoAnexo, imagemAceita, nomeParaMostrar, TAMANHO_MAXIMO_ARQUIVO } from '@/lib/arquivos'
 import { ARQUIVO_GRANDE_DEMAIS, traduzirErroBanco } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
@@ -22,17 +24,22 @@ const VALIDADE_DO_DOWNLOAD = 60
 const VALIDADE_DA_IMAGEM = 3600
 
 const SEM_PERMISSAO = traduzirErroBanco({ code: '42501' })
-const OBJETOS_FICARAM = 'Alguns anexos ou imagens não saíram do armazenamento. Avise o suporte.'
+export const OBJETOS_FICARAM = 'Alguns anexos ou imagens não saíram do armazenamento. Avise o suporte.'
 const ANEXO_FICOU = 'O anexo saiu do cartão, mas a cópia guardada não foi apagada. Avise o suporte.'
 const IMAGEM_DE_TIPO_ERRADO = 'Envie uma imagem PNG, JPG, GIF ou WEBP.'
 
 const comErro = (error) => ({ erro: traduzirErroBanco(error) })
+// O responsável recusado: no quadro do cliente, o texto de quem atende o cliente (o de sempre, também sem `quadro`); nos
+// quadros do menu (sem cliente), o neutro.
+const erroDoResponsavel = (error, quadro) => ({
+  erro: traduzirErroBanco(error, { sobre: quadro && !quadro.cliente_id ? 'quadro' : undefined }),
+})
 // Erros do envio e do link: os do Storage (403, 404, 413) e os do banco.
 const traduzirArquivo = (error) => traduzirErroBanco(error, { sobre: 'arquivo' })
 const balde = () => supabase.storage.from(BALDE)
 
-// Tira do balde os objetos (depois que a linha ou o cartão saiu), em lotes de 1000: true quando todos saíram.
-async function tirarDoBalde(caminhos) {
+// Tira do balde os objetos (depois que a linha, o cartão ou o quadro saiu), em lotes de 1000: true quando todos saíram.
+export async function tirarDoBalde(caminhos) {
   for (let inicio = 0; inicio < caminhos.length; inicio += POR_PEDIDO_NO_STORAGE) {
     const lote = caminhos.slice(inicio, inicio + POR_PEDIDO_NO_STORAGE)
     const { data, error } = await balde().remove(lote)
@@ -199,8 +206,9 @@ const CAMPOS_DO_CARTAO = ['titulo', 'descricao', 'prioridade', 'prazo']
 const OPCIONAIS_DO_CARTAO = ['descricao', 'prioridade', 'prazo']
 
 // Cartão novo no fim da coluna: { erro, cartao: { id } }. Os responsáveis entram em seguida; se o banco recusar algum,
-// o cartão já existe e volta junto com o erro (a janela abre nele para corrigir).
-export async function criarCartao({ colunaId, titulo, descricao, prioridade, prazo, responsaveis = [] }) {
+// o cartão já existe e volta junto com o erro (a janela abre nele para corrigir). `quadro`: o quadro aberto (o texto
+// do responsável recusado depende do tipo dele).
+export async function criarCartao({ colunaId, titulo, descricao, prioridade, prazo, responsaveis = [], quadro }) {
   const { data, error } = await supabase
     .from('cartoes')
     .insert({
@@ -218,7 +226,7 @@ export async function criarCartao({ colunaId, titulo, descricao, prioridade, pra
     const { error: erroResponsaveis } = await supabase
       .from('cartao_responsaveis')
       .insert(responsaveis.map((perfilId) => ({ cartao_id: cartao.id, perfil_id: perfilId })))
-    if (erroResponsaveis) return { ...comErro(erroResponsaveis), cartao }
+    if (erroResponsaveis) return { ...erroDoResponsavel(erroResponsaveis, quadro), cartao }
   }
   return { erro: null, cartao }
 }
@@ -250,9 +258,10 @@ export async function apagarCartao(id) {
   return { erro: null }
 }
 
-export async function adicionarResponsavel(cartaoId, perfilId) {
+// `quadro`: o quadro aberto (o texto do responsável recusado depende do tipo dele).
+export async function adicionarResponsavel(cartaoId, perfilId, { quadro } = {}) {
   const { error } = await supabase.from('cartao_responsaveis').insert({ cartao_id: cartaoId, perfil_id: perfilId })
-  return error ? comErro(error) : { erro: null }
+  return error ? erroDoResponsavel(error, quadro) : { erro: null }
 }
 
 export async function tirarResponsavel(cartaoId, perfilId) {
@@ -343,14 +352,15 @@ export async function anexosDoCartao({ cartaoId, pagina = 1 } = {}) {
   return { itens: data?.itens ?? [], total: data?.total ?? 0 }
 }
 
-// Anexa um arquivo (até 25 MB, qualquer tipo): sobe o objeto na pasta do cartão e depois grava a linha; se a linha não
-// grava, tira o objeto que subiu. { erro, anexo: { id, nome, tamanho, tipo, caminho, enviado_em, enviado_por } }.
-export async function enviarAnexo({ clienteId, cartaoId }, arquivo) {
+// Anexa um arquivo (até 25 MB, qualquer tipo): sobe o objeto na pasta do cartão (dentro da pasta do quadro,
+// pastaDoQuadro) e depois grava a linha; se a linha não grava, tira o objeto que subiu. { erro, anexo: { id, nome,
+// tamanho, tipo, caminho, enviado_em, enviado_por } }.
+export async function enviarAnexo({ pasta, cartaoId }, arquivo) {
   if (!arquivo?.size) return { erro: 'O arquivo está vazio.' }
   if (arquivo.size > TAMANHO_MAXIMO_ARQUIVO) return { erro: ARQUIVO_GRANDE_DEMAIS }
   // O nome que aparece (sem espaços nas pontas) também dá o nome no Storage.
   const nome = nomeParaMostrar(arquivo.name)
-  const caminho = caminhoDoAnexo(clienteId, cartaoId, nome)
+  const caminho = caminhoDoAnexo(pasta, cartaoId, nome)
   const tipo = arquivo.type || null
   const { error } = await balde().upload(caminho, arquivo, { contentType: tipo ?? 'application/octet-stream' })
   if (error) return { erro: traduzirArquivo(error) }
@@ -377,13 +387,14 @@ export async function apagarAnexo(anexo) {
   return { erro: null }
 }
 
-// Sobe a imagem colada ou escolhida na descrição (PNG, JPG, GIF ou WEBP, até 25 MB) na pasta de imagens do cartão:
-// { erro, caminho }. O nó "image" guarda o caminho (o banco recusa outro src); a tela mostra pela urlAssinada.
-export async function enviarImagemDaDescricao({ clienteId, cartaoId }, arquivo) {
+// Sobe a imagem colada ou escolhida na descrição (PNG, JPG, GIF ou WEBP, até 25 MB) na pasta de imagens do cartão
+// (dentro da pasta do quadro, pastaDoQuadro): { erro, caminho }. O nó "image" guarda o caminho (o banco recusa outro
+// src); a tela mostra pela urlAssinada.
+export async function enviarImagemDaDescricao({ pasta, cartaoId }, arquivo) {
   if (!imagemAceita(arquivo?.type)) return { erro: IMAGEM_DE_TIPO_ERRADO }
   if (!arquivo.size) return { erro: 'O arquivo está vazio.' }
   if (arquivo.size > TAMANHO_MAXIMO_ARQUIVO) return { erro: ARQUIVO_GRANDE_DEMAIS }
-  const caminho = caminhoDaImagem(clienteId, cartaoId, arquivo.type)
+  const caminho = caminhoDaImagem(pasta, cartaoId, arquivo.type)
   const { error } = await balde().upload(caminho, arquivo, { contentType: arquivo.type })
   if (error) return { erro: traduzirArquivo(error) }
   return { erro: null, caminho }

@@ -13,10 +13,10 @@ import { atalhosDoPrazo, OPCOES_DE_PRIORIDADE } from './cores'
 
 const PRIORIDADES = [{ valor: '', rotulo: 'Sem prioridade' }, ...OPCOES_DE_PRIORIDADE]
 
-// "Novo cartão" (como no Mochi): título, coluna, prioridade, prazo e responsáveis (só quem atende o cliente; a lista vem
-// do banco). Cria no fim da coluna. `aoCriado(id, colunaId, aviso?)`: o cartão já existe (aviso = um responsável que o
-// banco recusou; o cartão abre para corrigir). `aoRecusado()`: o banco recusou o cartão (sem permissão, coluna que saiu);
-// a janela mostra o motivo e quem chama relê o quadro.
+// "Novo cartão" (como no Mochi): título, coluna, prioridade, prazo e responsáveis (quem pode ser responsável no quadro; a
+// lista vem do banco). Cria no fim da coluna. `aoCriado(id, colunaId, aviso?)`: o cartão já existe (aviso = um
+// responsável que o banco recusou; o cartão abre para corrigir). `aoRecusado()`: o banco recusou o cartão (sem
+// permissão, coluna que saiu); a janela mostra o motivo e quem chama relê o quadro.
 export default function JanelaNovoCartao({ quadro, colunaId, aoFechar, aoCriado, aoRecusado = () => {} }) {
   const [titulo, setTitulo] = useState('')
   const [coluna, setColuna] = useState(colunaId ?? quadro.colunas[0]?.id ?? '')
@@ -45,7 +45,7 @@ export default function JanelaNovoCartao({ quadro, colunaId, aoFechar, aoCriado,
     setEnviando(true)
     const resposta = await criarCartao({
       colunaId: coluna, titulo: titulo.trim(), prioridade: prioridade || null, prazo: prazo || null,
-      responsaveis: responsaveis.map((p) => p.id),
+      responsaveis: responsaveis.map((p) => p.id), quadro,
     })
     setEnviando(false)
     if (resposta.erro && !resposta.cartao) {

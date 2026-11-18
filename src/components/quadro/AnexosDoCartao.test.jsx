@@ -31,7 +31,7 @@ afterEach(() => clicar.mockRestore())
 function tela(props = {}) {
   const aoMexer = vi.fn()
   const aoRecusar = vi.fn()
-  render(<AnexosDoCartao clienteId="k1" cartaoId="c1" podeMexer aoMexer={aoMexer} aoRecusar={aoRecusar} {...props} />)
+  render(<AnexosDoCartao pasta="k1" cartaoId="c1" podeMexer aoMexer={aoMexer} aoRecusar={aoRecusar} {...props} />)
   return { aoMexer, aoRecusar }
 }
 
@@ -54,7 +54,7 @@ describe('anexos do cartão', () => {
 
   it('paginação: some com 15 ou menos; aparece com mais e Próxima pede a página 2 ao banco', async () => {
     const user = userEvent.setup()
-    const { unmount } = render(<AnexosDoCartao clienteId="k1" cartaoId="c1" podeMexer aoMexer={vi.fn()} aoRecusar={vi.fn()} />)
+    const { unmount } = render(<AnexosDoCartao pasta="k1" cartaoId="c1" podeMexer aoMexer={vi.fn()} aoRecusar={vi.fn()} />)
     await tabela()
     expect(screen.queryByRole('navigation', { name: 'Paginação' })).not.toBeInTheDocument()
     unmount()
@@ -73,7 +73,7 @@ describe('anexos do cartão', () => {
     await tabela()
     const arquivo = new File(['x'], 'ata.pdf', { type: 'application/pdf' })
     await user.upload(screen.getByLabelText('Escolher arquivos para anexar'), arquivo)
-    expect(enviarAnexo).toHaveBeenCalledWith({ clienteId: 'k1', cartaoId: 'c1' }, arquivo)
+    expect(enviarAnexo).toHaveBeenCalledWith({ pasta: 'k1', cartaoId: 'c1' }, arquivo)
     await waitFor(() => expect(anexosDoCartao).toHaveBeenCalledTimes(2))
     expect(anexosDoCartao).toHaveBeenLastCalledWith({ cartaoId: 'c1', pagina: 1 })
     expect(toast.success).toHaveBeenCalledWith('ata.pdf anexado.')
@@ -90,8 +90,8 @@ describe('anexos do cartão', () => {
     expect(screen.getByText('Solte para anexar.')).toBeInTheDocument()
     expect(fireEvent.drop(area, { dataTransfer: { files: [a, b], types: ['Files'] } })).toBe(false)
     await waitFor(() => expect(enviarAnexo).toHaveBeenCalledTimes(2))
-    expect(enviarAnexo).toHaveBeenNthCalledWith(1, { clienteId: 'k1', cartaoId: 'c1' }, a)
-    expect(enviarAnexo).toHaveBeenNthCalledWith(2, { clienteId: 'k1', cartaoId: 'c1' }, b)
+    expect(enviarAnexo).toHaveBeenNthCalledWith(1, { pasta: 'k1', cartaoId: 'c1' }, a)
+    expect(enviarAnexo).toHaveBeenNthCalledWith(2, { pasta: 'k1', cartaoId: 'c1' }, b)
   })
 
   it('baixar usa o link assinado com o nome original', async () => {

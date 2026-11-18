@@ -120,6 +120,11 @@ const ERROS_DO_CHECKLIST = {
   estado_invalido: 'Essa situação de tarefa não existe. Atualize a página.',
 }
 
+// Nos quadros do menu (pessoal e do time) não há cliente: o responsável recusado ganha o texto neutro.
+const ERROS_DOS_QUADROS_DO_MENU = {
+  responsavel_invalido: 'Essa pessoa não pode ser responsável neste quadro. Escolha outra.',
+}
+
 // As regras das colunas dos modelos recusam (23514) texto acima do tamanho; a tela confere o mesmo antes de enviar.
 export const TEXTO_DO_MODELO_GRANDE_DEMAIS =
   'Algum texto passou do tamanho: nome do modelo e título da tarefa até 80 letras, descrição do modelo até 400, ' +
@@ -139,12 +144,15 @@ function traduzirErroDoStorage(erro) {
   return null
 }
 
-// `sobre`: 'time' (o padrão quando não vem) | 'cliente' | 'checkin' | 'arquivo' | 'modelo' | 'checklist' | 'quadro' —
-// muda o texto de alguns códigos. O 23503 do time com quadros vale com `sobre: 'time'` dito ou quando a recusa é a da
-// regra quadros_time_id_fkey (apagarTime não diz o `sobre`, e outro 23503 sem contexto continua no texto padrão).
+// `sobre`: 'time' (o padrão quando não vem) | 'cliente' | 'checkin' | 'arquivo' | 'modelo' | 'checklist' | 'quadro' (os
+// quadros do menu) — muda o texto de alguns códigos. O 23503 do time com quadros vale com `sobre: 'time'` dito ou quando
+// a recusa é a da regra quadros_time_id_fkey (apagarTime não diz o `sobre`, e outro 23503 sem contexto continua no texto
+// padrão).
 export function traduzirErroBanco(erro, { sobre } = {}) {
   const doChecklist = sobre === 'checklist' ? ERROS_DO_CHECKLIST[erro?.message] : null
   if (doChecklist) return doChecklist
+  const doQuadroDoMenu = sobre === 'quadro' ? ERROS_DOS_QUADROS_DO_MENU[erro?.message] : null
+  if (doQuadroDoMenu) return doQuadroDoMenu
   const mensagem = ERROS_MENSAGEM_BANCO[erro?.message]
   if (mensagem) return mensagem
   if (sobre === 'arquivo') {

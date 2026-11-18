@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import {
-  cartoesDoQuadro, moverCartao, moverColuna, quadroDoCliente, quadroPorId, quadrosDoCliente,
-} from '@/data/quadro'
+import { cartoesDoQuadro, moverCartao, moverColuna } from '@/data/quadro'
 import { ouvirQuadro } from '@/data/quadroAoVivo'
 
 // Filtros da barra do quadro. responsavel: '' | 'sem' | id (nomeDoResponsavel só para o seletor mostrar o nome).
@@ -29,10 +27,12 @@ function juntar(a, b) {
 
 const inserir = (lista, indice, item) => [...lista.slice(0, indice), item, ...lista.slice(indice)]
 
-// O quadro do cliente na tela: o quadro (colunas), uma página de cartões por coluna (mais com "ver mais"), o tempo real e
-// o arrastar otimista. Quem vê o quê é do banco: a central lista os quadros do cliente (um por
-// consultoria que o atendeu) e abre o escolhido (`escolher(id)`; sem escolha, o atual) só para ler; os outros recebem o
-// quadro da consultoria que atende. `filtros` já vem com a busca atrasada (a pessoa parou de digitar).
+// Um quadro na tela (o do cliente ou um do menu): o quadro (colunas), uma página de cartões por coluna (mais com "ver
+// mais"), o tempo real e o arrastar otimista. Quem vê o quê é do banco. Quem chama diz como ler o quadro:
+// `ler(escolhido)` → { quadro (null = sem quadro), quadros? } (`quadros`, quando vem, é a lista do seletor; ex.: a central
+// lista os quadros do cliente, um por consultoria que o atendeu, e abre o escolhido por `escolher(id)` ou, sem escolha, o
+// atual). `chave` diz qual quadro é (o cliente, o quadro do menu): chave nova começa do zero, como `escolher`. `filtros`
+// já vem com a busca atrasada (a pessoa parou de digitar).
 //
 // Tempo real (src/data/quadroAoVivo.js): avisos juntos a cada 300 ms. "tudo" (conectou, reconectou, plano B, acesso)
 // relê o quadro todo; aviso de colunas relê o quadro (nomes, cores, ordem) e as colunas novas; aviso de cartões relê só
@@ -42,7 +42,7 @@ const inserir = (lista, indice, item) => [...lista.slice(0, indice), item, ...li
 // "ver mais" que atropela uma releitura a refaz quando termina. Do mesmo jeito, a leitura do quadro que vale cumpre o que
 // as atropeladas pediam ("reler tudo", colunas). Se a releitura disser que a pessoa não vê mais o quadro (nulo ou
 // sem_permissao), para de ouvir e `semAcesso` fica ligado.
-export function useQuadro({ clienteId, central, filtros }) {
+export function useQuadro({ ler, chave, filtros }) {
   const [quadros, setQuadros] = useState(null)
   const [escolhido, setEscolhido] = useState(null)
   const [quadro, setQuadro] = useState(undefined) // undefined = carregando; null = sem quadro
@@ -67,6 +67,11 @@ export function useQuadro({ clienteId, central, filtros }) {
   const parar = useRef(null)
   const ocupado = useRef(0)
   const pendente = useRef(null)
+  // A leitura mais nova de quem chama (sem reler quando só a função muda: o que recomeça é a `chave`).
+  const lerOQuadro = useRef(ler)
+  useEffect(() => {
+    lerOQuadro.current = ler
+  })
 
   const mudarQuadro = useCallback((q) => {
     quadroRef.current = q
@@ -122,17 +127,9 @@ export function useQuadro({ clienteId, central, filtros }) {
     const numero = ++pedidoDoQuadro.current
     const atual = () => numero === pedidoDoQuadro.current
     try {
-      let q
-      if (central) {
-        const lista = await quadrosDoCliente(clienteId)
-        if (!atual()) return undefined
-        setQuadros(lista)
-        const quero = lista.find((x) => x.id === escolhidoRef.current) ?? lista.find((x) => x.atual) ?? lista[0]
-        q = quero ? await quadroPorId(quero.id) : null
-      } else {
-        q = await quadroDoCliente(clienteId)
-      }
+      const { quadro: q, quadros: lista } = await lerOQuadro.current(escolhidoRef.current)
       if (!atual()) return undefined
+      if (lista !== undefined) setQuadros(lista)
       setErro(null)
       if (!q && teveQuadro.current) {
         setSemAcesso(true)
@@ -164,7 +161,7 @@ export function useQuadro({ clienteId, central, filtros }) {
       }
       return undefined
     }
-  }, [central, clienteId, lerColuna, mudarQuadro])
+  }, [lerColuna, mudarQuadro])
 
   useEffect(() => {
     relerOQuadro.current = () => lerQuadro()
@@ -242,17 +239,12 @@ export function useQuadro({ clienteId, central, filtros }) {
     }
   }, [quadroId])
 
-  // ── Abrir e filtrar ──
+  // ── Abrir, trocar de quadro e filtrar ──
 
-  useEffect(() => {
-    escolhidoRef.current = escolhido
-    // Lê na volta seguinte, fora da montagem (o StrictMode monta duas vezes e só a segunda lê).
-    const espera = setTimeout(lerTudo, 0)
-    return () => clearTimeout(espera)
-  }, [lerTudo, escolhido])
-
-  // A central troca de quadro (o de outra consultoria que atendeu o cliente): começa do zero.
-  const escolher = useCallback((id) => {
+  // Começa do zero: as leituras em andamento ficam velhas (as que chegarem são descartadas) e a tela volta a
+  // "carregando", sem nada do quadro anterior.
+  const recomecar = useCallback(() => {
+    pedidoDoQuadro.current += 1
     pedidos.current = {}
     paginas.current = {}
     lendo.current = {}
@@ -265,9 +257,34 @@ export function useQuadro({ clienteId, central, filtros }) {
     colunasRef.current = {}
     setColunas({})
     setSemAcesso(false)
+    setErro(null)
     mudarQuadro(undefined)
-    setEscolhido(id)
   }, [mudarQuadro])
+
+  // Chave nova (outro cliente, outro quadro do menu): começa do zero, sem escolha e sem a lista do seletor, antes de a
+  // tela ser pintada (o quadro anterior não aparece nem por um instante).
+  const chaveAtual = useRef(chave)
+  useLayoutEffect(() => {
+    if (chaveAtual.current === chave) return
+    chaveAtual.current = chave
+    recomecar()
+    escolhidoRef.current = null
+    setEscolhido(null)
+    setQuadros(null)
+  }, [chave, recomecar])
+
+  useEffect(() => {
+    escolhidoRef.current = escolhido
+    // Lê na volta seguinte, fora da montagem (o StrictMode monta duas vezes e só a segunda lê).
+    const espera = setTimeout(lerTudo, 0)
+    return () => clearTimeout(espera)
+  }, [lerTudo, escolhido, chave])
+
+  // A central troca de quadro (o de outra consultoria que atendeu o cliente): começa do zero.
+  const escolher = useCallback((id) => {
+    recomecar()
+    setEscolhido(id)
+  }, [recomecar])
 
   const chaveDosFiltros = JSON.stringify(doBanco(filtros))
   useEffect(() => {

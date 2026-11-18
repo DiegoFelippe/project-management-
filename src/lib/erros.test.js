@@ -251,6 +251,12 @@ describe('traduzirErroBanco nos quadros do menu', () => {
     )
   })
 
+  it('responsável recusado: o texto neutro (nos quadros do menu não há cliente); sem "sobre", o do quadro do cliente', () => {
+    const recusa = { code: 'P0001', message: 'responsavel_invalido' }
+    expect(traduzirErroBanco(recusa, { sobre: 'quadro' })).toBe('Essa pessoa não pode ser responsável neste quadro. Escolha outra.')
+    expect(traduzirErroBanco(recusa)).toBe('Escolha alguém que atende este cliente: o consultor dele ou quem cuida da consultoria.')
+  })
+
   it('time que a pessoa não pode usar e quadro arquivado', () => {
     expect(traduzirErroBanco({ code: 'P0001', message: 'time_invalido' }, { sobre: 'quadro' })).toBe(
       'Esse time não está mais disponível para você. Escolha outro time.',

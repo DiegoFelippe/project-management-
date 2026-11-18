@@ -7,14 +7,10 @@
 // favorito }.
 import { traduzirErroBanco } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
+import { OBJETOS_FICARAM, tirarDoBalde } from './quadro'
 
 // Tamanho da página da janela de quadros arquivados (a função do banco devolve 15 por vez).
 export const QUADROS_ARQUIVADOS_POR_PAGINA = 15
-
-const BALDE = 'quadros'
-// O Storage tira até 1000 objetos por pedido.
-const POR_PEDIDO_NO_STORAGE = 1000
-const OBJETOS_FICARAM = 'Alguns anexos ou imagens não saíram do armazenamento. Avise o suporte.'
 
 const traduzir = (error) => traduzirErroBanco(error, { sobre: 'quadro' })
 const SEM_PERMISSAO = traduzir({ code: '42501' })
@@ -25,17 +21,6 @@ async function ler(funcao, parametros) {
   const { data, error } = await supabase.rpc(funcao, parametros)
   if (error) throw error
   return data
-}
-
-// Tira do balde os objetos (depois que o quadro saiu), em lotes de 1000: true quando todos saíram. (O mesmo de
-// quadro.js, que não o exporta.)
-async function tirarDoBalde(caminhos) {
-  for (let inicio = 0; inicio < caminhos.length; inicio += POR_PEDIDO_NO_STORAGE) {
-    const lote = caminhos.slice(inicio, inicio + POR_PEDIDO_NO_STORAGE)
-    const { data, error } = await supabase.storage.from(BALDE).remove(lote)
-    if (error || (data?.length ?? 0) < lote.length) return false
-  }
-  return true
 }
 
 // Update direto em quadros (renomear, arquivar, restaurar): nenhuma linha de volta = a regra do banco recusou (quem não

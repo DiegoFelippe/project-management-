@@ -25,10 +25,17 @@ export function caminhoDoArquivo(clienteId, nome, id = crypto.randomUUID()) {
   return `${clienteId}/${id}-${nomeNoStorage(nome)}`
 }
 
-// Quadro do cliente (bucket "quadros", o mesmo limite de 25 MB): o anexo do cartão em <cliente>/<cartao>/<uuid>-<nome>
-// e a imagem da descrição em <cliente>/<cartao>/imagens/<uuid>.<ext>. O banco confere as duas formas.
-export function caminhoDoAnexo(clienteId, cartaoId, nome, id = crypto.randomUUID()) {
-  return `${clienteId}/${cartaoId}/${id}-${nomeNoStorage(nome)}`
+// Quadros (bucket "quadros", o mesmo limite de 25 MB): cada quadro tem a pasta dele, a mesma regra de
+// private.pasta_do_quadro no banco: a do cliente (<cliente_id>) no quadro do cliente e quadro/<id> no pessoal e no do
+// time.
+export function pastaDoQuadro(quadro) {
+  return quadro.cliente_id ?? `quadro/${quadro.id}`
+}
+
+// Dentro da pasta do quadro, o anexo do cartão em <pasta>/<cartao>/<uuid>-<nome> e a imagem da descrição em
+// <pasta>/<cartao>/imagens/<uuid>.<ext>. O banco confere as duas formas.
+export function caminhoDoAnexo(pasta, cartaoId, nome, id = crypto.randomUUID()) {
+  return `${pasta}/${cartaoId}/${id}-${nomeNoStorage(nome)}`
 }
 
 // Imagens que a descrição aceita (o banco também recusa outra extensão; SVG fica de fora).
@@ -38,8 +45,8 @@ export const TIPOS_DE_IMAGEM = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image
 export const imagemAceita = (tipo) => typeof tipo === 'string' && Object.hasOwn(TIPOS_DE_IMAGEM, tipo)
 
 // null quando o tipo não é uma das imagens aceitas.
-export function caminhoDaImagem(clienteId, cartaoId, tipo, id = crypto.randomUUID()) {
-  return imagemAceita(tipo) ? `${clienteId}/${cartaoId}/imagens/${id}.${TIPOS_DE_IMAGEM[tipo]}` : null
+export function caminhoDaImagem(pasta, cartaoId, tipo, id = crypto.randomUUID()) {
+  return imagemAceita(tipo) ? `${pasta}/${cartaoId}/imagens/${id}.${TIPOS_DE_IMAGEM[tipo]}` : null
 }
 
 const DECIMAL = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 })

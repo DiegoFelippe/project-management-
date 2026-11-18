@@ -8,6 +8,7 @@ import {
   limparPasta,
   nomeNoStorage,
   nomeParaMostrar,
+  pastaDoQuadro,
   TAMANHO_MAXIMO_ARQUIVO,
 } from './arquivos'
 
@@ -47,6 +48,17 @@ describe('arquivos do cliente', () => {
 })
 
 describe('caminhos no balde quadros (o banco confere as duas formas)', () => {
+  it('pastaDoQuadro: cliente → <cliente_id>; pessoal e do time → quadro/<id> (a regra de private.pasta_do_quadro)', () => {
+    expect(pastaDoQuadro({ id: 'q1', cliente_id: 'k1' })).toBe('k1')
+    expect(pastaDoQuadro({ id: 'q2', cliente_id: null, tipo: 'pessoa' })).toBe('quadro/q2')
+    expect(pastaDoQuadro({ id: 'q3', cliente_id: null, tipo: 'time' })).toBe('quadro/q3')
+  })
+
+  it('nos quadros do menu, o anexo e a imagem ficam em quadro/<quadro>/<cartao>/…', () => {
+    expect(caminhoDoAnexo('quadro/q2', 'c1', 'Ata.pdf', UUID)).toBe(`quadro/q2/c1/${UUID}-Ata.pdf`)
+    expect(caminhoDaImagem('quadro/q2', 'c1', 'image/png', UUID)).toBe(`quadro/q2/c1/imagens/${UUID}.png`)
+  })
+
   it('anexo do cartão: <cliente>/<cartao>/<uuid>-<nome>', () => {
     expect(caminhoDoAnexo('k1', 'c1', 'Ata da reunião.pdf', UUID)).toBe(`k1/c1/${UUID}-Ata_da_reuniao.pdf`)
     expect(caminhoDoAnexo('k1', 'c1', 'a.pdf')).toMatch(/^k1\/c1\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-a\.pdf$/)

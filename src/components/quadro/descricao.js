@@ -33,8 +33,8 @@ export function normalizarLink(texto) {
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 const escapar = (texto) => texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-// Imagem da descrição deste cartão: `<cliente>/<cartao>/imagens/<uuid>.<png|jpg|jpeg|gif|webp>`, a mesma forma que o
-// banco aceita. `pasta` = `<cliente>/<cartao>/`.
+// Imagem da descrição deste cartão: `<pasta do quadro>/<cartao>/imagens/<uuid>.<png|jpg|jpeg|gif|webp>`, a mesma forma
+// que o banco aceita. `pasta` = `<pasta do quadro>/<cartao>/` (pastaDoQuadro: `<cliente>` ou `quadro/<id>`).
 export function imagemDoCartao(src, pasta) {
   if (typeof src !== 'string' || !pasta) return false
   return new RegExp(`^${escapar(pasta)}imagens/${UUID}\\.(png|jpg|jpeg|gif|webp)$`).test(src)

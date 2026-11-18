@@ -104,7 +104,7 @@ const Separador = () => <span className="mx-1 h-5 w-px bg-border" aria-hidden="t
 // Descrição do cartão com o editor do Mochi (TipTap): negrito, itálico, sublinhado, tachado, títulos, listas, citação,
 // código, link e imagem por upload. Só os nós e marcas que o banco aceita (StarterKit + imagem). Colar texto do Word ou
 // de uma página traz a formatação, nunca HTML cru: o que é perigoso sai, imagem de fora não entra (e a pessoa é avisada)
-// e link só http, https ou mailto. `conteudo`: o JSON gravado (lido só ao montar); `pasta`: `<cliente>/<cartao>/`;
+// e link só http, https ou mailto. `conteudo`: o JSON gravado (lido só ao montar); `pasta`: `<pasta do quadro>/<cartao>/`;
 // `aoMudar(json | null)` a cada mudança (quem chama espera a pessoa parar de digitar para gravar);
 // `aoEnviarImagem(arquivo)` → { erro, caminho }.
 export default function EditorDaDescricao({ conteudo, pasta, somenteLeitura = false, aoMudar, aoEnviarImagem }) {

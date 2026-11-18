@@ -12,6 +12,7 @@ import {
   adicionarResponsavel, apagarCartao, arquivarCartao, buscarCartao, editarCartao, enviarImagemDaDescricao, moverCartao,
   tirarResponsavel,
 } from '@/data/quadro'
+import { pastaDoQuadro } from '@/lib/arquivos'
 import { FUSO } from '@/lib/mes'
 import AnexosDoCartao from './AnexosDoCartao'
 import ChecklistDoCartao from './ChecklistDoCartao'
@@ -61,14 +62,15 @@ function oQueSome(contagem) {
 // rodapé Cancelar + Salvar do JanelaFormulario. As gravações do cartão vão em fila (a resposta velha nunca passa por cima
 // da nova). Recusa do banco: o motivo aparece e o cartão é relido — sumiu (ou a pessoa não o vê mais): avisa, fecha e o
 // quadro é relido; perdeu a permissão: vira só leitura e o quadro é relido. Quem só lê (central, dono, cliente arquivado,
-// quem não atende o cliente) lê tudo, sem campos. `aoFechar(colunasMexidas)`: o quadro relê essas colunas (mesmo sem o
-// tempo real); `aoQuadroMudou()`: o quadro relê tudo.
+// quadro arquivado, quem não atende o cliente) lê tudo, sem campos; `motivoSomenteLeitura` diz por quê (senão, "Você vê
+// este cartão só para ler."). Anexos e imagens vão para a pasta do quadro (pastaDoQuadro: a do cliente ou quadro/<id>).
+// `aoFechar(colunasMexidas)`: o quadro relê essas colunas (mesmo sem o tempo real); `aoQuadroMudou()`: o quadro relê tudo.
 //
 // Nada que a pessoa escreveu some calado: o título digitado que não gravou fica no campo (o cabeçalho só mostra o que o
 // banco aceitou), a descrição que não gravou volta a esperar, e a mudança de outro campo que falhou fica guardada para
 // refazer. Fechar tenta gravar de novo o que falta e, se ainda faltar algo, pergunta (NaoSalvo): continuar editando,
 // tentar de novo ou fechar sem salvar.
-export default function JanelaDoCartao({ cartaoId, quadro, cliente, perfil, aoFechar, aoQuadroMudou }) {
+export default function JanelaDoCartao({ cartaoId, quadro, perfil, motivoSomenteLeitura = null, aoFechar, aoQuadroMudou }) {
   const [cartao, setCartao] = useState(undefined) // undefined = carregando
   const [erro, setErro] = useState(null)
   const [titulo, setTitulo] = useState('')
@@ -280,7 +282,9 @@ export default function JanelaDoCartao({ cartaoId, quadro, cliente, perfil, aoFe
     const { id, nome, foto, cor } = pessoa
     setCartao((x) => (x.responsaveis.some((p) => p.id === id) ? x
       : { ...x, responsaveis: [...x.responsaveis, { id, nome, foto, cor }].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')) }))
-    return salvar('responsaveis', () => adicionarResponsavel(cartaoId, id), { chave: `responsaveis:${id}`, refazer: () => porResponsavel(pessoa) })
+    return salvar('responsaveis', () => adicionarResponsavel(cartaoId, id, { quadro }), {
+      chave: `responsaveis:${id}`, refazer: () => porResponsavel(pessoa),
+    })
   }
 
   function incluirResponsavel(pessoa) {
@@ -407,7 +411,8 @@ export default function JanelaDoCartao({ cartaoId, quadro, cliente, perfil, aoFe
   }
 
   const podeMexer = Boolean(cartao.pode_mexer)
-  const somenteLeitura = podeMexer ? null : cliente.arquivado ? 'Cliente arquivado: o cartão é só para ler.' : 'Você vê este cartão só para ler.'
+  const somenteLeitura = podeMexer ? null : motivoSomenteLeitura ?? 'Você vê este cartão só para ler.'
+  const pasta = pastaDoQuadro(quadro)
 
   return (
     <JanelaFormulario aberto aoFechar={fechar} icone={SquareKanban} largura="7xl" enviando={fechando}
@@ -447,8 +452,8 @@ export default function JanelaDoCartao({ cartaoId, quadro, cliente, perfil, aoFe
               <span className="form-label mb-0">Descrição</span>
               <EstadoDaGravacao estado={estados.descricao} />
             </div>
-            <EditorDaDescricao conteudo={cartao.descricao} pasta={`${cliente.id}/${cartao.id}/`} somenteLeitura={!podeMexer}
-              aoMudar={mudarDescricao} aoEnviarImagem={(arquivo) => enviarImagemDaDescricao({ clienteId: cliente.id, cartaoId: cartao.id }, arquivo)} />
+            <EditorDaDescricao conteudo={cartao.descricao} pasta={`${pasta}/${cartao.id}/`} somenteLeitura={!podeMexer}
+              aoMudar={mudarDescricao} aoEnviarImagem={(arquivo) => enviarImagemDaDescricao({ pasta, cartaoId: cartao.id }, arquivo)} />
           </div>
           <ChecklistDoCartao cartaoId={cartao.id} itensIniciais={cartao.checklist} podeMexer={podeMexer} aoMexer={mexeu} aoRecusar={recusado} />
         </div>
@@ -462,7 +467,7 @@ export default function JanelaDoCartao({ cartaoId, quadro, cliente, perfil, aoFe
       <div className="grid grid-cols-1 gap-6 border-t pt-6 xl:grid-cols-2">
         <ComentariosDoCartao cartaoId={cartao.id} perfil={perfil} podeMexer={podeMexer} podeGerir={Boolean(quadro.pode_gerir)}
           totalInicial={cartao.comentarios ?? 0} aoMexer={mexeu} aoRecusar={recusado} />
-        <AnexosDoCartao clienteId={cliente.id} cartaoId={cartao.id} podeMexer={podeMexer} aoMexer={mexeu} aoRecusar={recusado} />
+        <AnexosDoCartao pasta={pasta} cartaoId={cartao.id} podeMexer={podeMexer} aoMexer={mexeu} aoRecusar={recusado} />
       </div>
 
       {naoSalvo && (

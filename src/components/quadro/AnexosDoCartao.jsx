@@ -19,7 +19,8 @@ const LIMITE_EM_MB = TAMANHO_MAXIMO_ARQUIVO / 1048576
 // para a área, baixar pelo link assinado (com o nome original) e apagar com confirmação (quem enviou ou a gestão:
 // `pode_apagar` vem do banco). Até 25 MB, qualquer tipo. Anexo não se edita: apague e envie de novo. Quem só lê, baixa.
 // Recusa do banco: o motivo aparece e `aoRecusar(erro)` avisa a janela. `aoMexer()`: o quadro relê a contagem ao fechar.
-export default function AnexosDoCartao({ clienteId, cartaoId, podeMexer, aoMexer, aoRecusar }) {
+// `pasta`: a pasta do quadro no balde (pastaDoQuadro).
+export default function AnexosDoCartao({ pasta, cartaoId, podeMexer, aoMexer, aoRecusar }) {
   const [pagina, setPagina] = useState(1)
   const [versao, setVersao] = useState(0)
   const [resultado, setResultado] = useState(null)
@@ -54,7 +55,7 @@ export default function AnexosDoCartao({ clienteId, cartaoId, podeMexer, aoMexer
     let recusa = null
     for (const arquivo of arquivos) {
       setEnviando(arquivo.name)
-      const resposta = await enviarAnexo({ clienteId, cartaoId }, arquivo)
+      const resposta = await enviarAnexo({ pasta, cartaoId }, arquivo)
       if (resposta.erro) {
         falhas.push(`${arquivo.name}: ${resposta.erro}`)
         recusa = resposta.erro
