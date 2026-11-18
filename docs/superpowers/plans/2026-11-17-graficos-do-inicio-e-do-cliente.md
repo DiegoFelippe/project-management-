@@ -282,6 +282,25 @@ o risco; recorte por `private.recorte_do_inicio()`, período por `private.period
   usam mock e seguem verdes até a T5).
 - [ ] **Passo 5:** commit `Banco: funções dos gráficos do Início`.
 
+**Acréscimos da revisão da T1 (18/11; valem para a T2):**
+- **`entrou` conta em qualquer duração:** `novos_no_periodo`, `receberam_consultor` e `espera_media_dias` contam as
+  linhas com `entrou` mesmo quando `ate = de` (escolher consultor e mudar a previsão no mesmo "Salvar" grava um trecho
+  zero com `entrou`). Só as contagens "num instante" ignoram trecho zero. Teste com esse caso.
+- **Período efetivo vazio** (Mês futuro ou Personalizado que começa depois de hoje: `ate_efetivo < de`):
+  `comparacao_do_inicio` devolve `de`, `ate`, `forma` e `indicadores` nulos (a tela esconde a linha de variação, como o
+  design manda quando a comparação falha); o `painel_do_inicio` mantém o comportamento de hoje no Mês futuro (o
+  `painel_do_inicio.test.sql` com 2037-11 não muda). Gráficos com período vazio devolvem listas vazias, sem erro.
+- **Na migração da T2:** repetir o `revoke` de `private.checkins_resumir_horas` e `private.recalcular_horas_mes`
+  (faltou na T1; hoje o ACL já está certo); `comment on table private.situacoes_dos_clientes` dizendo a regra do
+  `entrou` em trecho zero e que "concordam por construção" vale quando a ordem de `em` é a das travas.
+- **Fechar check-in rápido:** índices parciais `checkins (cliente_id) where fim is null` e
+  `checkins (consultor_id) where fim is null`; `private.fechar_checkins` refeita em plpgsql com dois `update` separados
+  (`if p_cliente is not null … end if; if p_consultor is not null … end if;`), "Mesmo corpo de 20261116135529…" e o
+  `revoke` repetido; `performs_within` (< 20 ms) para "trocar o consultor de um cliente" e "gravar e fechar um
+  check-in" no `painel_volume`.
+- **`situacao_no_instante('tudo')`** lê todos os trechos (24–29 ms com 157 mil): chamar no máximo 2 vezes por pedido;
+  se precisar de mais, índice GiST em `tstzrange(de, coalesce(ate, 'infinity'))`.
+
 ### Task 3: Banco — faixa "Hoje" e horas por dia do cliente
 
 **Arquivos:** migração `graficos_do_cliente_hoje`; `supabase/tests/database/graficos_do_cliente.test.sql` (com os
