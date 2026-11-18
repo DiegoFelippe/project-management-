@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router'
 import RotaProtegida from '@/auth/RotaProtegida'
+import TelaComLimite from '@/components/comum/TelaComLimite'
 import Moldura from '@/components/shell/Moldura'
 import Calendario from '@/pages/Calendario'
 import Checkins from '@/pages/Checkins'
@@ -36,25 +37,27 @@ export default function Rotas() {
         <Route path="/trocar-senha" element={<TrocarSenha />} />
         <Route path="/configurar-verificacao" element={<ConfigurarVerificacao />} />
         <Route element={<Moldura />}>
-          <Route path="/" element={<Inicio />} />
-          <Route path="/capacidade" element={<Navigate to="/usuarios" replace />} />
-          <Route path="/clientes" element={<Clientes />} />
-          <Route path="/clientes/:id" element={<Cliente />} />
-          <Route path="/calendario" element={<Calendario />} />
-          <Route path="/checklists" element={<Checkins />} />
-          <Route path="/checkins" element={<ParaChecklists />} />
-          <Route path="/quadros" element={<Quadros />} />
-          <Route path="/quadros/:id" element={<Quadros />} />
-          <Route element={<RotaProtegida papeis={['dono', 'central', 'admin', 'gestor']} />}>
-            <Route path="/times" element={<Times />} />
-            <Route path="/times/:id" element={<Time />} />
-            <Route path="/usuarios" element={<Usuarios />} />
-          </Route>
-          <Route element={<RotaProtegida papeis={['dono', 'central']} />}>
-            <Route path="/consultorias" element={<Consultorias />} />
-          </Route>
-          <Route element={<RotaProtegida papeis={['dono', 'admin']} />}>
-            <Route path="/integracoes" element={<Integracoes />} />
+          <Route element={<TelaComLimite />}>
+            <Route path="/" element={<Inicio />} />
+            <Route path="/capacidade" element={<Navigate to="/usuarios" replace />} />
+            <Route path="/clientes" element={<Clientes />} />
+            <Route path="/clientes/:id" element={<Cliente />} />
+            <Route path="/calendario" element={<Calendario />} />
+            <Route path="/checklists" element={<Checkins />} />
+            <Route path="/checkins" element={<ParaChecklists />} />
+            <Route path="/quadros" element={<Quadros />} />
+            <Route path="/quadros/:id" element={<Quadros />} />
+            <Route element={<RotaProtegida papeis={['dono', 'central', 'admin', 'gestor']} />}>
+              <Route path="/times" element={<Times />} />
+              <Route path="/times/:id" element={<Time />} />
+              <Route path="/usuarios" element={<Usuarios />} />
+            </Route>
+            <Route element={<RotaProtegida papeis={['dono', 'central']} />}>
+              <Route path="/consultorias" element={<Consultorias />} />
+            </Route>
+            <Route element={<RotaProtegida papeis={['dono', 'admin']} />}>
+              <Route path="/integracoes" element={<Integracoes />} />
+            </Route>
           </Route>
         </Route>
       </Route>
