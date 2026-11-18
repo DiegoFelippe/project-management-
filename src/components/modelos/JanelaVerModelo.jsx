@@ -9,15 +9,14 @@ import { Button } from '@/components/ui/button'
 import { lerModelo } from '@/data/modelos'
 import { diaEmSP } from '@/lib/calendario'
 import { formatarDia } from '@/lib/mes'
+import { juntar } from '@/lib/nomes'
+import { ordemGlobal } from './modelo'
 import PreviaDoFluxo from './PreviaDoFluxo'
 
 const ABAS = [{ valor: 'lista', rotulo: 'Lista', icone: ListOrdered }, { valor: 'fluxo', rotulo: 'Fluxograma', icone: Workflow }]
 
 // "depois da 1", "depois da 1 e da 3", "depois da 1, da 2 e da 4".
-function depoisDe(numeros) {
-  const itens = numeros.map((n) => `da ${n}`)
-  return `depois ${itens.length < 2 ? itens.join('') : `${itens.slice(0, -1).join(', ')} e ${itens.at(-1)}`}`
-}
+const depoisDe = (numeros) => `depois ${juntar(numeros.map((n) => `da ${n}`))}`
 
 // O modelo só para ler (Ver, na lista de modelos): abas Lista (etapas e tarefas com prazo, opcional e "depois de") e
 // Fluxograma. Rodapé: Fechar e, conforme quem vê, Editar e Duplicar (quem mexe no modelo) ou "Duplicar para a minha
@@ -44,11 +43,7 @@ export default function JanelaVerModelo({ modeloId, aoFechar, aoEditar, aoDuplic
 
   const m = estado.modelo
   const arquivado = Boolean(m?.arquivado_em)
-  const ordem = useMemo(() => {
-    const mapa = new Map()
-    for (const e of m?.etapas ?? []) for (const t of e.tarefas) mapa.set(t.id, mapa.size + 1)
-    return mapa
-  }, [m])
+  const ordem = useMemo(() => ordemGlobal(m ?? { etapas: [] }), [m])
   const etapasDoFluxo = useMemo(() => (m?.etapas ?? []).map((e) => ({ id: e.id, nome: e.nome })), [m])
   const tarefasDoFluxo = useMemo(() => (m?.etapas ?? []).flatMap((e) => e.tarefas.map((t) => ({ ...t, etapa_id: e.id }))), [m])
 

@@ -151,6 +151,35 @@ describe('EditorDeEtapas', () => {
     expect(atual.etapas[1].nome).toBe('Execução')
   })
 
+  it('mudar o título de uma tarefa atualiza o chip de quem depende dela (a tarefa memorizada redesenha)', async () => {
+    montar()
+    await userEvent.type(screen.getByLabelText('Título da tarefa 1'), ' geral')
+    expect(within(tarefa(2)).getByText('1 · Reunião de início geral')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Descer a etapa 1' }))
+    // Plano de ação (agora a tarefa 1) depende da Análise do DRE, que agora é a 3: o chip mostra o número novo.
+    expect(within(tarefa(1)).getByText('3 · Análise do DRE').closest('[data-chip]')).toHaveAttribute('data-invalida')
+  })
+
+  it('no limite de 500 tarefas, nem tarefa nem etapa nova, e o editor diz por quê', () => {
+    const inicial = rascunhoDe(MODELO)
+    inicial.etapas = Array.from({ length: 10 }, (_, e) => ({ id: `e${e}`, nome: `E${e}`, tarefas: Array.from({ length: 50 }, (_, i) => (
+      { id: `t${e}-${i}`, titulo: 'T', descricao: '', obrigatoria: true, prazo_dias: '1', depende_de: [] })) }))
+    montar({ inicial })
+    expect(screen.getByRole('button', { name: 'Nova etapa' })).toBeDisabled()
+    for (const botao of screen.getAllByRole('button', { name: 'Tarefa nesta etapa' })) expect(botao).toBeDisabled()
+    expect(screen.getByText('O modelo chegou ao limite de 500 tarefas.')).toBeInTheDocument()
+  })
+
+  it('no limite de 50 etapas, Nova etapa desliga (tarefa na etapa ainda pode)', () => {
+    const inicial = rascunhoDe(MODELO)
+    inicial.etapas = Array.from({ length: 50 }, (_, e) => ({ id: `e${e}`, nome: `E${e}`, tarefas: [
+      { id: `t${e}`, titulo: 'T', descricao: '', obrigatoria: true, prazo_dias: '1', depende_de: [] }] }))
+    montar({ inicial })
+    expect(screen.getByRole('button', { name: 'Nova etapa' })).toBeDisabled()
+    expect(screen.getAllByRole('button', { name: 'Tarefa nesta etapa' })[0]).toBeEnabled()
+    expect(screen.getByText('O modelo chegou ao limite de 50 etapas.')).toBeInTheDocument()
+  })
+
   it('os erros do último Salvar destacam a etapa e a tarefa', () => {
     const inicial = rascunhoDe(MODELO)
     inicial.etapas[0].tarefas[0].titulo = ''

@@ -1,13 +1,12 @@
 import { RotateCcw, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { juntar } from '@/lib/nomes'
 
 const NOMES = {
   titulo: 'o título', descricao: 'a descrição', coluna: 'a coluna', prazo: 'o prazo', prioridade: 'a prioridade',
   responsaveis: 'os responsáveis',
 }
-
-const juntar = (partes) => (partes.length < 2 ? partes.join('') : `${partes.slice(0, -1).join(', ')} e ${partes.at(-1)}`)
 
 // "Não foi possível salvar o título e a descrição." (campos: titulo, descricao, coluna, prazo, prioridade, responsaveis).
 const naoFoiSalvo = (campos) => `Não foi possível salvar ${juntar(campos.map((c) => NOMES[c] ?? c))}.`

@@ -12,6 +12,7 @@ import { useAuth } from '@/auth/useAuth'
 import FichaDoConsultor from '@/components/usuarios/FichaDoConsultor'
 import { mudarCor, tirarFoto, trocarFoto } from '@/data/imagens'
 import { atualizarMeuContato, gerenciarAcesso } from '@/data/usuarios'
+import { juntar } from '@/lib/nomes'
 
 // Nome e gênero de cada passo, para a frase do que foi e do que não foi salvo.
 const PASSOS = {
@@ -22,7 +23,6 @@ const PASSOS = {
   senha: { nome: 'senha', artigo: 'a' },
 }
 const maiuscula = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1)
-const listar = (itens) => (itens.length === 1 ? itens[0] : `${itens.slice(0, -1).join(', ')} e ${itens.at(-1)}`)
 const comPonto = (texto) => (/[.!?]$/.test(texto) ? texto : `${texto}.`)
 
 // "Nome e foto salvos. A senha não mudou: <motivo> Falta salvar a cor do avatar."
@@ -30,10 +30,10 @@ function mensagemParcial({ salvos, falhou, motivo, faltam = [] }) {
   const feminino = salvos.every((passo) => PASSOS[passo].artigo === 'a')
   const salvo = `salv${feminino ? 'a' : 'o'}${salvos.length > 1 ? 's' : ''}`
   const partes = [
-    `${maiuscula(listar(salvos.map((passo) => PASSOS[passo].nome)))} ${salvo}.`,
+    `${maiuscula(juntar(salvos.map((passo) => PASSOS[passo].nome)))} ${salvo}.`,
     `${maiuscula(PASSOS[falhou].artigo)} ${PASSOS[falhou].nome} não mudou: ${comPonto(motivo)}`,
   ]
-  if (faltam.length) partes.push(`Falta salvar ${listar(faltam.map((passo) => `${PASSOS[passo].artigo} ${PASSOS[passo].nome}`))}.`)
+  if (faltam.length) partes.push(`Falta salvar ${juntar(faltam.map((passo) => `${PASSOS[passo].artigo} ${PASSOS[passo].nome}`))}.`)
   return partes.join(' ')
 }
 

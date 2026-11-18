@@ -12,7 +12,8 @@ vi.mock('@/data/consultorias', () => ({ buscarConsultoriasAtivas: vi.fn() }))
 
 const MODELO = {
   id: 'm1', nome: 'Gestão financeira', descricao: 'Para clientes novos', tipo: 'gestao', da_central: true, consultoria: null,
-  criado_por: { nome: 'Carla Central' }, criado_em: '2026-11-10T13:00:00Z', arquivado_em: null, pode_editar: true, pode_duplicar: true,
+  criado_por: { nome: 'Carla Central' }, criado_em: '2026-11-10T13:00:00Z', atualizado_em: '2026-11-17T21:37:40.123456+00:00',
+  arquivado_em: null, pode_editar: true, pode_duplicar: true,
   etapas: [
     { id: 'e1', nome: 'Diagnóstico', posicao: 1, tarefas: [
       { id: 't1', titulo: 'Reunião de início', descricao: null, obrigatoria: true, prazo_dias: 2, posicao: 1, depende_de: [] },
@@ -139,12 +140,90 @@ describe('JanelaModelo', () => {
     expect(within(janela).getByRole('button', { name: 'Em pé' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('Cancelar descarta o rascunho sem ir ao banco', async () => {
+  it('Cancelar com mudanças pergunta antes; Descartar fecha sem ir ao banco', async () => {
     const { janela, aoFechar } = abrir({ modelo: MODELO })
     await userEvent.type(within(janela).getByLabelText('Nome do modelo'), ' 2')
-    await userEvent.click(within(janela).getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(within(rodape(janela)).getByRole('button', { name: 'Cancelar' }))
+    const descartar = screen.getByRole('alertdialog', { name: 'Descartar as mudanças do modelo?' })
+    expect(descartar).toHaveTextContent('O que você mudou neste modelo se perde: nada foi salvo.')
+    expect(aoFechar).not.toHaveBeenCalled()
+    await userEvent.click(within(descartar).getByRole('button', { name: 'Descartar' }))
     expect(aoFechar).toHaveBeenCalled()
     expect(salvarModelo).not.toHaveBeenCalled()
+  })
+
+  it('Esc ou o X com mudanças também perguntam; continuar editando mantém o rascunho', async () => {
+    const { janela, aoFechar } = abrir({ modelo: MODELO })
+    await userEvent.type(within(janela).getByLabelText('Nome do modelo'), ' 2')
+    await userEvent.keyboard('{Escape}')
+    const descartar = screen.getByRole('alertdialog', { name: 'Descartar as mudanças do modelo?' })
+    await userEvent.click(within(descartar).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Editar modelo de check-in' })).toBeInTheDocument()
+    expect(within(janela).getByLabelText('Nome do modelo')).toHaveValue('Gestão financeira 2')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Fechar' }))
+    expect(screen.getByRole('alertdialog', { name: 'Descartar as mudanças do modelo?' })).toBeInTheDocument()
+    expect(aoFechar).not.toHaveBeenCalled()
+  })
+
+  it('sem mudanças, Esc fecha direto', async () => {
+    const { aoFechar } = abrir({ modelo: MODELO })
+    await userEvent.keyboard('{Escape}')
+    expect(aoFechar).toHaveBeenCalled()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('Esc numa confirmação dentro da janela (apagar etapa) desiste só dela', async () => {
+    const { janela, aoFechar } = abrir({ modelo: MODELO })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Apagar a etapa 1' }))
+    const etapa = within(janela).getByRole('region', { name: 'Etapa 1' })
+    expect(within(etapa).getByRole('button', { name: 'Manter' })).toHaveFocus()
+    await userEvent.keyboard('{Escape}')
+    expect(within(etapa).queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Editar modelo de check-in' })).toBeInTheDocument()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(aoFechar).not.toHaveBeenCalled()
+    expect(within(etapa).getByRole('button', { name: 'Apagar a etapa 1' })).toHaveFocus()
+  })
+
+  it('editar manda o atualizado_em lido; se alguém salvou depois, a mensagem aparece e a janela fica aberta', async () => {
+    vi.mocked(salvarModelo).mockResolvedValue({ id: null, erro: 'Alguém salvou este modelo depois que você abriu. Feche e abra de novo.' })
+    const { janela, aoSalvar } = abrir({ modelo: MODELO })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar modelo' }))
+    expect(salvarModelo).toHaveBeenCalledWith('m1', expect.objectContaining({ atualizado_em: '2026-11-17T21:37:40.123456+00:00' }))
+    expect(await within(rodape(janela)).findByRole('alert')).toHaveTextContent('Alguém salvou este modelo depois que você abriu. Feche e abra de novo.')
+    expect(screen.getByRole('dialog', { name: 'Editar modelo de check-in' })).toBeInTheDocument()
+    expect(aoSalvar).not.toHaveBeenCalled()
+  })
+
+  it('criar e duplicar não mandam atualizado_em (é modelo novo)', async () => {
+    const { janela } = abrir({ origem: MODELO })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar modelo' }))
+    expect(vi.mocked(salvarModelo).mock.calls[0][0]).toBeNull()
+    expect(vi.mocked(salvarModelo).mock.calls[0][1]).not.toHaveProperty('atualizado_em')
+  })
+
+  it('mudar o tipo apaga o erro do banco do rodapé', async () => {
+    vi.mocked(salvarModelo).mockResolvedValue({ id: null, erro: 'Escolha uma consultoria ativa para o modelo.' })
+    const { janela } = abrir({ modelo: MODELO })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar modelo' }))
+    expect(await within(rodape(janela)).findByRole('alert')).toBeInTheDocument()
+    await escolherNoSeletor(userEvent, 'Tipo de consultoria', 'Gestão de Pessoas')
+    expect(within(rodape(janela)).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('voltar de "Todas" para "Uma consultoria" mostra e salva a mesma consultoria', async () => {
+    const daAlfa = { ...MODELO, da_central: false, consultoria: { id: 'c1', nome: 'Alfa' } }
+    const { janela } = abrir({ origem: daAlfa })
+    const campo = () => within(janela).getByLabelText('Consultoria do modelo')
+    expect(campo()).toHaveTextContent('Alfa')
+    await escolherNoSeletor(userEvent, 'Consultoria do modelo', 'Beta')
+    expect(campo()).toHaveTextContent('Beta')
+    await userEvent.click(within(janela).getByRole('radio', { name: /Todas as consultorias/ }))
+    await userEvent.click(within(janela).getByRole('radio', { name: /Uma consultoria/ }))
+    expect(campo()).toHaveTextContent('Alfa')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar modelo' }))
+    expect(salvarModelo).toHaveBeenCalledWith(null, expect.objectContaining({ para: 'c1' }))
   })
 
   it('a Central escolhe para quem: todas ou uma consultoria (buscada no banco); sem escolher qual, avisa', async () => {

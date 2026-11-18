@@ -4,15 +4,13 @@ import { Aviso } from '@/components/auth/TelaDeAcesso'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { usoDoModelo } from '@/data/checklists'
+import { juntar, plural } from '@/lib/nomes'
 import { cn } from '@/lib/utils'
 
-const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
-
-// "A", "A e B", "A, B e C" e, quando o banco contou mais do que mandou de nomes, "… e mais N".
+// "A, B e C" e, quando o banco contou mais do que mandou de nomes, "A, B, C e mais N".
 function nomesDosClientes(nomes, total) {
   const resto = total - nomes.length
-  if (resto > 0) return `${nomes.join(', ')} e mais ${resto.toLocaleString('pt-BR')}`
-  return nomes.length < 2 ? nomes.join('') : `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}`
+  return juntar(resto > 0 ? [...nomes, `mais ${resto.toLocaleString('pt-BR')}`] : nomes)
 }
 
 // Apagar um modelo, com a confirmação que diz o que some junto (regra CRUD do CLAUDE.md). Antes, pergunta ao banco quem

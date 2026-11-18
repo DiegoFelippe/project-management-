@@ -168,6 +168,7 @@ describe('traduzirErroBanco com contexto', () => {
       'O modelo passou do limite: até 50 etapas, 500 tarefas e 30 dependências por tarefa.',
     )
     expect(msg('consultoria_invalida')).toBe('Escolha uma consultoria ativa para o modelo.')
+    expect(msg('modelo_mudou')).toBe('Alguém salvou este modelo depois que você abriu. Feche e abra de novo.')
     expect(msg('filtro_invalido', '22023')).toBe('Esse filtro não existe. Limpe os filtros e tente de novo.')
     // Texto acima do tamanho (o banco confere ao gravar): diz os limites.
     expect(msg('new row for relation "modelo_tarefas" violates check constraint "modelo_tarefas_titulo_check"', '23514'))

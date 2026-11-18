@@ -6,6 +6,7 @@ import { SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { juntar, plural } from '@/lib/nomes'
 import { cn } from '@/lib/utils'
 import EscolherDependencias from './EscolherDependencias'
 import {
@@ -14,13 +15,7 @@ import {
 } from './modelo'
 
 const PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
-const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`
 const nome = (texto, reserva) => texto?.trim() || reserva
-// "A", "A" e "B", "A", "B" e "C".
-function listar(nomes) {
-  const entre = nomes.map((n) => `"${n}"`)
-  return entre.length < 2 ? entre.join('') : `${entre.slice(0, -1).join(', ')} e ${entre.at(-1)}`
-}
 
 function BotaoIcone({ rotulo, icone: Icone, perigo, ...props }) {
   return (
@@ -30,10 +25,24 @@ function BotaoIcone({ rotulo, icone: Icone, perigo, ...props }) {
   )
 }
 
-// Confirmação dentro da própria etapa ou tarefa (Manter recebe o foco), dizendo o que sai junto.
+// Confirmação dentro da própria etapa ou tarefa (Manter recebe o foco), dizendo o que sai junto. Esc com o foco aqui
+// desiste só dela: ouvido na janela e na captura, para chegar antes do Esc da janela do modelo (que fecharia tudo).
 function ConfirmarNaLinha({ base, id, texto, rotulo, aoManter, aoApagar }) {
+  const caixa = useRef(null)
+  const manter = useRef(aoManter)
+  useEffect(() => { manter.current = aoManter })
+  useEffect(() => {
+    const tecla = (e) => {
+      if (e.key !== 'Escape' || !caixa.current?.contains(document.activeElement)) return
+      e.stopPropagation()
+      e.preventDefault()
+      manter.current()
+    }
+    window.addEventListener('keydown', tecla, true)
+    return () => window.removeEventListener('keydown', tecla, true)
+  }, [])
   return (
-    <div role="alert" className="border-destructive/30 bg-destructive/5 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2">
+    <div ref={caixa} role="alert" className="border-destructive/30 bg-destructive/5 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2">
       <p className="min-w-0 flex-1 basis-56 text-rotulo">{texto}</p>
       <Button id={`${base}-manter-${id}`} type="button" variant="outline" size="sm" onClick={aoManter}>Manter</Button>
       <Button type="button" variant="destructive" size="sm" onClick={aoApagar}><Trash2 /> {rotulo}</Button>
@@ -199,6 +208,12 @@ export default function EditorDeEtapas({ rascunho, mudar, erros }) {
   for (const e of rascunho.etapas) for (const t of e.tarefas) { ordem.set(t.id, ordem.size + 1); porId.set(t.id, t) }
   const total = ordem.size
   const ultimaEtapa = rascunho.etapas.length - 1
+  // Os limites do banco: sem tarefa nova (nem etapa nova, que já vem com uma) em 500 tarefas; sem etapa nova em 50.
+  const cheioDeTarefas = total >= LIMITES.tarefas
+  const cheioDeEtapas = rascunho.etapas.length >= LIMITES.etapas
+  const limite = cheioDeTarefas ? `O modelo chegou ao limite de ${plural(LIMITES.tarefas, 'tarefa', 'tarefas')}.`
+    : cheioDeEtapas ? `O modelo chegou ao limite de ${plural(LIMITES.etapas, 'etapa', 'etapas')}.` : null
+  const idDoLimite = `${base}-limite`
 
   // Os chips de cada tarefa e a chave do conteúdo deles (a tarefa memorizada compara a chave, não o objeto).
   function chipsDe(t) {
@@ -213,7 +228,7 @@ export default function EditorDeEtapas({ rascunho, mudar, erros }) {
     if (armado?.tipo !== 'tarefa' || armado.id !== t.id) return null
     const quem = dependentesDe(rascunho, t.id).map((x) => nome(x.titulo, 'Sem título'))
     if (!quem.length) return `Apagar "${nome(t.titulo, 'Sem título')}"?`
-    return `Apagar "${nome(t.titulo, 'Sem título')}"? ${listar(quem)} ${quem.length === 1 ? 'deixa' : 'deixam'} de depender dela.`
+    return `Apagar "${nome(t.titulo, 'Sem título')}"? ${juntar(quem.map((x) => `"${x}"`))} ${quem.length === 1 ? 'deixa' : 'deixam'} de depender dela.`
   }
 
   return (
@@ -259,17 +274,20 @@ export default function EditorDeEtapas({ rascunho, mudar, erros }) {
                 })}
               </ol>
             )}
-            <Button id={`${base}-nt-${e.id}`} type="button" variant="ghost" size="sm" disabled={total >= LIMITES.tarefas}
-              onClick={() => acoes.novaTarefa(e.id)}>
+            <Button id={`${base}-nt-${e.id}`} type="button" variant="ghost" size="sm" disabled={cheioDeTarefas}
+              aria-describedby={cheioDeTarefas ? idDoLimite : undefined} onClick={() => acoes.novaTarefa(e.id)}>
               <Plus /> Tarefa nesta etapa
             </Button>
           </section>
         )
       })}
-      <Button id={`${base}-nova-etapa`} type="button" variant="outline" disabled={rascunho.etapas.length >= LIMITES.etapas}
-        onClick={acoes.novaEtapa}>
-        <Plus /> Nova etapa
-      </Button>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Button id={`${base}-nova-etapa`} type="button" variant="outline" disabled={cheioDeEtapas || cheioDeTarefas}
+          aria-describedby={limite ? idDoLimite : undefined} onClick={acoes.novaEtapa}>
+          <Plus /> Nova etapa
+        </Button>
+        {limite && <p id={idDoLimite} className="text-muted-foreground text-legenda">{limite}</p>}
+      </div>
     </SecaoFormulario>
   )
 }

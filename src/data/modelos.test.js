@@ -80,6 +80,16 @@ describe('escritas dos modelos', () => {
     expect((await salvarModelo(null, dados)).erro).toMatch(/até 80 letras/)
   })
 
+  it('salvarModelo: quem abriu uma versão velha recebe "modelo_mudou" traduzido (e o atualizado_em vai em p_dados)', async () => {
+    rpcResponde(null, { code: 'P0001', message: 'modelo_mudou' })
+    const comData = { ...dados, atualizado_em: '2026-11-17T21:37:40.123456+00:00' }
+    expect(await salvarModelo('m1', comData)).toEqual({
+      id: null,
+      erro: 'Alguém salvou este modelo depois que você abriu. Feche e abra de novo.',
+    })
+    expect(supabase.rpc).toHaveBeenLastCalledWith('salvar_modelo', { p_id: 'm1', p_dados: comData })
+  })
+
   it('arquivar marca a data (o banco grava a dele); reativar limpa', async () => {
     banco.resposta = { data: [{ id: 'm1' }], error: null }
     expect(await arquivarModelo('m1')).toEqual({ erro: null })

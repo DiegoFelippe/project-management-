@@ -96,6 +96,7 @@ const ERROS_MENSAGEM_BANCO = {
   dependencia_invalida: 'Uma tarefa só pode depender de tarefas que vêm antes dela na lista.',
   modelo_grande_demais: 'O modelo passou do limite: até 50 etapas, 500 tarefas e 30 dependências por tarefa.',
   consultoria_invalida: 'Escolha uma consultoria ativa para o modelo.',
+  modelo_mudou: 'Alguém salvou este modelo depois que você abriu. Feche e abra de novo.',
   modelo_em_uso: 'Este modelo está em uso: clientes têm check-list dele. Arquive em vez de apagar.',
   // Check-list do cliente (aplicar, marcar e a nota)
   so_o_consultor_marca: 'Só o consultor do cliente marca as tarefas.',
