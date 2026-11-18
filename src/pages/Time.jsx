@@ -1,4 +1,4 @@
-import { Pencil, Trash2, UserMinus, UserPlus } from 'lucide-react'
+import { Pencil, RotateCcw, Trash2, UserMinus, UserPlus } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -36,7 +36,8 @@ export default function Time() {
   const { id } = useParams()
   const navigate = useNavigate()
   // Vindo do Novo time com pessoas que não entraram: elas já chegam escolhidas em "Colocar pessoas" (usabilidade, U7).
-  const { state } = useLocation()
+  // Lidas uma vez e tiradas do histórico, para recarregar ou voltar não as escolher de novo.
+  const { pathname, state } = useLocation()
   const { perfil } = useAuth()
   const [time, setTime] = useState(undefined)
   const [noTime, setNoTime] = useState(new Set())
@@ -45,6 +46,11 @@ export default function Time() {
   const [versao, setVersao] = useState(0)
   const carregar = () => setVersao((v) => v + 1)
   const acoes = useAcoesDoTime({ perfil, aoMudar: carregar, aoApagar: () => navigate('/times', { replace: true }) })
+  const vieramDoNovoTime = Boolean(state?.pessoasQueFaltam)
+
+  useEffect(() => {
+    if (vieramDoNovoTime) navigate(pathname, { replace: true, state: null })
+  }, [vieramDoNovoTime, navigate, pathname])
 
   useEffect(() => {
     let ativo = true
@@ -57,7 +63,9 @@ export default function Time() {
   }, [id, versao])
 
   // Pessoas do time: uma página por vez, em ordem de nome (regra "Escala" no CLAUDE.md).
-  const { resultado: membros, paginacao } = useListaPaginada(lerMembros, { id }, { versao })
+  const {
+    resultado: membros, erro: erroDosMembros, recarregar: lerMembrosDeNovo, paginacao,
+  } = useListaPaginada(lerMembros, { id }, { versao })
 
   const gerencio = Boolean(time) && acoes.gerencio(time)
 
@@ -110,13 +118,17 @@ export default function Time() {
 
   // O gestor também é do time (a lista de times o conta): ele vem na primeira linha da primeira página, com o papel
   // "Gestor do time" e sem "Tirar do time" (auditoria, R8). Se ele também estiver entre os membros, não aparece duas vezes.
+  // As contas fecham: a paginação ("1–15 de N") conta as pessoas do time, sem o gestor, e o subtítulo diz "Gestor e N
+  // pessoas" (o "N + 1 pessoas" da lista de times).
   const membrosSemGestor = membros?.itens.filter((p) => p.id !== time.gestor_id) ?? []
   const comGestor = Boolean(time.gestor) && paginacao.pagina === 1
-  const pessoas = membros ? membros.total + (time.gestor ? 1 : 0) : null
+  const subtitulo = !membros ? null
+    : !time.gestor ? plural(membros.total, 'pessoa', 'pessoas')
+      : membros.total === 0 ? 'Só o gestor, por enquanto' : `Gestor e ${plural(membros.total, 'pessoa', 'pessoas')}`
 
   return (
     <>
-      <Cabecalho voltarPara={VOLTAR} titulo={time.nome} descricao={pessoas === null ? null : plural(pessoas, 'pessoa', 'pessoas')}>
+      <Cabecalho voltarPara={VOLTAR} titulo={time.nome} descricao={subtitulo}>
         {gerencio && (
           <>
             <Button variant="outline" onClick={() => acoes.editar(time)}>
@@ -143,7 +155,13 @@ export default function Time() {
         </div>
       )}
 
-      {membros === null && <GraficoCarregando texto="Carregando as pessoas do time…" className="py-8" />}
+      {erroDosMembros && (
+        <div role="alert" className="mb-3 flex flex-wrap items-center gap-3 text-corpo text-destructive">
+          Não foi possível carregar as pessoas do time.
+          <Button type="button" variant="outline" onClick={lerMembrosDeNovo}><RotateCcw /> Tentar de novo</Button>
+        </div>
+      )}
+      {!erroDosMembros && membros === null && <GraficoCarregando texto="Carregando as pessoas do time…" className="py-8" />}
       {membros && !comGestor && membrosSemGestor.length === 0 && <ListaVazia>Ninguém no time ainda.</ListaVazia>}
       {membros && (comGestor || membrosSemGestor.length > 0) && (
         <Tabela rotulo="Pessoas do time" colunas={['Nome', 'Papel']} larguraMinima={560} semAcoes={!gerencio} paginacao={paginacao}>

@@ -229,8 +229,10 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   lugar (o lápis nunca muda de lugar). Exceção: a ação principal única da linha (Conectar, Mandar para consultoria,
   Escolher consultor, Fazer check-in) tem texto (`ghost sm`), à esquerda dos ícones. Quem só olha (nenhuma ação em linha
   nenhuma) fica sem a coluna (`semAcoes`). No celular a primeira coluna tem 160 px no mínimo e as ações não ficam fixas.
-  A tabela cabe na área de conteúdo de uma tela de 1440 px (cerca de 1.317 px): mais larga, a coluna de ações fixa cobre
-  a última coluna de dados.
+  **No máximo 3 ícones;** as ações raras (reenviar convite, mover, desativar...) vão para um "⋯" no fim da linha (o
+  `MenuDeAcoes` comum), que só aparece quando a linha tem alguma, mas guarda o lugar (como em Usuários). A tabela cabe
+  na área de conteúdo de uma tela de 1440 px (cerca de 1.317 px), medido no navegador com o pior caso de ações: mais
+  larga, a coluna de ações fixa cobre a última coluna de dados.
 - **Editar abre um formulário (janela) com o item daquela linha já preenchido.** Salvar atualiza a
   lista. O mesmo formulário serve para a tela de detalhe, quando houver.
 - **Teste de tela para cada lista:** a tabela pelo nome e o Editar abrindo com os dados da linha

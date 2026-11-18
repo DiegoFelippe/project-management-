@@ -1,6 +1,6 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '@/auth/useAuth'
@@ -56,7 +56,7 @@ describe('Time', () => {
     expect(toast.success).toHaveBeenCalledWith('Bruno saiu do time.')
   })
 
-  it('o gestor vem na primeira linha, como "Gestor do time" e sem "Tirar do time"; a conta fecha com a lista de times (auditoria, R8)', async () => {
+  it('o gestor vem na primeira linha, como "Gestor do time" e sem "Tirar do time"; a conta fecha: "Gestor e 2 pessoas" (auditoria, R8)', async () => {
     tela()
     const tabela = await screen.findByRole('table', { name: 'Pessoas do time' })
     const [, primeira, ...resto] = within(tabela).getAllByRole('row')
@@ -65,7 +65,7 @@ describe('Time', () => {
     expect(within(primeira).getByText('Gestor do time')).toBeInTheDocument()
     expect(within(primeira).queryByRole('button')).not.toBeInTheDocument()
     expect(resto).toHaveLength(2)
-    expect(screen.getByRole('heading', { name: 'Implantação' }).nextElementSibling).toHaveTextContent('3 pessoas')
+    expect(screen.getByRole('heading', { name: 'Implantação' }).nextElementSibling).toHaveTextContent('Gestor e 2 pessoas')
   })
 
   it('sem ninguém além do gestor, a tabela mostra só ele', async () => {
@@ -73,13 +73,21 @@ describe('Time', () => {
     tela()
     const tabela = await screen.findByRole('table', { name: 'Pessoas do time' })
     expect(within(tabela).getAllByRole('row')).toHaveLength(2)
-    expect(screen.getByText('1 pessoa')).toBeInTheDocument()
+    expect(screen.getByText('Só o gestor, por enquanto')).toBeInTheDocument()
   })
 
-  it('as pessoas do time paginam no banco acima de 15; o gestor fica só na primeira página', async () => {
+  it('as pessoas do time paginam no banco acima de 15 (some com 15); o gestor fica só na primeira página', async () => {
+    const quinze = Array.from({ length: 15 }, (_, i) => ({ id: `m${i}`, nome: `Pessoa ${i}`, email: `m${i}@x.test`, papel: 'pessoa' }))
+    vi.mocked(listarMembros).mockResolvedValue({ itens: quinze, total: 15 })
+    const { unmount } = tela()
+    await screen.findByRole('table', { name: 'Pessoas do time' })
+    expect(screen.queryByRole('navigation', { name: 'Paginação' })).not.toBeInTheDocument()
+    unmount()
     vi.mocked(listarMembros).mockResolvedValue({ itens: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa' }], total: 18 })
     tela()
     expect(await screen.findByText('1–15 de 18')).toBeInTheDocument()
+    // A paginação conta as pessoas do time, sem o gestor; o subtítulo diz os dois.
+    expect(screen.getByText('Gestor e 18 pessoas')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Próxima/ }))
     expect(listarMembros).toHaveBeenLastCalledWith('t1', { pagina: 2 })
     expect(await screen.findByText('16–18 de 18')).toBeInTheDocument()
@@ -115,17 +123,35 @@ describe('Time', () => {
     expect(within(screen.getByRole('list', { name: 'Pessoas escolhidas' })).getByText('Carla')).toBeInTheDocument()
   })
 
-  it('vindo do Novo time com pessoas que não entraram, elas já chegam escolhidas', async () => {
+  it('vindo do Novo time com pessoas que não entraram, elas já chegam escolhidas e saem do histórico (recarregar não as escolhe de novo)', async () => {
+    function Estado() {
+      const { state } = useLocation()
+      return <output aria-label="Estado da navegação">{JSON.stringify(state)}</output>
+    }
     render(
       <AuthContext.Provider value={{ perfil: gestor }}>
         <MemoryRouter initialEntries={[{ pathname: '/times/t1', state: { pessoasQueFaltam: [{ id: 'p3', nome: 'Carla' }] } }]}>
-          <Routes><Route path="/times/:id" element={<Time />} /></Routes>
+          <Routes><Route path="/times/:id" element={<><Time /><Estado /></>} /></Routes>
         </MemoryRouter>
       </AuthContext.Provider>,
     )
     await screen.findByRole('table', { name: 'Pessoas do time' })
     expect(within(screen.getByRole('list', { name: 'Pessoas escolhidas' })).getByText('Carla')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Colocar no time' })).toBeEnabled()
+    await waitFor(() => expect(screen.getByLabelText('Estado da navegação')).toHaveTextContent('null'))
+    expect(within(screen.getByRole('list', { name: 'Pessoas escolhidas' })).getByText('Carla')).toBeInTheDocument()
+  })
+
+  it('se a leitura das pessoas falha, o aviso aparece com "Tentar de novo", que lê de novo', async () => {
+    vi.mocked(listarMembros).mockRejectedValueOnce(new Error('rede'))
+    tela()
+    const aviso = await screen.findByRole('alert')
+    expect(aviso).toHaveTextContent('Não foi possível carregar as pessoas do time.')
+    expect(screen.queryByText('Carregando as pessoas do time…')).not.toBeInTheDocument()
+    await userEvent.click(within(aviso).getByRole('button', { name: 'Tentar de novo' }))
+    expect(await screen.findByRole('table', { name: 'Pessoas do time' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(listarMembros).toHaveBeenCalledTimes(2)
   })
 
   it('quem não gerencia o time só olha: sem Colocar pessoas e sem a coluna de ações', async () => {

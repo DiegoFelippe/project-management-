@@ -224,7 +224,10 @@ export default function Clientes() {
           {' '}Faça o check-out para começar outro.
         </p>
       )}
-      {buscando && <p role="status" className="mb-3 text-corpo text-muted-foreground">Buscando em todas as situações.</p>}
+      {/* A região de aviso fica sempre na página e só o texto muda: o leitor de tela anuncia quando a busca começa. */}
+      <p role="status" className={buscando ? 'mb-3 text-corpo text-muted-foreground' : 'sr-only'}>
+        {buscando ? 'Buscando em todas as situações.' : ''}
+      </p>
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && clientes === null && <GraficoCarregando texto="Carregando os clientes…" className="py-12" />}
       {clientes?.length === 0 && buscaAtrasada && <ListaVazia>Nenhum cliente encontrado.</ListaVazia>}

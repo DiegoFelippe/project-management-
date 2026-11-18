@@ -44,4 +44,35 @@ describe('HistoricoDoCliente', () => {
       ['Tarefa do check-list marcada como não se aplica', '—'],
     ])
   })
+
+  it('pagina no banco: some com 15, aparece com 16 e Próxima pede a página 2 (useListaPaginada)', async () => {
+    const evento = (i) => ({ id: `e${i}`, tipo: 'editado', em: '2026-11-17T10:00:00Z', autor: 'Central' })
+    vi.mocked(listarEventos).mockResolvedValue({ itens: Array.from({ length: 15 }, (_, i) => evento(i)), total: 15 })
+    const { unmount } = render(<HistoricoDoCliente clienteId="k1" versao={0} />)
+    await screen.findByRole('table', { name: 'Histórico' })
+    expect(screen.queryByRole('navigation', { name: 'Paginação' })).not.toBeInTheDocument()
+    unmount()
+    vi.mocked(listarEventos).mockResolvedValue({ itens: Array.from({ length: 15 }, (_, i) => evento(i)), total: 16 })
+    render(<HistoricoDoCliente clienteId="k1" versao={0} />)
+    expect(await screen.findByText('1–15 de 16')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Próxima/ }))
+    expect(listarEventos).toHaveBeenLastCalledWith('k1', { pagina: 2 })
+  })
+
+  it('a página que ficou vazia (o histórico encolheu) volta para a 1', async () => {
+    vi.mocked(listarEventos).mockImplementation(async (_cliente, { pagina }) => (pagina > 1
+      ? { itens: [], total: 15 }
+      : { itens: [{ id: 'e1', tipo: 'cadastrado', em: '2026-11-17T10:00:00Z', autor: 'Central' }], total: 16 }))
+    render(<HistoricoDoCliente clienteId="k1" versao={0} />)
+    await userEvent.click(await screen.findByRole('button', { name: /Próxima/ }))
+    await vi.waitFor(() => expect(listarEventos).toHaveBeenLastCalledWith('k1', { pagina: 1 }))
+    expect(await screen.findByText('Cadastrado')).toBeInTheDocument()
+  })
+
+  it('erro na leitura: o aviso no lugar do carregando', async () => {
+    vi.mocked(listarEventos).mockRejectedValue(new Error('rede'))
+    render(<HistoricoDoCliente clienteId="k1" versao={0} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar o histórico.')
+    expect(screen.queryByText('Carregando o histórico…')).not.toBeInTheDocument()
+  })
 })

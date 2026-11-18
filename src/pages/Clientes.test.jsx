@@ -593,10 +593,14 @@ describe('Clientes: a busca procura em todas as situações (usabilidade, U1)', 
     renderizarTela(<Clientes />, { perfil: central })
     await screen.findByRole('table', { name: 'Clientes' })
     expect(screen.queryByText('Buscando em todas as situações.')).not.toBeInTheDocument()
+    // A região de aviso já está na página, vazia: só o texto muda (o leitor de tela anuncia a troca).
+    const aviso = screen.getByRole('status')
+    expect(aviso).toHaveTextContent('')
     vi.mocked(listarClientes).mockResolvedValue({ itens: DE_TODAS, total: 4 })
     await buscar('usabilidade')
     await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'qualquer', busca: 'usabilidade', pagina: 1 })))
-    expect(await screen.findByRole('status')).toHaveTextContent('Buscando em todas as situações.')
+    await waitFor(() => expect(aviso).toHaveTextContent('Buscando em todas as situações.'))
+    expect(screen.getByRole('status')).toBe(aviso)
     // A situação escolhida continua no filtro; a busca só passa por cima dela.
     expect(screen.getByLabelText('Situação')).toHaveTextContent('Aguardando consultoria')
     const tabela = screen.getByRole('table', { name: 'Clientes' })

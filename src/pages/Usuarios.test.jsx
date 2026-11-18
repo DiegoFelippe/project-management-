@@ -30,6 +30,20 @@ vi.mock('@/data/times', () => ({
   listarOpcoesDeTimes: vi.fn().mockResolvedValue([]), adicionarMembro: vi.fn(), removerMembro: vi.fn(),
 }))
 
+// As ações raras da linha (Reenviar convite, Mover para a central, Desativar) ficam no "⋯" (revisão do lote B).
+async function pelaReticencia(linha, nome) {
+  await userEvent.click(within(linha).getByRole('button', { name: /^Mais ações de / }))
+  await userEvent.click(await screen.findByRole('menuitem', { name: nome }))
+}
+async function itensDaReticencia(linha) {
+  const botao = within(linha).queryByRole('button', { name: /^Mais ações de / })
+  if (!botao) return []
+  await userEvent.click(botao)
+  const itens = (await screen.findAllByRole('menuitem')).map((i) => i.textContent)
+  await userEvent.keyboard('{Escape}')
+  return itens
+}
+
 beforeAll(() => {
   URL.createObjectURL = vi.fn(() => 'blob:previa')
   URL.revokeObjectURL = vi.fn()
@@ -401,7 +415,7 @@ describe('Usuários', () => {
     it('Desativar diz quantos clientes da pessoa voltam para Aguardando consultor', async () => {
       vi.mocked(contarClientesAtivos).mockResolvedValue(4)
       renderizarTela(<Usuarios />, { perfil: admin })
-      await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Desativar' }))
+      await pelaReticencia(await screen.findByRole('row', { name: /Ana/ }), 'Desativar')
       const janela = screen.getByRole('alertdialog')
       expect(await within(janela).findByText(/4 clientes dela voltam para Aguardando consultor\./)).toBeInTheDocument()
       expect(contarClientesAtivos).toHaveBeenCalledWith({ consultorId: 'p1' })
@@ -412,7 +426,7 @@ describe('Usuários', () => {
     it('Desativar com 1 cliente fala no singular', async () => {
       vi.mocked(contarClientesAtivos).mockResolvedValue(1)
       renderizarTela(<Usuarios />, { perfil: admin })
-      await userEvent.click(within(await screen.findByRole('row', { name: /Ana/ })).getByRole('button', { name: 'Desativar' }))
+      await pelaReticencia(await screen.findByRole('row', { name: /Ana/ }), 'Desativar')
       expect(await screen.findByText(/1 cliente dela volta para Aguardando consultor\./)).toBeInTheDocument()
     })
 
@@ -435,7 +449,7 @@ describe('Usuários', () => {
         total: 1,
       })
       renderizarTela(<Usuarios />, { perfil: { id: 'd1', papel: 'dono', consultoria_id: null } })
-      await userEvent.click(await within(await screen.findByRole('row', { name: /Ana/ })).findByRole('button', { name: /Mover para a central/ }))
+      await pelaReticencia(await screen.findByRole('row', { name: /Ana/ }), 'Mover para a central')
       expect(await within(screen.getByRole('alertdialog')).findByText(/2 clientes dela voltam para Aguardando consultor\./))
         .toBeInTheDocument()
       expect(contarClientesAtivos).toHaveBeenCalledWith({ consultorId: 'p1' })
@@ -454,11 +468,10 @@ describe('Usuários', () => {
       vi.mocked(listarUsuarios).mockResolvedValue(LINHAS)
       vi.mocked(gerenciarAcesso).mockResolvedValue({ erro: null })
     })
-    const botoes = (nome) => within(screen.getByRole('row', { name: nome })).queryByRole('button', { name: /Mover para a central/ })
 
     it('o dono move um administrador para a central, depois de confirmar', async () => {
       renderizarTela(<Usuarios />, { perfil: { id: 'd1', papel: 'dono', consultoria_id: null } })
-      await userEvent.click(await within(await screen.findByRole('row', { name: /Ana/ })).findByRole('button', { name: /Mover para a central/ }))
+      await pelaReticencia(await screen.findByRole('row', { name: /Ana/ }), 'Mover para a central')
       const janela = screen.getByRole('alertdialog')
       expect(janela).toHaveTextContent(/sai da consultoria e dos times/)
       expect(gerenciarAcesso).not.toHaveBeenCalled()
@@ -470,8 +483,9 @@ describe('Usuários', () => {
       renderizarTela(<Usuarios />, { perfil: { id: 'd1', papel: 'dono', consultoria_id: null } })
       const linha = await screen.findByRole('row', { name: /Cida/ })
       expect(within(linha).getByRole('button', { name: 'Editar' })).toBeInTheDocument()
-      expect(within(linha).getByRole('button', { name: 'Desativar' })).toBeInTheDocument()
-      expect(botoes(/Cida/)).toBeNull()
+      // Cida é da central: não se move para a central de novo.
+      expect(await itensDaReticencia(linha)).toEqual(['Desativar'])
+      expect(await itensDaReticencia(screen.getByRole('row', { name: /Ana/ }))).toEqual(['Mover para a central', 'Desativar'])
     })
 
     it('na ficha do dono, o seletor de consultoria mostra só as ativas', async () => {
@@ -495,9 +509,10 @@ describe('Usuários', () => {
       renderizarTela(<Usuarios />, { perfil: { id: 'c9', papel: 'central', consultoria_id: null } })
       const ana = await screen.findByRole('row', { name: /Ana/ })
       expect(within(ana).getByRole('button', { name: 'Editar' })).toBeInTheDocument()
-      expect(within(ana).getByRole('button', { name: 'Desativar' })).toBeInTheDocument()
-      expect(botoes(/Ana/)).toBeNull()
-      expect(within(screen.getByRole('row', { name: /Cida/ })).queryByRole('button', { name: 'Editar' })).toBeNull()
+      expect(await itensDaReticencia(ana)).toEqual(['Desativar'])
+      const cida = screen.getByRole('row', { name: /Cida/ })
+      expect(within(cida).queryByRole('button', { name: 'Editar' })).toBeNull()
+      expect(await itensDaReticencia(cida)).toEqual([])
       expect(screen.getByLabelText('Consultoria')).toBeInTheDocument()
     })
   })
@@ -575,14 +590,40 @@ describe('Usuários', () => {
       }
     })
 
-    it('as ações da linha são botões só com ícone, com nome acessível e title', async () => {
+    it('as ações da linha são botões só com ícone, com nome acessível e title; as raras ficam no "⋯"', async () => {
       renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
       const ana = await screen.findByRole('row', { name: /Ana/ })
-      for (const nome of ['Editar', 'Capacidade', 'Desativar']) {
+      for (const nome of ['Editar', 'Capacidade', 'Mais ações de Ana']) {
         const botao = within(ana).getByRole('button', { name: nome })
         expect(botao).toHaveAttribute('title', nome)
         expect(botao).toHaveTextContent('')
       }
+      expect(within(ana).queryByRole('button', { name: 'Desativar' })).toBeNull()
+      expect(await itensDaReticencia(ana)).toEqual(['Desativar'])
+    })
+
+    it('posições fixas: no máximo Editar, Capacidade e "⋯"; sem ação rara, o "⋯" guarda o lugar', async () => {
+      const eu = { id: 'a1', nome: 'Eu Admin', email: 'eu@x.test', papel: 'admin', ativo: true, times: [], consultoria_id: 'c1' }
+      vi.mocked(listarUsuarios).mockResolvedValue({ itens: [eu, { id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [], consultoria_id: 'c1' }], total: 2 })
+      renderizarTela(<Usuarios />, { perfil: eu })
+      const lugares = (nome) => [...screen.getByRole('row', { name: nome }).querySelector('td:last-child').children]
+        .map((el) => el.getAttribute('aria-label') ?? (el.getAttribute('aria-hidden') && 'espaço'))
+      await screen.findByRole('row', { name: /Ana/ })
+      expect(lugares(/Ana/)).toEqual(['Editar', 'Capacidade', 'Mais ações de Ana'])
+      expect(lugares(/Eu Admin/)).toEqual(['Editar', 'Capacidade', 'espaço'])
+    })
+
+    it('Reenviar convite pelo "⋯": o mesmo pedido de antes e o aviso', async () => {
+      vi.mocked(reenviarConvite).mockResolvedValue({ erro: null })
+      vi.mocked(listarUsuarios).mockResolvedValue({
+        itens: [{ id: 'p3', nome: 'Caio', email: 'caio@x.test', papel: 'pessoa', ativo: true, times: [], convite_pendente: true }], total: 1,
+      })
+      renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+      const caio = await screen.findByRole('row', { name: /Caio/ })
+      expect(await itensDaReticencia(caio)).toEqual(['Reenviar convite', 'Desativar'])
+      await pelaReticencia(caio, 'Reenviar convite')
+      expect(reenviarConvite).toHaveBeenCalledWith('p3')
+      expect(toast.success).toHaveBeenCalledWith('Convite reenviado para caio@x.test.')
     })
 
     it('a linha da central mostra "—" nos quatro números', async () => {

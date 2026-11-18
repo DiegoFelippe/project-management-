@@ -1,4 +1,4 @@
-import { Gauge, Pencil, Plus, Send, Tags, TrendingUp, UserCheck, UserX, Landmark, Users } from 'lucide-react'
+import { Ellipsis, Gauge, Landmark, Pencil, Plus, Send, Tags, TrendingUp, UserCheck, UserX, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -14,6 +14,7 @@ import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
+import MenuDeAcoes from '@/components/comum/MenuDeAcoes'
 import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import { frase, juntar, useClientesAtivos } from '@/components/clientes/useClientesAtivos'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
@@ -72,6 +73,13 @@ function textoDoZerar({ pessoa, exigida }) {
     : 'Ela volta a entrar só com a senha e pode ativar de novo em Meu perfil.'
   const naoSalva = exigida !== Boolean(pessoa.exige_2fa) ? ' A chave Exigir ainda não foi salva: salve a ficha para ela valer.' : ''
   return `${inicio} ${depois}${naoSalva}`
+}
+
+// O "⋯" das ações raras da linha (MenuDeAcoes, o mesmo das colunas do quadro). Sem nenhuma para a linha, guarda o lugar.
+function MaisAcoes({ pessoa, itens }) {
+  const validos = itens.filter(Boolean)
+  if (!validos.length) return <AcaoDaLinha nome="Mais ações" icone={Ellipsis} visivel={false} />
+  return <MenuDeAcoes rotulo={`Mais ações de ${pessoa.nome}`} itens={validos} />
 }
 
 function Ocupacao({ n, passado }) {
@@ -189,7 +197,6 @@ export default function Usuarios() {
   const podeMover = (p) => ehAdminGeral && p.id !== perfil.id && p.ativo !== false && ['admin', 'gestor', 'pessoa'].includes(p.papel)
   // Que ações a tabela tem para quem vê (cada uma com o seu lugar em todas as linhas).
   const comCapacidade = ehDono || ['admin', 'gestor'].includes(perfil.papel)
-  const comDesativar = ehDono || perfil.papel === 'admin'
 
   // Pessoa vinda do painel: carregada por id (o RLS decide se ela aparece) e aberta na ação que faz sentido.
   useEffect(() => {
@@ -308,6 +315,7 @@ export default function Usuarios() {
   }
 
   async function reenviar(pessoa) {
+    if (reenviando) return
     setReenviando(pessoa.id)
     const { erro: falha } = await reenviarConvite(pessoa.id)
     setReenviando(null)
@@ -366,8 +374,9 @@ export default function Usuarios() {
                   <div className="flex max-w-48 items-center gap-3">
                     <Avatar pessoa={p} className="size-8 text-legenda" />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate font-semibold">{p.nome}</p>
+                      {/* O selo da situação desce para a linha de baixo quando não cabe ao lado: o nome não vira "A…". */}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <p className="max-w-full min-w-0 truncate font-semibold">{p.nome}</p>
                         {s !== 'Ativo' && <Badge variant={COR_DA_SITUACAO[s]} className="shrink-0">{s}</Badge>}
                       </div>
                       <p className="truncate text-rotulo text-muted-foreground" title={p.email}>{p.email}</p>
@@ -400,23 +409,24 @@ export default function Usuarios() {
                     <Celula className="tabular-nums">{formatarHoras(n?.realizado)}</Celula>
                   </>
                 )}
-                {/* Posições fixas (auditoria, G1): cada ação no seu lugar; a que não vale para a linha deixa o espaço. */}
-                {/* Reenviar convite (raro) vem antes, sem guardar lugar: com a célula alinhada à direita, ele não empurra os outros. */}
+                {/* Posições fixas (auditoria, G1): Editar · Capacidade · "⋯"; a que não vale para a linha deixa o espaço. As raras
+                    (Reenviar convite, Mover para a central, Desativar) ficam no "⋯", que só aparece quando há alguma, mas guarda o
+                    lugar: assim a tabela cabe em 1440 px e a coluna fixa não cobre a ocupação. Nos desativados, só Reativar. */}
                 <CelulaAcoes>
-                  {p.convite_pendente && p.ativo !== false && (!ehDono || podeEditar(p)) && (
-                    <AcaoDaLinha nome="Reenviar convite" icone={Send} disabled={reenviando === p.id} onClick={() => reenviar(p)} />
-                  )}
-                  <AcaoDaLinha nome="Editar" icone={Pencil} visivel={(podeEditar(p) || p.id === perfil.id) && p.ativo !== false}
-                    onClick={() => setEditando(p)} />
-                  {comCapacidade && <AcaoDaLinha nome="Capacidade" icone={Gauge} visivel={podeCapacidade(p)} onClick={() => setCapacidade(p)} />}
-                  {ehAdminGeral && (
-                    <AcaoDaLinha nome="Mover para a central" icone={Landmark} visivel={podeMover(p)}
-                      onClick={() => setConfirmando({ pessoa: p, acao: 'mover' })} />
-                  )}
-                  {comDesativar && (
-                    <AcaoDaLinha nome={p.ativo === false ? 'Reativar' : 'Desativar'} icone={p.ativo === false ? UserCheck : UserX}
-                      perigo={p.ativo !== false} visivel={podeDesativar(p)}
-                      onClick={() => setConfirmando({ pessoa: p, acao: p.ativo === false ? 'reativar' : 'desativar' })} />
+                  {p.ativo === false ? (
+                    <AcaoDaLinha nome="Reativar" icone={UserCheck} visivel={podeDesativar(p)}
+                      onClick={() => setConfirmando({ pessoa: p, acao: 'reativar' })} />
+                  ) : (
+                    <>
+                      <AcaoDaLinha nome="Editar" icone={Pencil} visivel={podeEditar(p) || p.id === perfil.id} onClick={() => setEditando(p)} />
+                      {comCapacidade && <AcaoDaLinha nome="Capacidade" icone={Gauge} visivel={podeCapacidade(p)} onClick={() => setCapacidade(p)} />}
+                      <MaisAcoes pessoa={p} itens={[
+                        p.convite_pendente && (!ehDono || podeEditar(p))
+                          && { rotulo: 'Reenviar convite', icone: Send, aoEscolher: () => reenviar(p) },
+                        podeMover(p) && { rotulo: 'Mover para a central', icone: Landmark, aoEscolher: () => setConfirmando({ pessoa: p, acao: 'mover' }) },
+                        podeDesativar(p) && { rotulo: 'Desativar', icone: UserX, perigo: true, aoEscolher: () => setConfirmando({ pessoa: p, acao: 'desativar' }) },
+                      ]} />
+                    </>
                   )}
                 </CelulaAcoes>
               </Linha>
