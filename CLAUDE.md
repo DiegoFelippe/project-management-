@@ -38,7 +38,14 @@ Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na 
 - **Animação nova:** keyframes `icone-<nome>` + a regra `.group:hover .anim-<nome>` (e `:focus-visible`)
   em `src/index.css`, e o nome em `ANIMACOES_DO_MENU`. O elemento clicável precisa da classe `group`
   e de `data-item-trilho`.
-- `menu.test.js` e `Trilho.test.jsx` falham se algum item ficar sem animação.
+- **No celular (abaixo de md), barra embaixo no lugar do trilho** — pedido do Diego, 17/11 (auditoria, G7):
+  `BarraDeBaixo` com até 5 itens do papel (`NA_BARRA_DE_BAIXO` em `menu.js`, na ordem do trilho; consultor: Início,
+  Clientes, Calendário, Check-lists, Quadros; gestor e administrador: Início, Clientes, Calendário, Quadros, Usuários;
+  central e dono: Início, Clientes, Calendário, Usuários, Consultorias), com o mesmo quadrado e as mesmas animações do
+  trilho e a área segura do iPhone (`viewport-fit=cover`). O ☰ da barra de cima (`MenuDoCelular`) tem as outras seções
+  do papel, o Meu perfil, o tema e o Sair, também com `group`, `data-item-trilho` e animação. O trilho do computador
+  não muda. Item novo no menu: decida se ele entra nos 5 do papel.
+- `menu.test.js` e `Trilho.test.jsx` falham se algum item ficar sem animação (no trilho, na barra de baixo e no ☰).
 - Com "reduzir movimento" ligado no sistema, as animações param (regra global em `src/index.css`).
 
 ## Botões: sempre animados
@@ -59,10 +66,12 @@ Toda tela nova segue esta ordem e estes componentes (detalhes nas seções abaix
 2. **Cabeçalho** (`Cabecalho`): título na escala (`text-titulo`), subtítulo e os botões do contexto (principal cheio,
    os outros `outline`).
 3. **Barra de filtros** (`BarraDeFiltros`): começa sempre com o ícone e "Filtros"; depois abas
-   (`AbasSegmentadas`), busca, filtros e o botão principal no fim. Filtros rodam no banco e voltam para a página 1.
+   (`AbasSegmentadas`), busca, filtros e o botão principal no fim. Filtros rodam no banco e voltam para a página 1. No
+   celular, os campos vão para a gaveta (`NaGaveta`, com `ativos` e `aoLimpar`; seção Padrão Hub).
 4. **Cartões de números** logo abaixo da barra: até 4, com o componente comum dos cartões (`CartoesDeNumeros`, o mesmo
    do Início e do Calendário), contados no banco no recorte de quem vê e seguindo os filtros de consultoria/consultor da
-   barra. Animam ao passar o mouse (sobem 1px com sombra e o ícone dá o pulinho, como os botões). Exceção: as abas
+   barra. Animam ao passar o mouse (sobem 1px com sombra e o ícone dá o pulinho, como os botões). O cartão cujo número a
+   lista sabe filtrar ganha `destino` e leva ao filtro (seção Padrão Hub). Exceção: as abas
    Quadro, Agenda e Check-ins da página do cliente não têm cartões (pedido do Diego, 17/11 e 18/11), nem a tela Quadros
    do menu (o mesmo quadro; seção Quadro).
 5. **Conteúdo:** lista sempre em `Tabela` (paginação de 15 vinda do banco, `ListaVazia`, ações na última coluna);
@@ -145,7 +154,7 @@ tela também (`QuadroKanban`, usado pela aba do cliente e pela tela Quadros).
 - **O navegador guarda só ids** (`localStorage` `ixc.quadros.<perfil>`: o último e os 8 recentes, em
   `src/lib/quadrosRecentes.js`), sempre conferidos no banco (`quadro_por_id`, `quadros_por_ids`); o que não volta sai
   da memória. Nome e contagem vêm sempre do banco.
-- **Tela `/quadros`** (todos os papéis; no trilho depois de Check-ins, com a animação `arrastar`): sem id abre o último
+- **Tela `/quadros`** (todos os papéis; no trilho depois de Check-lists, com a animação `arrastar`): sem id abre o último
   quadro (senão o primeiro favorito, de Meus ou Dos times; sem nenhum, "Você ainda não tem quadros." com Novo quadro);
   `/quadros/<id>` abre aquele (o do cliente manda para a página do cliente). Cabeçalho com quem vê, o
   `SeletorDeQuadro` (busca no banco; Favoritos, Recentes, Meus e Dos times), a estrela e o "⋯"; depois a
@@ -183,7 +192,7 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
 - **`Seletor` com muitas opções** usa `buscar` (busca no banco), nunca a lista inteira. Para escolher **várias de uma
   vez**, `multiplo` (a lista fica aberta e cada clique marca ou desmarca; as escolhidas aparecem fora do campo, com
   "Tirar", como `EscolhaDePessoas` no Novo time e em "Colocar pessoas") — pedido do Diego, 18/11 (usabilidade).
-- **Todo menu do trilho abre com `BarraDeFiltros`** (Início, Clientes, Calendário, Check-ins, Quadros — a
+- **Todo menu do trilho abre com `BarraDeFiltros`** (Início, Clientes, Calendário, Check-lists, Quadros — a
   `BarraDoQuadro` do cliente, sem o seletor Consultoria —, Times, Usuários, Consultorias, Integrações), e a barra **sempre começa com o ícone e a palavra "Filtros"** (como no Calendário; o componente já
   traz, não repita na tela). Pedido do Diego (2026-11-17). Nada de prop para esconder o rótulo. Depois vêm abas,
   busca, filtros e o botão principal no fim. Tela sem filtro natural ainda ganha a barra com o recorte que faz
@@ -196,12 +205,25 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   Diego, 17/11) são o
   `CartoesDeNumeros` (`src/components/comum/`): até 4, logo depois da barra, com "—" enquanto carregam, **contados no
   banco** por uma função por tela (`indicadores_de_clientes`, `_de_times`, `_de_usuarios`, `_de_consultorias`,
-  `_de_integracoes`; Check-ins: `indicadores_de_checkins` no Andamento e `indicadores_de_modelos` em Modelos; Início e
+  `_de_integracoes`; Check-lists: `indicadores_de_checkins` no Andamento e `indicadores_de_modelos` em Modelos; Início e
   Calendário: `painel_do_inicio` e `indicadores_da_agenda`), no recorte de quem vê e
   seguindo os filtros de consultoria/consultor (e o período) da barra; situação/abas e busca não mudam os cartões. Leitura
   em `src/data/indicadores.js`, uma por tela, pelo `useLeitura`. **Os cartões animam ao passar o mouse**: sobem 1px
   com sombra e o ícone dá o pulinho dos botões (`.cartao-animado` em `src/index.css`; "reduzir movimento" para). No
-  celular o ícone fica em cima do número. Teste de tela com `cartoesAbaixoDaBarra` (`src/test/cartoes.js`).
+  celular o cartão fica mais baixo: o ícone, menor, ao lado do rótulo (linha da altura de dois rótulos) e o número
+  embaixo, na largura toda — pedido do Diego, 17/11 (auditoria, G6). Teste de tela com `cartoesAbaixoDaBarra`
+  (`src/test/cartoes.js`).
+- **Barra de filtros no celular** — pedido do Diego, 17/11 (auditoria, G6): abaixo de 640 px a `BarraDeFiltros` mostra
+  o botão "Filtros" ("Filtros (2 ativos)" com filtro fora do padrão), a busca e a ação principal; os campos marcados com
+  `NaGaveta` (filho direto da barra) abrem numa gaveta de baixo com Limpar (desligado sem filtro ativo) e Ver resultados
+  (os filtros valem na hora). A tela passa `ativos` (quantos da gaveta estão fora do padrão) e `aoLimpar`. Abas que
+  trocam a tela (Consultorias: Ocupação do mês) ficam na barra; abas que filtram a lista vão para a gaveta. "Limpar
+  filtros" escrito na barra fica só no computador (`max-sm:hidden`). Sem campos na gaveta, fica o rótulo "Filtros".
+- **Cartão que leva ao filtro** — pedido do Diego, 18/11 (usabilidade, U5): `CartoesDeNumeros` aceita `destino` por
+  cartão (a função que aplica o filtro; a lista volta à página 1) e `ativo` (o do filtro que vale, `aria-current`). O
+  cartão vira botão ("Aguardando consultor: 16. Mostrar na lista"), com foco à vista e o afundar dos botões. Só ganha
+  destino o número que a lista filtra no banco, com o mesmo recorte (Clientes: as situações; Usuários: Pessoas ativas e
+  Sem tipo de consultoria; Consultorias ativas; Modelos ativos); os outros continuam só número.
 - **Botões do cabeçalho da página** (`Cabecalho`): a ação principal do contexto é `default` (cheia, `--primary`) e as
   demais são `outline`, tamanho padrão, com ícone. Apagar no cabeçalho é `outline` com o realce de perigo no hover.
   Nas linhas de tabela as ações são a `AcaoDaLinha` (seção Listas); `ghost sm` com texto só para a ação principal única
@@ -380,7 +402,9 @@ Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as
   "Não se aplica" quando há alguma.
 - **Uso no recorte de quem vê:** "N clientes que você vê usam" (a Central conta todos). Uma consultoria nunca vê modelos,
   check-lists, clientes ou nomes de outra; o Histórico só diz o nome do modelo para a Central e para a consultoria dele.
-- **Menu Check-ins** (`/checkins`, todos os papéis): abas Andamento (o consultor vê só os clientes dele) e Modelos, cada
+- **Menu Check-lists** (`/checklists`; `/checkins` redireciona com a mesma `?aba=`; "Check-in" fica só para as horas,
+  na aba Check-ins do cliente — pedido do Diego, 17/11, auditoria G3), todos os papéis: abas Andamento (o consultor vê
+  só os clientes dele) e Modelos, cada
   uma no molde (barra → cartões → `Tabela` de 15 vinda do banco). Com uma seção só, a página não mostra abas (pedido
   do Diego, 17/11).
 - **Exceções aprovadas pelo Diego (17/11, "Pode ser assim"):** as tarefas do check-list do cliente não se criam nem se
