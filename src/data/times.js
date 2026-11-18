@@ -4,7 +4,7 @@ import { traduzirErroBanco } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import { buscarPagina } from './paginar'
 
-const GESTOR = 'gestor:perfis!times_gestor_id_fkey(id, nome, foto, cor)'
+const GESTOR = 'gestor:perfis!times_gestor_id_fkey(id, nome, email, foto, cor)'
 const CAMPOS = `id, nome, descricao, consultoria_id, gestor_id, ${GESTOR}`
 // Na lista: só os 4 primeiros rostos e o total de membros (contado no banco), nunca todos os membros.
 const ROSTOS = 4
@@ -80,6 +80,16 @@ export async function adicionarMembro(timeId, pessoaId) {
   const { error } = await supabase.from('time_membros').insert({ time_id: timeId, pessoa_id: pessoaId })
   if (!error || error.code === '23505') return { erro: null } // 23505: já estava no time
   return { erro: traduzirErroBanco(error) }
+}
+
+// Várias pessoas de uma vez (Novo time e "Colocar no time"): uma chamada só, um comando só no banco — entram todas ou
+// nenhuma (a mesma regra de cada linha: RLS e o gatilho da consultoria). Quem já está no time fica como está.
+export async function adicionarMembros(timeId, pessoaIds) {
+  if (!pessoaIds.length) return { erro: null }
+  const { error } = await supabase
+    .from('time_membros')
+    .upsert(pessoaIds.map((pessoaId) => ({ time_id: timeId, pessoa_id: pessoaId })), { onConflict: 'time_id,pessoa_id', ignoreDuplicates: true })
+  return { erro: error ? traduzirErroBanco(error) : null }
 }
 
 export async function removerMembro(timeId, pessoaId) {

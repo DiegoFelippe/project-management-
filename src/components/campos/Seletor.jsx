@@ -17,8 +17,13 @@ function Marca({ opcao }) {
 // `opcoes` só precisa trazer a escolha atual, e o rodapé diz "N de TOTAL" quando há mais do que o mostrado.
 // Sem `buscar`, a busca (a partir de 8 opções) filtra `opcoes` na tela. `rotuloTodos` acrescenta a opção vazia
 // dos filtros. `tamanho`: "sm" nas barras de filtro, "md" nos formulários. No toque (pointer-coarse), o campo (.input) e cada opção
-// têm 44 px de altura.
-export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotuloTodos, tamanho = 'md', placeholder = 'Selecione', desabilitado = false }) {
+// têm 44 px de altura. `multiplo` (várias de uma vez: usabilidade, U7): `valor` é a lista dos escolhidos, cada clique (ou
+// Enter) marca ou desmarca sem fechar a lista, `aoMudar(lista, opcao)` diz qual mudou, e o gatilho diz quantas há
+// (`resumo(n)`); quem usa mostra as escolhidas fora do campo, com o nome.
+export default function Seletor({
+  id, valor, aoMudar, opcoes = [], buscar, rotuloTodos, tamanho = 'md', placeholder = 'Selecione', desabilitado = false,
+  multiplo = false, resumo = (n) => (n === 1 ? '1 escolhida' : `${n} escolhidas`),
+}) {
   const listaId = useId()
   const [aberto, setAberto] = useState(false)
   const [termo, setTermo] = useState('')
@@ -52,12 +57,15 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
   }, [buscar, remoto, opcoes, termo, todos])
 
   const atual = String(valor ?? '')
+  const valores = multiplo ? (valor ?? []).map(String) : null
+  const marcou = (o) => (multiplo ? valores.includes(String(o.valor)) : String(o.valor) === atual)
   // O resultado do banco só vale para o termo que está na caixa; enquanto não, a lista é do termo velho e Enter não escolhe.
   const fresco = !buscar || remoto?.termo === termo.trim()
-  const padrao = termo.trim() ? (mostradas.length ? 0 : -1) : mostradas.findIndex((o) => String(o.valor) === atual)
+  const padrao = termo.trim() ? (mostradas.length ? 0 : -1) : multiplo ? -1 : mostradas.findIndex((o) => String(o.valor) === atual)
   const ativoNaLista = ativo >= 0 && ativo < mostradas.length ? ativo : padrao
-  const selecionada = opcoes.find((o) => String(o.valor) === atual) ?? remoto?.itens.find((o) => String(o.valor) === atual)
+  const selecionada = multiplo ? undefined : opcoes.find((o) => String(o.valor) === atual) ?? remoto?.itens.find((o) => String(o.valor) === atual)
     ?? (escolhido && String(escolhido.valor) === atual ? escolhido : undefined) ?? (atual === '' ? todos : undefined)
+  const textoDoGatilho = multiplo ? (valores.length ? resumo(valores.length) : null) : selecionada?.rotulo
 
   function abrir() {
     if (desabilitado) return
@@ -69,6 +77,10 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
   }
 
   function escolher(opcao) {
+    if (multiplo) {
+      const novos = marcou(opcao) ? valor.filter((v) => String(v) !== String(opcao.valor)) : [...valor, opcao.valor]
+      return aoMudar(novos, opcao)
+    }
     setEscolhido(opcao)
     aoMudar(opcao.valor, opcao)
     setAberto(false)
@@ -93,7 +105,7 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
         onKeyDown={(e) => { if (e.key === 'ArrowDown' && !aberto) { e.preventDefault(); abrir() } }}
         className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center gap-2 text-left', campo, (aberto || (selecionada && rotuloTodos != null && selecionada.valor !== '')) && 'border-primary/60', aberto && 'ring-primary/15 ring-2')}>
         {selecionada && <Marca opcao={selecionada} />}
-        <span className={cn('min-w-0 flex-1 truncate', selecionada ? 'text-foreground font-medium' : 'text-muted-foreground')}>{selecionada ? selecionada.rotulo : placeholder}</span>
+        <span className={cn('min-w-0 flex-1 truncate', textoDoGatilho ? 'text-foreground font-medium' : 'text-muted-foreground')}>{textoDoGatilho ?? placeholder}</span>
         <ChevronDown className={cn('text-muted-foreground size-3.5 shrink-0 transition-transform', aberto && 'rotate-180')} aria-hidden="true" />
       </button>
 
@@ -107,9 +119,9 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
                 value={termo} onChange={(e) => { setTermo(e.target.value); setAtivo(-1) }} placeholder="Buscar..." className="input py-1.5 pl-8 texto-de-campo" />
             </div>
           )}
-          <div id={listaId} role="listbox" tabIndex={comBusca ? -1 : 0} ref={(el) => { if (el && !comBusca) el.focus() }} aria-activedescendant={!comBusca && ativoNaLista >= 0 ? idOpcao(ativoNaLista) : undefined} className="outline-none">
+          <div id={listaId} role="listbox" aria-multiselectable={multiplo || undefined} tabIndex={comBusca ? -1 : 0} ref={(el) => { if (el && !comBusca) el.focus() }} aria-activedescendant={!comBusca && ativoNaLista >= 0 ? idOpcao(ativoNaLista) : undefined} className="outline-none">
             {mostradas.map((o, i) => {
-              const marcada = String(o.valor) === atual
+              const marcada = marcou(o)
               return (
                 <div key={o.valor} id={idOpcao(i)} role="option" aria-selected={marcada} onClick={() => escolher(o)} onMouseMove={() => ativoNaLista !== i && setAtivo(i)}
                   ref={(el) => { if (el && i === ativoNaLista) el.scrollIntoView?.({ block: 'nearest' }) }}

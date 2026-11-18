@@ -1,36 +1,50 @@
-import { ArrowLeft, Pencil, Trash2, UserMinus, UserPlus } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Pencil, Trash2, UserMinus, UserPlus } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
-import { buscarComoOpcoes } from '@/components/campos/opcoesDePessoa'
-import Seletor from '@/components/campos/Seletor'
 import Avatar from '@/components/comum/Avatar'
-import Cabecalho from '@/components/comum/Cabecalho'
-import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
+import Cabecalho, { Voltar } from '@/components/comum/Cabecalho'
 import { GraficoCarregando } from '@/components/comum/Carregando'
-import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
-import EditarTime from '@/components/times/EditarTime'
+import EscolhaDePessoas from '@/components/times/EscolhaDePessoas'
+import { useAcoesDoTime } from '@/components/times/useAcoesDoTime'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { buscarPessoas } from '@/data/pessoas'
-import { adicionarMembro, apagarTime, buscarTime, editarTime, idsDosMembros, listarMembros, removerMembro } from '@/data/times'
+import { adicionarMembros, buscarTime, idsDosMembros, listarMembros, removerMembro } from '@/data/times'
+import { juntar, plural } from '@/lib/nomes'
+import { useListaPaginada } from '@/lib/useListaPaginada'
+
+const lerMembros = ({ id, pagina }) => listarMembros(id, { pagina })
+const VOLTAR = { caminho: '/times', rotulo: 'Times' }
+
+function Pessoa({ pessoa }) {
+  return (
+    <div className="flex items-center gap-3">
+      <Avatar pessoa={pessoa} className="size-8 text-legenda" />
+      <div className="min-w-0">
+        <p className="truncate font-semibold">{pessoa.nome}</p>
+        {pessoa.email && <p className="truncate text-rotulo text-muted-foreground">{pessoa.email}</p>}
+      </div>
+    </div>
+  )
+}
 
 export default function Time() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [editando, setEditando] = useState(false)
-  const [apagando, setApagando] = useState(false)
+  // Vindo do Novo time com pessoas que não entraram: elas já chegam escolhidas em "Colocar pessoas" (usabilidade, U7).
+  const { state } = useLocation()
   const { perfil } = useAuth()
   const [time, setTime] = useState(undefined)
-  const [membros, setMembros] = useState(null)
-  const [pagina, setPagina] = useState(1)
   const [noTime, setNoTime] = useState(new Set())
-  const [escolhida, setEscolhida] = useState('')
+  const [escolhidas, setEscolhidas] = useState(() => state?.pessoasQueFaltam ?? [])
   const [ocupado, setOcupado] = useState(false)
   const [versao, setVersao] = useState(0)
   const carregar = () => setVersao((v) => v + 1)
+  const acoes = useAcoesDoTime({ perfil, aoMudar: carregar, aoApagar: () => navigate('/times', { replace: true }) })
 
   useEffect(() => {
     let ativo = true
@@ -43,47 +57,35 @@ export default function Time() {
   }, [id, versao])
 
   // Pessoas do time: uma página por vez, em ordem de nome (regra "Escala" no CLAUDE.md).
-  useEffect(() => {
-    let ativo = true
-    listarMembros(id, { pagina })
-      .then((r) => {
-        if (!ativo) return
-        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
-        setMembros(r)
-      })
-      .catch(() => ativo && setMembros({ itens: [], total: 0 }))
-    return () => {
-      ativo = false
-    }
-  }, [id, pagina, versao])
+  const { resultado: membros, paginacao } = useListaPaginada(lerMembros, { id }, { versao })
 
-  // Mexer no time: administrador da consultoria ou o gestor do time. O dono só olha.
-  const gerencio = Boolean(time) && (perfil.papel === 'admin' || (perfil.papel === 'gestor' && time.gestor_id === perfil.id))
+  const gerencio = Boolean(time) && acoes.gerencio(time)
 
-  // Para o "Colocar pessoa": só os ids de quem já está (não a lista inteira de membros).
+  // Para o "Colocar pessoas": só os ids de quem já está (não a lista inteira de membros).
   useEffect(() => {
     if (!gerencio) return
     idsDosMembros(id).then(setNoTime).catch(() => setNoTime(new Set()))
   }, [gerencio, id, versao])
 
-  // Gestores para trocar no Editar (administrador) e pessoas para o "Colocar pessoa": busca no banco pelo nome, nunca
-  // a lista inteira. Quem já está no time e o gestor não são oferecidos de novo.
-  const buscarGestores = useCallback(
-    (termo) => buscarPessoas({ consultoriaId: perfil.consultoria_id, papeis: ['gestor', 'admin'], termo }),
-    [perfil.consultoria_id],
-  )
+  // Pessoas para o "Colocar pessoas": busca no banco pelo nome, nunca a lista inteira. Quem já está no time e o gestor não
+  // são oferecidos de novo.
   const gestorId = time?.gestor_id
-  const buscarDisponiveis = useMemo(() => buscarComoOpcoes(
+  const buscarDisponiveis = useCallback(
     (termo) => buscarPessoas({ consultoriaId: perfil.consultoria_id, termo, excluirIds: [...noTime, gestorId].filter(Boolean) }),
-  ), [perfil.consultoria_id, noTime, gestorId])
+    [perfil.consultoria_id, noTime, gestorId],
+  )
 
+  // Várias de uma vez, numa chamada só (entram todas ou nenhuma). Deu certo: aviso e a lista relida; não deu: o aviso diz
+  // quem não entrou, e elas continuam escolhidas para tentar de novo.
   async function colocar() {
-    if (!escolhida) return
+    if (!escolhidas.length) return
     setOcupado(true)
-    const { erro } = await adicionarMembro(time.id, escolhida)
+    const { erro } = await adicionarMembros(time.id, escolhidas.map((p) => p.id))
     setOcupado(false)
-    if (erro) return toast.error(erro)
-    setEscolhida('')
+    const quem = juntar(escolhidas.map((p) => p.nome))
+    if (erro) return toast.error(`${quem} não ${escolhidas.length === 1 ? 'entrou' : 'entraram'} no time: ${erro}`)
+    toast.success(`${quem} ${escolhidas.length === 1 ? 'entrou' : 'entraram'} no time.`)
+    setEscolhidas([])
     carregar()
   }
 
@@ -96,101 +98,71 @@ export default function Time() {
     carregar()
   }
 
-  const voltar = (
-    <Link to="/times" className="mb-3 inline-flex items-center gap-1 text-corpo font-medium text-muted-foreground hover:text-foreground">
-      <ArrowLeft className="size-4" /> Times
-    </Link>
-  )
-
   if (time === undefined) return <GraficoCarregando texto="Carregando o time…" className="py-12" />
   if (time === null) {
     return (
       <>
-        {voltar}
+        <Voltar para={VOLTAR.caminho}>{VOLTAR.rotulo}</Voltar>
         <p className="text-corpo text-muted-foreground">Esse time não existe ou você não tem acesso a ele.</p>
       </>
     )
   }
 
+  // O gestor também é do time (a lista de times o conta): ele vem na primeira linha da primeira página, com o papel
+  // "Gestor do time" e sem "Tirar do time" (auditoria, R8). Se ele também estiver entre os membros, não aparece duas vezes.
+  const membrosSemGestor = membros?.itens.filter((p) => p.id !== time.gestor_id) ?? []
+  const comGestor = Boolean(time.gestor) && paginacao.pagina === 1
+  const pessoas = membros ? membros.total + (time.gestor ? 1 : 0) : null
+
   return (
     <>
-      {voltar}
-      <Cabecalho titulo={time.nome} descricao={`Gestor: ${time.gestor?.nome ?? '—'}`}>
+      <Cabecalho voltarPara={VOLTAR} titulo={time.nome} descricao={pessoas === null ? null : plural(pessoas, 'pessoa', 'pessoas')}>
         {gerencio && (
           <>
-            <Button variant="outline" onClick={() => setEditando(true)}>
+            <Button variant="outline" onClick={() => acoes.editar(time)}>
               <Pencil /> Editar
             </Button>
-            <Button variant="outline" onClick={() => setApagando(true)}
+            <Button variant="outline" onClick={() => acoes.apagar(time)}
               className="text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive">
               <Trash2 /> Apagar time
             </Button>
           </>
         )}
       </Cabecalho>
-      {editando && (
-        <EditarTime key={time.id + time.nome} aberto time={time} papelDeQuemEdita={perfil.papel}
-          buscarGestores={buscarGestores}
-          aoFechar={() => setEditando(false)}
-          aoSalvar={async (dados) => {
-            const resposta = await editarTime(time.id, dados)
-            if (!resposta.erro) {
-              toast.success('Time atualizado.')
-              carregar()
-            }
-            return resposta
-          }} />
-      )}
-      <ConfirmarAcao aberto={apagando} aoFechar={() => setApagando(false)} titulo={`Apagar o time ${time.nome}?`}
-        descricao="O time some de vez. As pessoas continuam com acesso; só saem deste time."
-        rotuloConfirmar="Apagar time"
-        aoConfirmar={async () => {
-          const resposta = await apagarTime(time.id)
-          if (!resposta.erro) {
-            toast.success(`Time ${time.nome} apagado.`)
-            navigate('/times', { replace: true })
-          }
-          return resposta
-        }} />
+      {acoes.janelas}
       {time.descricao && <p className="-mt-3 mb-5 text-corpo text-muted-foreground">{time.descricao}</p>}
 
       {gerencio && (
-        <div className="mb-5 card flex flex-wrap items-end gap-2 p-3">
-          <div className="grid min-w-56 flex-1 gap-1.5">
-            <Label htmlFor="colocar-pessoa">Colocar pessoa</Label>
-            <Seletor id="colocar-pessoa" valor={escolhida} aoMudar={setEscolhida} buscar={buscarDisponiveis} placeholder="Escolha…" />
-          </div>
-          <Button onClick={colocar} disabled={!escolhida || ocupado}>
-            <UserPlus /> Colocar no time
-          </Button>
+        <div className="mb-5 card grid gap-1.5 p-3">
+          <Label htmlFor="colocar-pessoas">Colocar pessoas</Label>
+          <EscolhaDePessoas id="colocar-pessoas" escolhidas={escolhidas} aoMudar={setEscolhidas} buscar={buscarDisponiveis}>
+            <Button onClick={colocar} disabled={!escolhidas.length || ocupado}>
+              <UserPlus /> Colocar no time
+            </Button>
+          </EscolhaDePessoas>
         </div>
       )}
 
       {membros === null && <GraficoCarregando texto="Carregando as pessoas do time…" className="py-8" />}
-      {membros?.total === 0 && <ListaVazia>Ninguém no time ainda.</ListaVazia>}
-      {membros?.itens.length > 0 && (
-        <Tabela rotulo="Pessoas do time" colunas={['Nome', 'Papel']} larguraMinima={560}
-          paginacao={{ pagina, total: membros.total, aoMudar: setPagina }}>
-          {membros.itens.map((p) => (
+      {membros && !comGestor && membrosSemGestor.length === 0 && <ListaVazia>Ninguém no time ainda.</ListaVazia>}
+      {membros && (comGestor || membrosSemGestor.length > 0) && (
+        <Tabela rotulo="Pessoas do time" colunas={['Nome', 'Papel']} larguraMinima={560} semAcoes={!gerencio} paginacao={paginacao}>
+          {comGestor && (
+            <Linha>
+              <Celula><Pessoa pessoa={time.gestor} /></Celula>
+              <Celula className="text-muted-foreground">Gestor do time</Celula>
+              {gerencio && <CelulaAcoes><AcaoDaLinha nome="Tirar do time" icone={UserMinus} visivel={false} /></CelulaAcoes>}
+            </Linha>
+          )}
+          {membrosSemGestor.map((p) => (
             <Linha key={p.id}>
-              <Celula>
-                <div className="flex items-center gap-3">
-                  <Avatar pessoa={p} className="size-8 text-legenda" />
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{p.nome}</p>
-                    <p className="truncate text-rotulo text-muted-foreground">{p.email}</p>
-                  </div>
-                </div>
-              </Celula>
+              <Celula><Pessoa pessoa={p} /></Celula>
               <Celula className="text-muted-foreground">{NOME_DO_PAPEL[p.papel]}</Celula>
-              <CelulaAcoes>
-                {gerencio && (
-                  <Button variant="ghost" size="sm" disabled={ocupado} onClick={() => tirar(p)}
-                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-                    <UserMinus /> Tirar do time
-                  </Button>
-                )}
-              </CelulaAcoes>
+              {gerencio && (
+                <CelulaAcoes>
+                  <AcaoDaLinha nome="Tirar do time" icone={UserMinus} perigo disabled={ocupado} onClick={() => tirar(p)} />
+                </CelulaAcoes>
+              )}
             </Linha>
           ))}
         </Tabela>

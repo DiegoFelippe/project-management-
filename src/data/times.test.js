@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { listarTimes } from './times'
+import { adicionarMembros, listarTimes } from './times'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn() } }))
 
@@ -34,5 +34,27 @@ describe('listarTimes', () => {
     const r = await listarTimes({ pagina: 2 })
     expect(banco.chamou('range', 15, 29)).toBe(true)
     expect(r).toEqual({ itens: [{ id: 't1', nome: 'Suporte', membros: [], totalMembros: 7 }], total: 1 })
+  })
+})
+
+describe('adicionarMembros (várias pessoas de uma vez: usabilidade, U7)', () => {
+  it('uma chamada só, com uma linha por pessoa; quem já está no time fica como está (sem erro)', async () => {
+    const r = await adicionarMembros('t1', ['p1', 'p2'])
+    expect(r).toEqual({ erro: null })
+    expect(banco.chamou('from', 'time_membros')).toBe(true)
+    expect(banco.chamou('upsert', [{ time_id: 't1', pessoa_id: 'p1' }, { time_id: 't1', pessoa_id: 'p2' }],
+      { onConflict: 'time_id,pessoa_id', ignoreDuplicates: true })).toBe(true)
+    expect(banco.chamadas.filter((c) => c[0] === 'from')).toHaveLength(1)
+  })
+
+  it('sem ninguém, não vai ao banco', async () => {
+    expect(await adicionarMembros('t1', [])).toEqual({ erro: null })
+    expect(banco.chamadas).toEqual([])
+  })
+
+  it('o banco recusa (é tudo ou nada): devolve o erro traduzido', async () => {
+    banco.resposta = { data: null, error: { code: 'P0001', message: 'Só entra no time quem é da mesma consultoria' } }
+    const r = await adicionarMembros('t1', ['p1'])
+    expect(r.erro).toEqual(expect.any(String))
   })
 })

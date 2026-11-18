@@ -218,4 +218,48 @@ describe('Seletor: contraste da opção escolhida', () => {
     expect(screen.getAllByText('Bruno Lima').find((el) => escolhida.contains(el))).toHaveClass('text-primary-texto')
     expect(escolhida.innerHTML).not.toMatch(/text-primary(?![-\w])/)
   })
+
+  describe('multiplo (várias de uma vez: usabilidade, U7)', () => {
+    function Varias({ aoMudar = () => {}, ...props }) {
+      const [valores, setValores] = useState([])
+      return <Seletor id="sel" multiplo valor={valores} aoMudar={(v, opcao) => { setValores(v); aoMudar(v, opcao) }} opcoes={OPCOES} placeholder="Escolha as pessoas" {...props} />
+    }
+
+    it('a lista continua aberta: cada clique marca ou desmarca, e o aoMudar recebe a lista e a opção', async () => {
+      const aoMudar = vi.fn()
+      render(<><Label htmlFor="sel">Pessoas</Label><Varias aoMudar={aoMudar} /></>)
+      await userEvent.click(screen.getByLabelText('Pessoas'))
+      expect(screen.getByRole('listbox')).toHaveAttribute('aria-multiselectable', 'true')
+      await userEvent.click(screen.getByRole('option', { name: /Ana Souza/ }))
+      await userEvent.click(screen.getByRole('option', { name: /Carla Dias/ }))
+      expect(screen.getByRole('listbox')).toBeInTheDocument()
+      expect(aoMudar).toHaveBeenLastCalledWith(['a', 'c'], expect.objectContaining({ valor: 'c' }))
+      expect(screen.getByRole('option', { name: /Ana Souza/ })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('option', { name: /Bruno Lima/ })).toHaveAttribute('aria-selected', 'false')
+      await userEvent.click(screen.getByRole('option', { name: /Ana Souza/ }))
+      expect(aoMudar).toHaveBeenLastCalledWith(['c'], expect.objectContaining({ valor: 'a' }))
+    })
+
+    it('o gatilho diz quantas foram escolhidas; nenhuma, o placeholder', async () => {
+      render(<><Label htmlFor="sel">Pessoas</Label><Varias /></>)
+      const campo = screen.getByLabelText('Pessoas')
+      expect(campo).toHaveTextContent('Escolha as pessoas')
+      await userEvent.click(campo)
+      await userEvent.click(screen.getByRole('option', { name: /Ana Souza/ }))
+      await userEvent.click(screen.getByRole('option', { name: /Bruno Lima/ }))
+      await userEvent.keyboard('{Escape}')
+      expect(campo).toHaveTextContent('2 escolhidas')
+    })
+
+    it('com busca no banco: Enter marca a opção ativa e a lista continua aberta', async () => {
+      const buscar = vi.fn().mockResolvedValue({ itens: OPCOES, total: 3 })
+      const aoMudar = vi.fn()
+      render(<><Label htmlFor="sel">Pessoas</Label><Varias buscar={buscar} opcoes={[]} aoMudar={aoMudar} /></>)
+      await userEvent.click(screen.getByLabelText('Pessoas'))
+      await screen.findByRole('option', { name: /Ana Souza/ })
+      await userEvent.keyboard('{ArrowDown}{Enter}')
+      expect(aoMudar).toHaveBeenLastCalledWith(['a'], expect.objectContaining({ valor: 'a' }))
+      expect(screen.getByRole('listbox')).toBeInTheDocument()
+    })
+  })
 })
