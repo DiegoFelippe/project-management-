@@ -40,14 +40,35 @@ const TEXTOS = {
 
 const TITULO_DAS_TAREFAS = 'Tarefas marcadas nesta sessão'
 
-// "Tarefas concluídas: A; B." — o começo do "O que foi feito" no check-out.
-const textoDasTarefas = (tarefas) => `Tarefas concluídas: ${tarefas.map((t) => t.titulo).join('; ')}.`
+// "Tarefas concluídas: A; B. Não se aplica: C (motivo); D (motivo)." — o começo do "O que foi feito" no check-out (cada
+// parte só quando tem tarefa). O "O que foi feito" vai até 2.000 letras: se os motivos inteiros passarem de 1.500 (sobra
+// espaço para a pessoa completar), cada um entra cortado em 100 letras; o motivo inteiro fica na tarefa e no Histórico.
+const LIMITE_DO_TEXTO = 1500
+const MOTIVO_CURTO = 100
+const cortarMotivo = (motivo) => (motivo.length > MOTIVO_CURTO ? `${motivo.slice(0, MOTIVO_CURTO - 1).trimEnd()}…` : motivo)
+function textoDasTarefas(tarefas, cortar = false) {
+  const feitas = tarefas.filter((t) => t.estado !== 'nao_se_aplica')
+  const naoSeAplica = tarefas.filter((t) => t.estado === 'nao_se_aplica')
+  const partes = []
+  if (feitas.length) partes.push(`Tarefas concluídas: ${feitas.map((t) => t.titulo).join('; ')}.`)
+  if (naoSeAplica.length) {
+    // Sem o ponto final do motivo, para não ficar "(motivo.)."
+    const motivo = (t) => {
+      const texto = (t.motivo ?? '').trim().replace(/\.+$/, '')
+      return cortar ? cortarMotivo(texto) : texto
+    }
+    partes.push(`Não se aplica: ${naoSeAplica.map((t) => `${t.titulo} (${motivo(t)})`).join('; ')}.`)
+  }
+  const texto = partes.join(' ')
+  return !cortar && texto.length > LIMITE_DO_TEXTO ? textoDasTarefas(tarefas, true) : texto
+}
+const COMECOS_DO_TEXTO = ['Tarefas concluídas:', 'Não se aplica:']
 
 // Janela do check-in. modo: "checkout" (fim e o que foi feito), "lancar" (período passado) ou "editar"
 // (inclusive o check-in aberto, que fecha com o fim informado).
 // No check-out e no Editar, lê as tarefas do check-list marcadas no check-in (tarefasDoCheckin) e mostra "Tarefas
 // marcadas nesta sessão" (só para ler); no check-out com "O que foi feito" vazio, ele já vem com "Tarefas concluídas: A;
-// B." (o que a pessoa já digitou nunca é apagado). Lançar horas não tem tarefas.
+// B." e "Não se aplica: C (motivo)." (o que a pessoa já digitou nunca é apagado). Lançar horas não tem tarefas.
 // aoSalvar recebe { descricao } e, em ISO, só os horários que valem gravar: no check-out e no check-in
 // aberto o fim; nos outros, o início e o fim que a pessoa mudou (sem mexer, ficam os guardados, com os
 // segundos). Devolve { erro }.
@@ -155,7 +176,7 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
           <Label htmlFor="checkin-descricao">O que foi feito</Label>
           <textarea id="checkin-descricao" rows={4} value={descricao} onChange={(e) => setDescricao(e.target.value)}
             className="border-input bg-card focus-visible:border-ring focus-visible:ring-ring/30 w-full rounded-md border px-3 py-2 texto-de-campo shadow-xs outline-none hover:border-primary/40 focus-visible:ring-4" />
-          {checkout && descricao.startsWith('Tarefas concluídas:') && (
+          {checkout && COMECOS_DO_TEXTO.some((comeco) => descricao.startsWith(comeco)) && (
             <p className="text-muted-foreground text-legenda">Já vem com as tarefas marcadas; complete com o que mais foi feito.</p>
           )}
         </div>

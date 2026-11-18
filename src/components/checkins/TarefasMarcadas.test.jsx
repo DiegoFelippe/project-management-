@@ -11,6 +11,19 @@ describe('TarefasMarcadas', () => {
     expect(within(lista).getAllByRole('listitem').map((i) => i.textContent)).toEqual(['Análise do DRE', 'Mapa de custos'])
   })
 
+  it('a que não se aplica: chip cinza com o ícone próprio (nunca o check verde) e o motivo no título', () => {
+    render(<TarefasMarcadas rotulo="Nesta sessão" tarefas={[
+      ...TAREFAS, { tarefa_id: 't3', titulo: 'Inventário', estado: 'nao_se_aplica', motivo: 'Sem estoque' },
+    ]} />)
+    const chip = screen.getByRole('listitem', { name: 'Inventário (não se aplica)' })
+    expect(chip).toHaveTextContent('Inventário')
+    expect(chip).toHaveAttribute('title', 'Não se aplica: Inventário (Sem estoque)')
+    expect(chip.querySelector('.lucide-ban')).not.toBeNull()
+    expect(chip.querySelector('.lucide-check')).toBeNull()
+    expect(chip).not.toHaveClass('bg-positive-soft')
+    expect(screen.getAllByRole('listitem')[0].querySelector('.lucide-check')).not.toBeNull()
+  })
+
   it('"+N" quando há mais do que as mostradas, com um nome que se lê ("mais N tarefas marcadas")', () => {
     render(<TarefasMarcadas tarefas={TAREFAS} total={5} rotulo="Tarefas marcadas" />)
     const resto = screen.getByRole('listitem', { name: 'mais 3 tarefas marcadas' })

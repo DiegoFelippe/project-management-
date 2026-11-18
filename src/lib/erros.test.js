@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MENSAGEM_SSO, erroDeRecuperacao, traduzirErroAuth, traduzirErroBanco, traduzirErroFuncao } from './erros'
+import { MENSAGEM_SSO, MOTIVO_OBRIGATORIO, erroDeRecuperacao, traduzirErroAuth, traduzirErroBanco, traduzirErroFuncao } from './erros'
 
 describe('traduzirErroAuth', () => {
   it('traduz os erros de login', () => {
@@ -199,6 +199,11 @@ describe('traduzirErroBanco com contexto', () => {
     // A nota acima do tamanho (o banco confere ao gravar).
     expect(msg('new row for relation "checklist_tarefas" violates check constraint "checklist_tarefas_nota_check"', '23514'))
       .toBe('A nota vai até 500 letras.')
+    // "Não se aplica": o motivo é obrigatório (22023) e vai até 500 letras (a regra da coluna, 23514).
+    expect(msg('motivo_obrigatorio', '22023')).toBe('Conte por que esta tarefa não se aplica.')
+    expect(MOTIVO_OBRIGATORIO).toBe('Conte por que esta tarefa não se aplica.')
+    expect(msg('new row for relation "checklist_tarefas" violates check constraint "checklist_tarefas_motivo_check"', '23514'))
+      .toBe('O motivo vai até 500 letras.')
     // Fora do check-list, estado_invalido e o 23514 continuam os de sempre.
     expect(traduzirErroBanco({ code: 'P0001', message: 'estado_invalido' })).toBe('Algo deu errado. Tente de novo.')
     expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')

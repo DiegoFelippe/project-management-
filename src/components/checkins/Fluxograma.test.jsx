@@ -236,11 +236,12 @@ describe('Fluxograma', () => {
 })
 
 describe('LegendaDoFluxo', () => {
-  it('mostra as seis situações, o "depende de" e a dica', () => {
+  it('mostra as sete situações (com "Não se aplica" e o ícone dele), o "depende de" e a dica', () => {
     render(<LegendaDoFluxo dica="Clique numa tarefa para ver os detalhes." />)
     const legenda = screen.getByRole('list', { name: 'Legenda do fluxograma' })
     const itens = within(legenda).getAllByRole('listitem').map((li) => li.textContent)
-    expect(itens).toEqual(['Feita', 'Em andamento', 'A fazer', 'Bloqueada', 'Vence hoje', 'Atrasada', 'depende de'])
+    expect(itens).toEqual(['Feita', 'Não se aplica', 'Em andamento', 'A fazer', 'Bloqueada', 'Vence hoje', 'Atrasada', 'depende de'])
+    expect(within(legenda).getByText('Não se aplica').querySelector('.lucide-ban')).not.toBeNull()
     expect(screen.getByText('Clique numa tarefa para ver os detalhes.')).toHaveClass('text-legenda')
   })
 

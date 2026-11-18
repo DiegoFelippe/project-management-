@@ -1,16 +1,19 @@
 import { useId, useState } from 'react'
-import { Check, ClipboardCheck, Lock, Play, Undo2 } from 'lucide-react'
+import { Ban, Check, ClipboardCheck, Lock, Play, Undo2 } from 'lucide-react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import JanelaFormulario, { CartaoDaSecao, SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { MOTIVO_OBRIGATORIO } from '@/lib/erros'
 import { formatarDia } from '@/lib/mes'
 import { juntar, plural } from '@/lib/nomes'
 import { cn } from '@/lib/utils'
 import { SelosDaTarefa } from './ListaDoChecklist'
-import { feitaPorEm, rotuloDaSituacao } from './situacao'
+import { estaResolvida, feitaPorEm, rotuloDaSituacao } from './situacao'
 
 const MAXIMO_DA_NOTA = 500
+const MAXIMO_DO_MOTIVO = 500
 
 // A cor de cada situação (a bolinha das tarefas relacionadas), a mesma do fluxograma.
 const PINTA = {
@@ -25,10 +28,12 @@ const ACOES = {
   voltar: { estado: 'a_fazer', rotulo: 'Voltar para a fazer', andando: 'Voltando…', icone: Undo2 },
   reabrir: { estado: 'a_fazer', rotulo: 'Reabrir tarefa', andando: 'Reabrindo…', icone: Undo2 },
   nota: { estado: null, rotulo: 'Salvar nota', andando: 'Salvando…', icone: Check },
+  // Com o motivo aberto (o botão do corpo some), o principal repete o nome da ação; curto para caber a 360 px.
+  naoSeAplica: { estado: 'nao_se_aplica', rotulo: 'Não se aplica', andando: 'Marcando…', icone: Ban },
 }
 
 function situacaoEmPalavras(tarefa, s) {
-  if (tarefa.estado === 'feita') return feitaPorEm(tarefa)
+  if (estaResolvida(tarefa)) return feitaPorEm(tarefa)
   if (s.faltam === null) return 'Sem prazo'
   if (s.atrasada) return `Atrasada há ${plural(-s.faltam, 'dia', 'dias')}`
   if (s.venceHoje) return 'Vence hoje'
@@ -47,7 +52,9 @@ function Relacionadas({ rotulo, tarefas, situacoes, vazio, aoAbrir }) {
               <li key={t.id}>
                 <button type="button" onClick={() => aoAbrir(t)}
                   className="botao-animado hover:bg-accent flex w-full min-w-0 items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-[background-color,translate,scale] outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-[0.97]">
-                  <span aria-hidden="true" className={cn('size-2.5 shrink-0 rounded-full', PINTA[s?.cor] ?? PINTA.livre)} />
+                  {s?.cor === 'nao_se_aplica'
+                    ? <Ban aria-hidden="true" className="text-muted-foreground size-3 shrink-0" strokeWidth={2.5} />
+                    : <span aria-hidden="true" className={cn('size-2.5 shrink-0 rounded-full', PINTA[s?.cor] ?? PINTA.livre)} />}
                   <span className="min-w-0 flex-1 truncate text-rotulo font-medium">{t.titulo}</span>
                   <span className="text-muted-foreground shrink-0 text-legenda">{s ? rotuloDaSituacao(t, s) : ''}</span>
                 </button>
@@ -63,20 +70,30 @@ function Relacionadas({ rotulo, tarefas, situacoes, vazio, aoAbrir }) {
 }
 
 // Janela da tarefa do check-list do cliente: onde ela está (cliente, etapa, obrigatória ou opcional), os selos, a
-// descrição, o prazo e a situação, do que ela depende e o que ela libera (clicáveis: abrem aquela tarefa) e a nota.
+// descrição, o prazo e a situação, do que ela depende e o que ela libera (clicáveis: abrem aquela tarefa), o motivo (na
+// que não se aplica) e a nota.
 // Para quem marca (o consultor do cliente) o rodapé muda com a situação: a fazer → Começar e Marcar como feita; em
-// andamento → Voltar para a fazer e Marcar como feita; feita → Reabrir tarefa e Salvar nota; bloqueada → Salvar nota
-// (e Voltar para a fazer se já tinha começado). Para os outros: Fechar, e a nota só para ler.
-// `aoAgir({ estado, nota })` grava (estado nulo = só a nota) e devolve { erro }; sem erro, a janela fecha.
-// `situacoes`: a situação de cada tarefa (situacaoDaTarefa), por id.
+// andamento → Voltar para a fazer e Marcar como feita; feita ou não se aplica → Reabrir tarefa e Salvar nota; bloqueada →
+// Salvar nota (e Voltar para a fazer se já tinha começado). Para os outros: Fechar, e a nota e o motivo só para ler.
+// "Não se aplica" (a fazer ou em andamento, não bloqueada): o botão no corpo abre o campo Motivo (obrigatório, até 500
+// letras, o erro embaixo do campo) e o rodapé vira Cancelar, Voltar (sai do motivo) e Não se aplica (grava).
+// `aoAgir({ estado, nota, motivo? })` grava (estado nulo = só a nota; motivo só no "não se aplica") e devolve { erro };
+// sem erro, a janela fecha. `situacoes`: a situação de cada tarefa (situacaoDaTarefa), por id.
 export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nomeDoCliente, inicio, podeMarcar, aoAgir, aoAbrir, aoFechar }) {
   const [nota, setNota] = useState(tarefa.nota ?? '')
   const [acao, setAcao] = useState(null)
   const [erro, setErro] = useState(null)
+  const [comMotivo, setComMotivo] = useState(false)
+  const [motivo, setMotivo] = useState('')
+  const [erroDoMotivo, setErroDoMotivo] = useState(null)
   const idNota = useId()
+  const idMotivo = useId()
   const s = situacoes.get(tarefa.id)
   const feita = tarefa.estado === 'feita'
-  const bloqueada = !feita && s.bloqueada
+  const naoSeAplica = tarefa.estado === 'nao_se_aplica'
+  const resolvida = feita || naoSeAplica
+  const bloqueada = !resolvida && s.bloqueada
+  const podeNaoSeAplica = podeMarcar && !resolvida && !bloqueada
   const numeroDaEtapa = etapas.findIndex((e) => e.id === tarefa.etapa_id) + 1
   const etapa = etapas[numeroDaEtapa - 1]
   const porId = new Map(tarefas.map((t) => [t.id, t]))
@@ -85,25 +102,46 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
 
   async function agir(chave) {
     if (acao) return
+    const pedido = { estado: ACOES[chave].estado, nota }
+    if (chave === 'naoSeAplica') {
+      if (!motivo.trim()) {
+        setErroDoMotivo(MOTIVO_OBRIGATORIO)
+        document.getElementById(idMotivo)?.focus()
+        return
+      }
+      pedido.motivo = motivo.trim()
+    }
     setAcao(chave)
     setErro(null)
-    const resposta = await aoAgir({ estado: ACOES[chave].estado, nota })
+    const resposta = await aoAgir(pedido)
     setAcao(null)
     if (resposta?.erro) return setErro(resposta.erro)
     aoFechar()
   }
 
-  // O botão principal envia o formulário da nota (Marcar como feita ou Salvar nota); os outros são botões comuns.
+  function sairDoMotivo() {
+    setComMotivo(false)
+    setMotivo('')
+    setErroDoMotivo(null)
+    setErro(null)
+  }
+
+  // O botão principal envia o formulário (Marcar como feita, Não se aplica ou Salvar nota); os outros são
+  // botões comuns.
   let secundarias = []
   let principal = null
   if (podeMarcar) {
-    if (feita) [secundarias, principal] = [['reabrir'], 'nota']
+    if (resolvida) [secundarias, principal] = [['reabrir'], 'nota']
     else if (bloqueada) [secundarias, principal] = [tarefa.estado === 'andamento' ? ['voltar'] : [], 'nota']
+    else if (comMotivo) [secundarias, principal] = [[], 'naoSeAplica']
     else [secundarias, principal] = [[tarefa.estado === 'andamento' ? 'voltar' : 'comecar'], 'feita']
   }
-  const conteudoDoBotao = (chave) => {
+  // No celular os botões secundários ficam só com o ícone (o nome continua para o leitor de tela), como na janela do
+  // cartão do quadro: Cancelar, o secundário e o principal cabem a 360 px.
+  const conteudoDoBotao = (chave, secundario = false) => {
     const { rotulo, andando, icone: Icone } = ACOES[chave]
-    return acao === chave ? andando : <><Icone /> {rotulo}</>
+    if (acao === chave) return andando
+    return <><Icone /> {secundario ? <span className="max-sm:sr-only">{rotulo}</span> : rotulo}</>
   }
 
   const detalhe = `${nomeDoCliente} · etapa ${numeroDaEtapa}, ${etapa?.nome ?? ''} · ${tarefa.obrigatoria ? 'obrigatória' : 'opcional'}`
@@ -113,9 +151,14 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
       rodape={podeMarcar ? (
         <>
           <Button type="button" variant="outline" onClick={aoFechar} disabled={Boolean(acao)}>Cancelar</Button>
+          {comMotivo && (
+            <Button type="button" variant="outline" disabled={Boolean(acao)} onClick={sairDoMotivo}>
+              <Undo2 /> <span className="max-sm:sr-only">Voltar</span>
+            </Button>
+          )}
           {secundarias.map((chave) => (
             <Button key={chave} type="button" variant="outline" disabled={Boolean(acao)} onClick={() => agir(chave)}>
-              {conteudoDoBotao(chave)}
+              {conteudoDoBotao(chave, true)}
             </Button>
           ))}
           <Button type="submit" form="form-tarefa" disabled={Boolean(acao)}>{conteudoDoBotao(principal)}</Button>
@@ -144,14 +187,51 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
             </p>
           </CartaoDaSecao>
           <CartaoDaSecao className="p-3">
-            <p className="section-label">{feita ? 'Feita' : 'Situação'}</p>
+            <p className="section-label">{feita ? 'Feita' : naoSeAplica ? 'Não se aplica' : 'Situação'}</p>
             <p className="text-corpo">{situacaoEmPalavras(tarefa, s)}</p>
           </CartaoDaSecao>
         </div>
+        {naoSeAplica && (
+          <section aria-labelledby={`${idMotivo}-titulo`} className="bg-muted/50 space-y-1 rounded-xl border px-3 py-2.5">
+            <h3 id={`${idMotivo}-titulo`} className="section-label flex items-center gap-1.5">
+              <Ban className="size-3.5" aria-hidden="true" /> Motivo
+            </h3>
+            <p className="text-corpo break-words">{tarefa.motivo}</p>
+          </section>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Relacionadas rotulo="Depende de" tarefas={dependeDe} situacoes={situacoes} vazio="Nada: pode começar quando quiser." aoAbrir={aoAbrir} />
           <Relacionadas rotulo="Libera" tarefas={libera} situacoes={situacoes} vazio="Nenhuma tarefa espera por esta." aoAbrir={aoAbrir} />
         </div>
+        {podeNaoSeAplica && !comMotivo && (
+          <div className="bg-muted/40 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-3 py-2">
+            <p className="text-muted-foreground min-w-0 flex-1 basis-48 text-rotulo">Esta tarefa não é necessária neste cliente?</p>
+            <Button type="button" variant="outline" size="sm" disabled={Boolean(acao)} onClick={() => setComMotivo(true)}>
+              <Ban /> Não se aplica
+            </Button>
+          </div>
+        )}
+        {comMotivo && (
+          <div className="bg-muted/40 grid gap-2 rounded-xl border p-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <Label htmlFor={idMotivo}>Motivo</Label>
+              <span className="text-muted-foreground text-legenda tabular-nums">{motivo.length}/{MAXIMO_DO_MOTIVO}</span>
+            </div>
+            <Textarea id={idMotivo} rows={3} maxLength={MAXIMO_DO_MOTIVO} autoFocus required value={motivo}
+              aria-invalid={erroDoMotivo ? true : undefined}
+              aria-describedby={erroDoMotivo ? `${idMotivo}-erro ${idMotivo}-ajuda` : `${idMotivo}-ajuda`}
+              placeholder="Ex.: o cliente já tem o DRE auditado deste ano"
+              onChange={(e) => {
+                setMotivo(e.target.value)
+                if (erroDoMotivo && e.target.value.trim()) setErroDoMotivo(null)
+              }} />
+            {erroDoMotivo && <p id={`${idMotivo}-erro`} className="text-rotulo text-destructive">{erroDoMotivo}</p>}
+            <p id={`${idMotivo}-ajuda`} className="text-muted-foreground text-legenda">
+              A tarefa fecha sem ser feita e libera as que dependem dela. O motivo fica na tarefa e no Histórico do cliente,
+              para a auditoria.
+            </p>
+          </div>
+        )}
         {podeMarcar ? (
           <div className="grid gap-2">
             <Label htmlFor={idNota}>Nota (opcional)</Label>

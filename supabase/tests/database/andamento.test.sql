@@ -292,21 +292,21 @@ select is(testes.linha(testes.andamento('gestor_a'), 'Zqa Atraso'),
     'consultor', jsonb_build_object('id', testes.id('pessoa_a'), 'nome', 'Pessoa pessoa_a', 'foto', null, 'cor', null),
     'consultoria', null, 'pode_aplicar', true,
     'checklist', jsonb_build_object('id', testes.id('cl_atraso'), 'modelo_nome', 'Zqm Central todas', 'tarefas', 3,
-      'feitas', 0, 'pct', 0, 'atrasadas', 2,
+      'feitas', 0, 'nao_se_aplica', 0, 'pct', 0, 'atrasadas', 2,
       'proxima', jsonb_build_object('titulo', 'Análise do DRE', 'vence_em', testes.hoje() - 10))),
   'a linha: o cliente, o consultor (rosto e nome), quem aplica, o modelo, o progresso, as atrasadas (mesmo bloqueadas) '
   || 'e a próxima tarefa');
 select is(testes.linha(testes.andamento('gestor_a'), 'Zqa Rápida') -> 'checklist',
-  jsonb_build_object('id', testes.id('cl_rapida'), 'modelo_nome', 'Zqm Rápido', 'tarefas', 3, 'feitas', 0, 'pct', 0,
-    'atrasadas', 0, 'proxima', jsonb_build_object('titulo', 'Livre', 'vence_em', testes.hoje() + 10)),
+  jsonb_build_object('id', testes.id('cl_rapida'), 'modelo_nome', 'Zqm Rápido', 'tarefas', 3, 'feitas', 0, 'nao_se_aplica', 0,
+    'pct', 0, 'atrasadas', 0, 'proxima', jsonb_build_object('titulo', 'Livre', 'vence_em', testes.hoje() + 10)),
   'a próxima é a de data mais cedo entre as pendentes NÃO bloqueadas (Rápida vence antes, mas espera a Base)');
 select is(testes.linha(testes.andamento('gestor_a'), 'Zqa Em dia') -> 'checklist',
   jsonb_build_object('id', testes.id('cl_em_dia'), 'modelo_nome', 'Zqm Central todas', 'tarefas', 3, 'feitas', 1,
-    'pct', 33, 'atrasadas', 0, 'proxima', jsonb_build_object('titulo', 'Mapa de custos', 'vence_em', testes.hoje() + 10)),
+    'nao_se_aplica', 0, 'pct', 33, 'atrasadas', 0, 'proxima', jsonb_build_object('titulo', 'Mapa de custos', 'vence_em', testes.hoje() + 10)),
   'feita a Análise: 33%, e a próxima é o Mapa (liberado)');
 select is(testes.linha(testes.andamento('gestor_a'), 'Zzz Completo') -> 'checklist',
-  jsonb_build_object('id', testes.id('cl_completo'), 'modelo_nome', 'Zqm Rápido', 'tarefas', 3, 'feitas', 3, 'pct', 100,
-    'atrasadas', 0, 'proxima', null),
+  jsonb_build_object('id', testes.id('cl_completo'), 'modelo_nome', 'Zqm Rápido', 'tarefas', 3, 'feitas', 3, 'nao_se_aplica', 0,
+    'pct', 100, 'atrasadas', 0, 'proxima', null),
   'tudo feito: 100%, nenhuma atrasada e sem próxima');
 select is((select jsonb_build_object('consultor', l -> 'consultor', 'proxima', l #> '{checklist,proxima}')
     from testes.linha(testes.andamento('gestor_a'), 'Zqa Aguarda') l),
@@ -425,7 +425,7 @@ select is(testes.numeros('a_senha') ->> 'erro', 'P0001 sem_permissao', 'sessão 
 select is(testes.feita('pessoa_a', 'cl_atraso', 'Análise do DRE'), 'ok', 'o consultor marca a Análise atrasada');
 select is(testes.linha(testes.andamento('gestor_a'), 'Zqa Atraso') -> 'checklist',
   jsonb_build_object('id', testes.id('cl_atraso'), 'modelo_nome', 'Zqm Central todas', 'tarefas', 3, 'feitas', 1,
-    'pct', 33, 'atrasadas', 1, 'proxima', jsonb_build_object('titulo', 'Mapa de custos', 'vence_em', testes.hoje() - 5)),
+    'nao_se_aplica', 0, 'pct', 33, 'atrasadas', 1, 'proxima', jsonb_build_object('titulo', 'Mapa de custos', 'vence_em', testes.hoje() - 5)),
   'a linha acompanha: 33%, uma atrasada e a próxima é o Mapa');
 select is((testes.nomes(testes.andamento('gestor_a')))[1:2], array['Zqa Atraso', 'Zqa Aguarda'],
   'continua a mais atrasada (o Mapa venceu há 5 dias)');

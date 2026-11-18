@@ -116,6 +116,16 @@ describe('AndamentoDosClientes: a tela', () => {
     expect(celulas('Farmácia Central').slice(0, 6)).toEqual(['Farmácia CentralConcórdia/SC', 'BLBeto Lima', 'Sem modelo', '—', '—', '—'])
   })
 
+  it('progresso conta a que não se aplica como resolvida e diz quantas não se aplicam', async () => {
+    const comNsa = { ...EM_DIA, checklist: { ...EM_DIA.checklist, feitas: 3, nao_se_aplica: 1, pct: 80 } }
+    vi.mocked(listarAndamento).mockResolvedValue({ itens: [comNsa, COMPLETO], total: 2 })
+    tela(gestor)
+    await screen.findByRole('table', { name: 'Andamento dos clientes' })
+    expect(celulas('Mercado Bom Preço')[3]).toBe('80% · 4 de 51 não se aplica')
+    expect(within(linha('Mercado Bom Preço')).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '80')
+    expect(celulas('Oficina do Zé')[3]).toBe('100% · 5 de 5')
+  })
+
   it('Abrir leva à aba Check-ins do cliente (o nome também); Aplicar modelo só nos sem modelo', async () => {
     tela(gestor)
     await screen.findByRole('table', { name: 'Andamento dos clientes' })

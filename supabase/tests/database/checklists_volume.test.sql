@@ -150,7 +150,7 @@ from (
   select t.checklist_id, count(*) as tarefas, count(*) filter (where t.estado = 'feita') as feitas,
     count(*) filter (where t.obrigatoria) as obrigatorias,
     count(*) filter (where t.obrigatoria and t.estado = 'feita') as obrigatorias_feitas,
-    min(t.vence_em) filter (where t.estado <> 'feita') as proximo
+    min(t.vence_em) filter (where t.estado in ('a_fazer', 'andamento')) as proximo
   from public.checklist_tarefas t join v_checklists l on l.id = t.checklist_id
   group by t.checklist_id) x
 where cl.id = x.checklist_id;
@@ -277,7 +277,8 @@ select ok(not testes.varre('checklist_tarefas', format($$
   select t.id, t.estado from public.checklist_tarefas t where t.checklist_id = %L order by t.posicao $$,
     testes.id('grande_ativo')))
   and not testes.varre('checklist_tarefas', format($$
-  select d.tarefa_id, jsonb_agg(d.depende_de order by dt.posicao), bool_and(dt.estado = 'feita')
+  select d.tarefa_id, jsonb_agg(d.depende_de order by dt.posicao),
+    bool_and(dt.estado in ('feita', 'nao_se_aplica'))
   from public.checklist_tarefas t
   join public.checklist_dependencias d on d.tarefa_id = t.id
   join public.checklist_tarefas dt on dt.id = d.depende_de
@@ -289,14 +290,15 @@ select ok(not testes.varre('checklist_tarefas', format($$
 select ok(not testes.varre('checklist_tarefas', format($$
   select t.id, t.titulo from public.checklist_dependencias d
   join public.checklist_tarefas t on t.id = d.tarefa_id
-  where d.depende_de = %L and t.estado <> 'feita'
+  where d.depende_de = %L and t.estado in ('a_fazer', 'andamento')
     and not exists (select 1 from public.checklist_dependencias d2 join public.checklist_tarefas t2 on t2.id = d2.depende_de
-      where d2.tarefa_id = t.id and t2.estado <> 'feita') $$, testes.id('grande_t1')))
+      where d2.tarefa_id = t.id and t2.estado in ('a_fazer', 'andamento')) $$, testes.id('grande_t1')))
   and not testes.varre('checklist_dependencias', format($$
   select 1 from public.checklist_dependencias d join public.checklist_tarefas t on t.id = d.depende_de
-  where d.tarefa_id = %L and t.estado <> 'feita' $$, testes.id('grande_t450')))
+  where d.tarefa_id = %L and t.estado in ('a_fazer', 'andamento') $$, testes.id('grande_t450')))
   and not testes.varre('checklist_tarefas', format($$
-  select count(*), count(*) filter (where t.estado = 'feita'), min(t.vence_em) filter (where t.estado <> 'feita')
+  select count(*), count(*) filter (where t.estado = 'feita'), count(*) filter (where t.estado = 'nao_se_aplica'),
+    min(t.vence_em) filter (where t.estado in ('a_fazer', 'andamento'))
   from public.checklist_tarefas t where t.checklist_id = %L $$, testes.id('grande_ativo'))),
   'marcar (dependências, liberadas e recontar) vai por índice, sem Seq Scan');
 

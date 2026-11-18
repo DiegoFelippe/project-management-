@@ -298,6 +298,18 @@ Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as
   (`checkin_tarefas`, com o título copiado); desmarcar com ele aberto tira. Sem check-in aberto (ou com ele em outro
   cliente) a tarefa fica feita, fora de uma sessão. O check-out mostra "Tarefas marcadas nesta sessão" e, com "O que foi
   feito" vazio, já vem com "Tarefas concluídas: A; B."; apagar o check-in não desmarca as tarefas.
+- **"Não se aplica"** (pedido do Diego, 18/11; design, "Acréscimo de 18/11"): terceiro jeito de fechar uma tarefa, ao
+  lado de "feita" (`estado = 'nao_se_aplica'`). Marca quem marca "feita" (só o consultor do cliente, pela janela da
+  tarefa, com ou sem check-in), vale para obrigatória e não vale para bloqueada (`tarefa_bloqueada`); voltar para a
+  fazer (Reabrir) tira o motivo. **Motivo obrigatório** (1 a 500 letras, `motivo_obrigatorio` 22023), na coluna
+  `motivo`, à parte da nota; quem e quando ficam em `feita_por`/`feita_em`, e o Histórico ganha a linha
+  `tarefa_nao_se_aplica` (tarefa e motivo só para a Central e a consultoria do check-list). **Resolvida = feita ou não se
+  aplica:** libera as dependentes, conta no % e no Andamento, mas aparece à parte ("4 de 5 resolvidas: 3 feitas, 1 não
+  se aplica") e nunca entra em atrasadas, "vencem em 7 dias", próximo vencimento nem vira a próxima (no banco, pendente
+  = `estado in ('a_fazer', 'andamento')`, o predicado do índice das pendentes). Com o check-in aberto, entra em
+  `checkin_tarefas` com estado e motivo, e o check-out traz "Não se aplica: <tarefa> (<motivo>)". Visual: cinza com o
+  ícone `Ban` (nunca o check verde) na lista, no fluxograma, nos chips, na janela e na legenda; "Mostrar" ganha a aba
+  "Não se aplica" quando há alguma.
 - **Uso no recorte de quem vê:** "N clientes que você vê usam" (a Central conta todos). Uma consultoria nunca vê modelos,
   check-lists, clientes ou nomes de outra; o Histórico só diz o nome do modelo para a Central e para a consultoria dele.
 - **Menu Check-ins** (`/checkins`, todos os papéis): abas Andamento (o consultor vê só os clientes dele) e Modelos, cada

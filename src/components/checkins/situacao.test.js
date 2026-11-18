@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { diaCurto, feitaPorEm, mesmaSituacao, quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa } from './situacao'
+import {
+  diaCurto, estaResolvida, feitaPorEm, mesmaSituacao, quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa,
+} from './situacao'
 
 const HOJE = '2026-11-17'
 const t = (id, campos = {}) => ({ id, titulo: id, estado: 'a_fazer', vence_em: '2026-11-25', depende_de: [], ...campos })
@@ -52,6 +54,22 @@ describe('situacaoDaTarefa', () => {
     expect(situacao(t('y', { estado: 'andamento', depende_de: ['pendente'] })).cor).toBe('andamento')
   })
 
+  it('não se aplica: cinza, nunca atrasada nem "vence hoje", e não espera ninguém', () => {
+    const s = situacao(t('x', { estado: 'nao_se_aplica', motivo: 'Já feito pelo cliente', vence_em: '2026-11-01', depende_de: ['pendente'] }))
+    expect(s).toMatchObject({ cor: 'nao_se_aplica', bloqueada: false, atrasada: false, venceHoje: false, espera: [] })
+    expect(situacao(t('y', { estado: 'nao_se_aplica', vence_em: HOJE })).venceHoje).toBe(false)
+  })
+
+  it('a que não se aplica libera as que dependem dela, como a feita', () => {
+    const naoSeAplica = t('nsa', { estado: 'nao_se_aplica', motivo: 'Não precisa' })
+    const depende = t('d', { depende_de: ['feita', 'nsa'] })
+    expect(situacaoDaTarefa(depende, { ...POR_ID, nsa: naoSeAplica }, HOJE)).toMatchObject({ cor: 'livre', bloqueada: false })
+  })
+
+  it('estaResolvida: feita ou não se aplica', () => {
+    expect([FEITA, PENDENTE, ANDAMENTO, t('n', { estado: 'nao_se_aplica' })].map(estaResolvida)).toEqual([true, false, false, true])
+  })
+
   it('a conta dos dias atravessa mês e ano sem errar (e não depende do fuso do computador)', () => {
     expect(situacaoDaTarefa(t('x', { vence_em: '2027-01-01' }), {}, '2026-12-31').faltam).toBe(1)
     expect(situacaoDaTarefa(t('x', { vence_em: '2026-02-28' }), {}, '2026-03-01').faltam).toBe(-1)
@@ -86,6 +104,7 @@ describe('rotuloDaSituacao', () => {
     expect(rotulo(LIVRE)).toBe('A fazer')
     expect(rotulo(ANDAMENTO)).toBe('Em andamento')
     expect(rotulo(BLOQUEADA)).toBe('Bloqueada')
+    expect(rotulo(t('n', { estado: 'nao_se_aplica', vence_em: '2026-11-01' }))).toBe('Não se aplica')
     expect(rotulo(t('x', { vence_em: HOJE }))).toBe('A fazer, vence hoje')
     expect(rotulo(t('y', { vence_em: '2026-11-01' }))).toBe('A fazer, atrasada')
     expect(rotulo(t('z', { estado: 'andamento', vence_em: '2026-11-01', depende_de: ['pendente'] })))
@@ -104,12 +123,12 @@ describe('rotuloDaSituacao', () => {
 
   it('o nome sempre combina com a cor: "andamento" diz Em andamento; "bloqueada" diz Bloqueada; "feita" diz Feita', () => {
     const casos = []
-    for (const estado of ['a_fazer', 'andamento', 'feita']) {
+    for (const estado of ['a_fazer', 'andamento', 'feita', 'nao_se_aplica']) {
       for (const vence_em of ['2026-11-25', HOJE, '2026-11-01', null]) {
         for (const depende_de of [[], ['feita'], ['pendente']]) casos.push(t('c', { estado, vence_em, depende_de }))
       }
     }
-    const comeco = { andamento: 'Em andamento', bloqueada: 'Bloqueada', feita: 'Feita', livre: 'A fazer' }
+    const comeco = { andamento: 'Em andamento', bloqueada: 'Bloqueada', feita: 'Feita', livre: 'A fazer', nao_se_aplica: 'Não se aplica' }
     for (const caso of casos) {
       const s = situacao(caso)
       if (comeco[s.cor]) expect(rotulo(caso), JSON.stringify(caso)).toMatch(new RegExp(`^${comeco[s.cor]}`))
@@ -125,6 +144,9 @@ describe('datas e o resumo curto', () => {
   it('feitaPorEm: quem e o dia (em São Paulo); sem o nome quando o banco o esconde', () => {
     expect(feitaPorEm({ feita_em: '2026-11-13T02:00:00Z', feita_por: { nome: 'Ana Lima' } })).toBe('por Ana Lima em 12/11/2026')
     expect(feitaPorEm({ feita_em: '2026-11-12T15:00:00Z', feita_por: { nome: null } })).toBe('feita em 12/11/2026')
+    // Na que não se aplica, feita_por e feita_em dizem quem marcou e quando.
+    expect(feitaPorEm({ estado: 'nao_se_aplica', feita_em: '2026-11-12T15:00:00Z', feita_por: { nome: null } }))
+      .toBe('marcada em 12/11/2026')
   })
 
   it('quandoVence: "vence 20/11", "vence hoje" ou "venceu 12/11"', () => {
@@ -144,5 +166,7 @@ describe('datas e o resumo curto', () => {
     expect(resumo(t('f', { depende_de: ['pendente'] }))).toBe('Bloqueada · vence 25/11')
     expect(resumo(t('g', { obrigatoria: true }))).toBe('A fazer · vence 25/11')
     expect(resumo(t('h', { obrigatoria: false }))).toBe('Opcional · vence 25/11')
+    expect(resumo(t('i', { estado: 'nao_se_aplica', vence_em: '2026-11-01', feita_em: '2026-11-13T02:00:00Z' })))
+      .toBe('Não se aplica')
   })
 })

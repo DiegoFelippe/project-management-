@@ -31,7 +31,7 @@ const { indicadoresDeCheckins } = await import('../../src/data/indicadores.js')
 const { fazerCheckin, fazerCheckout, listarCheckins, meuCheckinAberto, tarefasDoCheckin } =
   await import('../../src/data/checkins.js')
 const { salvarModelo } = await import('../../src/data/modelos.js')
-const { apagarCliente } = await import('../../src/data/clientes.js')
+const { apagarCliente, listarEventos } = await import('../../src/data/clientes.js')
 
 const admin = clienteAdmin()
 // Marca dos nomes deste arquivo, para a busca achar só o que ele criou.
@@ -140,7 +140,7 @@ describe('check-list do cliente contra o banco de verdade', () => {
         consultoria: null,
         pode_aplicar: true,
         checklist: {
-          id: checklistId, modelo_nome: `${marca} Modelo um`, tarefas: 3, feitas: 0, pct: 0, atrasadas: 0,
+          id: checklistId, modelo_nome: `${marca} Modelo um`, tarefas: 3, feitas: 0, nao_se_aplica: 0, pct: 0, atrasadas: 0,
           proxima: { titulo: 'Análise do DRE', vence_em: somarDias(hoje(), 5) },
         },
       }],
@@ -186,12 +186,16 @@ describe('check-list do cliente contra o banco de verdade', () => {
       checkin_id: checkinId,
       tarefas: [{ tarefa_id: tarefa['Mapa de custos'], titulo: 'Mapa de custos' }],
     })
-    expect(await tarefasDoCheckin(checkinId)).toEqual([{ tarefa_id: tarefa['Mapa de custos'], titulo: 'Mapa de custos' }])
+    expect(await tarefasDoCheckin(checkinId)).toEqual([
+      { tarefa_id: tarefa['Mapa de custos'], titulo: 'Mapa de custos', estado: 'feita', motivo: null },
+    ])
 
     expect(await fazerCheckout(checkinId, { fim: new Date().toISOString(), descricao: 'Tarefas concluídas: Mapa de custos.' }))
       .toEqual({ erro: null })
     expect(await marcarTarefa(tarefa['Mapa de custos'], 'a_fazer')).toMatchObject({ estado: 'a_fazer', na_sessao: false })
-    expect(await tarefasDoCheckin(checkinId)).toEqual([{ tarefa_id: tarefa['Mapa de custos'], titulo: 'Mapa de custos' }])
+    expect(await tarefasDoCheckin(checkinId)).toEqual([
+      { tarefa_id: tarefa['Mapa de custos'], titulo: 'Mapa de custos', estado: 'feita', motivo: null },
+    ])
 
     for (const quem of ['pessoa', 'gestor', 'central']) {
       entrar(quem)
@@ -201,6 +205,58 @@ describe('check-list do cliente contra o banco de verdade', () => {
     entrar('gestorB')
     expect((await listarCheckins({ clienteId })).itens).toEqual([])
     expect(await tarefasDoCheckin(checkinId)).toEqual([])
+  })
+
+  it('"não se aplica" pela API: motivo obrigatório, só o consultor, entra no check-in, nos números e no Histórico', async () => {
+    entrar('pessoa')
+    expect(await marcarTarefa(tarefa['Mapa de custos'], 'nao_se_aplica', '   ')).toEqual({ erro: 'Conte por que esta tarefa não se aplica.' })
+    expect(await marcarTarefa(tarefa['Mapa de custos'], 'nao_se_aplica', 'x'.repeat(501))).toEqual({ erro: 'O motivo vai até 500 letras.' })
+    entrar('gestor')
+    expect(await marcarTarefa(tarefa['Mapa de custos'], 'nao_se_aplica', 'Não precisa'))
+      .toEqual({ erro: 'Só o consultor do cliente marca as tarefas.', desatualizado: true })
+
+    // Um check-in aberto logo depois do anterior (os check-ins da pessoa não se sobrepõem).
+    entrar('pessoa')
+    expect(await fazerCheckin(clienteId)).toEqual({ erro: null })
+    const novo = (await meuCheckinAberto(pessoas.pessoa.id)).id
+    const { data: anterior } = await admin.from('checkins').select('fim').eq('id', checkinId).single()
+    await admin.from('checkins').update({ inicio: new Date(new Date(anterior.fim).getTime() + 1).toISOString() }).eq('id', novo)
+
+    expect(await marcarTarefa(tarefa['Mapa de custos'], 'nao_se_aplica', ' Sem custos fixos ')).toMatchObject({
+      estado: 'nao_se_aplica', liberadas: [{ id: tarefa['Plano de ação'], titulo: 'Plano de ação' }], na_sessao: true, erro: null,
+    })
+    const lido = await lerChecklist(clienteId)
+    expect(lido.tarefas[1]).toMatchObject({
+      estado: 'nao_se_aplica', motivo: 'Sem custos fixos', feita_por: { nome: expect.any(String) },
+    })
+    expect(lido.resumo).toMatchObject({ tarefas: 3, feitas: 1, nao_se_aplica: 1, resolvidas: 2 })
+    expect(lido.sessao.tarefas).toEqual([
+      { tarefa_id: tarefa['Mapa de custos'], titulo: 'Mapa de custos', estado: 'nao_se_aplica', motivo: 'Sem custos fixos' },
+    ])
+    expect(await tarefasDoCheckin(novo)).toEqual([
+      { tarefa_id: tarefa['Mapa de custos'], titulo: 'Mapa de custos', estado: 'nao_se_aplica', motivo: 'Sem custos fixos' },
+    ])
+    expect(await fazerCheckout(novo, { fim: new Date().toISOString(), descricao: 'Não se aplica: Mapa de custos (Sem custos fixos).' }))
+      .toEqual({ erro: null })
+
+    for (const quem of ['pessoa', 'gestor', 'central']) {
+      entrar(quem)
+      const { itens } = await listarCheckins({ clienteId })
+      expect(itens.find((k) => k.id === novo)).toMatchObject({
+        tarefas: [{ titulo: 'Mapa de custos', estado: 'nao_se_aplica', motivo: 'Sem custos fixos' }], total_tarefas: 1,
+      })
+    }
+    entrar('gestor')
+    expect((await listarAndamento({ busca: marca })).itens[0].checklist).toMatchObject({ feitas: 1, nao_se_aplica: 1, pct: 67 })
+    const { itens: eventos } = await listarEventos(clienteId)
+    expect(eventos.find((e) => e.tipo === 'tarefa_nao_se_aplica'))
+      .toMatchObject({ tarefa: 'Mapa de custos', motivo: 'Sem custos fixos', autor: expect.any(String) })
+
+    // Desfazer: volta para a fazer, sem motivo; o check-in fechado continua contando a história.
+    entrar('pessoa')
+    expect(await marcarTarefa(tarefa['Mapa de custos'], 'a_fazer')).toMatchObject({ estado: 'a_fazer', na_sessao: false })
+    expect((await lerChecklist(clienteId)).tarefas[1]).toMatchObject({ estado: 'a_fazer', motivo: null, feita_por: null })
+    expect((await tarefasDoCheckin(novo))[0]).toMatchObject({ estado: 'nao_se_aplica', motivo: 'Sem custos fixos' })
   })
 
   it('quem só acompanha não marca; o consultor escreve a nota; os erros vêm traduzidos', async () => {

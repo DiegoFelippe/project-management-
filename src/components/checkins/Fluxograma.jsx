@@ -1,5 +1,5 @@
 import { useId, useMemo, useRef } from 'react'
-import { ArrowRight, Check, Circle, Clock, Lock, Play, TriangleAlert } from 'lucide-react'
+import { ArrowRight, Ban, Check, Circle, Clock, Lock, Play, TriangleAlert } from 'lucide-react'
 import { TAMANHO } from '@/lib/tipografia'
 import { cn } from '@/lib/utils'
 import { ALTURA_DO_NO, LARGURA_DO_NO, caminhoDaSeta, cortar, layoutDoFluxo, quebrarTitulo } from './fluxo'
@@ -18,8 +18,12 @@ const ESTILO = {
   bloqueada: { tom: 'text-muted-foreground', fundo: 'fill-muted stroke-input', tracejada: true, titulo: 'fill-muted-foreground' },
   hoje: { tom: 'text-notice', fundo: 'fill-notice-soft stroke-notice' },
   atrasada: { tom: 'text-destructive', fundo: 'fill-destructive/10 stroke-destructive' },
+  // Não se aplica: cinza (borda cheia, a bloqueada é tracejada) com o ícone próprio, nunca o check verde.
+  nao_se_aplica: { tom: 'text-muted-foreground', fundo: 'fill-muted stroke-muted-foreground/60', titulo: 'fill-muted-foreground' },
 }
-const ICONE = { livre: Circle, feita: Check, andamento: Play, bloqueada: Lock, hoje: Clock, atrasada: TriangleAlert }
+const ICONE = {
+  livre: Circle, feita: Check, andamento: Play, bloqueada: Lock, hoje: Clock, atrasada: TriangleAlert, nao_se_aplica: Ban,
+}
 
 // Setas: a que sai de tarefa feita fica verde; as da tarefa escolhida, em destaque (por cima das outras); a que aponta
 // para uma tarefa que vem depois (só num rascunho do editor de modelos) fica tracejada, em vermelho.
@@ -246,11 +250,12 @@ export default function Fluxograma({
 }
 
 const ITENS_DA_LEGENDA = [
-  ['feita', 'Feita'], ['andamento', 'Em andamento'], ['livre', 'A fazer'], ['bloqueada', 'Bloqueada'], ['hoje', 'Vence hoje'],
-  ['atrasada', 'Atrasada'],
+  ['feita', 'Feita'], ['nao_se_aplica', 'Não se aplica'], ['andamento', 'Em andamento'], ['livre', 'A fazer'],
+  ['bloqueada', 'Bloqueada'], ['hoje', 'Vence hoje'], ['atrasada', 'Atrasada'],
 ]
 const AMOSTRA = {
   feita: 'bg-positive-soft border-positive',
+  nao_se_aplica: 'bg-muted border-muted-foreground/60',
   andamento: 'bg-accent border-primary',
   livre: 'bg-card border-input',
   bloqueada: 'bg-muted border-input border-dashed',
@@ -265,7 +270,9 @@ export function LegendaDoFluxo({ dica }) {
       <ul aria-label="Legenda do fluxograma" className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
         {ITENS_DA_LEGENDA.map(([cor, texto]) => (
           <li key={cor} className="inline-flex items-center gap-1.5">
-            <span aria-hidden="true" className={cn('inline-block h-2.5 w-3.5 rounded-[3px] border', AMOSTRA[cor])} />
+            {cor === 'nao_se_aplica'
+              ? <Ban aria-hidden="true" className="size-3.5" />
+              : <span aria-hidden="true" className={cn('inline-block h-2.5 w-3.5 rounded-[3px] border', AMOSTRA[cor])} />}
             {texto}
           </li>
         ))}

@@ -5,7 +5,7 @@
 -- e os números, para a Central (todas as consultorias), a gestão e o consultor, e a página do pior caso. Além do tempo,
 -- o plano das consultas que as funções rodam não pode varrer checklist_tarefas nem checklist_dependencias (Seq Scan):
 -- atrasadas e próxima tarefa saem só para as 15 linhas da página (a próxima, já na ordem do índice, para na primeira
--- livre), e os números de prazo só olham as tarefas dos check-lists que vencem em até 7 dias, pelo índice das não feitas.
+-- livre), e os números de prazo só olham as tarefas dos check-lists que vencem em até 7 dias, pelo índice das pendentes.
 -- Medido: Central ~7 a 12 ms a página e ~15 ms os números; gestão e consultor ~5 ms a página e ~1,5 ms os números; o pior
 -- caso ~24 ms. Roda com: npm run test:db
 begin;
@@ -130,7 +130,7 @@ from (
   select t.checklist_id, count(*) as tarefas, count(*) filter (where t.estado = 'feita') as feitas,
     count(*) filter (where t.obrigatoria) as obrigatorias,
     count(*) filter (where t.obrigatoria and t.estado = 'feita') as obrigatorias_feitas,
-    min(t.vence_em) filter (where t.estado <> 'feita') as proximo
+    min(t.vence_em) filter (where t.estado in ('a_fazer', 'andamento')) as proximo
   from public.checklist_tarefas t join v_checklists l on l.id = t.checklist_id
   group by t.checklist_id) x
 where cl.id = x.checklist_id;
@@ -279,33 +279,34 @@ select ok(not testes.varre('clientes', format($$
   'a do consultor também');
 reset enable_seqscan;
 
--- Atrasadas e próxima tarefa de uma linha da página (15 vezes por página): pelo índice das não feitas.
+-- Atrasadas e próxima tarefa de uma linha da página (15 vezes por página): pelo índice das pendentes.
 select ok(not testes.varre('checklist_tarefas', format($$
   select count(*) from public.checklist_tarefas t
-  where %L::date < %L::date and t.checklist_id = %L and t.estado <> 'feita' and t.vence_em < %L $$,
+  where %L::date < %L::date and t.checklist_id = %L and t.estado in ('a_fazer', 'andamento')
+    and t.vence_em < %L $$,
     testes.hoje() - 30, testes.hoje(), testes.id('checklist_atrasado'), testes.hoje()))
   and not testes.varre('checklist_tarefas', format($$
   select jsonb_build_object('titulo', t.titulo, 'vence_em', t.vence_em)
   from public.checklist_tarefas t
-  where t.checklist_id = %L and t.estado <> 'feita'
+  where t.checklist_id = %L and t.estado in ('a_fazer', 'andamento')
     and not exists (select 1 from public.checklist_dependencias d
       join public.checklist_tarefas dt on dt.id = d.depende_de
-      where d.tarefa_id = t.id and dt.estado <> 'feita')
+      where d.tarefa_id = t.id and dt.estado in ('a_fazer', 'andamento'))
   order by t.vence_em, t.posicao limit 1 $$, testes.id('checklist_atrasado')))
   and not testes.varre('checklist_dependencias', format($$
   select 1 from public.checklist_tarefas t
-  where t.checklist_id = %L and t.estado <> 'feita'
+  where t.checklist_id = %L and t.estado in ('a_fazer', 'andamento')
     and not exists (select 1 from public.checklist_dependencias d
       join public.checklist_tarefas dt on dt.id = d.depende_de
-      where d.tarefa_id = t.id and dt.estado <> 'feita') $$, testes.id('checklist_atrasado'))),
+      where d.tarefa_id = t.id and dt.estado in ('a_fazer', 'andamento')) $$, testes.id('checklist_atrasado'))),
   'atrasadas e próxima tarefa de cada linha: por índice, sem Seq Scan nas tarefas e dependências');
 select ok(not testes.ordena(format($$
   select jsonb_build_object('titulo', t.titulo, 'vence_em', t.vence_em)
   from public.checklist_tarefas t
-  where t.checklist_id = %L and t.estado <> 'feita'
+  where t.checklist_id = %L and t.estado in ('a_fazer', 'andamento')
     and not exists (select 1 from public.checklist_dependencias d
       join public.checklist_tarefas dt on dt.id = d.depende_de
-      where d.tarefa_id = t.id and dt.estado <> 'feita')
+      where d.tarefa_id = t.id and dt.estado in ('a_fazer', 'andamento'))
   order by t.vence_em, t.posicao limit 1 $$, testes.id('checklist_atrasado'))),
   'a próxima tarefa sai na ordem do índice (vencimento e posição), sem ordenar: para na primeira livre');
 
@@ -323,9 +324,9 @@ select ok(not testes.varre('checklist_tarefas', format($$
   cross join lateral (
     select count(*) filter (where t.vence_em < %1$L) as atrasadas, count(*) filter (where t.vence_em >= %1$L) as vencem
     from public.checklist_tarefas t
-    where t.checklist_id = a.checklist_id and t.estado <> 'feita' and t.vence_em <= %2$L) x
+    where t.checklist_id = a.checklist_id and t.estado in ('a_fazer', 'andamento') and t.vence_em <= %2$L) x
   where a.proximo_vencimento <= %2$L $$, testes.hoje(), testes.hoje() + 7)),
-  'os números de prazo de todas as consultorias: pelo índice das não feitas, sem Seq Scan nas tarefas');
+  'os números de prazo de todas as consultorias: pelo índice das pendentes, sem Seq Scan nas tarefas');
 
 select ok(testes.varre('checklist_tarefas', $$ select t.id from public.checklist_tarefas t where t.nota = 'x' $$),
   'controle do teste: uma consulta sem índice é pega como Seq Scan');

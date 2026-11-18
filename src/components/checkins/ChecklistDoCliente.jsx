@@ -16,7 +16,7 @@ import JanelaInicioDosPrazos from './JanelaInicioDosPrazos'
 import ListaDoChecklist from './ListaDoChecklist'
 import PainelDaSessao from './PainelDaSessao'
 import { ehCelular } from './fluxo'
-import { quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa } from './situacao'
+import { entraNoFiltro, estaResolvida, quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa } from './situacao'
 
 const VISOES = [{ valor: 'lista', rotulo: 'Lista', icone: ListOrdered }, { valor: 'fluxo', rotulo: 'Fluxograma', icone: Workflow }]
 const ORIENTACOES = [{ valor: 'deitado', rotulo: 'Deitado', icone: ArrowRight }, { valor: 'em-pe', rotulo: 'Em pé', icone: ArrowDown }]
@@ -26,8 +26,19 @@ function avisoDaMarcacao(tarefa, estado, resposta) {
   if (estado === 'andamento') return `${tarefa.titulo} em andamento.`
   if (estado === 'a_fazer') return `${tarefa.titulo} voltou para a fazer.`
   const liberadas = resposta.liberadas?.length ? ` Agora dá para fazer: ${juntar(resposta.liberadas.map((t) => t.titulo))}.` : ''
+  if (estado === 'nao_se_aplica') {
+    const sessao = resposta.na_sessao ? ' Entrou no resumo deste check-in.' : ' Sem check-in aberto neste cliente: fica fora de uma sessão.'
+    return `${tarefa.titulo}: não se aplica.${liberadas}${sessao}`
+  }
   const sessao = resposta.na_sessao ? ' Entrou no resumo deste check-in.' : ' Sem check-in aberto neste cliente: fica feita, fora de uma sessão.'
   return `${tarefa.titulo} feita.${liberadas}${sessao}`
+}
+
+// "Feitas" de uma etapa no fluxograma: "1 de 3 feitas" ou, com alguma que não se aplica, "2 de 3 resolvidas".
+function contagemDaEtapa(_etapa, daEtapa) {
+  const resolvidas = daEtapa.filter(estaResolvida).length
+  if (daEtapa.some((t) => t.estado === 'nao_se_aplica')) return `${resolvidas} de ${daEtapa.length} resolvidas`
+  return `${resolvidas} de ${daEtapa.length} feitas`
 }
 
 // A releitura traz objetos novos para todas as tarefas; as que não mudaram ficam com o objeto de antes, para a lista
@@ -58,9 +69,9 @@ function avisoDeQuemAcompanha(cliente, consultor) {
 }
 
 // O check-list do cliente na aba Check-ins (em cima da tabela de check-ins), numa leitura do banco (checklist_do_cliente).
-// Com modelo: barra (Lista/Fluxograma, Todas/Pendentes/Feitas, Deitado/Em pé, a próxima tarefa) → cartões "Andamento do
-// check-list" (contados no banco) → caixas Modelo aplicado e Check-in → aviso para quem só acompanha → lista por etapa
-// ou fluxograma. Sem modelo: a caixa do modelo (Aplicar modelo para quem aplica) e a caixa Check-in.
+// Com modelo: barra (Lista/Fluxograma, Todas/Pendentes/Feitas e, quando há, Não se aplica, Deitado/Em pé, a próxima
+// tarefa) → caixas Modelo aplicado e Check-in → aviso para quem só acompanha → lista por etapa ou fluxograma. Sem
+// modelo: a caixa do modelo (Aplicar modelo para quem aplica) e a caixa Check-in.
 // Filtro e orientação rodam na tela (o check-list já veio inteiro; exceção aprovada pelo Diego em 17/11); no celular o
 // fluxograma começa em pé. Marcar pela caixa é otimista (se o banco recusar, volta e avisa); pela janela da tarefa, grava
 // e fecha. Toda mudança relê o check-list e chama `aoMudar` (o recarregar da página: o botão de check-in, a sessão e a
@@ -152,9 +163,9 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
 
   const abrirTarefa = useCallback((t) => setJanela({ tipo: 'tarefa', id: t.id }), [])
 
-  // Pela janela da tarefa: a nota (se mudou) e depois a situação (se pediu). { erro } fica na janela; recusa de tela
-  // velha fecha a janela, avisa e relê (a tarefa pode nem estar mais na aba).
-  async function agir(tarefa, { estado, nota }) {
+  // Pela janela da tarefa: a nota (se mudou) e depois a situação (se pediu; "não se aplica" vai com o motivo). { erro }
+  // fica na janela; recusa de tela velha fecha a janela, avisa e relê (a tarefa pode nem estar mais na aba).
+  async function agir(tarefa, { estado, nota, motivo }) {
     const recusou = (resposta) => {
       if (!resposta.desatualizado) return resposta
       toast.error(resposta.erro)
@@ -168,7 +179,9 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
       if (resposta.erro) return recusou(resposta)
     }
     if (estado) {
-      const resposta = await marcarTarefa(tarefa.id, estado)
+      const resposta = await (estado === 'nao_se_aplica'
+        ? marcarTarefa(tarefa.id, estado, motivo)
+        : marcarTarefa(tarefa.id, estado))
       if (resposta.erro) {
         if (mudouNota && !resposta.desatualizado) mudou()
         return recusou(resposta)
@@ -224,7 +237,11 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
   }
 
   const tarefaAberta = janela?.tipo === 'tarefa' ? tarefas.find((t) => t.id === janela.id) : null
-  const apagada = (t) => (filtro === 'pendentes' && t.estado === 'feita') || (filtro === 'feitas' && t.estado !== 'feita')
+  const resolvidas = resumo.resolvidas ?? resumo.feitas
+  const naoSeAplica = resumo.nao_se_aplica ?? 0
+  // A aba "Não se aplica" só existe quando há alguma; desfeita a última, o filtro volta para Todas.
+  const filtroDaTela = filtro === 'nao_se_aplica' && !naoSeAplica ? 'todas' : filtro
+  const apagada = (t) => !entraNoFiltro(t, filtroDaTela)
   const infoNoFluxo = (t) => {
     const s = situacoes.get(t.id)
     return { cor: s.cor, sub: resumoDaSituacao(t, s), rotulo: rotuloDaSituacao(t, s), apagado: apagada(t) }
@@ -237,10 +254,11 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
       {titulo}
       <BarraDeFiltros className="mb-0">
         <AbasSegmentadas rotulo="Visualização" abas={VISOES} valor={visao} aoMudar={setVisao} />
-        <AbasSegmentadas rotulo="Mostrar" valor={filtro} aoMudar={setFiltro} abas={[
+        <AbasSegmentadas rotulo="Mostrar" valor={filtroDaTela} aoMudar={setFiltro} abas={[
           { valor: 'todas', rotulo: 'Todas', contador: resumo.tarefas },
-          { valor: 'pendentes', rotulo: 'Pendentes', contador: resumo.tarefas - resumo.feitas, pendente: resumo.atrasadas > 0 },
+          { valor: 'pendentes', rotulo: 'Pendentes', contador: resumo.tarefas - resolvidas, pendente: resumo.atrasadas > 0 },
           { valor: 'feitas', rotulo: 'Feitas', contador: resumo.feitas },
+          ...(naoSeAplica ? [{ valor: 'nao_se_aplica', rotulo: 'Não se aplica', contador: naoSeAplica }] : []),
         ]} />
         {visao === 'fluxo' && (
           <AbasSegmentadas rotulo="Orientação do fluxograma" abas={ORIENTACOES} valor={vertical ? 'em-pe' : 'deitado'}
@@ -249,7 +267,7 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
         <p className="text-muted-foreground min-w-0 text-rotulo sm:ml-auto">
           {proxima
             ? <>Próxima: <strong className="text-foreground font-semibold">{proxima.titulo}</strong> · {quandoVence(proxima.vence_em, dia)}</>
-            : 'Tudo feito.'}
+            : naoSeAplica ? 'Tudo resolvido.' : 'Tudo feito.'}
         </p>
       </BarraDeFiltros>
       {/* Sem cartões de números na aba Check-ins do cliente (pedido do Diego, 18/11), como no Quadro e na Agenda. */}
@@ -261,13 +279,13 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
         </p>
       )}
       {visao === 'lista' ? (
-        <ListaDoChecklist etapas={dados.etapas} tarefas={tarefas} situacoes={situacoes} filtro={filtro} podeMarcar={dados.pode_marcar}
+        <ListaDoChecklist etapas={dados.etapas} tarefas={tarefas} situacoes={situacoes} filtro={filtroDaTela} podeMarcar={dados.pode_marcar}
           ocupadas={ocupadas} aoMarcar={marcar} aoAbrir={abrirTarefa} />
       ) : (
         <section aria-label="Fluxograma" className="card min-w-0 overflow-hidden">
           <Fluxograma etapas={dados.etapas} tarefas={tarefas} vertical={vertical} infoDaTarefa={infoNoFluxo}
             selecionada={tarefaAberta?.id ?? null} aoEscolher={abrirTarefa} rotulo={`Fluxograma das tarefas de ${cliente.nome}`}
-            contagemDaEtapa={(_etapa, daEtapa) => `${daEtapa.filter((t) => t.estado === 'feita').length} de ${daEtapa.length} feitas`} />
+            contagemDaEtapa={contagemDaEtapa} />
           <LegendaDoFluxo dica={`Clique numa tarefa para ${dados.pode_marcar ? 'ver os detalhes e marcar' : 'ver os detalhes'}. Arraste o quadro para os lados.`} />
         </section>
       )}

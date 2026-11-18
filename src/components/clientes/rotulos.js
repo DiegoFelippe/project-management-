@@ -19,8 +19,9 @@ export function lerHoras(texto) {
   return Number(limpo)
 }
 
-// Texto de cada evento do histórico. Nome nulo = o banco escondeu (é de outra consultoria). O nome do modelo de check-in
-// só vem para a Central e para a consultoria do check-list; sem ele, o texto fica sem o nome.
+// Texto de cada evento do histórico. Nome nulo = o banco escondeu (é de outra consultoria). O nome do modelo de check-in,
+// a tarefa e o motivo do "não se aplica" só vêm para a Central e para a consultoria do check-list; sem eles, o texto
+// fica só com o fato.
 export function textoDoEvento(e) {
   const consultoria = (nome) => nome ?? 'outra consultoria'
   const consultor = (nome) => nome ?? 'outro consultor'
@@ -43,6 +44,9 @@ export function textoDoEvento(e) {
     case 'modelo_aplicado': return e.modelo ? `Modelo de check-in aplicado: ${e.modelo}` : 'Modelo de check-in aplicado'
     case 'modelo_trocado': return e.modelo ? `Modelo de check-in trocado para ${e.modelo}` : 'Modelo de check-in trocado'
     case 'modelo_tirado': return e.modelo ? `Modelo de check-in tirado: ${e.modelo}` : 'Modelo de check-in tirado'
+    case 'tarefa_nao_se_aplica': return e.tarefa
+      ? `Tarefa não se aplica: ${e.tarefa}${e.motivo ? ` (${e.motivo})` : ''}`
+      : 'Tarefa do check-list marcada como não se aplica'
     default: return e.tipo
   }
 }

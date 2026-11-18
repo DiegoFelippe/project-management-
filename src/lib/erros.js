@@ -60,6 +60,9 @@ export function traduzirErroFuncao(codigo) {
 // O banco recusa (23514) check-in de mais de 24 h; a tela confere o mesmo antes de enviar.
 export const CHECKIN_DE_MAIS_DE_24H = 'Um check-in não pode passar de 24 h. Ajuste o horário de fim.'
 
+// O motivo do "não se aplica" é obrigatório: a janela da tarefa diz o mesmo embaixo do campo, antes de enviar.
+export const MOTIVO_OBRIGATORIO = 'Conte por que esta tarefa não se aplica.'
+
 // Mensagens levantadas pelo banco (raise exception '<texto>').
 const ERROS_MENSAGEM_BANCO = {
   so_central_muda: 'Só a central muda os dados do cliente.',
@@ -106,6 +109,8 @@ const ERROS_MENSAGEM_BANCO = {
   modelo_indisponivel: 'Esse modelo não está mais disponível para este cliente. Escolha outro.',
   inicio_invalido: 'O início dos prazos precisa estar entre 2 anos atrás e 1 ano à frente.',
   tarefa_bloqueada: 'Esta tarefa depende de outras que ainda não foram feitas.',
+  // "Não se aplica" sem motivo (ou só com espaços): 22023
+  motivo_obrigatorio: MOTIVO_OBRIGATORIO,
   // Quadros do menu (pessoais e de time)
   time_invalido: 'Esse time não está mais disponível para você. Escolha outro time.',
   quadro_arquivado: 'Este quadro está arquivado: restaure antes de renomear.',
@@ -176,8 +181,10 @@ export function traduzirErroBanco(erro, { sobre } = {}) {
     if (sobre === 'checkin') return CHECKIN_DE_MAIS_DE_24H
     // No quadro, o que a pessoa digita é só o nome.
     if (sobre === 'quadro') return 'O nome do quadro precisa ter de 1 a 80 letras.'
-    // No check-list, o que a pessoa digita é só a nota da tarefa.
-    if (sobre === 'checklist') return 'A nota vai até 500 letras.'
+    // No check-list, o que a pessoa digita é a nota da tarefa e o motivo do "não se aplica".
+    if (sobre === 'checklist') {
+      return /checklist_tarefas_motivo_check/.test(erro.message ?? '') ? 'O motivo vai até 500 letras.' : 'A nota vai até 500 letras.'
+    }
     // Só as regras de tamanho dos textos (nome, descrição, título); as outras (ex.: tipo) ficam no texto de sempre.
     if (sobre === 'modelo' && /_(nome|descricao|titulo)_check"/.test(erro.message ?? '')) {
       return TEXTO_DO_MODELO_GRANDE_DEMAIS

@@ -120,6 +120,26 @@ describe('escritas do check-list', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('marcar_tarefa', { p_tarefa: 't1', p_estado: 'feita' })
   })
 
+  it('marcarTarefa com "não se aplica" manda o motivo; nos outros estados, não', async () => {
+    rpcResponde({ estado: 'nao_se_aplica', feita_em: '2026-11-18T12:00:00Z', liberadas: [], na_sessao: false })
+    expect(await marcarTarefa('t1', 'nao_se_aplica', 'O cliente não tem estoque')).toMatchObject({ estado: 'nao_se_aplica', erro: null })
+    expect(supabase.rpc).toHaveBeenLastCalledWith('marcar_tarefa', {
+      p_tarefa: 't1', p_estado: 'nao_se_aplica', p_motivo: 'O cliente não tem estoque',
+    })
+    await marcarTarefa('t1', 'a_fazer')
+    expect(supabase.rpc).toHaveBeenLastCalledWith('marcar_tarefa', { p_tarefa: 't1', p_estado: 'a_fazer' })
+  })
+
+  it('motivo em branco ou grande demais: o texto para a pessoa, sem reler a tela', async () => {
+    rpcResponde(null, { code: '22023', message: 'motivo_obrigatorio' })
+    expect(await marcarTarefa('t1', 'nao_se_aplica', ' ')).toEqual({ erro: 'Conte por que esta tarefa não se aplica.' })
+    rpcResponde(null, {
+      code: '23514',
+      message: 'new row for relation "checklist_tarefas" violates check constraint "checklist_tarefas_motivo_check"',
+    })
+    expect(await marcarTarefa('t1', 'nao_se_aplica', 'x'.repeat(501))).toEqual({ erro: 'O motivo vai até 500 letras.' })
+  })
+
   it('marcarTarefa traduz as recusas', async () => {
     rpcResponde(null, { code: 'P0001', message: 'tarefa_bloqueada' })
     expect(await marcarTarefa('t1', 'feita')).toEqual({

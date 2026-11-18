@@ -1,22 +1,32 @@
 import { memo } from 'react'
-import { CalendarDays, Check, Clock, Lock, Play, StickyNote, TriangleAlert } from 'lucide-react'
+import { Ban, CalendarDays, Check, Clock, Lock, Play, StickyNote, TriangleAlert } from 'lucide-react'
 import Caixa from '@/components/campos/Caixa'
 import { ListaVazia } from '@/components/comum/Tabela'
 import { Badge } from '@/components/ui/badge'
 import { juntar, plural } from '@/lib/nomes'
 import { BarraDeProgresso } from './CartaoDoModelo'
-import { diaCurto, feitaPorEm, mesmaSituacao } from './situacao'
+import { diaCurto, entraNoFiltro, estaResolvida, feitaPorEm, mesmaSituacao } from './situacao'
 
 const SELO_ANDAMENTO = 'border-transparent bg-accent text-primary-texto'
 const SELO_ATRASADA = 'border-transparent bg-destructive/10 text-destructive'
 const SELO_BLOQUEADA = 'border-transparent bg-muted text-muted-foreground'
 const SELO_SESSAO = 'border-transparent bg-sky-500/10 text-sky-700 dark:text-sky-300'
+// Não se aplica: cinza, com o ícone próprio (nunca o check verde).
+const SELO_NAO_SE_APLICA = 'border-transparent bg-muted text-muted-foreground'
 
-// Os selos da tarefa (a lista e a janela da tarefa): Feita por … em …; Em andamento; Atrasada · venceu 12/11, Vence hoje
-// ou Vence 20/11; Bloqueada e o que ela espera. Em andamento e bloqueada (uma dependência foi reaberta) é um selo só,
-// "Em andamento · espera N tarefas", como no fluxograma. `idMotivo` vai no motivo do bloqueio (a caixa desligada aponta
-// para ele).
+// Os selos da tarefa (a lista e a janela da tarefa): Feita por … em …; Não se aplica por … em …; Em andamento; Atrasada ·
+// venceu 12/11, Vence hoje ou Vence 20/11; Bloqueada e o que ela espera. Em andamento e bloqueada (uma dependência foi
+// reaberta) é um selo só, "Em andamento · espera N tarefas", como no fluxograma. `idMotivo` vai no motivo do bloqueio (a
+// caixa desligada aponta para ele).
 export function SelosDaTarefa({ tarefa, situacao, idMotivo }) {
+  if (tarefa.estado === 'nao_se_aplica') {
+    return (
+      <>
+        <Badge variant="outline" data-selo="nao_se_aplica" className={SELO_NAO_SE_APLICA}><Ban /> Não se aplica</Badge>
+        <span className="text-muted-foreground text-legenda">{feitaPorEm(tarefa)}</span>
+      </>
+    )
+  }
   if (tarefa.estado === 'feita') {
     return (
       <>
@@ -56,14 +66,23 @@ export function SelosDaTarefa({ tarefa, situacao, idMotivo }) {
 const mesmasProps = (a, b) => Object.keys(a).length === Object.keys(b).length
   && Object.keys(a).every((chave) => (chave === 'situacao' ? mesmaSituacao(a.situacao, b.situacao) : Object.is(a[chave], b[chave])))
 
+// A que não se aplica não tem a caixa (nunca o check): um quadrado cinza com o ícone próprio; desfazer é pela janela
+// (Reabrir tarefa).
 const ItemDaTarefa = memo(function ItemDaTarefa({ tarefa, situacao, podeMarcar, ocupada, aoMarcar, aoAbrir }) {
   const feita = tarefa.estado === 'feita'
-  const bloqueada = !feita && situacao.bloqueada
+  const naoSeAplica = tarefa.estado === 'nao_se_aplica'
+  const bloqueada = !feita && !naoSeAplica && situacao.bloqueada
   const idMotivo = bloqueada ? `motivo-${tarefa.id}` : undefined
   return (
     <li aria-busy={ocupada || undefined} className="flex items-start gap-3 px-4 py-3 aria-busy:cursor-progress">
-      <Caixa nome={tarefa.titulo} marcado={feita} desabilitado={!podeMarcar || bloqueada} descritoPor={idMotivo}
-        aoMudar={(marcada) => aoMarcar(tarefa, marcada ? 'feita' : 'a_fazer')} className="mt-0.5" />
+      {naoSeAplica ? (
+        <span aria-hidden="true" className="bg-muted text-muted-foreground border-input mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border">
+          <Ban className="size-3" strokeWidth={3} />
+        </span>
+      ) : (
+        <Caixa nome={tarefa.titulo} marcado={feita} desabilitado={!podeMarcar || bloqueada} descritoPor={idMotivo}
+          aoMudar={(marcada) => aoMarcar(tarefa, marcada ? 'feita' : 'a_fazer')} className="mt-0.5" />
+      )}
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <button type="button" onClick={() => aoAbrir(tarefa)}
@@ -77,6 +96,12 @@ const ItemDaTarefa = memo(function ItemDaTarefa({ tarefa, situacao, podeMarcar, 
         <div data-selos className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <SelosDaTarefa tarefa={tarefa} situacao={situacao} idMotivo={idMotivo} />
         </div>
+        {naoSeAplica && tarefa.motivo && (
+          <p className="bg-muted/60 flex items-start gap-1.5 rounded-lg px-2 py-1 text-rotulo">
+            <Ban className="text-muted-foreground mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 break-words"><span className="font-semibold">Motivo:</span> {tarefa.motivo}</span>
+          </p>
+        )}
         {tarefa.nota && (
           <p className="bg-muted/60 flex items-start gap-1.5 rounded-lg px-2 py-1 text-rotulo">
             <StickyNote className="text-muted-foreground mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
@@ -88,24 +113,30 @@ const ItemDaTarefa = memo(function ItemDaTarefa({ tarefa, situacao, podeMarcar, 
   )
 }, mesmasProps)
 
-const VAZIO = { feitas: 'Nenhuma tarefa feita ainda.', pendentes: 'Tudo feito: nenhuma tarefa pendente.' }
+const VAZIO = {
+  feitas: 'Nenhuma tarefa feita ainda.',
+  pendentes: 'Tudo resolvido: nenhuma tarefa pendente.',
+  nao_se_aplica: 'Nenhuma tarefa marcada como "não se aplica".',
+}
 
-// O check-list em lista: um cartão por etapa (número, nome, "3 de 5" e barra) com as tarefas na ordem do modelo. Cada
-// tarefa: a caixa de marcar (desligada para quem não marca e na bloqueada, que mostra o que espera), o título (abre a
-// janela da tarefa), "Opcional", "Nesta sessão", a descrição, os selos e a nota. `filtro` ('todas' | 'pendentes' |
-// 'feitas') roda na tela: o check-list já veio inteiro; etapa sem nenhuma tarefa no filtro some. `ocupadas`: as tarefas
-// que estão indo para o banco agora. `aoMarcar` e `aoAbrir` precisam ser estáveis (useCallback) para o memo dos itens.
+// O check-list em lista: um cartão por etapa (número, nome, "3 de 5" resolvidas e barra) com as tarefas na ordem do
+// modelo. Cada tarefa: a caixa de marcar (desligada para quem não marca e na bloqueada, que mostra o que espera; a que
+// não se aplica tem o quadrado cinza no lugar), o título (abre a janela da tarefa), "Opcional", "Nesta sessão", a
+// descrição, os selos, o motivo (a que não se aplica) e a nota. `filtro` ('todas' | 'pendentes' | 'feitas' |
+// 'nao_se_aplica') roda na tela: o check-list já veio inteiro; etapa sem nenhuma tarefa no filtro some. `ocupadas`: as
+// tarefas que estão indo para o banco agora. `aoMarcar` e `aoAbrir` precisam ser estáveis (useCallback) para o memo dos
+// itens.
 export default function ListaDoChecklist({ etapas, tarefas, situacoes, filtro, podeMarcar, ocupadas, aoMarcar, aoAbrir }) {
   const daEtapa = new Map(etapas.map((e) => [e.id, []]))
   for (const t of tarefas) daEtapa.get(t.etapa_id)?.push(t)
-  const entra = (t) => filtro === 'todas' || (filtro === 'feitas') === (t.estado === 'feita')
+  const entra = (t) => entraNoFiltro(t, filtro)
 
   const blocos = etapas.map((etapa, i) => {
     const todas = daEtapa.get(etapa.id)
     const mostradas = todas.filter(entra)
     if (!mostradas.length) return null
-    const feitas = todas.filter((t) => t.estado === 'feita').length
-    const pct = todas.length ? Math.round((feitas / todas.length) * 100) : 0
+    const resolvidas = todas.filter(estaResolvida).length
+    const pct = todas.length ? Math.round((resolvidas / todas.length) * 100) : 0
     const nome = `${i + 1} · ${etapa.nome}`
     return (
       <section key={etapa.id} aria-label={nome} className="card min-w-0 overflow-hidden">
@@ -115,7 +146,7 @@ export default function ListaDoChecklist({ etapas, tarefas, situacoes, filtro, p
           </span>
           <h3 className="min-w-0 flex-1 text-subtitulo font-semibold break-words">{etapa.nome}</h3>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-legenda font-semibold tabular-nums">{feitas} de {todas.length}</span>
+            <span className="text-muted-foreground text-legenda font-semibold tabular-nums">{resolvidas} de {todas.length}</span>
             <BarraDeProgresso pct={pct} rotulo={`Progresso de ${etapa.nome}`} className="h-1.5 w-20 sm:w-28" />
           </div>
         </header>

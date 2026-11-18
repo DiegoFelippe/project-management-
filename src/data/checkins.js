@@ -9,7 +9,7 @@ import { buscarPagina } from './paginar'
 // tarefasDoCheckin e na sessão do checklist_do_cliente): marcada_em, titulo, tarefa_id.
 const CAMPOS_DA_LISTA =
   'id, inicio, fim, descricao, consultor_id, consultoria_id, consultor:consultor_do_checkin(nome), ' +
-  'cliente:cliente_do_checkin(id, nome), tarefas:checkin_tarefas(titulo), total_tarefas:checkin_tarefas(count)'
+  'cliente:cliente_do_checkin(id, nome), tarefas:checkin_tarefas(titulo, estado, motivo), total_tarefas:checkin_tarefas(count)'
 const TAREFAS_NA_LISTA = 3
 
 const traduzir = (erro) => traduzirErroBanco(erro, { sobre: 'checkin' })
@@ -65,7 +65,8 @@ export async function apagarCheckin(id) {
   return resultadoDaEscrita(await supabase.from('checkins').delete().eq('id', id).select('id'))
 }
 
-// Uma página de check-ins. Cada um traz tarefas ([{ titulo }], até 3) e total_tarefas (número).
+// Uma página de check-ins. Cada um traz tarefas ([{ titulo, estado ('feita' | 'nao_se_aplica'), motivo }], até 3) e
+// total_tarefas (número).
 export async function listarCheckins({ clienteId, consultorId, pagina = 1 } = {}) {
   let consulta = supabase
     .from('checkins')
@@ -87,12 +88,13 @@ export async function listarCheckins({ clienteId, consultorId, pagina = 1 } = {}
   return { ...resultado, itens }
 }
 
-// As tarefas do check-list marcadas como feitas num check-in (o título guardado nele), na ordem em que foram marcadas
-// (desempate pelo título e pelo id): [{ tarefa_id, titulo }]. Para o check-out e para editar o check-in.
+// As tarefas do check-list fechadas num check-in (feitas ou "não se aplica", com o título e o motivo guardados nele), na
+// ordem em que foram marcadas (desempate pelo título e pelo id): [{ tarefa_id, titulo, estado, motivo }]. Para o
+// check-out e para editar o check-in.
 export async function tarefasDoCheckin(checkinId) {
   const { data, error } = await supabase
     .from('checkin_tarefas')
-    .select('tarefa_id, titulo')
+    .select('tarefa_id, titulo, estado, motivo')
     .eq('checkin_id', checkinId)
     .order('marcada_em')
     .order('titulo')

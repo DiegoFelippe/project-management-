@@ -27,4 +27,21 @@ describe('HistoricoDoCliente', () => {
     await userEvent.tab()
     expect(rolagem).toHaveFocus()
   })
+
+  it('"não se aplica": a tarefa e o motivo (quem marcou na coluna Quem); escondidos pelo banco, só o fato', async () => {
+    vi.mocked(listarEventos).mockResolvedValue({
+      itens: [
+        { id: 'e2', tipo: 'tarefa_nao_se_aplica', em: '2026-11-18T10:00:00Z', tarefa: 'Inventário', motivo: 'O cliente não tem estoque', autor: 'Ana Lima' },
+        { id: 'e1', tipo: 'tarefa_nao_se_aplica', em: '2026-11-17T10:00:00Z', tarefa: null, motivo: null, autor: null },
+      ],
+      total: 2,
+    })
+    render(<HistoricoDoCliente clienteId="k1" versao={0} />)
+    const tabela = await screen.findByRole('table', { name: 'Histórico' })
+    const linhas = within(tabela).getAllByRole('row').slice(1).map((l) => within(l).getAllByRole('cell').slice(1).map((c) => c.textContent))
+    expect(linhas).toEqual([
+      ['Tarefa não se aplica: Inventário (O cliente não tem estoque)', 'Ana Lima'],
+      ['Tarefa do check-list marcada como não se aplica', '—'],
+    ])
+  })
 })

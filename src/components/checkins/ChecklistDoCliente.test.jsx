@@ -491,6 +491,121 @@ describe('ChecklistDoCliente: com modelo', () => {
   })
 })
 
+describe('ChecklistDoCliente: não se aplica', () => {
+  const NSA = tarefa('t6', 'e2', 6, 'Inventário', {
+    vence_em: '2026-11-01', estado: 'nao_se_aplica', motivo: 'O cliente não tem estoque', feita_em: '2026-11-14T15:00:00Z',
+    feita_por: { nome: 'Ana Lima' },
+  })
+  const COM_NSA = {
+    ...DADOS,
+    tarefas: [...TAREFAS, NSA],
+    etapas: [DADOS.etapas[0], { ...DADOS.etapas[1], tarefas: 3, nao_se_aplica: 1 }],
+    resumo: { ...DADOS.resumo, tarefas: 6, nao_se_aplica: 1, resolvidas: 2 },
+  }
+
+  it('lista: selo cinza com ícone próprio no lugar da caixa, o motivo à vista; a etapa conta como resolvida', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue(COM_NSA)
+    tela(consultor)
+    const plano = await screen.findByRole('region', { name: '2 · Plano' })
+    expect(plano).toHaveTextContent('1 de 3')
+    expect(nomesDasCaixas()).not.toContain('Inventário')
+    const item = within(plano).getByRole('button', { name: 'Inventário' }).closest('li')
+    expect(item.querySelector('[data-selo="nao_se_aplica"] .lucide-ban')).not.toBeNull()
+    expect(item.querySelector('.lucide-check')).toBeNull()
+    expect(item).toHaveTextContent('Não se aplica')
+    expect(item).toHaveTextContent('por Ana Lima em 14/11/2026')
+    expect(item).toHaveTextContent('Motivo: O cliente não tem estoque')
+    expect(item).not.toHaveTextContent('Atrasada')
+  })
+
+  it('caixa Modelo aplicado: "2 de 6 resolvidas: 1 feita, 1 não se aplica" e o % conta as duas', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue(COM_NSA)
+    tela(consultor)
+    const modelo = await screen.findByRole('region', { name: 'Modelo aplicado' })
+    expect(modelo).toHaveTextContent('2 de 6 resolvidas: 1 feita, 1 não se aplica')
+    expect(within(modelo).getByRole('progressbar', { name: 'Progresso do check-list' })).toHaveAttribute('aria-valuenow', '33')
+  })
+
+  it('"Mostrar" ganha "Não se aplica" (só quando há alguma); Pendentes não conta a que não se aplica', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue(COM_NSA)
+    tela(consultor)
+    const mostrar = await screen.findByRole('group', { name: 'Mostrar' })
+    expect(within(mostrar).getAllByRole('button').map((b) => b.textContent)).toEqual(['Todas6', 'Pendentes4', 'Feitas1', 'Não se aplica1'])
+    await userEvent.click(within(mostrar).getByRole('button', { name: /^Não se aplica/ }))
+    expect(screen.getAllByRole('listitem').map((li) => li.querySelector('button').textContent)).toEqual(['Inventário'])
+    await userEvent.click(within(mostrar).getByRole('button', { name: /^Pendentes/ }))
+    expect(screen.queryByRole('button', { name: 'Inventário' })).not.toBeInTheDocument()
+    await userEvent.click(within(mostrar).getByRole('button', { name: /^Feitas/ }))
+    expect(nomesDasCaixas()).toEqual(['Reunião de alinhamento'])
+  })
+
+  it('o consultor marca pela janela, com o motivo: grava, fecha, avisa o que liberou, relê e avisa a página', async () => {
+    vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'nao_se_aplica', liberadas: [{ id: 't4', titulo: 'Mapa de custos' }], na_sessao: true, erro: null })
+    const { aoMudar } = tela(consultor)
+    await userEvent.click(await screen.findByRole('button', { name: 'Análise do DRE' }))
+    const janela = screen.getByRole('dialog', { name: 'Análise do DRE' })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    await userEvent.type(within(janela).getByRole('textbox', { name: 'Motivo' }), '  O DRE já veio auditado ')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    expect(marcarTarefa).toHaveBeenCalledWith('t2', 'nao_se_aplica', 'O DRE já veio auditado')
+    expect(anotarTarefa).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(toast.success).toHaveBeenCalledWith(
+      'Análise do DRE: não se aplica. Agora dá para fazer: Mapa de custos. Entrou no resumo deste check-in.')
+    await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
+    expect(aoMudar).toHaveBeenCalled()
+  })
+
+  it('sem check-in aberto, o aviso diz que fica fora de uma sessão; Reabrir desfaz', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue(COM_NSA)
+    vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'nao_se_aplica', liberadas: [], na_sessao: false, erro: null })
+    tela(consultor)
+    await userEvent.click(await screen.findByRole('button', { name: 'Coleta de documentos' }))
+    let janela = screen.getByRole('dialog', { name: 'Coleta de documentos' })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    await userEvent.type(within(janela).getByRole('textbox', { name: 'Motivo' }), 'Documentos já entregues')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
+      'Coleta de documentos: não se aplica. Sem check-in aberto neste cliente: fica fora de uma sessão.'))
+
+    vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'a_fazer', liberadas: [], na_sessao: false, erro: null })
+    await userEvent.click(screen.getByRole('button', { name: 'Inventário' }))
+    janela = screen.getByRole('dialog', { name: 'Inventário' })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Reabrir tarefa' }))
+    expect(marcarTarefa).toHaveBeenLastCalledWith('t6', 'a_fazer')
+    await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith('Inventário voltou para a fazer.'))
+  })
+
+  it('fluxograma: caixa cinza com a situação "Não se aplica" e a legenda com a cor nova', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue(COM_NSA)
+    const { container } = tela(consultor)
+    await screen.findByRole('region', { name: '1 · Diagnóstico' })
+    await userEvent.click(screen.getByRole('button', { name: 'Fluxograma' }))
+    const fluxo = screen.getByRole('group', { name: 'Fluxograma das tarefas de Provedor Alfa' })
+    expect(within(fluxo).getByRole('button', { name: 'Inventário: Não se aplica' })).toBeInTheDocument()
+    expect(container.querySelector('[data-tarefa="t6"]')).toHaveAttribute('data-situacao', 'nao_se_aplica')
+    expect(container.querySelector('[data-tarefa="t6"] .lucide-ban')).not.toBeNull()
+    expect(within(fluxo).getByText('1 de 3 resolvidas')).toBeInTheDocument()
+    const legenda = screen.getByRole('list', { name: 'Legenda do fluxograma' })
+    expect(within(legenda).getByText('Não se aplica')).toBeInTheDocument()
+  })
+
+  it('a gestão e a Central só leem: o motivo aparece na janela, sem "Não se aplica"', async () => {
+    for (const perfil of [gestor, central]) {
+      vi.mocked(lerChecklist).mockResolvedValue({ ...COM_NSA, pode_aplicar: true, pode_marcar: false })
+      const { unmount } = tela(perfil)
+      await userEvent.click(await screen.findByRole('button', { name: 'Inventário' }))
+      let janela = screen.getByRole('dialog', { name: 'Inventário' })
+      expect(within(janela).getByRole('region', { name: 'Motivo' })).toHaveTextContent('O cliente não tem estoque')
+      await userEvent.click(within(janela.querySelector('[data-slot="janela-rodape"]')).getByRole('button', { name: 'Fechar' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Análise do DRE' }))
+      janela = screen.getByRole('dialog', { name: 'Análise do DRE' })
+      expect(within(janela).queryByRole('button', { name: 'Não se aplica' })).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+})
+
 describe('ChecklistDoCliente: sem modelo', () => {
   it('o consultor vê que a gestão aplica e a caixa Check-in; sem barra, cartões nem lista', async () => {
     vi.mocked(lerChecklist).mockResolvedValue(SEM_MODELO)

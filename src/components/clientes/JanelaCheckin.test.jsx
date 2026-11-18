@@ -257,6 +257,40 @@ describe('JanelaCheckin: tarefas do check-list marcadas no check-in', () => {
     }))
   })
 
+  it('check-out com tarefa que não se aplica: "Não se aplica: <tarefa> (<motivo>)" depois das concluídas', async () => {
+    vi.mocked(tarefasDoCheckin).mockResolvedValue([
+      TAREFAS[0],
+      { tarefa_id: 't3', titulo: 'Inventário', estado: 'nao_se_aplica', motivo: 'O cliente não tem estoque' },
+      { ...TAREFAS[1], estado: 'feita', motivo: null },
+      // O ponto final do motivo sai, para não ficar "(Terceirizada.)."
+      { tarefa_id: 't4', titulo: 'Folha', estado: 'nao_se_aplica', motivo: 'Terceirizada.' },
+    ])
+    const { janela } = abrir('checkout', aberto)
+    const campo = within(janela).getByLabelText('O que foi feito')
+    await waitFor(() => expect(campo).toHaveValue(
+      'Tarefas concluídas: Análise do DRE; Mapa de custos. Não se aplica: Inventário (O cliente não tem estoque); Folha (Terceirizada).'))
+    expect(janela).toHaveTextContent('Já vem com as tarefas marcadas; complete com o que mais foi feito.')
+    expect(itens(janela)).toEqual(['Análise do DRE', 'Inventário', 'Mapa de custos', 'Folha'])
+  })
+
+  it('check-out só com tarefa que não se aplica: o texto começa por ela', async () => {
+    vi.mocked(tarefasDoCheckin).mockResolvedValue([{ tarefa_id: 't3', titulo: 'Inventário', estado: 'nao_se_aplica', motivo: 'Sem estoque' }])
+    const { janela } = abrir('checkout', aberto)
+    const campo = within(janela).getByLabelText('O que foi feito')
+    await waitFor(() => expect(campo).toHaveValue('Não se aplica: Inventário (Sem estoque).'))
+    expect(janela).toHaveTextContent('Já vem com as tarefas marcadas; complete com o que mais foi feito.')
+  })
+
+  it('check-out com motivos longos: cada motivo entra cortado para o texto caber (o inteiro fica na tarefa)', async () => {
+    const longo = (letra) => letra.repeat(450)
+    vi.mocked(tarefasDoCheckin).mockResolvedValue(['A', 'B', 'C', 'D'].map((letra) => (
+      { tarefa_id: letra, titulo: `Tarefa ${letra}`, estado: 'nao_se_aplica', motivo: longo(letra) })))
+    const { janela } = abrir('checkout', aberto)
+    const campo = within(janela).getByLabelText('O que foi feito')
+    await waitFor(() => expect(campo.value).toMatch(/^Não se aplica: Tarefa A \(A{99}…\); Tarefa B/))
+    expect(campo.value.length).toBeLessThan(1500)
+  })
+
   it('check-out: o que a pessoa já digitou não é apagado quando as tarefas chegam depois', async () => {
     let responder
     vi.mocked(tarefasDoCheckin).mockImplementation(() => new Promise((r) => { responder = r }))

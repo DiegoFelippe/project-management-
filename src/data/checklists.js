@@ -75,10 +75,14 @@ export const mudarInicio = (checklistId, inicio) =>
 // Tira o modelo do cliente: o check-list se encerra e vira histórico. { erro }.
 export const tirarModelo = (checklistId) => escrever('tirar_modelo', { p_checklist: checklistId })
 
-// estado: 'a_fazer' | 'andamento' | 'feita'. { estado, feita_em, liberadas: [{ id, titulo }], na_sessao, erro } — o que
-// ficou livre e se a tarefa entrou no check-in aberto; com erro, só { erro } (e desatualizado, se a tela ficou velha).
-export async function marcarTarefa(tarefaId, estado) {
-  const { data, error } = await supabase.rpc('marcar_tarefa', { p_tarefa: tarefaId, p_estado: estado })
+// estado: 'a_fazer' | 'andamento' | 'feita' | 'nao_se_aplica' (este com o motivo, obrigatório: 1 a 500 letras; o banco
+// tira os espaços das pontas). { estado, feita_em, liberadas: [{ id, titulo }], na_sessao, erro } — o que ficou livre e
+// se a tarefa entrou no check-in aberto; com erro, só { erro } (e desatualizado, se a tela ficou velha; motivo em branco
+// ou grande demais não é tela velha).
+export async function marcarTarefa(tarefaId, estado, motivo) {
+  const argumentos = { p_tarefa: tarefaId, p_estado: estado }
+  if (estado === 'nao_se_aplica') argumentos.p_motivo = motivo ?? null
+  const { data, error } = await supabase.rpc('marcar_tarefa', argumentos)
   if (error) return recusa(error)
   return { ...data, erro: null }
 }

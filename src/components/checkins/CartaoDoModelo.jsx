@@ -2,6 +2,7 @@ import { CalendarCog, ListChecks, Replace, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { diaEmSP } from '@/lib/calendario'
 import { formatarDia } from '@/lib/mes'
+import { plural } from '@/lib/nomes'
 import { cn } from '@/lib/utils'
 
 const BOTAO_PERIGO = 'hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive'
@@ -33,8 +34,16 @@ function Topo({ rotulo, titulo, children, fim }) {
   )
 }
 
+// O progresso em palavras: "3 de 5 feitas" ou, com alguma que não se aplica, "4 de 5 resolvidas: 3 feitas, 1 não se
+// aplica" (resolvida = feita ou não se aplica; as duas contam no %).
+function progressoEmPalavras({ tarefas, feitas, nao_se_aplica: naoSeAplica = 0 }) {
+  if (!naoSeAplica) return `${feitas} de ${tarefas} feitas`
+  return `${feitas + naoSeAplica} de ${tarefas} resolvidas: ${plural(feitas, 'feita', 'feitas')}, ${naoSeAplica} não se aplica`
+}
+
 // Caixa do modelo na aba Check-ins do cliente. Com check-list: "Modelo aplicado" (nome, quem aplicou e quando, de quando
-// contam os prazos, % e barra, contados no banco) e, para quem aplica, Trocar modelo, Início dos prazos e Tirar modelo.
+// contam os prazos, %, barra e o progresso em palavras, contados no banco) e, para quem aplica, Trocar modelo, Início dos
+// prazos e Tirar modelo.
 // Sem: "Este cliente ainda não tem um modelo" e, para quem aplica, Aplicar modelo; para os outros, `semModelo` diz o
 // porquê. `resumo` é o do checklist_do_cliente.
 export default function CartaoDoModelo({ checklist, resumo, podeAplicar, semModelo, aoAplicar, aoMudarInicio, aoTirar }) {
@@ -57,7 +66,8 @@ export default function CartaoDoModelo({ checklist, resumo, podeAplicar, semMode
     )
   }
 
-  const pct = resumo.tarefas ? Math.round((resumo.feitas / resumo.tarefas) * 100) : 0
+  const resolvidas = resumo.resolvidas ?? resumo.feitas + (resumo.nao_se_aplica ?? 0)
+  const pct = resumo.tarefas ? Math.round((resolvidas / resumo.tarefas) * 100) : 0
   const quem = checklist.aplicado_por?.nome ? `Aplicado por ${checklist.aplicado_por.nome} em` : 'Aplicado em'
   return (
     <section aria-label="Modelo aplicado" className="card flex min-w-0 flex-col gap-3 p-4">
@@ -67,7 +77,10 @@ export default function CartaoDoModelo({ checklist, resumo, podeAplicar, semMode
           {quem} {formatarDia(diaEmSP(checklist.aplicado_em))} · prazos contam de {formatarDia(checklist.inicio)}
         </p>
       </Topo>
-      <BarraDeProgresso pct={pct} rotulo="Progresso do check-list" />
+      <div className="grid gap-1.5">
+        <BarraDeProgresso pct={pct} rotulo="Progresso do check-list" />
+        <p className="text-muted-foreground text-legenda tabular-nums">{progressoEmPalavras(resumo)}</p>
+      </div>
       {podeAplicar && (
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={aoAplicar}><Replace /> Trocar modelo</Button>

@@ -28,7 +28,8 @@ describe('listarCheckins', () => {
       count: 2,
     }
     const { itens } = await listarCheckins({ clienteId: 'k1' })
-    expect(selecionado()).toContain('tarefas:checkin_tarefas(titulo)')
+    // Com o estado e o motivo: a que não se aplica tem o chip dela.
+    expect(selecionado()).toContain('tarefas:checkin_tarefas(titulo, estado, motivo)')
     expect(selecionado()).toContain('total_tarefas:checkin_tarefas(count)')
     // A mesma ordem das tarefas de um check-in em todo lugar (lista, check-out e a sessão do check-list).
     const ordemDasTarefas = banco.chamadas.filter(([metodo, , opcoes]) => metodo === 'order' && opcoes?.referencedTable === 'tarefas')
@@ -43,7 +44,7 @@ describe('tarefasDoCheckin', () => {
     banco.resposta = { data: [{ tarefa_id: 't1', titulo: 'Análise do DRE' }], error: null }
     expect(await tarefasDoCheckin('c1')).toEqual([{ tarefa_id: 't1', titulo: 'Análise do DRE' }])
     expect(banco.chamou('from', 'checkin_tarefas')).toBe(true)
-    expect(banco.chamou('select', 'tarefa_id, titulo')).toBe(true)
+    expect(banco.chamou('select', 'tarefa_id, titulo, estado, motivo')).toBe(true)
     expect(banco.chamou('eq', 'checkin_id', 'c1')).toBe(true)
     // marcada_em, titulo, tarefa_id: a mesma ordem da lista de check-ins e da sessão no check-list.
     expect(banco.chamadas.filter(([metodo]) => metodo === 'order').map(([, coluna]) => coluna))

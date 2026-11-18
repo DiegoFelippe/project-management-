@@ -66,13 +66,21 @@ function Consultor({ linha, comConsultoria }) {
   )
 }
 
+// O progresso conta as resolvidas (feitas e as que não se aplicam, como o pct do banco); as que não se aplicam aparecem
+// embaixo, à parte.
 function Progresso({ cliente, checklist }) {
+  const naoSeAplica = checklist.nao_se_aplica ?? 0
   return (
     <div className="min-w-32">
       <p className="tabular-nums whitespace-nowrap">
-        {checklist.pct}% · {numero(checklist.feitas)} de {numero(checklist.tarefas)}
+        {checklist.pct}% · {numero(checklist.feitas + naoSeAplica)} de {numero(checklist.tarefas)}
       </p>
       <BarraDeProgresso pct={checklist.pct} rotulo={`Progresso de ${cliente.nome}`} className="mt-1.5" />
+      {naoSeAplica > 0 && (
+        <p className="text-muted-foreground mt-1 text-legenda tabular-nums whitespace-nowrap">
+          {numero(naoSeAplica)} {naoSeAplica === 1 ? 'não se aplica' : 'não se aplicam'}
+        </p>
+      )}
     </div>
   )
 }

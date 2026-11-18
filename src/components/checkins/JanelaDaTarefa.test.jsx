@@ -128,6 +128,106 @@ describe('JanelaDaTarefa', () => {
     expect(aoAbrir).toHaveBeenCalledWith(expect.objectContaining({ id: 't3' }))
   })
 
+  describe('não se aplica', () => {
+    const NSA = t('t6', 'e2', 'Inventário', {
+      estado: 'nao_se_aplica', motivo: 'O cliente não tem estoque', feita_em: '2026-11-14T15:00:00Z', feita_por: { nome: 'Ana Lima' },
+      depende_de: ['t1'], vence_em: '2026-11-01',
+    })
+    const COM_NSA = [...TAREFAS, NSA, t('t7', 'e2', 'Contagem', { depende_de: ['t6'] })]
+
+    it('a fazer e livre: "Não se aplica" no corpo; abre o Motivo (obrigatório, até 500) e o rodapé confirma', async () => {
+      const { janela, rodape, botoes, aoAgir, aoFechar } = abrir('t2')
+      expect(botoes()).toEqual(['Cancelar', 'Começar', 'Marcar como feita'])
+      // No celular o secundário fica só com o ícone (o nome continua), para Cancelar e o principal caberem a 360 px.
+      expect(within(rodape).getByText('Começar')).toHaveClass('max-sm:sr-only')
+      await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+      const motivo = within(janela).getByRole('textbox', { name: 'Motivo' })
+      expect(motivo).toHaveFocus()
+      expect(motivo).toHaveAttribute('maxlength', '500')
+      expect(motivo).toHaveClass('texto-de-campo')
+      expect(janela).toHaveTextContent('0/500')
+      expect(janela).toHaveTextContent('A tarefa fecha sem ser feita e libera as que dependem dela.')
+      expect(botoes()).toEqual(['Cancelar', 'Voltar', 'Não se aplica'])
+      expect(within(rodape).getByText('Voltar')).toHaveClass('max-sm:sr-only')
+      const confirmar = within(rodape).getByRole('button', { name: 'Não se aplica' })
+      expect(confirmar).toHaveAttribute('type', 'submit')
+
+      await userEvent.click(confirmar)
+      expect(aoAgir).not.toHaveBeenCalled()
+      expect(motivo).toHaveAttribute('aria-invalid', 'true')
+      expect(motivo).toHaveAccessibleDescription(/Conte por que esta tarefa não se aplica\./)
+      expect(within(janela).getByText('Conte por que esta tarefa não se aplica.')).toHaveClass('text-destructive')
+
+      await userEvent.type(motivo, '   ')
+      await userEvent.click(confirmar)
+      expect(aoAgir).not.toHaveBeenCalled()
+
+      await userEvent.clear(motivo)
+      await userEvent.type(motivo, 'Cliente já tem o DRE auditado')
+      expect(janela).toHaveTextContent('29/500')
+      expect(motivo).not.toHaveAttribute('aria-invalid')
+      await userEvent.click(confirmar)
+      expect(aoAgir).toHaveBeenCalledWith({ estado: 'nao_se_aplica', nota: 'Faltam os extratos', motivo: 'Cliente já tem o DRE auditado' })
+      expect(aoFechar).toHaveBeenCalled()
+    })
+
+    it('Voltar sai do Motivo sem gravar; o rodapé volta a ser o de antes', async () => {
+      const { janela, rodape, botoes, aoAgir } = abrir('t4')
+      await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+      await userEvent.click(within(rodape).getByRole('button', { name: 'Voltar' }))
+      expect(within(janela).queryByRole('textbox', { name: 'Motivo' })).not.toBeInTheDocument()
+      expect(botoes()).toEqual(['Cancelar', 'Voltar para a fazer', 'Marcar como feita'])
+      expect(aoAgir).not.toHaveBeenCalled()
+    })
+
+    it('enquanto grava: "Marcando…" e tudo parado; erro do banco fica na janela', async () => {
+      let responder
+      const aoAgir = vi.fn(() => new Promise((r) => { responder = r }))
+      const { janela, rodape, aoFechar } = abrir('t2', { aoAgir })
+      await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+      await userEvent.type(within(janela).getByRole('textbox', { name: 'Motivo' }), 'Não precisa')
+      await userEvent.click(within(rodape).getByRole('button', { name: 'Não se aplica' }))
+      expect(within(rodape).getByRole('button', { name: 'Marcando…' })).toBeDisabled()
+      expect(within(rodape).getByRole('button', { name: 'Voltar' })).toBeDisabled()
+      responder({ erro: 'Só o consultor do cliente marca as tarefas.' })
+      expect(await within(janela).findByText('Só o consultor do cliente marca as tarefas.')).toBeInTheDocument()
+      expect(aoFechar).not.toHaveBeenCalled()
+    })
+
+    it('bloqueada, feita ou para quem só acompanha: sem "Não se aplica"', () => {
+      expect(within(abrir('t3').janela).queryByRole('button', { name: 'Não se aplica' })).not.toBeInTheDocument()
+      expect(within(abrir('t1').janela).queryByRole('button', { name: 'Não se aplica' })).not.toBeInTheDocument()
+      expect(within(abrir('t2', { podeMarcar: false }).janela).queryByRole('button', { name: 'Não se aplica' })).not.toBeInTheDocument()
+    })
+
+    it('a que não se aplica: selo cinza com ícone próprio (nunca o check), o motivo, quem e quando; Reabrir volta para a fazer', async () => {
+      const { janela, rodape, botoes, aoAgir } = abrir('t6', { tarefas: COM_NSA })
+      const selos = janela.querySelector('[data-selos]')
+      expect(selos).toHaveTextContent('Não se aplica')
+      expect(selos).toHaveTextContent('por Ana Lima em 14/11/2026')
+      expect(selos).not.toHaveTextContent('Atrasada')
+      expect(selos.querySelector('[data-selo="nao_se_aplica"] svg.lucide-ban')).not.toBeNull()
+      expect(selos.querySelector('.lucide-check')).toBeNull()
+      expect(within(janela).getByRole('region', { name: 'Motivo' })).toHaveTextContent('O cliente não tem estoque')
+      expect(within(janela).getByRole('list', { name: 'Libera' })).toHaveTextContent('Contagem')
+      expect(botoes()).toEqual(['Cancelar', 'Reabrir tarefa', 'Salvar nota'])
+      await userEvent.click(within(rodape).getByRole('button', { name: 'Reabrir tarefa' }))
+      expect(aoAgir).toHaveBeenCalledWith({ estado: 'a_fazer', nota: '' })
+    })
+
+    it('quem só acompanha vê o motivo, sem mudar nada', () => {
+      const { janela, botoes } = abrir('t6', { tarefas: COM_NSA, podeMarcar: false })
+      expect(within(janela).getByRole('region', { name: 'Motivo' })).toHaveTextContent('O cliente não tem estoque')
+      expect(botoes()).toEqual(['Fechar'])
+    })
+
+    it('nas relacionadas, a que não se aplica diz isso (e libera: a dependente fica "A fazer")', () => {
+      const { janela } = abrir('t7', { tarefas: COM_NSA })
+      expect(within(janela).getByRole('list', { name: 'Depende de' })).toHaveTextContent('InventárioNão se aplica')
+      expect(within(janela).queryByText(/Ainda não dá para marcar/)).not.toBeInTheDocument()
+    })
+  })
+
   it('enquanto grava, o botão diz o que está fazendo e tudo fica parado; erro do banco fica na janela', async () => {
     let responder
     const aoAgir = vi.fn(() => new Promise((r) => { responder = r }))
