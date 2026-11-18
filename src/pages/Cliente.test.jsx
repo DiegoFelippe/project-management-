@@ -301,8 +301,40 @@ describe('Cliente (página)', () => {
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Análise do DRE' }))
     expect(marcarTarefa).toHaveBeenCalledWith('t1', 'feita')
     await waitFor(() => expect(buscarCliente).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(listarCheckins).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
+    // Com modelo, a tabela fica na aba Check-ins do check-list: lê do banco ao abrir, já com o que mudou.
+    expect(listarCheckins).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Check-ins' }))
+    expect(await screen.findByRole('table', { name: 'Check-ins' })).toBeInTheDocument()
+    expect(listarCheckins).toHaveBeenCalledTimes(1)
+  })
+
+  it('com modelo, a tabela de check-ins sai de baixo do check-list e vai para a aba Check-ins (Lista | Fluxograma | Check-ins)', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue(COM_MODELO)
+    tela(adminDaSti, '/clientes/k1?aba=checkins')
+    const visao = await screen.findByRole('group', { name: 'Visualização' })
+    expect(within(visao).getAllByRole('button').map((b) => b.textContent)).toEqual(['Lista', 'Fluxograma', 'Check-ins'])
+    expect(screen.getByRole('region', { name: '1 · Diagnóstico' })).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Check-ins' })).not.toBeInTheDocument()
+
+    await userEvent.click(within(visao).getByRole('button', { name: 'Check-ins' }))
+    const tabela = await screen.findByRole('table', { name: 'Check-ins' })
+    expect(screen.queryByRole('region', { name: '1 · Diagnóstico' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Mostrar' })).not.toBeInTheDocument()
+    // Editar e apagar continuam pela aba.
+    await userEvent.click(within(within(tabela).getByRole('row', { name: /Reunião/ })).getByRole('button', { name: 'Editar' }))
+    const janela = screen.getByRole('dialog', { name: 'Editar check-in em Provedor Alfa' })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
+    expect(editarCheckin).toHaveBeenCalledWith('c1', { descricao: 'Reunião' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const depois = await screen.findByRole('table', { name: 'Check-ins' })
+    await userEvent.click(within(within(depois).getByRole('row', { name: /Ajuste/ })).getByRole('button', { name: 'Apagar' }))
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar check-in' }))
+    expect(apagarCheckin).toHaveBeenCalledWith('c2')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
+    expect(screen.getByRole('region', { name: '1 · Diagnóstico' })).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Check-ins' })).not.toBeInTheDocument()
   })
 
   it('o histórico mostra aplicar, trocar e tirar o modelo de check-in, com o nome do modelo', async () => {

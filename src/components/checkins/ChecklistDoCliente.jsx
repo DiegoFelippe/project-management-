@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowRight, Eye, ListOrdered, Workflow } from 'lucide-react'
+import { ArrowDown, ArrowRight, Clock, Eye, ListOrdered, Workflow } from 'lucide-react'
 import { toast } from 'sonner'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
@@ -18,7 +18,12 @@ import PainelDaSessao from './PainelDaSessao'
 import { ehCelular } from './fluxo'
 import { entraNoFiltro, estaResolvida, quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa } from './situacao'
 
-const VISOES = [{ valor: 'lista', rotulo: 'Lista', icone: ListOrdered }, { valor: 'fluxo', rotulo: 'Fluxograma', icone: Workflow }]
+// Lista e Fluxograma mostram as tarefas; Check-ins, a tabela de check-ins do cliente (acréscimo de 18/11).
+const VISOES = [
+  { valor: 'lista', rotulo: 'Lista', icone: ListOrdered },
+  { valor: 'fluxo', rotulo: 'Fluxograma', icone: Workflow },
+  { valor: 'checkins', rotulo: 'Check-ins', icone: Clock },
+]
 const ORIENTACOES = [{ valor: 'deitado', rotulo: 'Deitado', icone: ArrowRight }, { valor: 'em-pe', rotulo: 'Em pé', icone: ArrowDown }]
 
 // O aviso depois de mudar a situação de uma tarefa: o que liberou e se ela entrou no check-in aberto.
@@ -68,15 +73,17 @@ function avisoDeQuemAcompanha(cliente, consultor) {
   return `Você acompanha o andamento. Quem marca as tarefas é ${consultor.nome}, o consultor do cliente.`
 }
 
-// O check-list do cliente na aba Check-ins (em cima da tabela de check-ins), numa leitura do banco (checklist_do_cliente).
-// Com modelo: barra (Lista/Fluxograma, Todas/Pendentes/Feitas e, quando há, Não se aplica, Deitado/Em pé, a próxima
-// tarefa) → caixas Modelo aplicado e Check-in → aviso para quem só acompanha → lista por etapa ou fluxograma. Sem
-// modelo: a caixa do modelo (Aplicar modelo para quem aplica) e a caixa Check-in.
+// O check-list do cliente na aba Check-ins da página do cliente, numa leitura do banco (checklist_do_cliente).
+// Com modelo: barra (Lista/Fluxograma/Check-ins, Todas/Pendentes/Feitas e, quando há, Não se aplica, Deitado/Em pé, a
+// próxima tarefa) → caixas Modelo aplicado e Check-in → aviso para quem só acompanha → lista por etapa, fluxograma ou a
+// tabela `checkins` (a CheckinsDoCliente que a página manda; na visão Check-ins somem os filtros só de tarefas e o aviso).
+// Sem modelo: a caixa do modelo (Aplicar modelo para quem aplica), a caixa Check-in e a tabela embaixo, sem abas. Se a
+// leitura falha, o aviso e a tabela embaixo. A visão escolhida não vai para o endereço.
 // Filtro e orientação rodam na tela (o check-list já veio inteiro; exceção aprovada pelo Diego em 17/11); no celular o
 // fluxograma começa em pé. Marcar pela caixa é otimista (se o banco recusar, volta e avisa); pela janela da tarefa, grava
 // e fecha. Toda mudança relê o check-list e chama `aoMudar` (o recarregar da página: o botão de check-in, a sessão e a
 // tabela andam juntos). `versao` muda quando a página recarrega. Quem faz o quê vem do banco (pode_aplicar, pode_marcar).
-export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, checkinAberto = null }) {
+export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, checkinAberto = null, checkins = null }) {
   const [dados, setDados] = useState(undefined) // undefined = carregando; null = não vê o cliente
   const [erro, setErro] = useState(null)
   const [recarga, setRecarga] = useState(0)
@@ -194,9 +201,16 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
     return { erro: null }
   }
 
-  if (erro) return <p role="alert" className="text-corpo text-destructive">{erro}</p>
+  if (erro) {
+    return (
+      <div className="grid min-w-0 grid-cols-1 gap-6">
+        <p role="alert" className="text-corpo text-destructive">{erro}</p>
+        {checkins}
+      </div>
+    )
+  }
   if (dados === undefined) return <GraficoCarregando texto="Carregando o check-list…" className="py-8" />
-  if (dados === null) return null
+  if (dados === null) return checkins
 
   const { checklist, resumo } = dados
   const fechar = () => setJanela(null)
@@ -228,11 +242,14 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
 
   if (!checklist) {
     return (
-      <section aria-labelledby={idTitulo} className="grid min-w-0 grid-cols-1 gap-4">
-        {titulo}
-        {caixas}
-        {janelaDeAplicar}
-      </section>
+      <div className="grid min-w-0 grid-cols-1 gap-6">
+        <section aria-labelledby={idTitulo} className="grid min-w-0 grid-cols-1 gap-4">
+          {titulo}
+          {caixas}
+          {janelaDeAplicar}
+        </section>
+        {checkins}
+      </div>
     )
   }
 
@@ -247,19 +264,22 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
     return { cor: s.cor, sub: resumoDaSituacao(t, s), rotulo: rotuloDaSituacao(t, s), apagado: apagada(t) }
   }
   const proxima = resumo.proxima
-  const quemAcompanha = !dados.pode_marcar && avisoDeQuemAcompanha(cliente, dados.consultor)
+  const daTabela = visao === 'checkins'
+  const quemAcompanha = !daTabela && !dados.pode_marcar && avisoDeQuemAcompanha(cliente, dados.consultor)
 
   return (
     <section aria-labelledby={idTitulo} className="grid min-w-0 grid-cols-1 gap-4">
       {titulo}
       <BarraDeFiltros className="mb-0">
         <AbasSegmentadas rotulo="Visualização" abas={VISOES} valor={visao} aoMudar={setVisao} />
-        <AbasSegmentadas rotulo="Mostrar" valor={filtroDaTela} aoMudar={setFiltro} abas={[
-          { valor: 'todas', rotulo: 'Todas', contador: resumo.tarefas },
-          { valor: 'pendentes', rotulo: 'Pendentes', contador: resumo.tarefas - resolvidas, pendente: resumo.atrasadas > 0 },
-          { valor: 'feitas', rotulo: 'Feitas', contador: resumo.feitas },
-          ...(naoSeAplica ? [{ valor: 'nao_se_aplica', rotulo: 'Não se aplica', contador: naoSeAplica }] : []),
-        ]} />
+        {!daTabela && (
+          <AbasSegmentadas rotulo="Mostrar" valor={filtroDaTela} aoMudar={setFiltro} abas={[
+            { valor: 'todas', rotulo: 'Todas', contador: resumo.tarefas },
+            { valor: 'pendentes', rotulo: 'Pendentes', contador: resumo.tarefas - resolvidas, pendente: resumo.atrasadas > 0 },
+            { valor: 'feitas', rotulo: 'Feitas', contador: resumo.feitas },
+            ...(naoSeAplica ? [{ valor: 'nao_se_aplica', rotulo: 'Não se aplica', contador: naoSeAplica }] : []),
+          ]} />
+        )}
         {visao === 'fluxo' && (
           <AbasSegmentadas rotulo="Orientação do fluxograma" abas={ORIENTACOES} valor={vertical ? 'em-pe' : 'deitado'}
             aoMudar={(valor) => setVertical(valor === 'em-pe')} />
@@ -278,7 +298,7 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
           <span className="min-w-0">{quemAcompanha}</span>
         </p>
       )}
-      {visao === 'lista' ? (
+      {daTabela ? checkins : visao === 'lista' ? (
         <ListaDoChecklist etapas={dados.etapas} tarefas={tarefas} situacoes={situacoes} filtro={filtroDaTela} podeMarcar={dados.pode_marcar}
           ocupadas={ocupadas} aoMarcar={marcar} aoAbrir={abrirTarefa} />
       ) : (

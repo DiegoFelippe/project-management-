@@ -67,10 +67,13 @@ const consultor = { id: 'p1', papel: 'pessoa', consultoria_id: 's1' }
 const gestor = { id: 'g1', papel: 'gestor', consultoria_id: 's1' }
 const central = { id: 'c0', papel: 'central', consultoria_id: null }
 
-function tela(perfil, { cliente = CLIENTE, aoMudar = vi.fn() } = {}) {
-  const r = renderizarTela(<ChecklistDoCliente cliente={cliente} perfil={perfil} versao={0} aoMudar={aoMudar} />, { perfil })
+function tela(perfil, { cliente = CLIENTE, aoMudar = vi.fn(), checkins } = {}) {
+  const r = renderizarTela(
+    <ChecklistDoCliente cliente={cliente} perfil={perfil} versao={0} aoMudar={aoMudar} checkins={checkins} />, { perfil })
   return { ...r, aoMudar }
 }
+// A tabela de check-ins que a página manda (CheckinsDoCliente): aqui, um marcador.
+const TABELA_DE_CHECKINS = <section aria-label="Tabela de check-ins (teste)">tabela</section>
 const nomesDasCaixas = () => screen.getAllByRole('checkbox').map((c) => c.getAttribute('aria-label'))
 
 beforeEach(() => {
@@ -650,6 +653,74 @@ describe('ChecklistDoCliente: sem modelo', () => {
     tela(central, { cliente: { ...CLIENTE, arquivado: true } })
     expect(await screen.findByRole('region', { name: 'Modelo de check-in' }))
       .toHaveTextContent('Cliente arquivado: reative o cliente para aplicar um modelo.')
+  })
+})
+
+describe('ChecklistDoCliente: aba Check-ins (acréscimo de 18/11)', () => {
+  const tabela = () => screen.queryByRole('region', { name: 'Tabela de check-ins (teste)' })
+
+  it('com modelo, "Visualização" tem Lista, Fluxograma e Check-ins; a tabela só aparece na aba Check-ins', async () => {
+    tela(consultor, { checkins: TABELA_DE_CHECKINS })
+    const visao = await screen.findByRole('group', { name: 'Visualização' })
+    expect(within(visao).getAllByRole('button').map((b) => b.textContent)).toEqual(['Lista', 'Fluxograma', 'Check-ins'])
+    expect(tabela()).not.toBeInTheDocument()
+
+    await userEvent.click(within(visao).getByRole('button', { name: 'Check-ins' }))
+    expect(within(visao).getByRole('button', { name: 'Check-ins' })).toHaveAttribute('aria-pressed', 'true')
+    expect(tabela()).toBeInTheDocument()
+    // Somem a lista, o fluxograma e os filtros só de tarefas; a barra, a caixa do modelo e a da sessão ficam.
+    expect(screen.queryByRole('region', { name: '1 · Diagnóstico' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Fluxograma' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Mostrar' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Orientação do fluxograma' })).not.toBeInTheDocument()
+    expect(screen.getByText('Filtros')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Modelo aplicado' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Check-in' })).toBeInTheDocument()
+    // A tabela vem depois das caixas.
+    const caixa = screen.getByRole('region', { name: 'Modelo aplicado' })
+    expect(caixa.compareDocumentPosition(tabela()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await userEvent.click(within(visao).getByRole('button', { name: 'Lista' }))
+    expect(screen.getByRole('region', { name: '1 · Diagnóstico' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Mostrar' })).toBeInTheDocument()
+    expect(tabela()).not.toBeInTheDocument()
+  })
+
+  it('do fluxograma para Check-ins e de volta: a orientação só no fluxograma', async () => {
+    tela(consultor, { checkins: TABELA_DE_CHECKINS })
+    await userEvent.click(await screen.findByRole('button', { name: 'Fluxograma' }))
+    expect(screen.getByRole('group', { name: 'Orientação do fluxograma' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Check-ins' }))
+    expect(screen.queryByRole('group', { name: 'Orientação do fluxograma' })).not.toBeInTheDocument()
+    expect(tabela()).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Fluxograma' }))
+    expect(screen.getByRole('region', { name: 'Fluxograma' })).toBeInTheDocument()
+    expect(tabela()).not.toBeInTheDocument()
+  })
+
+  it('quem só acompanha: na aba Check-ins não aparece o aviso de quem marca as tarefas', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue(GERENCIA)
+    tela(gestor, { checkins: TABELA_DE_CHECKINS })
+    expect(await screen.findByText(/Você acompanha o andamento/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Check-ins' }))
+    expect(screen.queryByText(/Você acompanha o andamento/)).not.toBeInTheDocument()
+    expect(tabela()).toBeInTheDocument()
+  })
+
+  it('sem modelo: sem abas, e a tabela fica embaixo das caixas, como antes', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue(SEM_MODELO)
+    tela(consultor, { checkins: TABELA_DE_CHECKINS })
+    const modelo = await screen.findByRole('region', { name: 'Modelo de check-in' })
+    expect(screen.queryByRole('group', { name: 'Visualização' })).not.toBeInTheDocument()
+    expect(tabela()).toBeInTheDocument()
+    expect(modelo.compareDocumentPosition(tabela()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('se o check-list não carrega, a tabela de check-ins aparece mesmo assim (embaixo do aviso)', async () => {
+    vi.mocked(lerChecklist).mockRejectedValue(new Error('rede'))
+    tela(consultor, { checkins: TABELA_DE_CHECKINS })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar o check-list.')
+    expect(tabela()).toBeInTheDocument()
   })
 })
 

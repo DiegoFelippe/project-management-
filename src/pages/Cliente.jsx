@@ -147,16 +147,15 @@ export default function Cliente() {
     { id: 'quadro', rotulo: 'Quadro', conteudo: <QuadroDoCliente key={cliente.id} cliente={cliente} perfil={perfil} /> },
     // O calendário do menu, só com os compromissos deste cliente (check-ins e histórico têm as abas deles).
     { id: 'agenda', rotulo: 'Agenda', conteudo: <CalendarioDaAgenda key={cliente.id} cliente={cliente} /> },
-    // O check-list do modelo aplicado (lista ou fluxograma, a sessão aberta) em cima da tabela de check-ins.
+    // O check-list do modelo aplicado (Lista | Fluxograma | Check-ins, a sessão aberta). A tabela de check-ins vai para o
+    // check-list: com modelo, é a visão Check-ins; sem modelo, fica embaixo das caixas, como antes.
     {
       id: 'checkins',
       rotulo: 'Check-ins',
       conteudo: (
-        <div className="grid min-w-0 grid-cols-1 gap-6">
-          <ChecklistDoCliente key={cliente.id} cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar}
-            checkinAberto={aberto} />
-          <CheckinsDoCliente cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar} />
-        </div>
+        <ChecklistDoCliente key={cliente.id} cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar}
+          checkinAberto={aberto}
+          checkins={<CheckinsDoCliente cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar} />} />
       ),
     },
     { id: 'arquivos', rotulo: 'Arquivos', conteudo: <ArquivosDoCliente cliente={cliente} perfil={perfil} /> },
