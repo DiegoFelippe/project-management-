@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import Campo from '@/components/campos/Campo'
 import CampoData from '@/components/campos/CampoData'
 import CampoHora from '@/components/campos/CampoHora'
 import TarefasMarcadas from '@/components/checkins/TarefasMarcadas'
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { useEnvio } from '@/components/comum/useEnvio'
-import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { tarefasDoCheckin } from '@/data/checkins'
 import { CHECKIN_DE_MAIS_DE_24H } from '@/lib/erros'
-import { horasEntre } from '@/lib/horas'
+import { formatarDuracao, horasEntre } from '@/lib/horas'
+import { cn } from '@/lib/utils'
 
 const MAXIMO_DE_HORAS = 24
 const dois = (n) => String(n).padStart(2, '0')
@@ -20,16 +22,46 @@ const horaLocal = (d) => `${dois(d.getHours())}:${dois(d.getMinutes())}`
 // Fim para fechar um check-in aberto: agora ou, se o check-out ficou esquecido, início + 24 h (o máximo).
 const fimSugerido = (inicio) => new Date(Math.min(Date.now(), inicio.getTime() + MAXIMO_DE_HORAS * 3_600_000))
 
-// Valores dos campos ao abrir. Check-in aberto (check-out ou Editar) já vem com o fim sugerido.
+// Valores dos campos ao abrir. Check-in aberto (check-out ou Editar) já vem com o fim sugerido. Lançar horas começa em
+// hoje (usabilidade, U8), com o fim no mesmo dia.
 function camposIniciais(checkin) {
   const inicio = checkin?.inicio ? new Date(checkin.inicio) : null
   const fim = checkin?.fim ? new Date(checkin.fim) : inicio ? fimSugerido(inicio) : null
+  const hoje = dataLocal(new Date())
   return {
-    data: inicio ? dataLocal(inicio) : '',
+    data: inicio ? dataLocal(inicio) : hoje,
     inicio: inicio ? horaLocal(inicio) : '',
-    dataFim: fim ? dataLocal(fim) : '',
+    dataFim: fim ? dataLocal(fim) : hoje,
     fim: fim ? horaLocal(fim) : '',
   }
+}
+
+// Atalhos da data do Lançar horas, como o "Hoje / Amanhã" do evento: horas esquecidas quase sempre são de hoje ou de ontem.
+function atalhosDaData() {
+  const agora = new Date()
+  return [
+    { rotulo: 'Hoje', dia: dataLocal(agora) },
+    { rotulo: 'Ontem', dia: dataLocal(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() - 1)) },
+  ]
+}
+
+// Os erros do check-in, todos de uma vez, cada um no seu campo (usabilidade, U2). As contas entre o início e o fim só
+// valem com os dois horários; o erro delas vai para o Fim.
+function errosDoCheckin({ checkout, data, inicio, diaDoFim, comDataDoFim, fim, de, ate, descricao }) {
+  const erros = {}
+  if (!checkout && !data) erros.data = 'Informe a data.'
+  if (!checkout && !inicio) erros.inicio = 'Informe o início.'
+  if (comDataDoFim && !diaDoFim) erros.dataFim = 'Informe a data do fim.'
+  if (!fim) erros.fim = checkout ? 'Informe a hora do fim.' : 'Informe o fim.'
+  if (Object.keys(erros).length === 0) {
+    if (Number.isNaN(de.getTime()) || Number.isNaN(ate.getTime())) erros.fim = 'Informe a data, o início e o fim.'
+    else if (ate <= de) erros.fim = 'O fim precisa ser depois do início.'
+    else if (ate > new Date()) erros.fim = 'O horário não pode estar no futuro.'
+    else if (horasEntre(de, ate) > MAXIMO_DE_HORAS) erros.fim = CHECKIN_DE_MAIS_DE_24H
+  }
+  // O banco pede pelo menos 2 caracteres no que foi feito de um check-in fechado.
+  if (descricao.trim().length < 2) erros.descricao = 'Conte o que foi feito.'
+  return erros
 }
 
 const TEXTOS = {
@@ -72,15 +104,22 @@ const COMECOS_DO_TEXTO = ['Tarefas concluídas:', 'Não se aplica:']
 // aoSalvar recebe { descricao } e, em ISO, só os horários que valem gravar: no check-out e no check-in
 // aberto o fim; nos outros, o início e o fim que a pessoa mudou (sem mexer, ficam os guardados, com os
 // segundos). Devolve { erro }.
+// Lançar horas (U8): a data começa em hoje, com os atalhos "Hoje / Ontem", e a duração aparece ao lado do Fim. Os erros
+// ficam embaixo de cada campo, todos de uma vez, e fechar com algo digitado pergunta antes (U2 e U4; o texto que vem
+// pronto das tarefas não conta como digitado).
 export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, aoFechar, aoSalvar }) {
   const [iniciais] = useState(() => camposIniciais(checkin))
+  const [atalhos] = useState(atalhosDaData)
   const [data, setData] = useState(iniciais.data)
   const [inicio, setInicio] = useState(iniciais.inicio)
   const [dataFim, setDataFim] = useState(iniciais.dataFim)
   const [fim, setFim] = useState(iniciais.fim)
   const [descricao, setDescricao] = useState(checkin?.descricao ?? '')
-  const { erro, setErro, enviando, enviar } = useEnvio(aoFechar)
+  // O "O que foi feito" como abriu (ou como veio pronto das tarefas, no check-out): o que muda dali é da pessoa.
+  const [descricaoDeBase, setDescricaoDeBase] = useState(checkin?.descricao ?? '')
+  const { erro, erros, conferir, enviando, enviar } = useEnvio(aoFechar)
   const checkout = modo === 'checkout'
+  const lancar = modo === 'lancar'
   const fechando = Boolean(checkin?.inicio && !checkin?.fim)
   // Data do fim: sempre no check-out; nos outros, quando o check-in atravessa a meia-noite.
   const comDataDoFim = checkout || iniciais.dataFim !== iniciais.data
@@ -97,7 +136,14 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
         if (!ativo) return
         const itens = lista ?? []
         setTarefas({ itens })
-        if (checkout && itens.length) setDescricao((atual) => (atual.trim() ? atual : textoDasTarefas(itens)))
+        if (checkout && itens.length) {
+          setDescricao((atual) => {
+            if (atual.trim()) return atual
+            const texto = textoDasTarefas(itens)
+            setDescricaoDeBase(texto)
+            return texto
+          })
+        }
       })
       .catch(() => ativo && setTarefas({ itens: [], erro: true }))
     return () => {
@@ -105,22 +151,22 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
     }
   }, [idDoCheckin, checkout])
 
+  const diaDoFim = comDataDoFim ? dataFim : data
+  const mudouInicio = data !== iniciais.data || inicio !== iniciais.inicio
+  const mudouFim = diaDoFim !== iniciais.dataFim || fim !== iniciais.fim
+  const alterado = mudouInicio || mudouFim || descricao !== descricaoDeBase
+  // A duração calculada, ao lado do Fim (U8): só com os dois horários e o fim depois do início.
+  const duracao = (() => {
+    if (!data || !inicio || !diaDoFim || !fim) return null
+    const ms = new Date(`${diaDoFim}T${fim}`) - new Date(`${data}T${inicio}`)
+    return ms > 0 ? formatarDuracao(ms) : null
+  })()
+
   async function salvar(evento) {
     evento.preventDefault()
-    const diaDoFim = comDataDoFim ? dataFim : data
-    if (!fim || !diaDoFim || (!checkout && (!data || !inicio))) {
-      return setErro(checkout ? 'Informe a data e a hora do fim.' : 'Informe a data, o início e o fim.')
-    }
-    const mudouInicio = data !== iniciais.data || inicio !== iniciais.inicio
-    const mudouFim = diaDoFim !== iniciais.dataFim || fim !== iniciais.fim
-    const de = mudouInicio ? new Date(`${data}T${inicio}`) : new Date(checkin.inicio)
+    const de = mudouInicio ? new Date(`${data}T${inicio}`) : new Date(checkin?.inicio)
     const ate = mudouFim ? new Date(`${diaDoFim}T${fim}`) : checkin?.fim ? new Date(checkin.fim) : fimSugerido(de)
-    if (Number.isNaN(de.getTime()) || Number.isNaN(ate.getTime())) return setErro('Informe a data, o início e o fim.')
-    if (ate <= de) return setErro('O fim precisa ser depois do início.')
-    if (ate > new Date()) return setErro('O horário não pode estar no futuro.')
-    if (horasEntre(de, ate) > MAXIMO_DE_HORAS) return setErro(CHECKIN_DE_MAIS_DE_24H)
-    // O banco pede pelo menos 2 caracteres no que foi feito de um check-in fechado.
-    if (descricao.trim().length < 2) return setErro('Conte o que foi feito.')
+    if (!conferir(errosDoCheckin({ checkout, data, inicio, diaDoFim, comDataDoFim, fim, de, ate, descricao }))) return
 
     const dados = { descricao: descricao.trim() }
     if (mudouInicio) dados.inicio = de.toISOString()
@@ -129,40 +175,48 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
   }
 
   const campoDataDoFim = (
-    <div className="grid gap-2">
-      <Label htmlFor="checkin-data-fim">Data do fim</Label>
+    <Campo id="checkin-data-fim" rotulo="Data do fim" erro={erros.dataFim}>
       <CampoData id="checkin-data-fim" valor={dataFim} aoMudar={setDataFim} obrigatorio />
-    </div>
+    </Campo>
   )
   const campoFim = (
-    <div className="grid gap-2">
-      <Label htmlFor="checkin-fim">Fim</Label>
+    <Campo id="checkin-fim" rotulo="Fim" erro={erros.fim} dica={duracao && !checkout ? <span className="tabular-nums">Duração: {duracao}</span> : undefined}>
       <CampoHora id="checkin-fim" valor={fim} aoMudar={setFim} obrigatorio />
-    </div>
+    </Campo>
   )
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={`${textos.titulo} ${nomeDoCliente}`} icone={Clock} largura="lg" enviando={enviando}
       descricao={modo === 'editar' && fechando ? 'Informe o fim e o que foi feito para fechar o check-in.' : textos.descricao}
-      form="form-checkin" rotuloEnviar={textos.botao}>
+      erros={erros} alterado={alterado} form="form-checkin" rotuloEnviar={textos.botao}>
       <form id="form-checkin" noValidate onSubmit={salvar} className="space-y-5">
+        {lancar && (
+          // No toque, 44 px e 8 px entre os atalhos (auditoria, G5), como os do evento.
+          <div role="group" aria-label="Atalhos da data" className="flex flex-wrap gap-1 pointer-coarse:gap-2">
+            {atalhos.map((a) => (
+              <button key={a.rotulo} type="button" aria-pressed={data === a.dia} onClick={() => setData(a.dia)}
+                className={cn('botao-animado rounded-md px-2 py-1 text-legenda font-medium transition-[background-color,color,translate,scale] outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97] pointer-coarse:min-h-11 pointer-coarse:px-3',
+                  data === a.dia ? 'bg-primary-cheio text-primary-foreground' : 'bg-primary/10 text-primary-texto hover:bg-primary/15')}>
+                {a.rotulo}
+              </button>
+            ))}
+          </div>
+        )}
         {checkout ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 items-start gap-3">
             {campoDataDoFim}
             {campoFim}
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-3 grid gap-2 sm:col-span-1">
-              <Label htmlFor="checkin-data">Data</Label>
+          <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3">
+            <Campo id="checkin-data" rotulo="Data" erro={erros.data} className="col-span-2 sm:col-span-1">
               <CampoData id="checkin-data" valor={data} aoMudar={setData} obrigatorio />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="checkin-inicio">Início</Label>
+            </Campo>
+            <Campo id="checkin-inicio" rotulo="Início" erro={erros.inicio}>
               <CampoHora id="checkin-inicio" valor={inicio} aoMudar={setInicio} obrigatorio />
-            </div>
+            </Campo>
             {campoFim}
-            {comDataDoFim && <div className="col-span-3">{campoDataDoFim}</div>}
+            {comDataDoFim && <div className="col-span-2 sm:col-span-3">{campoDataDoFim}</div>}
           </div>
         )}
         {tarefas.itens.length > 0 && (
@@ -172,14 +226,10 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
           </div>
         )}
         {tarefas.erro && <p className="text-muted-foreground text-legenda">Não foi possível carregar as tarefas marcadas nesta sessão.</p>}
-        <div className="grid gap-2">
-          <Label htmlFor="checkin-descricao">O que foi feito</Label>
-          <textarea id="checkin-descricao" rows={4} value={descricao} onChange={(e) => setDescricao(e.target.value)}
-            className="border-input bg-card focus-visible:border-ring focus-visible:ring-ring/30 w-full rounded-md border px-3 py-2 texto-de-campo shadow-xs outline-none hover:border-primary/40 focus-visible:ring-4" />
-          {checkout && COMECOS_DO_TEXTO.some((comeco) => descricao.startsWith(comeco)) && (
-            <p className="text-muted-foreground text-legenda">Já vem com as tarefas marcadas; complete com o que mais foi feito.</p>
-          )}
-        </div>
+        <Campo id="checkin-descricao" rotulo="O que foi feito" erro={erros.descricao}
+          dica={checkout && COMECOS_DO_TEXTO.some((comeco) => descricao.startsWith(comeco)) ? 'Já vem com as tarefas marcadas; complete com o que mais foi feito.' : undefined}>
+          <Textarea id="checkin-descricao" rows={4} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+        </Campo>
         {erro && <Aviso>{erro}</Aviso>}
       </form>
     </JanelaFormulario>

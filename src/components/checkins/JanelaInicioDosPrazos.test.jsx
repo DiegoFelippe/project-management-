@@ -59,4 +59,12 @@ describe('JanelaInicioDosPrazos', () => {
     expect(await within(janela).findByText('O início dos prazos precisa estar entre 2 anos atrás e 1 ano à frente.')).toBeInTheDocument()
     expect(aoSalvar).not.toHaveBeenCalled()
   })
+
+  it('fechar com a data mudada pergunta antes de descartar (usabilidade, U4)', async () => {
+    const { janela, aoFechar } = abrir()
+    await escolherData(userEvent, 'Início dos prazos', '2026-11-20')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Cancelar' }))
+    expect(aoFechar).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })).toBeInTheDocument()
+  })
 })

@@ -104,11 +104,6 @@ describe('envio dos formulários em janela', () => {
     '/src/components/quadros/JanelaApagarQuadro.jsx': 'confirmação de apagar',
     '/src/components/quadro/AbrirCartao.jsx': 'a janela do cartão grava campo a campo e pergunta pelo NaoSalvo',
   }
-  // As janelas dos check-ins entram depois da rodada da T8 dos check-ins (lote F, 18/11): até lá, ficam de fora.
-  const PENDENTES = [
-    '/src/components/checkins/JanelaAplicarModelo.jsx', '/src/components/checkins/JanelaDaTarefa.jsx',
-    '/src/components/checkins/JanelaInicioDosPrazos.jsx', '/src/components/clientes/JanelaCheckin.jsx',
-  ]
 
   it('toda JanelaFormulario que envia (rotuloEnviar= ou um submit no rodape=) passa alterado=', () => {
     const problemas = []
@@ -116,7 +111,7 @@ describe('envio dos formulários em janela', () => {
       const codigo = readFileSync(arquivo, 'utf8')
       if (!codigo.includes('<JanelaFormulario')) continue
       const nome = arquivo.replace(process.cwd(), '')
-      if (SEM_PERGUNTA[nome] || PENDENTES.includes(nome)) continue
+      if (SEM_PERGUNTA[nome]) continue
       for (const tag of aberturasDaJanela(codigo)) {
         const envia = /\srotuloEnviar=/.test(tag) || (/\srodape=/.test(tag) && /type="submit"|onClick=\{enviar\}/.test(tag))
         if (envia && !/\salterado=/.test(tag)) problemas.push(`${nome}: JanelaFormulario que envia sem alterado=`)
@@ -129,7 +124,7 @@ describe('envio dos formulários em janela', () => {
     const problemas = []
     for (const arquivo of arquivosJsx(join(process.cwd(), 'src'))) {
       const codigo = readFileSync(arquivo, 'utf8')
-      if (!codigo.includes('<JanelaFormulario') || PENDENTES.includes(arquivo.replace(process.cwd(), ''))) continue
+      if (!codigo.includes('<JanelaFormulario')) continue
       for (const tag of aberturasDaJanela(codigo)) {
         if (/>\s*Cancelar\s*</.test(tag)) problemas.push(arquivo.replace(process.cwd(), ''))
       }

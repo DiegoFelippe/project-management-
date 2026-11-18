@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react'
 import { ListChecks, TriangleAlert } from 'lucide-react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import Campo from '@/components/campos/Campo'
 import CampoData from '@/components/campos/CampoData'
 import Seletor from '@/components/campos/Seletor'
-import JanelaFormulario, { CartaoDaSecao } from '@/components/comum/JanelaFormulario'
+import JanelaFormulario, { BotaoCancelar, CartaoDaSecao } from '@/components/comum/JanelaFormulario'
+import { useEnvio } from '@/components/comum/useEnvio'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { aplicarModelo, modelosParaAplicar } from '@/data/checklists'
 import { somarDias } from '@/lib/calendario'
 import { formatarDia, hoje } from '@/lib/mes'
@@ -25,12 +26,14 @@ function detalheDoModelo(m, atualId) {
 // por busca (os do tipo de consultoria do consultor do cliente primeiro); Início dos prazos começa hoje (São Paulo); a
 // prévia diz quantas tarefas e quando vence a última. Com `checklist` (o ativo: { modelo_id, tarefas, feitas }) é a
 // troca: o aviso diz que o check-list atual é trocado e começa do zero. Grava com aplicarModelo; deu certo, chama
-// `aoAplicar({ id, modelo, inicio })` e fecha.
+// `aoAplicar({ id, modelo, inicio })` e fecha. Os erros ficam embaixo de cada campo, de uma vez, e fechar com algo
+// escolhido pergunta antes (usabilidade, U2 e U4).
 export default function JanelaAplicarModelo({ cliente, checklist = null, aoFechar, aoAplicar }) {
   const [modelo, setModelo] = useState(null)
-  const [inicio, setInicio] = useState(() => hoje())
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  const [inicioPadrao] = useState(() => hoje())
+  const [inicio, setInicio] = useState(inicioPadrao)
+  const { erro, erros, conferir, enviando, enviar } = useEnvio()
+  const alterado = Boolean(modelo) || inicio !== inicioPadrao
   const trocando = Boolean(checklist)
   const atualId = checklist?.modelo_id
 
@@ -39,17 +42,19 @@ export default function JanelaAplicarModelo({ cliente, checklist = null, aoFecha
     return { itens: itens.map((m) => ({ valor: m.id, rotulo: m.nome, detalhe: detalheDoModelo(m, atualId), modelo: m })), total }
   }, [cliente.id, atualId])
 
-  async function enviar(e) {
+  async function aplicar(e) {
     e.preventDefault()
-    if (!modelo) return setErro('Escolha um modelo.')
-    if (!inicio) return setErro('Escolha o início dos prazos.')
-    setErro(null)
-    setEnviando(true)
-    const resposta = await aplicarModelo({ clienteId: cliente.id, modeloId: modelo.id, inicio })
-    setEnviando(false)
-    if (resposta.erro) return setErro(resposta.erro)
-    aoAplicar({ id: resposta.id, modelo, inicio })
-    aoFechar()
+    const achados = {}
+    if (!modelo) achados.modelo = 'Escolha um modelo.'
+    if (!inicio) achados.inicio = 'Escolha o início dos prazos.'
+    if (!conferir(achados)) return
+    await enviar(async () => {
+      const resposta = await aplicarModelo({ clienteId: cliente.id, modeloId: modelo.id, inicio })
+      if (resposta.erro) return resposta
+      aoAplicar({ id: resposta.id, modelo, inicio })
+      aoFechar()
+      return { erro: null }
+    })
   }
 
   const previa = modelo && inicio
@@ -59,30 +64,28 @@ export default function JanelaAplicarModelo({ cliente, checklist = null, aoFecha
   const rotulo = trocando ? 'Trocar modelo' : 'Aplicar modelo'
 
   return (
-    <JanelaFormulario aberto aoFechar={aoFechar} icone={ListChecks} largura="lg" enviando={enviando}
+    <JanelaFormulario aberto aoFechar={aoFechar} icone={ListChecks} largura="lg" enviando={enviando} erros={erros} alterado={alterado}
       titulo={trocando ? `Trocar o modelo de ${cliente.nome}` : `Aplicar modelo em ${cliente.nome}`}
       descricao={`${quemSegue} vai seguir as tarefas como check-list. Aparecem os modelos que a consultoria do cliente pode usar.`}
       rodape={(
         <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
+          <BotaoCancelar />
           <Button type="submit" form="form-aplicar-modelo" disabled={enviando}>
             {enviando ? 'Aplicando…' : <><ListChecks /> {rotulo}</>}
           </Button>
         </>
       )}>
-      <form id="form-aplicar-modelo" noValidate onSubmit={enviar} className="space-y-5">
-        <div className="grid gap-2">
-          <Label htmlFor="aplicar-modelo">Modelo</Label>
+      <form id="form-aplicar-modelo" noValidate onSubmit={aplicar} className="space-y-5">
+        <Campo id="aplicar-modelo" rotulo="Modelo" erro={erros.modelo}>
           <Seletor id="aplicar-modelo" valor={modelo?.id ?? ''} aoMudar={(_valor, opcao) => setModelo(opcao.modelo)} buscar={buscar}
             opcoes={modelo ? [{ valor: modelo.id, rotulo: modelo.nome, detalhe: detalheDoModelo(modelo, atualId) }] : []}
             placeholder="Escolha um modelo" />
-        </div>
+        </Campo>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="grid content-start gap-2">
-            <Label htmlFor="aplicar-inicio">Início dos prazos</Label>
+          <Campo id="aplicar-inicio" rotulo="Início dos prazos" erro={erros.inicio} className="content-start"
+            dica="O prazo de cada tarefa conta em dias corridos a partir desta data.">
             <CampoData id="aplicar-inicio" valor={inicio} aoMudar={setInicio} obrigatorio />
-            <p className="text-muted-foreground text-legenda">O prazo de cada tarefa conta em dias corridos a partir desta data.</p>
-          </div>
+          </Campo>
           <CartaoDaSecao className="p-3">
             <p className="section-label">Prévia</p>
             <p className="text-corpo tabular-nums">{previa}</p>

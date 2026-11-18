@@ -266,4 +266,21 @@ describe('JanelaDaTarefa', () => {
     expect(aoFechar).not.toHaveBeenCalled()
     expect(within(rodape).getByRole('button', { name: 'Marcar como feita' })).toBeEnabled()
   })
+
+  // Usabilidade, U4: a nota digitada não some sem perguntar.
+  it('fechar com a nota mudada pergunta antes de descartar; sem mudança, fecha direto', async () => {
+    const { aoFechar } = abrir('t2')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(aoFechar).toHaveBeenCalledTimes(1)
+  })
+
+  it('com a nota mudada, Esc pergunta; Descartar fecha', async () => {
+    const { aoFechar } = abrir('t2')
+    await userEvent.type(screen.getByLabelText('Nota (opcional)'), ' e de outubro')
+    await userEvent.keyboard('{Escape}')
+    expect(aoFechar).not.toHaveBeenCalled()
+    await userEvent.click(within(screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })).getByRole('button', { name: 'Descartar' }))
+    expect(aoFechar).toHaveBeenCalledTimes(1)
+  })
 })
+

@@ -128,14 +128,78 @@ describe('JanelaCheckin: lançar horas', () => {
     expect(aoSalvar).not.toHaveBeenCalled()
   })
 
-  it('exige data, horários e descrição', async () => {
+  // Usabilidade, U2 e U8: todos os erros de uma vez, cada um no seu campo, com o foco no primeiro.
+  it('exige horários e descrição: os três erros aparecem juntos, cada um no seu campo', async () => {
     const { aoSalvar, janela } = abrir()
     await enviar(janela)
-    expect(within(janela).getByText('Informe a data, o início e o fim.')).toBeInTheDocument()
+    expect(within(janela).getByLabelText('Início')).toHaveAccessibleDescription(/Informe o início\./)
+    expect(within(janela).getByLabelText('Fim')).toHaveAccessibleDescription(/Informe o fim\./)
+    expect(within(janela).getByLabelText('O que foi feito')).toHaveAccessibleDescription('Conte o que foi feito.')
+    expect(within(janela).getByLabelText('Início')).toHaveFocus()
+    expect(within(janela).queryByRole('alert')).toBeNull()
     await preencher(janela, { data: '2026-11-10', inicio: '09:00', fim: '10:00' })
     await enviar(janela)
+    expect(within(janela).getByLabelText('Início')).not.toHaveAttribute('aria-invalid')
     expect(within(janela).getByText('Conte o que foi feito.')).toBeInTheDocument()
     expect(aoSalvar).not.toHaveBeenCalled()
+  })
+
+  it('fim antes do início: o erro fica embaixo do Fim', async () => {
+    const { janela } = abrir()
+    await preencher(janela, { data: '2026-11-10', inicio: '10:00', fim: '09:00' })
+    await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
+    await enviar(janela)
+    expect(within(janela).getByLabelText('Fim')).toHaveAttribute('aria-invalid', 'true')
+    expect(within(janela).getByLabelText('Fim')).toHaveAccessibleDescription(/O fim precisa ser depois do início\./)
+  })
+
+  describe('data, atalhos e duração (usabilidade, U8)', () => {
+    beforeEach(() => vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-10T12:34:56') }))
+    afterEach(() => vi.useRealTimers())
+
+    it('abre com a data de hoje; os atalhos Hoje e Ontem trocam a data', async () => {
+      const { aoSalvar, janela } = abrir()
+      expect(within(janela).getByLabelText('Data')).toHaveTextContent('10 de nov de 2026')
+      const atalhos = within(janela).getByRole('group', { name: 'Atalhos da data' })
+      expect(within(atalhos).getByRole('button', { name: 'Hoje' })).toHaveAttribute('aria-pressed', 'true')
+      await userEvent.click(within(atalhos).getByRole('button', { name: 'Ontem' }))
+      expect(within(janela).getByLabelText('Data')).toHaveTextContent('9 de nov de 2026')
+      expect(within(atalhos).getByRole('button', { name: 'Ontem' })).toHaveAttribute('aria-pressed', 'true')
+      expect(within(atalhos).getByRole('button', { name: 'Hoje' })).toHaveAttribute('aria-pressed', 'false')
+      await escolherHora(userEvent, 'Início', '09:00')
+      await escolherHora(userEvent, 'Fim', '10:30')
+      await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
+      await enviar(janela)
+      expect(aoSalvar).toHaveBeenCalledWith({
+        inicio: new Date('2026-11-09T09:00').toISOString(), fim: new Date('2026-11-09T10:30').toISOString(), descricao: 'Reunião',
+      })
+    })
+
+    it('mostra a duração calculada ao lado do Fim (e nada enquanto falta um horário ou o fim vem antes)', async () => {
+      const { janela } = abrir()
+      expect(within(janela).queryByText(/Duração/)).toBeNull()
+      await escolherHora(userEvent, 'Início', '09:00')
+      await escolherHora(userEvent, 'Fim', '10:30')
+      expect(within(janela).getByText('Duração: 1 h 30')).toBeInTheDocument()
+      expect(within(janela).getByLabelText('Fim')).toHaveAccessibleDescription(/Duração: 1 h 30/)
+      await escolherHora(userEvent, 'Fim', '08:00')
+      expect(within(janela).queryByText(/Duração/)).toBeNull()
+    })
+  })
+
+  // Usabilidade, U4.
+  it('fechar com algo digitado pergunta antes de descartar; sem nada, fecha direto', async () => {
+    const aoFechar = vi.fn()
+    const { unmount } = render(<JanelaCheckin aberto modo="lancar" nomeDoCliente="Alfa" aoFechar={aoFechar} aoSalvar={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(aoFechar).toHaveBeenCalledTimes(1)
+    unmount()
+    render(<JanelaCheckin aberto modo="lancar" nomeDoCliente="Alfa" aoFechar={aoFechar} aoSalvar={vi.fn()} />)
+    await userEvent.type(screen.getByLabelText('O que foi feito'), 'Reunião com o cliente')
+    await userEvent.keyboard('{Escape}')
+    expect(aoFechar).toHaveBeenCalledTimes(1)
+    await userEvent.click(within(screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })).getByRole('button', { name: 'Descartar' }))
+    expect(aoFechar).toHaveBeenCalledTimes(2)
   })
 
   it('envia início e fim em ISO, no horário local', async () => {
@@ -255,6 +319,17 @@ describe('JanelaCheckin: tarefas do check-list marcadas no check-in', () => {
     expect(aoSalvar).toHaveBeenCalledWith(expect.objectContaining({
       descricao: 'Tarefas concluídas: Análise do DRE; Mapa de custos. Revisei a planilha.',
     }))
+  })
+
+  // Usabilidade, U4: o texto que vem pronto das tarefas não é "o que a pessoa digitou".
+  it('check-out com o texto das tarefas vindo pronto: fechar sem mexer não pergunta', async () => {
+    vi.mocked(tarefasDoCheckin).mockResolvedValue(TAREFAS)
+    const aoFechar = vi.fn()
+    render(<JanelaCheckin aberto modo="checkout" nomeDoCliente="Alfa" checkin={aberto} aoFechar={aoFechar} aoSalvar={vi.fn()} />)
+    await waitFor(() => expect(screen.getByLabelText('O que foi feito')).toHaveValue('Tarefas concluídas: Análise do DRE; Mapa de custos.'))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(aoFechar).toHaveBeenCalledTimes(1)
   })
 
   it('check-out com tarefa que não se aplica: "Não se aplica: <tarefa> (<motivo>)" depois das concluídas', async () => {

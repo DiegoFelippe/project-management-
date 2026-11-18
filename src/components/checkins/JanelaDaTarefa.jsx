@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import { Ban, Check, ClipboardCheck, Lock, Play, Undo2 } from 'lucide-react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
-import JanelaFormulario, { CartaoDaSecao, SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import JanelaFormulario, { BotaoCancelar, CartaoDaSecao, SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -80,7 +80,8 @@ function Relacionadas({ rotulo, tarefas, situacoes, vazio, aoAbrir }) {
 // "Não se aplica" (a fazer ou em andamento, não bloqueada): o botão no corpo abre o campo Motivo (obrigatório, até 500
 // letras, o erro embaixo do campo) e o rodapé vira Cancelar, Voltar (sai do motivo) e Não se aplica (grava).
 // `aoAgir({ estado, nota, motivo? })` grava (estado nulo = só a nota; motivo só no "não se aplica") e devolve { erro };
-// sem erro, a janela fecha. `situacoes`: a situação de cada tarefa (situacaoDaTarefa), por id.
+// sem erro, a janela fecha. `situacoes`: a situação de cada tarefa (situacaoDaTarefa), por id. Fechar com a nota mudada
+// ou o motivo escrito pergunta antes (usabilidade, U4).
 export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nomeDoCliente, inicio, podeMarcar, aoAgir, aoAbrir, aoFechar }) {
   const [nota, setNota] = useState(tarefa.nota ?? '')
   const [acao, setAcao] = useState(null)
@@ -102,6 +103,7 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
   const porId = new Map(tarefas.map((t) => [t.id, t]))
   const dependeDe = (tarefa.depende_de ?? []).map((id) => porId.get(id)).filter(Boolean)
   const libera = tarefas.filter((t) => t.depende_de?.includes(tarefa.id))
+  const alterado = nota !== (tarefa.nota ?? '') || motivo.trim() !== ''
 
   async function agir(chave) {
     if (acao) return
@@ -150,10 +152,10 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
   const detalhe = `${nomeDoCliente} · etapa ${numeroDaEtapa}, ${etapa?.nome ?? ''} · ${tarefa.obrigatoria ? 'obrigatória' : 'opcional'}`
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo={tarefa.titulo} descricao={detalhe} icone={ClipboardCheck} largura="lg"
-      enviando={Boolean(acao)}
+      enviando={Boolean(acao)} alterado={alterado}
       rodape={podeMarcar ? (
         <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={Boolean(acao)}>Cancelar</Button>
+          <BotaoCancelar />
           {comMotivo && (
             <Button type="button" variant="outline" className={SO_ICONE} disabled={Boolean(acao)} onClick={sairDoMotivo}>
               <Undo2 /> <span className="max-sm:sr-only">Voltar</span>
@@ -240,9 +242,8 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
         {podeMarcar ? (
           <div className="grid gap-2">
             <Label htmlFor={idNota}>Nota (opcional)</Label>
-            <textarea id={idNota} rows={3} maxLength={MAXIMO_DA_NOTA} value={nota} onChange={(e) => setNota(e.target.value)}
-              placeholder="Ex.: faltam os extratos de setembro"
-              className="border-input bg-card focus-visible:border-ring focus-visible:ring-ring/30 w-full rounded-md border px-3 py-2 texto-de-campo shadow-xs outline-none hover:border-primary/40 focus-visible:ring-4" />
+            <Textarea id={idNota} rows={3} maxLength={MAXIMO_DA_NOTA} value={nota} onChange={(e) => setNota(e.target.value)}
+              placeholder="Ex.: faltam os extratos de setembro" />
           </div>
         ) : (
           <SecaoFormulario titulo="Nota">
