@@ -6,7 +6,7 @@ import { apagarCheckin, editarCheckin, listarCheckins, meuCheckinAberto } from '
 import { eventosDoPeriodo, feriadosDoPeriodo, indicadoresDaAgenda, meuGoogle } from '@/data/agenda'
 import { limparPastaDoCliente, listarArquivos, listarPastas } from '@/data/arquivos'
 import { apagarCliente, buscarCliente, checkinsPorSemana, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
-import { cartoesDoQuadro, indicadoresDoQuadro, limparQuadroDoCliente, quadroDoCliente } from '@/data/quadro'
+import { cartoesDoQuadro, limparQuadroDoCliente, quadroDoCliente } from '@/data/quadro'
 import { ouvirQuadro } from '@/data/quadroAoVivo'
 import { renderizarTela } from '@/test/renderizar'
 import Cliente from './Cliente'
@@ -37,7 +37,7 @@ vi.mock('@/data/arquivos', () => ({
 }))
 vi.mock('@/data/quadro', () => ({
   CARTOES_POR_PAGINA: 50, ARQUIVADOS_POR_PAGINA: 15, limparQuadroDoCliente: vi.fn(),
-  quadroDoCliente: vi.fn(), quadrosDoCliente: vi.fn(), quadroPorId: vi.fn(), cartoesDoQuadro: vi.fn(), indicadoresDoQuadro: vi.fn(),
+  quadroDoCliente: vi.fn(), quadrosDoCliente: vi.fn(), quadroPorId: vi.fn(), cartoesDoQuadro: vi.fn(),
   cartoesArquivados: vi.fn(), pessoasDoQuadro: vi.fn(), moverCartao: vi.fn(), moverColuna: vi.fn(), apagarColuna: vi.fn(),
   criarCartao: vi.fn(), restaurarCartao: vi.fn(), apagarCartao: vi.fn(), criarColuna: vi.fn(), editarColuna: vi.fn(),
 }))
@@ -131,8 +131,9 @@ describe('Cliente (página)', () => {
     expect(screen.getAllByRole('tab').map((a) => a.textContent)).toEqual(['Geral', 'Quadro', 'Agenda', 'Check-ins', 'Arquivos', 'Histórico'])
     await waitFor(() => expect(eventosDoPeriodo).toHaveBeenCalledWith(expect.objectContaining({ clienteId: 'k1' })))
     expect(eventosDoPeriodo.mock.calls.every(([filtros]) => filtros.clienteId === 'k1')).toBe(true)
-    expect(indicadoresDaAgenda).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), { clienteId: 'k1' })
-    expect(screen.getByRole('region', { name: 'Indicadores da agenda' })).toBeInTheDocument()
+    // Sem cartões de números dentro do cliente (pedido do Diego, 17/11).
+    expect(indicadoresDaAgenda).not.toHaveBeenCalled()
+    expect(screen.queryByRole('region', { name: 'Indicadores da agenda' })).not.toBeInTheDocument()
     // Só compromissos: os check-ins ficam na aba Check-ins e o histórico na aba Histórico.
     expect(listarCheckins).not.toHaveBeenCalled()
     expect(listarEventos).not.toHaveBeenCalled()
@@ -289,7 +290,6 @@ describe('Cliente (página)', () => {
       colunas: [{ id: 'col1', nome: 'A fazer', cor: null, concluidos: false, posicao: 1024, cartoes: 0, arquivados: 0 }],
     })
     vi.mocked(cartoesDoQuadro).mockResolvedValue({ itens: [], total: 0 })
-    vi.mocked(indicadoresDoQuadro).mockResolvedValue({ cartoes: 0, atrasados: 0, vencem_em_7_dias: 0, sem_responsavel: 0 })
     tela(consultor, '/clientes/k1?aba=quadro')
     expect(await screen.findByRole('region', { name: 'Coluna A fazer' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Quadro' })).toHaveAttribute('aria-selected', 'true')

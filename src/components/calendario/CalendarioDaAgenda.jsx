@@ -48,8 +48,7 @@ const ehCelular = () => typeof window.matchMedia === 'function' && !window.match
 const lerEventos = ({ de, ate, consultorId, consultoriaId, clienteId, tipo }) => eventosDoPeriodo({ de, ate, consultorId, consultoriaId, clienteId, tipo })
 const lerAusencias = ({ de, ate, consultorId, consultoriaId }) => ausenciasDoPeriodo({ de, ate, consultorId, consultoriaId })
 const lerFeriados = ({ de, ate }) => feriadosDoPeriodo(de, ate)
-// Sem recorte, só o dia; na agenda do cliente, os números só daquele cliente.
-const lerIndicadores = ({ dia, clienteId }) => (clienteId ? indicadoresDaAgenda(dia, { clienteId }) : indicadoresDaAgenda(dia))
+const lerIndicadores = ({ dia }) => indicadoresDaAgenda(dia)
 
 // O "Mostrar" dos eventos vai ao banco: as duas caixas = todos (sem tipo); uma só = aquele tipo; nenhuma = não lê.
 function tipoDosEventos(mostrar) {
@@ -87,7 +86,7 @@ function useItensDoPeriodo({ de, ate, filtros, mostrar, versao, ligado = true })
 // - Sem `cliente`: o menu Calendário. Aqui também termina a conexão do Google da pessoa (o Google volta para
 //   /calendario?code=…&state=…).
 // - Com `cliente` ({ id, nome, consultoria_id, arquivado, contato_nome, contato_email }, a aba Agenda do cliente): só os
-//   eventos daquele cliente e os números só dele; a barra fica sem consultor, consultoria e cliente, e o "Mostrar", só
+//   eventos daquele cliente, sem os cartões de números; a barra fica sem consultor, consultoria e cliente, e o "Mostrar", só
 //   com reuniões e feriados; "Novo evento" já nasce no cliente (travado). Cliente arquivado ou sem consultoria não ganha
 //   evento novo.
 export default function CalendarioDaAgenda({ cliente = null }) {
@@ -136,7 +135,8 @@ export default function CalendarioDaAgenda({ cliente = null }) {
   const cobre = periodo.de <= proximos.de && periodo.ate >= proximos.ate
   const daSemana = useItensDoPeriodo({ ...proximos, filtros, mostrar, versao, ligado: !cobre })
   const porDiaProximos = cobre ? doPeriodo.porDia : daSemana.porDia
-  const indicadores = useLeitura(lerIndicadores, { dia: hoje, clienteId, versao })
+  // Dentro do cliente a agenda não tem cartões de números (pedido do Diego, 17/11): nem lê.
+  const indicadores = useLeitura(lerIndicadores, cliente ? null : { dia: hoje, versao })
 
   // O dia do detalhe: o clicado, se está no período; senão hoje (ou o primeiro dia do mês/período).
   const diaDoDetalhe = periodo.dias.includes(selecionado) ? selecionado
@@ -269,7 +269,7 @@ export default function CalendarioDaAgenda({ cliente = null }) {
         consultor={consultor} aoConsultor={setConsultor} cliente={clienteDoFiltro} aoCliente={setClienteDoFiltro} temFiltros={temFiltros} aoLimpar={limpar}
         google={google} conectando={conectando} aoConectar={conectar} aoDesconectar={() => setDesconectando(true)}
         aoNovo={criar && (() => criar(diaDoDetalhe))} />
-      <IndicadoresDaAgenda indicadores={indicadores.dados} />
+      {!cliente && <IndicadoresDaAgenda indicadores={indicadores.dados} />}
       {doPeriodo.haMais && (
         <p role="status" className="mb-3 text-corpo text-notice">
           Há mais eventos neste período do que o calendário mostra.

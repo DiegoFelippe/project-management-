@@ -61,7 +61,8 @@ Toda tela nova segue esta ordem e estes componentes (detalhes nas seções abaix
    (`AbasSegmentadas`), busca, filtros e o botão principal no fim. Filtros rodam no banco e voltam para a página 1.
 4. **Cartões de números** logo abaixo da barra: até 4, com o componente comum dos cartões (`CartoesDeNumeros`, o mesmo
    do Início e do Calendário), contados no banco no recorte de quem vê e seguindo os filtros de consultoria/consultor da
-   barra. Animam ao passar o mouse (sobem 1px com sombra e o ícone dá o pulinho, como os botões).
+   barra. Animam ao passar o mouse (sobem 1px com sombra e o ícone dá o pulinho, como os botões). Exceção: as abas
+   Quadro e Agenda da página do cliente não têm cartões (pedido do Diego, 17/11).
 5. **Conteúdo:** lista sempre em `Tabela` (paginação de 15 vinda do banco, `ListaVazia`, ações na última coluna);
    Editar abre o formulário preenchido.
 6. **Formulário:** `JanelaFormulario` + `SecaoFormulario` (abas `AbasSegmentadas` e 2 colunas quando é grande, como
@@ -90,7 +91,7 @@ Design: `docs/superpowers/specs/2026-11-17-kanban-do-cliente-design.md` (inclui 
 - **Tempo real por canal privado:** o aviso leva só ids, nunca dados; a tela relê pelo banco ao receber o aviso e ao
   `conectou`, `reconectou`, `plano_b` e `sem_acesso` (e quando o acesso muda). O plano B (releitura) roda a cada 30 s
   enquanto o canal não está de pé.
-- **Os 4 números do topo seguem só o filtro Responsável** (busca, prioridade e prazo não mudam os números).
+- **A aba Quadro e a aba Agenda do cliente não têm cartões de números** (pedido do Diego, 17/11).
 - **Cartões lidos por coluna** (50 por vez, "ver mais"): nunca o quadro inteiro de uma vez.
 - **Apagar cartão só por `apagar_cartao`** (sem delete direto na tabela): a função devolve os caminhos no Storage e o
   app os tira do balde em seguida. **Cartões seguram o cliente:** apagar cliente com cartões dá 23503 e a tela manda
@@ -135,7 +136,8 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   Até, no endereço; Times: busca pelo nome; Integrações: Todas/Conectadas/Não conectadas). As abas são
   `AbasSegmentadas`; `comoAbas` só nas abas de página, como as do cliente. Times: "Novo time" é o botão principal
   da barra (administrador e gestor), e o dono vê a consultoria no lugar dele. **Toda tela do menu: barra de filtros
-  (ícone + "Filtros") → cartões de números → conteúdo.** Os cartões (pedido do Diego, 17/11) são o
+  (ícone + "Filtros") → cartões de números → conteúdo** (exceção: as abas Quadro e Agenda da página do cliente não têm
+  cartões, pedido do Diego, 17/11). Os cartões (pedido do Diego, 17/11) são o
   `CartoesDeNumeros` (`src/components/comum/`): até 4, logo depois da barra, com "—" enquanto carregam, **contados no
   banco** por uma função por tela (`indicadores_de_clientes`, `_de_times`, `_de_usuarios`, `_de_consultorias`,
   `_de_integracoes`; Início e Calendário: `painel_do_inicio` e `indicadores_da_agenda`), no recorte de quem vê e
@@ -225,8 +227,8 @@ Design: `docs/superpowers/specs/2026-11-16-calendario-design.md` (decisões da c
 - **Edge Function NOVA no Supabase local** exige `npx supabase stop && npx supabase start` (faça antes um backup com
   `pg_dumpall`; os dados ficam). `npm run functions:reiniciar` só recarrega as que o runtime já conhece.
 - **Agenda dentro do cliente** (pedido do Diego, 17/11): a aba Agenda usa o mesmo calendário do menu
-  (`CalendarioDaAgenda` com o cliente), recortado pelo cliente e **só com os eventos dele** — os números contam só as
-  reuniões do cliente, a barra não tem consultor/consultoria/cliente, "Mostrar" tem reuniões e feriados e "Novo
+  (`CalendarioDaAgenda` com o cliente), recortado pelo cliente e **só com os eventos dele** — sem cartões de números (a aba Quadro
+  e a aba Agenda do cliente não os têm, pedido do Diego, 17/11), a barra não tem consultor/consultoria/cliente, "Mostrar" tem reuniões e feriados e "Novo
   evento" abre com o cliente travado. Check-ins ficam na aba Check-ins e o histórico na aba Histórico (que traz
   "Reunião realizada" e "Pasta da reunião criada").
 

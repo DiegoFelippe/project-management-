@@ -4,14 +4,13 @@ import { toast } from 'sonner'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   anexosDoCartao, apagarColuna, buscarCartao, cartoesDoQuadro, comentariosDoCartao, criarCartao, criarColuna, editarCartao,
-  editarColuna, indicadoresDoQuadro, moverCartao, moverColuna, pessoasDoQuadro, quadroDoCliente, quadroPorId, quadrosDoCliente,
+  editarColuna, moverCartao, moverColuna, pessoasDoQuadro, quadroDoCliente, quadroPorId, quadrosDoCliente,
 } from '@/data/quadro'
 import { ouvirQuadro } from '@/data/quadroAoVivo'
 import { somarDias } from '@/lib/calendario'
 import { hoje } from '@/lib/mes'
 import { arrastarComTeclado, simularGeometria, soltarArrasto } from '@/test/arrastar'
 import { escolherNoSeletor } from '@/test/campos'
-import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { prepararEditor } from '@/test/editor'
 import { renderizarTela } from '@/test/renderizar'
 import QuadroDoCliente from './QuadroDoCliente'
@@ -19,7 +18,7 @@ import QuadroDoCliente from './QuadroDoCliente'
 vi.mock('@/data/quadro', () => ({
   CARTOES_POR_PAGINA: 50, ARQUIVADOS_POR_PAGINA: 15,
   quadroDoCliente: vi.fn(), quadrosDoCliente: vi.fn(), quadroPorId: vi.fn(), cartoesDoQuadro: vi.fn(),
-  indicadoresDoQuadro: vi.fn(), cartoesArquivados: vi.fn(), pessoasDoQuadro: vi.fn(), moverCartao: vi.fn(),
+  cartoesArquivados: vi.fn(), pessoasDoQuadro: vi.fn(), moverCartao: vi.fn(),
   moverColuna: vi.fn(), apagarColuna: vi.fn(), criarCartao: vi.fn(), restaurarCartao: vi.fn(), apagarCartao: vi.fn(),
   criarColuna: vi.fn(), editarColuna: vi.fn(),
   // Janela do cartão
@@ -85,7 +84,6 @@ beforeEach(() => {
   vi.mocked(quadrosDoCliente).mockResolvedValue([])
   vi.mocked(quadroPorId).mockResolvedValue(null)
   vi.mocked(cartoesDoQuadro).mockImplementation(async ({ colunaId }) => ({ itens: cartoes[colunaId], total: cartoes[colunaId].length }))
-  vi.mocked(indicadoresDoQuadro).mockResolvedValue({ cartoes: 4, atrasados: 1, vencem_em_7_dias: 2, sem_responsavel: 3 })
   vi.mocked(pessoasDoQuadro).mockResolvedValue({ itens: [pessoa('p1', 'Ana Lima'), pessoa('g1', 'Gabi Souza')], total: 2 })
   vi.mocked(moverCartao).mockResolvedValue({ erro: null, cartao: {}, renumerou: false })
   vi.mocked(moverColuna).mockResolvedValue({ erro: null, coluna: {}, renumerou: false })
@@ -126,17 +124,13 @@ const pronto = async () => {
 }
 
 describe('aba Quadro: o que cada um vê', () => {
-  it('barra de filtros, os 4 números logo abaixo e as colunas com os cartões', async () => {
+  it('barra de filtros, sem cartões de números abaixo (pedido do Diego, 17/11), e as colunas com os cartões', async () => {
     tela()
-    const numeros = await cartoesAbaixoDaBarra('Indicadores do quadro')
     await pronto()
+    expect(screen.queryByRole('region', { name: 'Indicadores do quadro' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Cartões no quadro')).not.toBeInTheDocument()
     expect(quadroDoCliente).toHaveBeenCalledWith('k1')
     expect(cartoesDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ quadroId: 'q1', colunaId: 'col1', pagina: 1 }))
-    expect(indicadoresDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ quadroId: 'q1' }))
-    expect(numeroDoCartao(numeros, 'Cartões no quadro')).toBe('4')
-    expect(numeroDoCartao(numeros, 'Atrasados')).toBe('1')
-    expect(numeroDoCartao(numeros, 'Vencem em 7 dias')).toBe('2')
-    expect(numeroDoCartao(numeros, 'Sem responsável')).toBe('3')
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['A fazer', 'Em andamento', 'Concluído'])
     expect(ordem('A fazer')).toEqual(['Mapear boletos', 'Revisar contratos', 'Ligar para o financeiro'])
     expect(within(screen.getByRole('region', { name: 'Coluna A fazer' })).getByTitle('3 cartões')).toBeInTheDocument()
@@ -313,12 +307,10 @@ describe('aba Quadro: o que cada um vê', () => {
     await user.tab()
     await waitFor(() => expect(editarCartao).toHaveBeenCalledWith('c4', { titulo: 'Configurar a OLT' }))
     const antes = vi.mocked(cartoesDoQuadro).mock.calls.length
-    vi.mocked(indicadoresDoQuadro).mockClear()
     await user.click(within(janela).getAllByRole('button', { name: 'Fechar' }).at(-1))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await waitFor(() => expect(vi.mocked(cartoesDoQuadro).mock.calls.length).toBe(antes + 1))
     expect(cartoesDoQuadro).toHaveBeenLastCalledWith(expect.objectContaining({ quadroId: 'q1', colunaId: 'col2', pagina: 1 }))
-    expect(indicadoresDoQuadro).toHaveBeenCalled()
   })
 
   it('fechar sem mudar nada não relê nada', async () => {
@@ -602,26 +594,6 @@ describe('filtros', () => {
     await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ prazo: 'atrasados', responsavel: 'g1' })))
   })
 
-  it('os 4 números seguem só o Responsável: busca, Prioridade e Prazo não mudam os números', async () => {
-    const user = userEvent.setup()
-    tela()
-    const numeros = await cartoesAbaixoDaBarra('Indicadores do quadro')
-    await pronto()
-    expect(indicadoresDoQuadro).toHaveBeenCalledTimes(1)
-    expect(indicadoresDoQuadro).toHaveBeenCalledWith({ quadroId: 'q1', responsavel: '' })
-    await escolherNoSeletor(user, 'Prioridade', 'Alta')
-    await escolherNoSeletor(user, 'Prazo', 'Atrasados')
-    await user.type(screen.getByRole('searchbox', { name: 'Buscar cartões' }), 'boleto')
-    await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ busca: 'boleto', prazo: 'atrasados' })))
-    expect(indicadoresDoQuadro).toHaveBeenCalledTimes(1)
-    expect(numeroDoCartao(numeros, 'Cartões no quadro')).toBe('4')
-    vi.mocked(indicadoresDoQuadro).mockResolvedValue({ cartoes: 2, atrasados: 0, vencem_em_7_dias: 1, sem_responsavel: 0 })
-    await escolherNoSeletor(user, 'Responsável', 'Gabi Souza')
-    await waitFor(() => expect(indicadoresDoQuadro).toHaveBeenLastCalledWith({ quadroId: 'q1', responsavel: 'g1' }))
-    expect(indicadoresDoQuadro).toHaveBeenCalledTimes(2)
-    await waitFor(() => expect(numeroDoCartao(numeros, 'Cartões no quadro')).toBe('2'))
-  })
-
   it('busca no banco, depois que a pessoa para de digitar', async () => {
     const user = userEvent.setup()
     tela()
@@ -827,11 +799,10 @@ describe('tempo real', () => {
     expect(parar).toHaveBeenCalled()
   })
 
-  it('aviso de cartões relê só as colunas que mudaram (e os números)', async () => {
+  it('aviso de cartões relê só as colunas que mudaram ', async () => {
     tela()
     await pronto()
     vi.mocked(cartoesDoQuadro).mockClear()
-    vi.mocked(indicadoresDoQuadro).mockClear()
     cartoes.col2 = [...cartoes.col2, cartao('c9', 'col2', 'Trocar roteador')]
     await act(async () => avisar({
       eventos: [{ tabela: 'cartoes', operacao: 'insert', cartoes: ['c9'], colunas: ['col2'] }],
@@ -840,7 +811,6 @@ describe('tempo real', () => {
     expect(await screen.findByRole('button', { name: 'Cartão Trocar roteador' })).toBeInTheDocument()
     expect(cartoesDoQuadro).toHaveBeenCalledTimes(1)
     expect(cartoesDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ colunaId: 'col2' }))
-    expect(indicadoresDoQuadro).toHaveBeenCalledTimes(1)
   })
 
   it('conectou, reconectou ou plano B: relê o quadro todo', async () => {
@@ -859,7 +829,6 @@ describe('tempo real', () => {
     tela(gestora)
     await pronto()
     vi.mocked(cartoesDoQuadro).mockClear()
-    vi.mocked(indicadoresDoQuadro).mockClear()
     let leituraVelha
     vi.mocked(quadroDoCliente).mockReturnValueOnce(new Promise((pronto) => { leituraVelha = pronto }))
     await act(async () => avisar({ eventos: [{ motivo: 'reconectou' }], tudo: true, acesso: false, tabelas: [], colunas: [], cartoes: [] }))
@@ -867,7 +836,6 @@ describe('tempo real', () => {
     await user.click(screen.getByRole('button', { name: 'Apagar a coluna Em andamento' }))
     await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledTimes(3))
     expect(cartoesDoQuadro.mock.calls.map(([p]) => p.colunaId).sort()).toEqual(['col1', 'col2', 'col3'])
-    expect(indicadoresDoQuadro).toHaveBeenCalled()
     await act(async () => leituraVelha({ ...QUADRO, pode_gerir: true }))
     expect(cartoesDoQuadro).toHaveBeenCalledTimes(3)
   })
@@ -879,18 +847,6 @@ describe('tempo real', () => {
     await act(async () => avisar({ eventos: [{ motivo: 'plano_b' }], tudo: true, acesso: false, tabelas: [], colunas: [], cartoes: [] }))
     expect(await screen.findByText('Você não tem mais acesso a este quadro.')).toBeInTheDocument()
     expect(parar).toHaveBeenCalled()
-  })
-
-  it('números recusados (sem_permissao) relêem o quadro, e quem não vê mais recebe o aviso', async () => {
-    tela()
-    await pronto()
-    vi.mocked(indicadoresDoQuadro).mockRejectedValue({ code: 'P0001', message: 'sem_permissao' })
-    vi.mocked(quadroDoCliente).mockResolvedValue(null)
-    await act(async () => avisar({
-      eventos: [{ tabela: 'cartao_comentarios', operacao: 'insert', cartoes: ['c4'], colunas: ['col2'] }],
-      tudo: false, acesso: false, tabelas: ['cartao_comentarios'], colunas: ['col2'], cartoes: ['c4'],
-    }))
-    expect(await screen.findByText('Você não tem mais acesso a este quadro.')).toBeInTheDocument()
   })
 
   it('quem perdeu o acesso para de ouvir e vê o aviso', async () => {

@@ -122,12 +122,6 @@ export async function cartoesDoQuadro({ quadroId, colunaId, pagina = 1, ...filtr
   return { itens: data?.itens ?? [], total: data?.total ?? 0 }
 }
 
-// Os 4 números do topo com os mesmos filtros: { cartoes, atrasados, vencem_em_7_dias, sem_responsavel }.
-export async function indicadoresDoQuadro({ quadroId, ...filtros } = {}) {
-  const data = await ler('indicadores_do_quadro', { p_quadro: quadroId, ...parametrosDosFiltros(filtros) })
-  return { cartoes: 0, atrasados: 0, vencem_em_7_dias: 0, sem_responsavel: 0, ...data }
-}
-
 // Arquivados do quadro (mais recentes primeiro), 15 por página, com busca: { itens, total }. Cada item: { id, titulo,
 // prioridade, prazo, arquivado_em, criado_em, criado_por, coluna: { id, nome } }.
 export async function cartoesArquivados({ quadroId, busca, pagina = 1 } = {}) {

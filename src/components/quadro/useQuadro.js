@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
-  cartoesDoQuadro, indicadoresDoQuadro, moverCartao, moverColuna, quadroDoCliente, quadroPorId, quadrosDoCliente,
+  cartoesDoQuadro, moverCartao, moverColuna, quadroDoCliente, quadroPorId, quadrosDoCliente,
 } from '@/data/quadro'
 import { ouvirQuadro } from '@/data/quadroAoVivo'
 
@@ -29,8 +29,7 @@ function juntar(a, b) {
 
 const inserir = (lista, indice, item) => [...lista.slice(0, indice), item, ...lista.slice(indice)]
 
-// O quadro do cliente na tela: o quadro (colunas), uma página de cartões por coluna (mais com "ver mais"), os 4 números
-// (seguem só o filtro de responsável: busca, prioridade e prazo não mudam os números, regra do CLAUDE.md), o tempo real e
+// O quadro do cliente na tela: o quadro (colunas), uma página de cartões por coluna (mais com "ver mais"), o tempo real e
 // o arrastar otimista. Quem vê o quê é do banco: a central lista os quadros do cliente (um por
 // consultoria que o atendeu) e abre o escolhido (`escolher(id)`; sem escolha, o atual) só para ler; os outros recebem o
 // quadro da consultoria que atende. `filtros` já vem com a busca atrasada (a pessoa parou de digitar).
@@ -50,7 +49,6 @@ export function useQuadro({ clienteId, central, filtros }) {
   const [erro, setErro] = useState(null)
   const [semAcesso, setSemAcesso] = useState(false)
   const [colunas, setColunas] = useState({}) // colunaId → { itens, total, carregandoMais, erro }
-  const [indicadores, setIndicadores] = useState(null)
 
   const quadroRef = useRef(undefined)
   const colunasRef = useRef({})
@@ -65,7 +63,6 @@ export function useQuadro({ clienteId, central, filtros }) {
   const colunasPedidas = useRef(new Set()) // colunas que alguma leitura do quadro pediu para reler
   const relerOQuadro = useRef(() => {})
   const pedidoDoQuadro = useRef(0)
-  const pedidoDosNumeros = useRef(0)
   const teveQuadro = useRef(false)
   const parar = useRef(null)
   const ocupado = useRef(0)
@@ -89,17 +86,6 @@ export function useQuadro({ clienteId, central, filtros }) {
   const invalidar = useCallback((colunaId) => {
     pedidos.current[colunaId] = (pedidos.current[colunaId] ?? 0) + 1
     return lendo.current[colunaId] != null || Boolean(pedindoMais.current[colunaId] || relerDepois.current[colunaId])
-  }, [])
-
-  const lerNumeros = useCallback(async (quadroId) => {
-    const numero = ++pedidoDosNumeros.current
-    try {
-      const r = await indicadoresDoQuadro({ quadroId, responsavel: filtrosRef.current.responsavel })
-      if (numero === pedidoDosNumeros.current) setIndicadores(r)
-    } catch (falha) {
-      // Sem permissão: relê o quadro (quem não vê mais recebe o aviso). Outro erro: os números ficam como estavam.
-      if (semPermissao(falha)) relerOQuadro.current()
-    }
   }, [])
 
   // Relê a coluna com as páginas que já estavam abertas ("ver mais"), mais a que foi pedida e ainda não entrou.
@@ -128,7 +114,7 @@ export function useQuadro({ clienteId, central, filtros }) {
     }
   }, [mudarColuna])
 
-  // Lê o quadro. `tudo`: relê todas as colunas e os números; `colunas`: relê essas. A leitura que vale (a mais nova)
+  // Lê o quadro. `tudo`: relê todas as colunas; `colunas`: relê essas. A leitura que vale (a mais nova)
   // cumpre o que as atropeladas pediram; sempre carrega as colunas que ainda não estavam na tela.
   const lerQuadro = useCallback(async ({ tudo = false, colunas: ids = [] } = {}) => {
     if (tudo) querTudo.current = true
@@ -162,7 +148,6 @@ export function useQuadro({ clienteId, central, filtros }) {
         for (const c of q.colunas) {
           if (reler || pedidas.has(c.id) || !(c.id in colunasRef.current)) lerColuna(q.id, c.id)
         }
-        if (reler) lerNumeros(q.id)
       }
       return q ?? null
     } catch (falha) {
@@ -179,7 +164,7 @@ export function useQuadro({ clienteId, central, filtros }) {
       }
       return undefined
     }
-  }, [central, clienteId, lerColuna, lerNumeros, mudarQuadro])
+  }, [central, clienteId, lerColuna, mudarQuadro])
 
   useEffect(() => {
     relerOQuadro.current = () => lerQuadro()
@@ -236,8 +221,7 @@ export function useQuadro({ clienteId, central, filtros }) {
     } else {
       for (const c of q.colunas) if (resumo.colunas?.includes(c.id)) lerColuna(q.id, c.id)
     }
-    lerNumeros(q.id)
-  }, [lerColuna, lerNumeros, lerTudo, relerQuadro])
+  }, [lerColuna, lerTudo, relerQuadro])
 
   const receber = useRef(null)
   useEffect(() => {
@@ -280,7 +264,6 @@ export function useQuadro({ clienteId, central, filtros }) {
     pendente.current = null
     colunasRef.current = {}
     setColunas({})
-    setIndicadores(null)
     setSemAcesso(false)
     mudarQuadro(undefined)
     setEscolhido(id)
@@ -297,13 +280,6 @@ export function useQuadro({ clienteId, central, filtros }) {
     relerDepois.current = {}
     for (const c of q.colunas) lerColuna(q.id, c.id)
   }, [chaveDosFiltros, lerColuna])
-
-  // Os números só mudam com o responsável (depois do efeito acima, que guarda os filtros).
-  const responsavel = filtros.responsavel
-  useEffect(() => {
-    const q = quadroRef.current
-    if (q) lerNumeros(q.id)
-  }, [responsavel, lerNumeros])
 
   // ── Arrastar ──
 
@@ -384,7 +360,7 @@ export function useQuadro({ clienteId, central, filtros }) {
   }, [liberar, soltarCartao, soltarColuna])
 
   return {
-    quadros, quadro, erro, semAcesso, colunas, indicadores,
-    escolher, lerTudo, relerQuadro, lerColuna, lerNumeros, verMais, mudarQuadro, comecarArrasto, soltar,
+    quadros, quadro, erro, semAcesso, colunas,
+    escolher, lerTudo, relerQuadro, lerColuna, verMais, mudarQuadro, comecarArrasto, soltar,
   }
 }

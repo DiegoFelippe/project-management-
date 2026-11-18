@@ -89,17 +89,15 @@ afterEach(() => {
 })
 
 describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () => {
-  it('lê só os eventos do cliente e os números dele, sem o título da página do menu', async () => {
+  it('lê só os eventos do cliente, sem cartões de números (e sem pedir os números), sem o título da página do menu', async () => {
     tela(gestora)
     const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
     expect(await within(grade).findByRole('button', { name: /Kickoff Alfa/ })).toBeInTheDocument()
     expect(eventosDoPeriodo).toHaveBeenCalledTimes(1)
     // Na aba, todo evento é do cliente (uma reunião com cliente): o "Mostrar" pede as reuniões dele.
     expect(eventosDoPeriodo).toHaveBeenCalledWith({ ...MES, consultorId: undefined, consultoriaId: undefined, clienteId: 'k1', tipo: 'reunioes' })
-    expect(indicadoresDaAgenda).toHaveBeenCalledWith('2026-11-17', { clienteId: 'k1' })
-    const indicadores = screen.getByRole('region', { name: 'Indicadores da agenda' })
-    await waitFor(() => expect(within(indicadores).getByText('Reuniões no mês').parentElement).toHaveTextContent('2'))
-    expect(within(indicadores).getByText('Pastas criadas no mês').parentElement).toHaveTextContent('1')
+    expect(screen.queryByRole('region', { name: 'Indicadores da agenda' })).not.toBeInTheDocument()
+    expect(indicadoresDaAgenda).not.toHaveBeenCalled()
     expect(screen.queryByRole('heading', { name: 'Calendário', level: 1 })).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Detalhe do dia' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Próximos 7 dias' })).toBeInTheDocument()

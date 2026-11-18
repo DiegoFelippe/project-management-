@@ -24,7 +24,6 @@ import {
   editarItemDoChecklist,
   enviarAnexo,
   enviarImagemDaDescricao,
-  indicadoresDoQuadro,
   limparQuadroDoCliente,
   moverCartao,
   moverColuna,
@@ -121,16 +120,6 @@ describe('leituras do quadro (funções do banco)', () => {
     expect(await cartoesDoQuadro({ quadroId: 'q1', colunaId: 'col1', busca: '   ', prioridade: '' })).toEqual({ itens: [], total: 0 })
     expect(supabase.rpc).toHaveBeenCalledWith('cartoes_do_quadro', {
       p_quadro: 'q1', p_coluna: 'col1', p_pagina: 1, p_busca: null, p_prioridade: null, p_responsavel: null, p_prazo: null,
-    })
-  })
-
-  it('indicadoresDoQuadro manda os mesmos filtros (sem a coluna)', async () => {
-    rpcResponde({ cartoes: 6, atrasados: 1, vencem_em_7_dias: 2, sem_responsavel: 3 })
-    expect(await indicadoresDoQuadro({ quadroId: 'q1', responsavel: 'p1' })).toEqual({
-      cartoes: 6, atrasados: 1, vencem_em_7_dias: 2, sem_responsavel: 3,
-    })
-    expect(supabase.rpc).toHaveBeenCalledWith('indicadores_do_quadro', {
-      p_quadro: 'q1', p_busca: null, p_prioridade: null, p_responsavel: 'p1', p_prazo: null,
     })
   })
 

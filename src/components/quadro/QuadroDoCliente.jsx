@@ -14,7 +14,6 @@ import { useAlturaDoQuadro } from './alturaDoQuadro'
 import ApagarColuna from './ApagarColuna'
 import BarraDoQuadro from './BarraDoQuadro'
 import Coluna from './Coluna'
-import IndicadoresDoQuadro from './IndicadoresDoQuadro'
 import JanelaArquivados from './JanelaArquivados'
 import JanelaNovoCartao from './JanelaNovoCartao'
 import NovaColuna from './NovaColuna'
@@ -36,8 +35,8 @@ export default function QuadroDoCliente({ cliente, perfil }) {
   const [janela, setJanela] = useState(null) // { tipo: 'novo', colunaId } | { tipo: 'arquivados' } | { tipo: 'apagar', colunaId }
   const [cartaoAberto, setCartaoAberto] = useState(null)
   const {
-    quadros, quadro, erro, semAcesso, colunas, indicadores,
-    escolher, lerTudo, relerQuadro, lerColuna, lerNumeros, mudarQuadro, verMais, comecarArrasto, soltar,
+    quadros, quadro, erro, semAcesso, colunas,
+    escolher, lerTudo, relerQuadro, lerColuna, mudarQuadro, verMais, comecarArrasto, soltar,
   } = useQuadro({ clienteId: cliente.id, central, filtros: { ...filtros, busca: buscaAtrasada } })
   const abrirCartao = useCallback((id) => setCartaoAberto(id), [])
   const faixa = useRef(null)
@@ -71,8 +70,7 @@ export default function QuadroDoCliente({ cliente, perfil }) {
   const podeMexer = quadro.pode_mexer
   const filtrando = temFiltro(filtros)
   const hoje = hojeEmSP()
-  // Quantos cartões passam pelos filtros: a soma das contagens do banco de cada coluna filtrada (os números do topo
-  // seguem só o responsável). Enquanto alguma coluna não chegou, a frase fica sem o número.
+  // Quantos cartões passam pelos filtros: a soma das contagens do banco de cada coluna filtrada. Enquanto alguma coluna não chegou, a frase fica sem o número.
   const totais = quadro.colunas.map((c) => colunas[c.id]?.total)
   const comFiltro = totais.every((t) => typeof t === 'number') ? totais.reduce((soma, t) => soma + t, 0) : null
 
@@ -85,9 +83,6 @@ export default function QuadroDoCliente({ cliente, perfil }) {
       mudarQuadro(antes)
       toast.error(resposta.erro)
       lerTudo()
-    } else if ('concluidos' in campos) {
-      // Atrasados e "vencem em 7 dias" não contam a coluna de concluídos.
-      lerNumeros(quadro.id)
     }
   }
 
@@ -119,20 +114,18 @@ export default function QuadroDoCliente({ cliente, perfil }) {
     if (aviso) toast.warning(`O cartão foi criado, mas: ${aviso}`)
     else toast.success('Cartão criado.')
     lerColuna(quadro.id, colunaId)
-    lerNumeros(quadro.id)
     abrirCartao(id)
   }
 
-  // A janela do cartão fechou: relê as colunas que ela mexeu (o cartão, a coluna nova dele) e os números.
+  // A janela do cartão fechou: relê as colunas que ela mexeu (o cartão, a coluna nova dele) 
   function fecharCartao(colunasMexidas = []) {
     setCartaoAberto(null)
     const ids = colunasMexidas.filter((id) => quadro.colunas.some((c) => c.id === id))
     for (const id of ids) lerColuna(quadro.id, id)
-    if (ids.length) lerNumeros(quadro.id)
   }
 
   function abrirApagar(coluna) {
-    // As contagens da confirmação vêm do quadro: relê para dizer quantos somem com os números de agora.
+    // As contagens da confirmação vêm do quadro: relê para dizer quantos somem com a contagem de agora.
     relerQuadro()
     setJanela({ tipo: 'apagar', colunaId: coluna.id })
   }
@@ -164,7 +157,6 @@ export default function QuadroDoCliente({ cliente, perfil }) {
       <BarraDoQuadro quadroId={quadro.id} quadros={central ? quadros : null} escolhido={quadro.id} aoEscolher={escolher}
         filtros={filtros} aoFiltrar={setFiltros} podeMexer={podeMexer}
         aoArquivados={() => setJanela({ tipo: 'arquivados' })} aoNovoCartao={() => setJanela({ tipo: 'novo', colunaId: null })} />
-      <IndicadoresDoQuadro indicadores={indicadores} />
       {(filtrando || somenteLeitura) && (
         <div className="mb-3 grid gap-1 text-rotulo text-muted-foreground">
           {somenteLeitura && <p>{somenteLeitura}</p>}
