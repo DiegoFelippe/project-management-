@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowRight, CalendarClock, CheckCheck, Eye, ListOrdered, ShieldCheck, TriangleAlert, Workflow } from 'lucide-react'
+import { ArrowDown, ArrowRight, Eye, ListOrdered, Workflow } from 'lucide-react'
 import { toast } from 'sonner'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
 import { GraficoCarregando } from '@/components/comum/Carregando'
-import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { anotarTarefa, lerChecklist, marcarTarefa, tirarModelo } from '@/data/checklists'
 import { formatarDia, hoje as hojeEmSP } from '@/lib/mes'
@@ -224,7 +223,6 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
     )
   }
 
-  const pct = resumo.tarefas ? Math.round((resumo.feitas / resumo.tarefas) * 100) : 0
   const tarefaAberta = janela?.tipo === 'tarefa' ? tarefas.find((t) => t.id === janela.id) : null
   const apagada = (t) => (filtro === 'pendentes' && t.estado === 'feita') || (filtro === 'feitas' && t.estado !== 'feita')
   const infoNoFluxo = (t) => {
@@ -254,16 +252,7 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
             : 'Tudo feito.'}
         </p>
       </BarraDeFiltros>
-      <CartoesDeNumeros rotulo="Andamento do check-list" className="mb-0" cartoes={[
-        { chave: 'feitas', rotulo: 'Tarefas feitas', icone: CheckCheck, tom: 'positivo', valor: resumo.feitas,
-          detalhe: `de ${resumo.tarefas.toLocaleString('pt-BR')} · ${pct}%` },
-        { chave: 'obrigatorias', rotulo: 'Obrigatórias feitas', icone: ShieldCheck, valor: resumo.obrigatorias_feitas,
-          detalhe: `de ${resumo.obrigatorias.toLocaleString('pt-BR')}` },
-        { chave: 'vencem', rotulo: 'Vencem em 7 dias', icone: CalendarClock, tom: 'aviso', valor: resumo.vencem_7_dias,
-          destaque: resumo.vencem_7_dias ? 'atencao' : undefined },
-        { chave: 'atrasadas', rotulo: 'Atrasadas', icone: TriangleAlert, tom: 'perigo', valor: resumo.atrasadas,
-          destaque: resumo.atrasadas ? 'perigo' : undefined },
-      ]} />
+      {/* Sem cartões de números na aba Check-ins do cliente (pedido do Diego, 18/11), como no Quadro e na Agenda. */}
       {caixas}
       {quemAcompanha && (
         <p className="bg-muted/50 text-muted-foreground flex items-start gap-2 rounded-xl border px-3 py-2 text-rotulo">

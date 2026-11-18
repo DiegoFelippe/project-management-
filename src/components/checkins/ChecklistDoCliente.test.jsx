@@ -6,7 +6,6 @@ import {
   anotarTarefa, aplicarModelo, lerChecklist, marcarTarefa, modelosParaAplicar, mudarInicio, tirarModelo,
 } from '@/data/checklists'
 import { escolherData, escolherNoSeletor } from '@/test/campos'
-import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
 import ChecklistDoCliente from './ChecklistDoCliente'
 
@@ -82,18 +81,13 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('ChecklistDoCliente: com modelo', () => {
-  it('barra (Filtros, Lista/Fluxograma, Todas/Pendentes/Feitas com os números, Próxima) → cartões com os números do banco', async () => {
-    // Números do banco que a tela não teria como contar sozinha: os cartões mostram o que veio.
-    vi.mocked(lerChecklist).mockResolvedValue({ ...DADOS, resumo: { ...DADOS.resumo, vencem_7_dias: 12, atrasadas: 9 } })
+  it('barra (Filtros, Lista/Fluxograma, Todas/Pendentes/Feitas com os números, Próxima) e sem cartões de números', async () => {
     tela(consultor)
-    const cartoes = await cartoesAbaixoDaBarra('Andamento do check-list')
+    await screen.findByRole('region', { name: 'Modelo aplicado' })
     expect(lerChecklist).toHaveBeenCalledWith('k1')
-    expect(numeroDoCartao(cartoes, 'Tarefas feitas')).toBe('1')
-    expect(within(cartoes).getByText('de 5 · 20%')).toBeInTheDocument()
-    expect(numeroDoCartao(cartoes, 'Obrigatórias feitas')).toBe('1')
-    expect(within(cartoes).getByText('de 4')).toBeInTheDocument()
-    expect(numeroDoCartao(cartoes, 'Vencem em 7 dias')).toBe('12')
-    expect(numeroDoCartao(cartoes, 'Atrasadas')).toBe('9')
+    // A aba Check-ins do cliente não tem cartões de números (pedido do Diego, 18/11), como o Quadro e a Agenda.
+    expect(screen.queryByRole('region', { name: 'Andamento do check-list' })).not.toBeInTheDocument()
+    expect(document.querySelector('[data-cartao]')).toBeNull()
 
     const barra = screen.getByText('Filtros').closest('.card')
     const visao = within(barra).getByRole('group', { name: 'Visualização' })
@@ -248,7 +242,7 @@ describe('ChecklistDoCliente: com modelo', () => {
       'Não foi possível atualizar o check-list. Atualize a página para ver o de agora.'))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Coleta de documentos' })).toBeChecked()
-    expect(screen.getByRole('region', { name: 'Andamento do check-list' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Modelo aplicado' })).toBeInTheDocument()
   })
 
   it('em andamento e bloqueada: um selo só, "Em andamento · espera N tarefas", como no fluxograma e na janela', async () => {
