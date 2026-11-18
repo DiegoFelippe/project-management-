@@ -537,9 +537,12 @@ describe('agenda: criar, editar, apagar e responder (núcleo da Edge Function, G
     expect(erro.extra.erro).toBe('Você só cria eventos na agenda dos consultores da sua consultoria.')
     expect(await linha(naAgendaDeD.id)).toBeNull()
 
-    // O evento de D: a gestora de C não edita nem apaga (nem fica sabendo que existe).
-    for (const tentativa of [salvar(p.gestora, { id: deD.id, titulo: 'Invadido' }), apagar(p.gestora, deD.id)]) {
-      expect(await recusa(tentativa)).toMatchObject({ status: 404, codigo: 'evento_nao_encontrado' })
+    // O evento de D: a gestora de C não edita nem apaga (nem fica sabendo que existe). Uma tentativa por vez: com as
+    // duas promessas criadas juntas, o apagar era recusado enquanto o laço ainda esperava o salvar, sem ninguém
+    // ouvindo a recusa (erro solto "evento_nao_encontrado" no fim da rodada, de vez em quando).
+    const tentativas = [() => salvar(p.gestora, { id: deD.id, titulo: 'Invadido' }), () => apagar(p.gestora, deD.id)]
+    for (const tentar of tentativas) {
+      expect(await recusa(tentar())).toMatchObject({ status: 404, codigo: 'evento_nao_encontrado' })
     }
     expect((await linha(deD.id)).titulo).toBe('Reunião da D')
 
