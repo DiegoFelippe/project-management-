@@ -20,7 +20,8 @@ function Campo({ id, rotulo, children }) {
 }
 
 // Novo cliente (sem `cliente`, botão "Criar cliente") ou Editar cliente (preenchido, "Salvar"). aoSalvar(dados) devolve
-// { erro }. Só o nome e a previsão são obrigatórios (como no banco); os demais campos dizem "(opcional)".
+// { erro }. Só o nome e a previsão são obrigatórios (como no banco); os demais campos dizem "(opcional)" (a coluna da
+// UF tem 7,5rem para o rótulo caber numa linha).
 export default function FormularioCliente({ aberto, aoFechar, cliente, aoSalvar }) {
   const [nome, setNome] = useState(cliente?.nome ?? '')
   const [razaoSocial, setRazaoSocial] = useState(cliente?.razao_social ?? '')
@@ -74,11 +75,11 @@ export default function FormularioCliente({ aberto, aoFechar, cliente, aoSalvar 
               <Input id="cliente-cnpj" className="h-10" inputMode="text" maxLength={18} value={cnpj}
                 onChange={(e) => setCnpj(e.target.value)} onBlur={() => cnpjValido(cnpj) && setCnpj(formatarCnpj(cnpj))} />
             </Campo>
-            <div className="grid grid-cols-[1fr_5rem] gap-3">
-              <Campo id="cliente-cidade" rotulo="Cidade">
+            <div className="grid grid-cols-[1fr_7.5rem] gap-3">
+              <Campo id="cliente-cidade" rotulo="Cidade (opcional)">
                 <Input id="cliente-cidade" className="h-10" maxLength={80} value={cidade} onChange={(e) => setCidade(e.target.value)} />
               </Campo>
-              <Campo id="cliente-uf" rotulo="UF">
+              <Campo id="cliente-uf" rotulo="UF (opcional)">
                 <Input id="cliente-uf" className="h-10 uppercase" maxLength={2} value={uf} onChange={(e) => setUf(e.target.value)} />
               </Campo>
             </div>

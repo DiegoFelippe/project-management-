@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { useEnvio } from './useEnvio'
+import { FALHA_NO_ENVIO, useEnvio } from './useEnvio'
 
 // Uma ação que só termina quando o teste manda (para ver o estado no meio do envio).
 function acaoPendente() {
@@ -78,12 +78,22 @@ describe('useEnvio', () => {
     expect(await segundo).toBe(false)
   })
 
-  it('se a ação falhar, os botões voltam e a falha segue para quem chamou', async () => {
+  it('uma ação que lança sem ser promessa também vira o aviso', async () => {
+    const { result } = renderHook(() => useEnvio(vi.fn()))
+    let deuCerto
+    await act(async () => { deuCerto = await result.current.enviar(() => { throw new Error('quebrou') }) })
+    expect(deuCerto).toBe(false)
+    expect(result.current.erro).toBe(FALHA_NO_ENVIO)
+  })
+
+  it('se a ação lançar (sem rede), mostra o aviso de falha, devolve false, os botões voltam e nada é relançado', async () => {
     const aoConcluir = vi.fn()
     const { result } = renderHook(() => useEnvio(aoConcluir))
-    await act(async () => {
-      await expect(result.current.enviar(() => Promise.reject(new Error('sem rede')))).rejects.toThrow('sem rede')
-    })
+    let deuCerto
+    await act(async () => { deuCerto = await result.current.enviar(() => Promise.reject(new TypeError('Failed to fetch'))) })
+    expect(deuCerto).toBe(false)
+    expect(result.current.erro).toBe('Não deu para salvar. Tente de novo.')
+    expect(result.current.erro).toBe(FALHA_NO_ENVIO)
     expect(result.current.enviando).toBe(false)
     expect(aoConcluir).not.toHaveBeenCalled()
     // E dá para enviar de novo.

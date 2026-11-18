@@ -29,6 +29,21 @@ describe('JanelaMandar', () => {
     expect(aoMandar).toHaveBeenCalledWith('s2', expect.objectContaining({ id: 's2' }))
   })
 
+  it('confirmar de novo limpa o erro da tentativa anterior enquanto envia', async () => {
+    const aoMandar = vi.fn()
+      .mockResolvedValueOnce({ erro: 'A consultoria está arquivada.' })
+      .mockImplementationOnce(() => new Promise(() => {}))
+    render(<JanelaMandar aberto cliente={cliente} aoFechar={() => {}} aoMandar={aoMandar} />)
+    const janela = await screen.findByRole('dialog', { name: 'Mandar Alfa Net para uma consultoria' })
+    await within(janela).findByRole('radio', { name: /STI/ })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Mandar para STI' }))
+    expect(await within(janela).findByText('A consultoria está arquivada.')).toBeInTheDocument()
+    await userEvent.click(within(janela).getByRole('button', { name: 'Mandar para STI' }))
+    expect(aoMandar).toHaveBeenCalledTimes(2)
+    expect(within(janela).queryByText('A consultoria está arquivada.')).toBeNull()
+    expect(within(janela).getByRole('button', { name: 'Salvando…' })).toBeDisabled()
+  })
+
   it('a busca espera 300 ms', async () => {
     render(<JanelaMandar aberto cliente={cliente} aoFechar={() => {}} aoMandar={vi.fn()} />)
     await screen.findByRole('radio', { name: /STI/ })

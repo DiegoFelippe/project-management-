@@ -39,7 +39,7 @@ describe('FormularioCliente', () => {
 
   it('"(opcional)" só nos campos que o banco não exige; nome e previsão não têm', () => {
     abrir()
-    for (const rotulo of ['Razão social', 'CNPJ', 'Contato', 'Telefone do contato', 'E-mail do contato', 'Observações']) {
+    for (const rotulo of ['Razão social', 'CNPJ', 'Cidade', 'UF', 'Contato', 'Telefone do contato', 'E-mail do contato', 'Observações']) {
       expect(screen.getByLabelText(`${rotulo} (opcional)`)).toBeInTheDocument()
     }
     expect(screen.getByLabelText('Nome')).toBeInTheDocument()
@@ -63,7 +63,7 @@ describe('FormularioCliente', () => {
     abrir({ cliente: CLIENTE })
     const salvar = screen.getByRole('button', { name: 'Salvar' })
     expect(salvar).toHaveAttribute('type', 'submit')
-    expect(salvar.form).toBe(screen.getByLabelText('Cidade').form)
+    expect(salvar.form).toBe(screen.getByLabelText('Cidade (opcional)').form)
   })
 
   it('horas por mês acima de 744 avisam na tela e não chegam ao banco', async () => {
@@ -102,6 +102,16 @@ describe('FormularioCliente', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(screen.getByText('Informe a previsão de horas por mês.')).toBeInTheDocument()
     expect(aoSalvar).not.toHaveBeenCalled()
+  })
+
+  it('se o envio falhar (sem rede), a janela avisa, continua aberta e o botão volta', async () => {
+    const aoSalvar = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    const { aoFechar } = abrir({ cliente: CLIENTE, aoSalvar })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(await screen.findByText('Não deu para salvar. Tente de novo.')).toBeInTheDocument()
+    expect(aoFechar).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeEnabled()
+    expect(screen.getByRole('dialog', { name: 'Editar cliente' })).not.toHaveAttribute('aria-busy')
   })
 
   it('erro devolvido por quem salva aparece e a janela continua', async () => {
