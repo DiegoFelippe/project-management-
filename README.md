@@ -97,7 +97,7 @@ Elas estão em `supabase/config.toml`.
 | `npm run functions:reiniciar` | Recarrega as Edge Functions depois de mudar o código delas |
 | `npm test` | Testes das telas (Vitest) |
 | `npm run test:integracao` | Testes das Edge Functions e dos comandos, no Supabase local de verdade |
-| `npm run test:db` | Testes das regras de acesso do banco (pgTAP) |
+| `npm run test:db` | Testes das regras de acesso do banco (pgTAP); no fim roda `vacuum analyze`, porque os testes de volume criam e desfazem milhões de linhas e incham as tabelas |
 | `npm run lint` / `npm run build` | Revisão do código e build de produção |
 
 ## Ligar o login com Google no local

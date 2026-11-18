@@ -16,7 +16,7 @@
     "app:up": "docker compose up -d --build --renew-anon-volumes",
     "app:down": "docker compose down",
     "app:logs": "docker compose logs -f app",
-    "test:db": "supabase test db",
+    "test:db": "supabase test db; s=$?; docker exec supabase_db_consultoria psql -U postgres -qc 'vacuum analyze' >/dev/null 2>&1; exit $s",
     "test": "vitest run --project unidade",
     "test:integracao": "vitest run --project integracao",
     "functions:reiniciar": "docker restart supabase_edge_runtime_consultoria",
