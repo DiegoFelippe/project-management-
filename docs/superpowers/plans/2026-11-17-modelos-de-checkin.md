@@ -396,3 +396,26 @@ TarefasMarcadas,AndamentoDosClientes}*`, `src/components/modelos/*` (só a legen
   tarefa de um cliente da Consultoria Exemplo, com e sem check-in; gestor e central só veem). Passo 5: commit
   `Check-list: tarefa "Não se aplica" com motivo`.
 
+### Task 9: Aba "Check-ins" ao lado de Lista e Fluxograma (acréscimo de 18/11)
+
+Pedido do Diego (18/11 08:51): "dentro de check-in existe lista, fluxograma; quero colocar mais uma aba para colocar os
+check-ins individuais". Depois da T8 (mesmos arquivos). Sem banco.
+
+**Arquivos:** `src/components/checkins/ChecklistDoCliente.jsx` (+ teste), `src/pages/Cliente.jsx` (+ teste da aba).
+
+**Decisões do controlador (o Diego pode mudar):**
+- "Visualização" passa a ter três abas: **Lista | Fluxograma | Check-ins**. Em Check-ins aparece a tabela
+  `CheckinsDoCliente` de hoje (paginada no banco, editar e apagar como está) no lugar da lista/fluxograma; embaixo do
+  check-list não há mais a tabela (sai de `Cliente.jsx`).
+- Em Check-ins somem os filtros que só valem para tarefas ("Mostrar" Todas/Pendentes/Feitas e a orientação do
+  fluxograma); a barra, a caixa do modelo e a da sessão ficam.
+- Cliente **sem modelo** (sem lista nem fluxograma): a tela fica como hoje, o vazio do check-list e a tabela de
+  check-ins embaixo, sem abas.
+- A aba escolhida não precisa ir para o endereço (como Lista/Fluxograma hoje).
+
+**Testes:** com modelo, as três abas; clicar em Check-ins mostra a tabela "Check-ins" e esconde a lista e o "Mostrar";
+voltar para Lista volta; a tabela não aparece embaixo quando há modelo; sem modelo, a tabela continua embaixo; editar e
+apagar check-in pela aba continuam funcionando (os testes de `CheckinsDoCliente` seguem verdes).
+
+- [ ] Commit `Check-ins do cliente: aba Check-ins ao lado de Lista e Fluxograma`.
+
