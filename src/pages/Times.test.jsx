@@ -8,6 +8,7 @@ import { buscarConsultorias } from '@/data/consultorias'
 import { indicadoresDeTimes } from '@/data/indicadores'
 import { buscarPessoas } from '@/data/pessoas'
 import { adicionarMembros, apagarTime, criarTime, editarTime, listarTimes } from '@/data/times'
+import { traduzirErroBanco } from '@/lib/erros'
 import { escolherNoSeletor } from '@/test/campos'
 import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
@@ -84,6 +85,24 @@ describe('Times', () => {
     await userEvent.click(within(await screen.findByRole('row', { name: /Implantação/ })).getByRole('button', { name: 'Apagar' }))
     await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar time' }))
     expect(apagarTime).toHaveBeenCalledWith('t1')
+  })
+
+  it('time com quadros não se apaga: a confirmação avisa antes e o 23503 mostra a mensagem dos quadros', async () => {
+    const quadrosSeguram = traduzirErroBanco({
+      code: '23503',
+      message: 'update or delete on table "times" violates foreign key constraint "quadros_time_id_fkey" on table "quadros"',
+    })
+    vi.mocked(apagarTime).mockResolvedValue({ erro: quadrosSeguram })
+    renderizarTela(<Times />, { perfil: admin })
+    await userEvent.click(within(await screen.findByRole('row', { name: /Implantação/ })).getByRole('button', { name: 'Apagar' }))
+    const confirmar = screen.getByRole('alertdialog')
+    expect(within(confirmar).getByText(/Se o time tiver quadros, apague-os antes, em Quadros\./)).toBeInTheDocument()
+    await userEvent.click(within(confirmar).getByRole('button', { name: 'Apagar time' }))
+    expect(await within(confirmar).findByText(
+      'Este time tem quadros (abertos ou arquivados). Apague os quadros dele em Quadros antes de apagar o time.',
+    )).toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    expect(toast.success).not.toHaveBeenCalled()
   })
 
   it('o gestor só edita e apaga os times dele; o dono só olha', async () => {

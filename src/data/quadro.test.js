@@ -333,6 +333,18 @@ describe('cartões', () => {
     expect(await criarCartao({ colunaId: 'col1', titulo: 'X', responsaveis: ['p9'], quadro: doCliente }))
       .toEqual({ erro: DO_CLIENTE, cartao: { id: 'c1' } })
   })
+
+  it('responsável repetido num quadro do menu (23505): o texto de sempre, nunca o do nome do quadro', async () => {
+    const pessoal = { id: 'q9', cliente_id: null, tipo: 'pessoa' }
+    const repetido = { code: '23505', message: 'duplicate key value violates unique constraint "cartao_responsaveis_pkey"' }
+    banco.resposta = { data: null, error: repetido }
+    const resposta = await adicionarResponsavel('c1', 'p9', { quadro: pessoal })
+    expect(resposta.erro).not.toBe('Já existe um quadro aberto com esse nome.')
+    expect(resposta).toEqual(await adicionarResponsavel('c1', 'p9'))
+    // Sem permissão também fica no texto de sempre.
+    banco.resposta = { data: null, error: { code: '42501', message: 'new row violates row-level security policy' } }
+    expect(await adicionarResponsavel('c1', 'p9', { quadro: pessoal })).toEqual({ erro: 'Você não tem permissão para isso.' })
+  })
 })
 
 describe('colunas, checklist e comentários', () => {

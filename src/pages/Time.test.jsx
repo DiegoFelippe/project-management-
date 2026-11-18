@@ -5,7 +5,8 @@ import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '@/auth/useAuth'
 import { buscarPessoas } from '@/data/pessoas'
-import { adicionarMembros, buscarTime, idsDosMembros, listarMembros, removerMembro } from '@/data/times'
+import { adicionarMembros, apagarTime, buscarTime, idsDosMembros, listarMembros, removerMembro } from '@/data/times'
+import { traduzirErroBanco } from '@/lib/erros'
 import { escolherNoSeletor } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
 import Time from './Time'
@@ -132,6 +133,22 @@ describe('Time', () => {
     const tabela = await screen.findByRole('table', { name: 'Pessoas do time' })
     expect(within(tabela).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Nome', 'Papel'])
     expect(screen.queryByLabelText('Colocar pessoas')).not.toBeInTheDocument()
+  })
+
+  it('time com quadros não se apaga: a confirmação avisa antes e o 23503 mostra a mensagem dos quadros', async () => {
+    vi.mocked(apagarTime).mockResolvedValue({
+      erro: traduzirErroBanco({ code: '23503', message: 'violates foreign key constraint "quadros_time_id_fkey" on table "quadros"' }),
+    })
+    tela()
+    await userEvent.click(await screen.findByRole('button', { name: 'Apagar time' }))
+    const confirmar = screen.getByRole('alertdialog')
+    expect(within(confirmar).getByText(/Se o time tiver quadros, apague-os antes, em Quadros\./)).toBeInTheDocument()
+    await userEvent.click(within(confirmar).getByRole('button', { name: 'Apagar time' }))
+    expect(apagarTime).toHaveBeenCalledWith('t1')
+    expect(await within(confirmar).findByText(
+      'Este time tem quadros (abertos ou arquivados). Apague os quadros dele em Quadros antes de apagar o time.',
+    )).toBeInTheDocument()
+    expect(toast.success).not.toHaveBeenCalled()
   })
 
   it('Editar abre o formulário com o time preenchido; o "← Times" volta para a lista', async () => {

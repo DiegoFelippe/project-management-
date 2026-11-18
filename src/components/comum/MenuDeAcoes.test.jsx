@@ -105,4 +105,12 @@ describe('MenuDeAcoes', () => {
       expect(item.className).toContain('pointer-coarse:min-h-11')
     }
   })
+
+  it('o botão é ghost nas linhas e, com variante="outline", serve ao cabeçalho da página', () => {
+    render(<MenuDeAcoes rotulo="Ações da linha" itens={[{ rotulo: 'Renomear', icone: Pencil, aoEscolher: vi.fn() }]} />)
+    expect(screen.getByRole('button', { name: 'Ações da linha' })).not.toHaveClass('border')
+    cleanup()
+    render(<MenuDeAcoes rotulo="Mais ações do quadro" variante="outline" itens={[{ rotulo: 'Renomear', icone: Pencil, aoEscolher: vi.fn() }]} />)
+    expect(screen.getByRole('button', { name: 'Mais ações do quadro' })).toHaveClass('border', 'bg-card')
+  })
 })

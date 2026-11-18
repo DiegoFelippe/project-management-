@@ -45,7 +45,7 @@ export function useAcoesDoTime({ perfil, aoMudar, aoApagar }) {
       )}
       {apagando && (
         <ConfirmarAcao aberto aoFechar={() => setApagando(null)} titulo={`Apagar o time ${apagando.nome}?`}
-          descricao="O time some de vez. As pessoas continuam com acesso; só saem deste time."
+          descricao="O time some de vez. As pessoas continuam com acesso; só saem deste time. Se o time tiver quadros, apague-os antes, em Quadros."
           rotuloConfirmar="Apagar time" aoConfirmar={() => apagar(apagando)} />
       )}
     </>

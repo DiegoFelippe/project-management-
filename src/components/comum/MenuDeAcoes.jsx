@@ -16,7 +16,8 @@ const alturaDoMenu = (itens) => itens.length * (noToque() ? 44 : 36) + 12
 // - rotulo: o nome do botão e do menu ("Ações da coluna A fazer").
 // - itens: [{ rotulo, icone, aoEscolher, perigo? }] (só os que a pessoa pode fazer; o banco continua mandando).
 // - ref: o botão "⋯" (âncora de um painel que a ação abra, como o da cor da coluna).
-export default function MenuDeAcoes({ rotulo, itens, ref, className }) {
+// - variante: o estilo do botão (ghost nas linhas e listas; outline no cabeçalho da página, como os outros botões de lá).
+export default function MenuDeAcoes({ rotulo, itens, ref, className, variante = 'ghost' }) {
   const id = useId()
   const botao = useRef(null)
   const [aberto, setAberto] = useState(null) // null | 'primeiro' | 'ultimo'
@@ -57,7 +58,7 @@ export default function MenuDeAcoes({ rotulo, itens, ref, className }) {
 
   return (
     <>
-      <Button ref={botao} type="button" variant="ghost" size="icon" aria-label={rotulo} title={rotulo}
+      <Button ref={botao} type="button" variant={variante} size="icon" aria-label={rotulo} title={rotulo}
         aria-haspopup="menu" aria-expanded={Boolean(aberto)} aria-controls={aberto ? `${id}-menu` : undefined}
         onClick={() => setAberto((a) => (a ? null : 'primeiro'))} onKeyDown={teclarNoBotao} className={className}>
         <Ellipsis />

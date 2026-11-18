@@ -29,10 +29,13 @@ const ANEXO_FICOU = 'O anexo saiu do cartão, mas a cópia guardada não foi apa
 const IMAGEM_DE_TIPO_ERRADO = 'Envie uma imagem PNG, JPG, GIF ou WEBP.'
 
 const comErro = (error) => ({ erro: traduzirErroBanco(error) })
-// O responsável recusado: no quadro do cliente, o texto de quem atende o cliente (o de sempre, também sem `quadro`); nos
-// quadros do menu (sem cliente), o neutro.
+// O responsável recusado (responsavel_invalido): no quadro do cliente, o texto de quem atende o cliente (o de sempre,
+// também sem `quadro`); nos quadros do menu (sem cliente), o neutro. Os outros erros (repetido, sem permissão...) ficam
+// no texto de sempre: o `sobre: 'quadro'` traduziria o 23505 como nome de quadro em uso.
 const erroDoResponsavel = (error, quadro) => ({
-  erro: traduzirErroBanco(error, { sobre: quadro && !quadro.cliente_id ? 'quadro' : undefined }),
+  erro: traduzirErroBanco(error, {
+    sobre: error?.message === 'responsavel_invalido' && quadro && !quadro.cliente_id ? 'quadro' : undefined,
+  }),
 })
 // Erros do envio e do link: os do Storage (403, 404, 413) e os do banco.
 const traduzirArquivo = (error) => traduzirErroBanco(error, { sobre: 'arquivo' })

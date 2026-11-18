@@ -21,7 +21,7 @@ describe('Trilho', () => {
       </AuthContext.Provider>,
     )
     const itens = container.querySelectorAll('[data-item-trilho]')
-    expect(itens.length).toBe(10) // 8 itens do dono + bolinha + Sair
+    expect(itens.length).toBe(11) // 9 itens do dono + bolinha + Sair
     for (const item of itens) {
       expect(item.querySelector('[class*="anim-"]'), item.textContent).not.toBeNull()
     }
@@ -32,6 +32,10 @@ describe('Trilho', () => {
     expect(checkins).toHaveAttribute('href', '/checkins')
     expect(checkins.querySelector('.anim-abrir')).not.toBeNull()
     expect(checkins.previousElementSibling).toBe(calendario)
+    const quadros = [...itens].find((item) => item.textContent === 'Quadros')
+    expect(quadros).toHaveAttribute('href', '/quadros')
+    expect(quadros.querySelector('.anim-arrastar')).not.toBeNull()
+    expect(quadros.previousElementSibling).toBe(checkins)
   })
 
   it('o nome que não cabe quebra em duas linhas, sem reticências e com a mesma letra (auditoria, R3)', () => {

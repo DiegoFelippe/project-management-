@@ -162,9 +162,14 @@ describe('criar, renomear, arquivar, restaurar', () => {
     expect(await restaurarQuadro('q1')).toEqual({ erro: SEM_PERMISSAO })
   })
 
-  it('restaurar com um nome que já está em uso entre os abertos: a mensagem do nome', async () => {
+  it('restaurar com um nome que já está em uso entre os abertos: a mensagem do design (renomear um deles)', async () => {
     banco.resposta = { data: null, error: { code: '23505', message: 'duplicate key' } }
-    expect(await restaurarQuadro('q1')).toEqual({ erro: 'Já existe um quadro aberto com esse nome.' })
+    expect(await restaurarQuadro('q1')).toEqual({
+      erro: 'Já existe um quadro aberto com esse nome. Renomeie um deles e tente de novo.',
+    })
+    // As outras recusas continuam com o texto de sempre.
+    banco.resposta = { data: null, error: { code: 'P0001', message: 'sem_permissao' } }
+    expect(await restaurarQuadro('q1')).toEqual({ erro: SEM_PERMISSAO })
   })
 })
 

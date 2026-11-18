@@ -484,10 +484,10 @@ describe('janela do cartão: só leitura', () => {
     expect(await within(j).findByRole('button', { name: 'Baixar contrato.pdf' })).toBeInTheDocument()
   })
 
-  it('cliente arquivado: o aviso diz por quê', async () => {
+  it('motivoSomenteLeitura: o aviso diz por quê (o texto que o QuadroDoCliente passa com o cliente arquivado)', async () => {
     vi.mocked(buscarCartao).mockResolvedValue({ ...CARTAO, pode_mexer: false, pode_apagar: false })
-    abrir({ motivoSomenteLeitura: 'Cliente arquivado: o cartão é só para ler.' })
+    abrir({ motivoSomenteLeitura: 'Cliente arquivado: o quadro é só para ler.' })
     const j = await janela()
-    expect(within(j).getByText('Cliente arquivado: o cartão é só para ler.')).toBeInTheDocument()
+    expect(within(j).getByText('Cliente arquivado: o quadro é só para ler.')).toBeInTheDocument()
   })
 })

@@ -24,9 +24,10 @@ async function ler(funcao, parametros) {
 }
 
 // Update direto em quadros (renomear, arquivar, restaurar): nenhuma linha de volta = a regra do banco recusou (quem não
-// administra) ou o quadro sumiu.
-async function atualizarQuadro(id, campos) {
+// administra) ou o quadro sumiu. `nomeEmUso`: o texto do 23505 (nome repetido entre os abertos), quando é outro.
+async function atualizarQuadro(id, campos, { nomeEmUso } = {}) {
   const { data, error } = await supabase.from('quadros').update(campos).eq('id', id).select('id')
+  if (error?.code === '23505' && nomeEmUso) return { erro: nomeEmUso }
   if (error) return { erro: traduzir(error) }
   if (!data?.length) return { erro: SEM_PERMISSAO }
   return { erro: null }
@@ -83,8 +84,11 @@ export function arquivarQuadro(id) {
   return atualizarQuadro(id, { arquivado_em: new Date().toISOString() })
 }
 
+// Restaurar com um nome já em uso entre os abertos (23505): o texto do design diz o que fazer.
+export const NOME_EM_USO_AO_RESTAURAR = 'Já existe um quadro aberto com esse nome. Renomeie um deles e tente de novo.'
+
 export function restaurarQuadro(id) {
-  return atualizarQuadro(id, { arquivado_em: null })
+  return atualizarQuadro(id, { arquivado_em: null }, { nomeEmUso: NOME_EM_USO_AO_RESTAURAR })
 }
 
 // Acende (favorito = true) ou apaga a estrela do quadro para quem está logado. Já marcado ou já desmarcado não é erro;

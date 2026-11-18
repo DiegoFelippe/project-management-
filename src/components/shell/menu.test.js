@@ -6,11 +6,11 @@ const ids = (papel) => itensDoMenu(papel).map((item) => item.id)
 
 describe('itensDoMenu', () => {
   it('cada papel vê os seus itens', () => {
-    expect(ids('pessoa')).toEqual(['inicio', 'clientes', 'calendario', 'checkins'])
-    expect(ids('gestor')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'times', 'usuarios'])
-    expect(ids('admin')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'times', 'usuarios', 'integracoes'])
-    expect(ids('central')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'times', 'usuarios', 'consultorias'])
-    expect(ids('dono')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'times', 'usuarios', 'consultorias', 'integracoes'])
+    expect(ids('pessoa')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'quadros'])
+    expect(ids('gestor')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'quadros', 'times', 'usuarios'])
+    expect(ids('admin')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'quadros', 'times', 'usuarios', 'integracoes'])
+    expect(ids('central')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'quadros', 'times', 'usuarios', 'consultorias'])
+    expect(ids('dono')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'quadros', 'times', 'usuarios', 'consultorias', 'integracoes'])
   })
 
   it('o menu não tem mais Projetos nem itens "em breve" (pedido do Diego, 16/11)', () => {
@@ -37,6 +37,8 @@ describe('tituloDaRota', () => {
     expect(tituloDaRota('/integracoes')).toBe('Integrações')
     expect(tituloDaRota('/calendario')).toBe('Calendário')
     expect(tituloDaRota('/checkins')).toBe('Check-ins')
+    expect(tituloDaRota('/quadros')).toBe('Quadros')
+    expect(tituloDaRota('/quadros/x')).toBe('Quadros')
   })
 })
 
@@ -77,6 +79,21 @@ describe('animação no hover', () => {
     const css = readFileSync('src/index.css', 'utf8')
     expect(css).toMatch(/@keyframes icone-abrir \{/)
     expect(css).toMatch(/\.group:hover \.anim-abrir, \.group:focus-visible \.anim-abrir \{ animation: icone-abrir/)
+  })
+
+  it('Quadros, para todos os papéis, depois de Calendário (e de Check-ins, que já estava logo depois dele), usa a animação arrastar, que existe em src/index.css', () => {
+    for (const papel of ['pessoa', 'gestor', 'admin', 'central', 'dono']) {
+      const itens = itensDoMenu(papel)
+      const quadros = itens.find((item) => item.id === 'quadros')
+      expect(quadros).toMatchObject({ rotulo: 'Quadros', rota: '/quadros', animacao: 'arrastar' })
+      expect(itens.indexOf(quadros)).toBeGreaterThan(itens.findIndex((item) => item.id === 'calendario'))
+      expect(itens[itens.indexOf(quadros) - 1].id).toBe('checkins')
+    }
+    expect(ANIMACOES_DO_MENU).toContain('arrastar')
+    expect(itensDoMenu('dono').filter((item) => item.animacao === 'arrastar')).toHaveLength(1)
+    const css = readFileSync('src/index.css', 'utf8')
+    expect(css).toMatch(/@keyframes icone-arrastar \{/)
+    expect(css).toMatch(/\.group:hover \.anim-arrastar, \.group:focus-visible \.anim-arrastar \{ animation: icone-arrastar/)
   })
 
   it('cada animação aparece no trilho uma vez só', () => {

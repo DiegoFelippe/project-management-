@@ -12,6 +12,7 @@ import Entrar from '@/pages/Entrar'
 import EsqueciSenha from '@/pages/EsqueciSenha'
 import Inicio from '@/pages/Inicio'
 import Integracoes from '@/pages/Integracoes'
+import Quadros from '@/pages/Quadros'
 import Time from '@/pages/Time'
 import Times from '@/pages/Times'
 import TrocarSenha from '@/pages/TrocarSenha'
@@ -35,6 +36,8 @@ export default function Rotas() {
           <Route path="/clientes/:id" element={<Cliente />} />
           <Route path="/calendario" element={<Calendario />} />
           <Route path="/checkins" element={<Checkins />} />
+          <Route path="/quadros" element={<Quadros />} />
+          <Route path="/quadros/:id" element={<Quadros />} />
           <Route element={<RotaProtegida papeis={['dono', 'central', 'admin', 'gestor']} />}>
             <Route path="/times" element={<Times />} />
             <Route path="/times/:id" element={<Time />} />
