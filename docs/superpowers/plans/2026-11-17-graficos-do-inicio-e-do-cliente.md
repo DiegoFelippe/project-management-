@@ -221,7 +221,8 @@ o risco; recorte por `private.recorte_do_inicio()`, período por `private.period
   horas_mes, sem_checkin, acima_do_ritmo }], total, sem_checkin, acima_do_ritmo }`, 15 por página, por nota, nome, id.
 - `public.horas_por_cliente(p_mes date default null, p_de date default null, p_ate date default null, p_pagina int
   default null)` → sem página: `{ itens: [{ id, nome, sub, horas, previsto }] (10), resto: { clientes, horas },
-  total_horas, total_clientes, participacao_3, participacao_10 }`; com página: `{ itens (15), total }`. Central e
+  total_horas, total_clientes, participacao_3, participacao_10 }` (participações em fração 0–1, `round(…, 4)`, como
+  `ocupacao`; pgTAP confere que ficam entre 0 e 1); com página: `{ itens (15), total }`. Central e
   gestão: clientes com horas no período (resumo por cliente nos meses inteiros + bordas), `sub` = consultoria (tudo) ou
   consultor visível (consultoria); consultor: todos os clientes não arquivados dele, com 0 h inclusive, só as horas
   dele, `sub` nulo. `previsto` = `horas_mes` no Mês; no período, `round(horas_mes × dias do efetivo / 30,4, 1)`.
