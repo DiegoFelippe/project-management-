@@ -198,7 +198,7 @@ describe('JanelaEvento: novo', () => {
     expect(salvarEvento).not.toHaveBeenCalled()
     expect(screen.getByLabelText('Título')).toHaveAccessibleDescription('Escreva o título do evento.')
     expect(screen.getByLabelText('Das')).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByLabelText('Das')).toHaveAccessibleDescription(/Escolha o horário de início ou ligue "Dia inteiro"\./)
+    expect(screen.getByLabelText('Das')).toHaveAccessibleDescription(/Escolha o início ou ligue "Dia inteiro"\./)
     expect(screen.getByLabelText('Título')).toHaveFocus()
     expect(screen.queryByRole('alert')).toBeNull()
   })

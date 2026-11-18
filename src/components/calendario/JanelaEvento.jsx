@@ -190,7 +190,7 @@ function errosDoEvento({ titulo, consultor, horario, diaInteiro, horaInicio }) {
   const erros = {}
   if (!titulo.trim()) erros.titulo = 'Escreva o título do evento.'
   if (!consultor) erros.consultor = 'Escolha o consultor: o evento fica na agenda dele.'
-  if (!diaInteiro && !horaInicio) erros.horaInicio = 'Escolha o horário de início ou ligue "Dia inteiro".'
+  if (!diaInteiro && !horaInicio) erros.horaInicio = 'Escolha o início ou ligue "Dia inteiro".'
   else if (horario.erro) erros[CAMPO_DO_HORARIO[horario.campo] ?? 'data'] = horario.erro
   return erros
 }
