@@ -221,6 +221,27 @@ Pedido do Diego (2026-11-16). Design: `docs/superpowers/specs/2026-11-16-tipogra
 - `src/components/comum/tipografiaVarredura.test.js` varre `src/` e falha com arquivo:linha; `tamanhoNoCelular.test.jsx`
   guarda os campos.
 
+## Gráficos
+
+Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-design.md` (protótipo aprovado:
+`docs/prototipo/graficos-poc.html`).
+
+- **Sem biblioteca de gráfico** (recharts mediu 138 KB gzip): todo gráfico usa os componentes de
+  `src/components/graficos/` — `CartaoDeGrafico` (título, leitura, legenda, estados), `GraficoDeColunas`,
+  `GraficoDeLinha`, `BarrasHorizontais`, `MiniBarra`, `Medidor`, `BarraSegmentada`, `DiasComCheckin`, com a `Dica` e a
+  `Legenda` deles. Gráfico novo reaproveita essas peças; peça nova entra lá, com teste.
+- **Cores só por `--grafico-*`** (`src/index.css`, claro e escuro; nomes curtos em `graficos/cores.js`): nada de hex
+  nem `--primary` direto no gráfico. Série, acima, folga e referência seguram 4,5:1 sobre o cartão
+  (`src/lib/contraste.test.js`); vermelho e âmbar sempre com ícone e o número escrito; texto nunca na cor da série.
+- **SVG na largura real** (`useLargura`, sem `viewBox` que estica) e texto do SVG só com `fontSize={TAMANHO.legenda}`
+  (11 px) ou maior; rótulos do eixo X com 44 px entre eles (sempre o último); a 360 px nada rola para o lado.
+- **Todo gráfico tem visão em tabela** ("Ver em tabela", com os mesmos números) e **dica no mouse, no toque e no
+  teclado** (marca focável com `aria-label`; na linha, um alvo só e as setas ← →; Esc fecha). Texto da dica é texto
+  do React, nunca HTML montado.
+- **A leitura (frase do gráfico) usa só números do banco** ou a lista inteira que o gráfico mostra, nunca uma amostra:
+  as regras ficam em `src/lib/frasesDosGraficos.js`, com teste. A variação dos cartões ("▲ 12% vs out.") é
+  `src/lib/variacao.js` + `rotuloDaComparacao` (`src/lib/periodo.js`), com o período anterior vindo do banco.
+
 ## Agenda (Calendário)
 
 Design: `docs/superpowers/specs/2026-11-16-calendario-design.md` (decisões da construção no fim).
