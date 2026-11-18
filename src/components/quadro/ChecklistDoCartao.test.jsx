@@ -29,6 +29,14 @@ function tela(props = {}) {
 const progresso = () => screen.getByRole('progressbar', { name: 'Progresso do checklist' })
 
 describe('checklist do cartão', () => {
+  it('no toque, cada linha tem 44 px (12 px em cima e embaixo): o alvo de 44 px de uma caixa não cobre o da vizinha', () => {
+    const { lista } = tela()
+    const linhas = within(lista).getAllByRole('listitem')
+    for (const linha of linhas) expect(linha).toHaveClass('py-1', 'pointer-coarse:py-3')
+    // O alvo da Caixa sem texto cresce 13 px para cada lado do quadrado de 18 px: 44 px, a altura da linha no toque.
+    expect(within(linhas[1]).getByRole('checkbox').parentElement).toHaveClass('pointer-coarse:before:-inset-[13px]')
+  })
+
   it('mostra os itens e a barra de progresso (1 de 2 feitos)', () => {
     const { lista } = tela()
     expect(within(lista).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Levantar boletos', 'Ligar para o financeiro'])

@@ -103,7 +103,8 @@ export default function ChecklistDoCartao({ cartaoId, itensIniciais, podeMexer, 
       {total > 0 && (
         <ul aria-label="Itens do checklist" className="space-y-0.5">
           {itens.map((item) => (
-            <li key={item.id} className="group flex items-start gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-muted/50">
+            // No toque, 12 px em cima e embaixo: a linha fica com 44 px, a altura do alvo da Caixa, e um alvo não cobre o outro.
+            <li key={item.id} className="group flex items-start gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-muted/50 pointer-coarse:py-3">
               {podeMexer ? (
                 <Caixa nome={item.texto} marcado={item.feito} aoMudar={(feito) => marcar(item, feito)} className="mt-0.5" />
               ) : (
