@@ -8,8 +8,9 @@
    a moldura (trilho e barra de cima) é branca; o conteúdo fica num painel rebaixado cinza-azulado;
    uma cor de ação só, o azul (botão principal, item aberto do menu, seleção, foco, links).
    Cores no formato do shadcn/ui. Contraste mínimo de 4,5:1 nos pares do dia a dia (auditoria, pedido do Diego 17/11;
-   src/lib/contraste.test.js confere): --primary-cheio é o fundo azul com texto branco (o botão principal), igual ao
-   --primary no claro; --domingo e --sabado são os dias do fim de semana no Calendário. */
+   src/lib/contraste.test.js confere): --primary-cheio é o fundo azul com texto branco (o botão principal), o próprio
+   --primary no claro; --primary-texto é o texto azul sobre o azul-claro de realce (bg-primary/10, bg-accent: "Hoje",
+   opção escolhida, selos), um tom mais firme do mesmo azul; --domingo e --sabado são os dias do fim de semana. */
 :root {
   --radius: 0.75rem;
   --moldura: #ffffff;
@@ -21,7 +22,8 @@
   --popover: #ffffff;
   --popover-foreground: #0f172a;
   --primary: #2563eb;
-  --primary-cheio: #2563eb;
+  --primary-cheio: var(--primary);
+  --primary-texto: #1d4ed8;
   --primary-foreground: #ffffff;
   --secondary: #f1f5f9;
   --secondary-foreground: #0f172a;
@@ -57,6 +59,7 @@
   --popover-foreground: #e5e9f0;
   --primary: #3b82f6;
   --primary-cheio: #2563eb;
+  --primary-texto: #60a5fa;
   --primary-foreground: #ffffff;
   --secondary: #1b2438;
   --secondary-foreground: #e5e9f0;
@@ -95,6 +98,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-cheio: var(--primary-cheio);
+  --color-primary-texto: var(--primary-texto);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);

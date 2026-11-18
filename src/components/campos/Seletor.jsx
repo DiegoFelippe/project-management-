@@ -116,10 +116,10 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
                   className={cn('flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 pointer-coarse:min-h-11', marcada && 'bg-primary/10', i === ativoNaLista && 'bg-accent')}>
                   <Marca opcao={o} />
                   <span className="min-w-0 flex-1">
-                    <span className={cn('block truncate text-rotulo', marcada ? 'text-primary font-medium' : 'text-foreground')}>{o.rotulo}</span>
+                    <span className={cn('block truncate text-rotulo', marcada ? 'text-primary-texto font-medium' : 'text-foreground')}>{o.rotulo}</span>
                     {o.detalhe && <span className="text-muted-foreground block truncate text-legenda">{o.detalhe}</span>}
                   </span>
-                  {marcada && <Check className="text-primary size-3.5 shrink-0" aria-hidden="true" />}
+                  {marcada && <Check className="text-primary-texto size-3.5 shrink-0" aria-hidden="true" />}
                 </div>
               )
             })}

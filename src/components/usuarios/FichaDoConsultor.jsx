@@ -127,7 +127,7 @@ function EscolhaDeAcesso({ valor, aoMudar }) {
 // Cartão com o estado do acesso de quem já existe (Ativo, Convite pendente, Senha provisória, Desativado).
 const ESTADOS_DO_ACESSO = {
   Ativo: { icone: CheckCircle2, cor: 'bg-positive-soft text-positive', linha: 'Pode entrar no app.' },
-  'Convite pendente': { icone: MailCheck, cor: 'bg-primary/10 text-primary', linha: 'O convite foi enviado e a pessoa ainda não criou a senha.' },
+  'Convite pendente': { icone: MailCheck, cor: 'bg-primary/10 text-primary-texto', linha: 'O convite foi enviado e a pessoa ainda não criou a senha.' },
   'Senha provisória': { icone: KeyRound, cor: 'bg-notice-soft text-notice', linha: 'Ela ainda vai trocar a senha provisória no primeiro acesso.' },
   Desativado: { icone: UserX, cor: 'bg-muted text-muted-foreground', linha: 'Não entra no app enquanto estiver desativada.' },
 }

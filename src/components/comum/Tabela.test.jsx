@@ -1,7 +1,15 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Paginacao, Tabela } from './Tabela'
+
+// O jsdom não mede: scrollWidth e clientWidth de mentira para dizer se a tabela rola para o lado.
+function rolagemDe(conteudo, visivel) {
+  const antes = ['scrollWidth', 'clientWidth'].map((nome) => [nome, Object.getOwnPropertyDescriptor(HTMLElement.prototype, nome)])
+  Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, get: () => conteudo })
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => visivel })
+  onTestFinished(() => antes.forEach(([nome, d]) => (d ? Object.defineProperty(HTMLElement.prototype, nome, d) : delete HTMLElement.prototype[nome])))
+}
 
 describe('Tabela (padrão das listas)', () => {
   it('semAcoes tira a coluna de ações e titulo entra no cartão', () => {
@@ -11,11 +19,19 @@ describe('Tabela (padrão das listas)', () => {
     expect(screen.getByRole('heading', { name: 'Quem espera' })).toBeInTheDocument()
   })
 
-  it('só de leitura (semAcoes): a rolagem para o lado recebe o foco do teclado e tem nome (auditoria, R13)', () => {
+  it('só de leitura (semAcoes) e rolando para o lado: a rolagem recebe o foco do teclado e tem nome (auditoria, R13)', () => {
+    rolagemDe(900, 360)
     render(<Tabela rotulo="Histórico" semAcoes colunas={['Quando']}><Linha><Celula>ontem</Celula></Linha></Tabela>)
     const rolagem = screen.getByRole('region', { name: 'Tabela Histórico' })
     expect(rolagem).toHaveAttribute('tabindex', '0')
     expect(rolagem).toContainElement(screen.getByRole('table', { name: 'Histórico' }))
+  })
+
+  it('só de leitura mas cabendo na tela (computador): nada de parada a mais no Tab', () => {
+    rolagemDe(900, 900)
+    render(<Tabela rotulo="Histórico" semAcoes colunas={['Quando']}><Linha><Celula>ontem</Celula></Linha></Tabela>)
+    expect(screen.queryByRole('region')).toBeNull()
+    expect(screen.getByRole('table', { name: 'Histórico' }).parentElement).not.toHaveAttribute('tabindex')
   })
 
   it('com ações, a rolagem não vira mais uma parada do Tab (as ações já recebem o foco)', () => {
@@ -57,6 +73,17 @@ describe('Tabela (padrão das listas)', () => {
     const [, cabecalhoAcoes] = within(tabela).getAllByRole('columnheader')
     expect(cabecalhoAcoes).toHaveClass('sticky', 'right-0')
     expect(within(tabela).getByRole('button', { name: 'Editar' }).closest('td')).toHaveClass('sticky', 'right-0')
+  })
+
+  it('no celular (abaixo de sm) a coluna de ações não fica fixa: o nome continua à vista em 360 px (revisão do lote A)', () => {
+    render(
+      <Tabela rotulo="Times" colunas={['Time']}>
+        <Linha><Celula>Suporte</Celula><CelulaAcoes><button type="button" className="botao-animado">Editar</button></CelulaAcoes></Linha>
+      </Tabela>,
+    )
+    const tabela = screen.getByRole('table', { name: 'Times' })
+    expect(within(tabela).getAllByRole('columnheader')[1]).toHaveClass('max-sm:static')
+    expect(within(tabela).getByRole('button', { name: 'Editar' }).closest('td')).toHaveClass('max-sm:static')
   })
 
   it('lista vazia mostra o aviso', () => {

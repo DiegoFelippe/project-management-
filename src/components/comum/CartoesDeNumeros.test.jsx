@@ -49,7 +49,7 @@ describe('CartoesDeNumeros', () => {
   it('o ícone vai num quadradinho colorido pelo tom (azul quando não diz)', () => {
     render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={CARTOES} />)
     const [ativos, ocupacao, aguardando] = screen.getByRole('region').querySelectorAll('[data-cartao]')
-    expect(ativos.querySelector('svg').parentElement).toHaveClass('bg-primary/10', 'text-primary')
+    expect(ativos.querySelector('svg').parentElement).toHaveClass('bg-primary/10', 'text-primary-texto')
     expect(ocupacao.querySelector('svg').parentElement).toHaveClass('text-destructive')
     expect(aguardando.querySelector('svg')).toBeNull()
   })

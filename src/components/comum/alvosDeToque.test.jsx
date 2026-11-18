@@ -12,6 +12,7 @@ import Chave from '@/components/campos/Chave'
 import Seletor from '@/components/campos/Seletor'
 import { Button } from '@/components/ui/button'
 import AbasSegmentadas from './AbasSegmentadas'
+import NavegacaoDoMes from './NavegacaoDoMes'
 import { CelulaAcoes, Celula, Linha, Tabela } from './Tabela'
 
 // Alvos de toque (auditoria de 17/11, G5): só em tela de toque (variante pointer-coarse: do Tailwind), botões, campos,
@@ -85,6 +86,22 @@ describe('alvos de 44 px no toque', () => {
     for (const atalho of within(atalhos).getAllByRole('button')) expect(classes(atalho)).toContain(ALVO)
   })
 
+  it('NavegacaoDoMes: as setas têm 44 × 44 px (no celular elas são só o ícone)', () => {
+    render(<NavegacaoDoMes mes="2026-11-01" aoMudar={() => {}} />)
+    for (const nome of ['Mês anterior', 'Próximo mês']) {
+      const seta = screen.getByRole('button', { name: nome })
+      expect(classes(seta)).toContain(ALVO)
+      expect(classes(seta)).toContain(LARGO)
+    }
+  })
+
+  it('Caixa sem texto (item de lista): o alvo de 44 px cresce em volta do quadrado, sem mudar o alinhamento da linha', () => {
+    render(<Caixa nome="Enviar extratos" marcado={false} aoMudar={() => {}} />)
+    const caixa = screen.getByRole('checkbox', { name: 'Enviar extratos' })
+    expect(classes(caixa.closest('label'))).not.toContain(ALVO)
+    expect(classes(caixa.parentElement)).toContain('pointer-coarse:before:-inset-[13px]')
+  })
+
   it('Caixa e Chave: o rótulo inteiro é o alvo, com 44 px', () => {
     render(
       <>
@@ -129,6 +146,9 @@ describe('varredura dos alvos de toque', () => {
     'src/components/campos/CampoHora.jsx',
     'src/components/campos/CampoNumero.jsx',
     'src/components/campos/Seletor.jsx',
+    'src/components/calendario/JanelaEvento.jsx',
+    'src/components/calendario/ChipDoEvento.jsx',
+    'src/components/comum/MenuDeAcoes.jsx',
     'src/index.css',
   ])('%s tem pointer-coarse:min-h-11', (arquivo) => {
     expect(readFileSync(join(process.cwd(), arquivo), 'utf8')).toContain(ALVO)

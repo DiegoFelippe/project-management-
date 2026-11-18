@@ -50,7 +50,7 @@ export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, 
         >
           <header className={cn('flex items-start gap-3 rounded-t-2xl px-6 py-4', abas ? 'pb-3' : 'border-b')}>
             {Icone && (
-              <span data-slot="janela-icone" className="bg-primary/10 text-primary grid size-10 shrink-0 place-items-center rounded-xl">
+              <span data-slot="janela-icone" className="bg-primary/10 text-primary-texto grid size-10 shrink-0 place-items-center rounded-xl">
                 <Icone className="size-5" aria-hidden="true" />
               </span>
             )}

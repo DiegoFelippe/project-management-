@@ -7,17 +7,30 @@ import { CONTRASTE_MINIMO, contraste, misturar } from './contraste'
 
 // Guarda do contraste (auditoria de 17/11, pedido do Diego): os pares de cores que a tela usa o dia todo seguram pelo
 // menos 4,5:1 (WCAG AA, texto normal), no claro e no escuro. Os valores vêm do próprio src/index.css.
+// Lê os --tokens de um seletor (#hex ou var(--outro)). O escuro herda o que não redefine, como no CSS (a classe .dark
+// fica no mesmo <html> do :root), e o var() é resolvido no tema de quem o lê.
 function tokens(css, seletor) {
   const valores = {}
   const blocos = css.matchAll(new RegExp(`(?:^|\\n)${seletor.replace('.', '\\.')}\\s*\\{([^}]*)\\}`, 'g'))
   for (const [, corpo] of blocos) {
-    for (const [, nome, valor] of corpo.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{3,6})\s*;/g)) valores[nome] = valor
+    for (const [, nome, valor] of corpo.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{3,6}|var\(--[\w-]+\))\s*;/g)) valores[nome] = valor
   }
   return valores
 }
 
+function resolver(crus) {
+  const valor = (nome, visto = new Set()) => {
+    const v = crus[nome]
+    const ref = /^var\(--([\w-]+)\)$/.exec(v ?? '')
+    if (!ref || visto.has(nome)) return v
+    return valor(ref[1], new Set(visto).add(nome))
+  }
+  return Object.fromEntries(Object.keys(crus).map((nome) => [nome, valor(nome)]))
+}
+
 const CSS = readFileSync(join(process.cwd(), 'src/index.css'), 'utf8')
-const TEMAS = { claro: tokens(CSS, ':root'), escuro: tokens(CSS, '.dark') }
+const CLARO = tokens(CSS, ':root')
+const TEMAS = { claro: resolver(CLARO), escuro: resolver({ ...CLARO, ...tokens(CSS, '.dark') }) }
 const arredondar = (n) => Math.round(n * 100) / 100
 
 // [texto, fundo, onde aparece]. Os fundos com opacidade são misturados sobre o cartão, como na tela.
@@ -33,6 +46,9 @@ function pares(t) {
     ['primary-foreground', 'primary-cheio', 'botão principal cheio'],
     ['primary', 'card', 'link e texto azul no cartão'],
     ['primary', 'background', 'link e texto azul no painel'],
+    ['primary-texto', 'card', 'texto azul do realce no cartão'],
+    ['primary-texto', 'background', 'texto azul do realce no painel'],
+    ['primary-texto', 'accent', 'texto azul sobre o bg-accent'],
     ['domingo', 'card', 'domingo no Calendário'],
     ['sabado', 'card', 'sábado no Calendário'],
   ].map(([texto, fundo, onde]) => ({ texto: t[texto], fundo: t[fundo], onde: `${texto} sobre ${fundo} (${onde})` }))
@@ -41,13 +57,18 @@ function pares(t) {
       { texto: t.sabado, fundo: fimDeSemana, onde: 'sábado sobre a célula do fim de semana' },
       { texto: t.domingo, fundo: t.accent, onde: 'domingo no dia escolhido' },
       { texto: t.sabado, fundo: t.accent, onde: 'sábado no dia escolhido' },
+      // Azul-claro de realce (bg-primary/5…/20) sobre o cartão e o painel: "Hoje", opção escolhida, selos, números.
+      ...[0.05, 0.1, 0.15, 0.2].flatMap((alfa) => [
+        { texto: t['primary-texto'], fundo: misturar(t.primary, t.card, alfa), onde: `primary-texto sobre bg-primary/${alfa * 100} no cartão` },
+        { texto: t['primary-texto'], fundo: misturar(t.primary, t.background, alfa), onde: `primary-texto sobre bg-primary/${alfa * 100} no painel` },
+      ]),
     ])
 }
 
 describe('contraste dos tokens de src/index.css', () => {
   it('lê os tokens do claro e do escuro', () => {
     for (const t of Object.values(TEMAS)) {
-      for (const nome of ['background', 'card', 'muted', 'muted-foreground', 'primary', 'primary-cheio', 'primary-foreground', 'domingo', 'sabado']) {
+      for (const nome of ['background', 'card', 'muted', 'muted-foreground', 'primary', 'primary-cheio', 'primary-texto', 'primary-foreground', 'domingo', 'sabado']) {
         expect(t[nome], nome).toMatch(/^#/)
       }
     }
@@ -60,10 +81,15 @@ describe('contraste dos tokens de src/index.css', () => {
     expect(fracos).toEqual([])
   })
 
-  it('o botão cheio usa o azul da consultoria nos dois temas (#2563eb, branco a 5,2:1)', () => {
-    expect(TEMAS.claro['primary-cheio']).toBe('#2563eb')
-    expect(TEMAS.escuro['primary-cheio']).toBe('#2563eb')
-    expect(arredondar(contraste('#ffffff', TEMAS.escuro['primary-cheio']))).toBeGreaterThanOrEqual(5.1)
+  it('no claro o azul cheio é o próprio --primary; no escuro, um azul que segura o branco (o --primary de lá não segura)', () => {
+    expect(CLARO['primary-cheio']).toBe('var(--primary)')
+    expect(contraste('#ffffff', TEMAS.escuro.primary)).toBeLessThan(CONTRASTE_MINIMO)
+    expect(contraste('#ffffff', TEMAS.escuro['primary-cheio'])).toBeGreaterThanOrEqual(CONTRASTE_MINIMO)
+  })
+
+  it('o texto azul comum sobre o azul-claro de realce não segura 4,5:1 (por isso existe o --primary-texto)', () => {
+    expect(contraste(TEMAS.claro.primary, misturar(TEMAS.claro.primary, TEMAS.claro.card, 0.1))).toBeLessThan(CONTRASTE_MINIMO)
+    expect(contraste(TEMAS.escuro.primary, misturar(TEMAS.escuro.primary, TEMAS.escuro.card, 0.1))).toBeLessThan(CONTRASTE_MINIMO)
   })
 })
 
@@ -93,8 +119,10 @@ describe('texto sobre a cor da pessoa ou do evento', () => {
   })
 })
 
-// Varredura: texto branco (text-primary-foreground) sobre o azul cheio usa bg-primary-cheio. O bg-primary no escuro é o
-// azul claro (#3b82f6), que fica em 3,7:1 com o branco; ele continua para barras, bolinhas e texto azul.
+// Varredura das combinações que não seguram 4,5:1 num mesmo elemento: texto branco (text-primary-foreground ou text-white)
+// sobre o bg-primary sólido (no escuro é o azul claro, 3,7:1; use bg-primary-cheio) e text-primary sobre o azul-claro de
+// realce (bg-primary/N ou bg-accent; use text-primary-texto). Olha cada linha e cada cn(…) inteiro, mesmo quebrado em
+// várias linhas. As variantes (hover:, aria-pressed:…) contam como a mesma classe.
 function arquivos(pasta) {
   return readdirSync(pasta).flatMap((nome) => {
     const caminho = join(pasta, nome)
@@ -103,23 +131,70 @@ function arquivos(pasta) {
   })
 }
 
-const AZUL_CLARO_COM_BRANCO = /(?<![\w-])bg-primary(?![\w/-]).*text-primary-foreground|text-primary-foreground.*(?<![\w-])bg-primary(?![\w/-])/
+const REGRAS = [
+  { motivo: 'texto branco sobre bg-primary (use bg-primary-cheio)', fundo: (c) => c === 'bg-primary', texto: (c) => c === 'text-primary-foreground' || c === 'text-white' },
+  { motivo: 'text-primary sobre azul-claro (use text-primary-texto)', fundo: (c) => /^bg-primary\/\d+$/.test(c) || c === 'bg-accent', texto: (c) => c === 'text-primary' },
+]
 
-describe('varredura do azul cheio', () => {
-  it('a regra pega bg-primary com texto branco e deixa passar o cheio, a opacidade e as barras', () => {
-    expect(AZUL_CLARO_COM_BRANCO.test("'bg-primary text-primary-foreground'")).toBe(true)
-    expect(AZUL_CLARO_COM_BRANCO.test("'text-primary-foreground hover:bg-primary'")).toBe(true)
-    expect(AZUL_CLARO_COM_BRANCO.test("'bg-primary-cheio text-primary-foreground'")).toBe(false)
-    expect(AZUL_CLARO_COM_BRANCO.test("'bg-primary/10 text-primary'")).toBe(false)
-    expect(AZUL_CLARO_COM_BRANCO.test("'h-full rounded-full bg-primary'")).toBe(false)
+// Classes de cor de um trecho, sem as variantes: "hover:bg-primary/10" vira "bg-primary/10".
+const classesDe = (trecho) => new Set([...trecho.matchAll(/(?<![\w-])(?:[\w-]+:)*((?:bg|text)-[\w/-]+)/g)].map((m) => m[1]))
+
+function problemas(trecho) {
+  const classes = [...classesDe(trecho)]
+  return REGRAS.filter((r) => classes.some(r.fundo) && classes.some(r.texto)).map((r) => r.motivo)
+}
+
+// Cada cn(…) com os parênteses equilibrados, e a linha onde começa.
+function chamadasDeCn(codigo) {
+  const achadas = []
+  for (const m of codigo.matchAll(/(?<![\w.])cn\(/g)) {
+    let profundidade = 0
+    for (let i = m.index + 2; i < codigo.length; i++) {
+      if (codigo[i] === '(') profundidade += 1
+      else if (codigo[i] === ')' && --profundidade === 0) {
+        achadas.push({ trecho: codigo.slice(m.index, i + 1), linha: codigo.slice(0, m.index).split('\n').length })
+        break
+      }
+    }
+  }
+  return achadas
+}
+
+function varrer(codigo) {
+  const achados = new Set()
+  codigo.split('\n').forEach((linha, i) => problemas(linha).forEach((p) => achados.add(`${i + 1}: ${p}`)))
+  for (const { trecho, linha } of chamadasDeCn(codigo)) problemas(trecho).forEach((p) => achados.add(`${linha}: ${p}`))
+  return [...achados]
+}
+
+// O lote D está trocando este trecho do JanelaEvento (tire daqui quando trocar); só o trecho exato passa, o resto do arquivo não.
+const PENDENTES_DO_LOTE_D = [
+  "data === a.dia ? 'bg-primary-cheio text-primary-foreground' : 'bg-primary/10 text-primary hover:bg-primary/15'",
+]
+
+describe('varredura das combinações sem contraste', () => {
+  it('pega texto branco no bg-primary e text-primary no azul-claro, na mesma linha, em cn() quebrado e com variantes', () => {
+    expect(varrer("'bg-primary text-primary-foreground'")).toHaveLength(1)
+    expect(varrer("'text-white hover:bg-primary'")).toHaveLength(1)
+    expect(varrer("className={cn('grid size-8 rounded-lg',\n  ligada ? 'bg-primary text-white' : 'bg-muted')}")).toHaveLength(2)
+    expect(varrer("cn('px-2',\n  marcada && 'bg-primary/10',\n  marcada ? 'text-primary' : 'text-foreground')")).toEqual(['1: text-primary sobre azul-claro (use text-primary-texto)'])
+    expect(varrer("'aria-pressed:bg-primary/10 aria-pressed:text-primary'")).toHaveLength(1)
+    expect(varrer("'bg-accent text-primary'")).toHaveLength(1)
   })
 
-  it('nenhuma tela põe texto branco sobre o bg-primary', () => {
+  it('deixa passar o azul cheio, o texto de realce, as barras e o texto azul sem fundo', () => {
+    for (const bom of ["'bg-primary-cheio text-primary-foreground'", "'bg-primary/10 text-primary-texto'", "'h-full rounded-full bg-primary'",
+      "'text-primary underline'", "'bg-primary/10 text-primary-foreground'", "'bg-accent text-accent-foreground'"]) {
+      expect(varrer(bom), bom).toEqual([])
+    }
+  })
+
+  it('nenhuma tela usa essas combinações', () => {
     const achados = []
     for (const arquivo of arquivos(join(process.cwd(), 'src'))) {
-      readFileSync(arquivo, 'utf8').split('\n').forEach((linha, i) => {
-        if (AZUL_CLARO_COM_BRANCO.test(linha)) achados.push(`${arquivo.split('/src/')[1]}:${i + 1}`)
-      })
+      let codigo = readFileSync(arquivo, 'utf8')
+      for (const trecho of PENDENTES_DO_LOTE_D) codigo = codigo.replace(trecho, "''")
+      achados.push(...varrer(codigo).map((a) => `${arquivo.split('/src/')[1]}:${a}`))
     }
     expect(achados).toEqual([])
   })

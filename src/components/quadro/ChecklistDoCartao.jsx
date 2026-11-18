@@ -108,7 +108,7 @@ export default function ChecklistDoCartao({ cartaoId, itensIniciais, podeMexer, 
                 <Caixa nome={item.texto} marcado={item.feito} aoMudar={(feito) => marcar(item, feito)} className="mt-0.5" />
               ) : (
                 <span role="img" aria-label={item.feito ? 'Feito' : 'A fazer'}
-                  className={cn('mt-0.5 grid size-[18px] shrink-0 place-items-center rounded-md border',
+                  className={cn('mt-0.5 grid size-[18px] shrink-0 place-items-center rounded-[5px] border',
                     item.feito ? 'border-primary-cheio bg-primary-cheio text-primary-foreground' : 'bg-card')}>
                   {item.feito && <Check className="size-3" strokeWidth={3} aria-hidden="true" />}
                 </span>

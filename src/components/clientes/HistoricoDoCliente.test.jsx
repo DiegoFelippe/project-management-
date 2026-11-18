@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { listarEventos } from '@/data/clientes'
 import HistoricoDoCliente from './HistoricoDoCliente'
 
@@ -14,7 +14,12 @@ beforeEach(() => {
 })
 
 describe('HistoricoDoCliente', () => {
-  it('a tabela é só de leitura: sem coluna de ações e com a rolagem alcançável pelo teclado (auditoria, R13)', async () => {
+  it('a tabela é só de leitura: sem coluna de ações e, quando rola para o lado (celular), alcançável pelo teclado (auditoria, R13)', async () => {
+    // O jsdom não mede: a tabela "rola" com 520 px de conteúdo em 340 px.
+    const antes = ['scrollWidth', 'clientWidth'].map((nome) => [nome, Object.getOwnPropertyDescriptor(HTMLElement.prototype, nome)])
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, get: () => 520 })
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 340 })
+    onTestFinished(() => antes.forEach(([nome, d]) => (d ? Object.defineProperty(HTMLElement.prototype, nome, d) : delete HTMLElement.prototype[nome])))
     render(<HistoricoDoCliente clienteId="k1" versao={0} />)
     const tabela = await screen.findByRole('table', { name: 'Histórico' })
     expect(within(tabela).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Quando', 'O quê', 'Quem'])

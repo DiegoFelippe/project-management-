@@ -23,7 +23,7 @@ const celula = (marcada, fora, hoje, dentro = true) => cn(
   'rounded-lg tabular-nums disabled:cursor-not-allowed',
   marcada ? 'bg-primary-cheio text-primary-foreground font-semibold'
     : fora ? 'text-muted-foreground/40'
-      : cn(dentro ? 'text-foreground' : 'text-muted-foreground/60', 'hover:bg-primary/10', hoje && 'text-primary ring-primary/60 font-semibold ring-1 ring-inset'),
+      : cn(dentro ? 'text-foreground' : 'text-muted-foreground/60', 'hover:bg-primary/10', hoje && 'text-primary-texto ring-primary/60 font-semibold ring-1 ring-inset'),
 )
 
 // Calendário do padrão Hub no lugar do <input type="date">. O valor é texto "yyyy-MM-dd" (com `comHora`,
@@ -185,7 +185,7 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
                   className={cn(atalho, 'bg-muted text-foreground hover:bg-accent font-medium disabled:opacity-40')}>{a.rotulo}</BotaoCampo>
               ))}
               {!fora(hoje) && (
-                <BotaoCampo onClick={() => { setVisao(hoje); setFoco(hoje); escolher(hoje) }} className={cn(atalho, 'bg-primary/10 text-primary hover:bg-primary/20 font-semibold')}>Hoje</BotaoCampo>
+                <BotaoCampo onClick={() => { setVisao(hoje); setFoco(hoje); escolher(hoje) }} className={cn(atalho, 'bg-primary/10 text-primary-texto hover:bg-primary/20 font-semibold')}>Hoje</BotaoCampo>
               )}
               {comHora && <BotaoCampo onClick={() => setAberto(false)} className={cn(atalho, 'bg-primary-cheio text-primary-foreground font-semibold')}>Pronto</BotaoCampo>}
             </div>

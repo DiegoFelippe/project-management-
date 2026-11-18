@@ -43,7 +43,7 @@ export default function PainelDaSessao({ sessao, ultimo, souConsultor = false, c
   return (
     <section aria-label="Check-in" className="card flex min-w-0 flex-col gap-3 p-4">
       <div className="flex items-start gap-3">
-        <span className="bg-primary/10 text-primary grid size-10 shrink-0 place-items-center rounded-xl">
+        <span className="bg-primary/10 text-primary-texto grid size-10 shrink-0 place-items-center rounded-xl">
           <Clock className="size-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">

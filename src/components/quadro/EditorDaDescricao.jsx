@@ -93,7 +93,7 @@ function Ferramenta({ nome, ativo, desabilitado, aoClicar, children }) {
       disabled={desabilitado}
       // O clique não tira a seleção do texto (a formatação vale para o trecho escolhido).
       onMouseDown={(e) => e.preventDefault()} onClick={aoClicar}
-      className="aria-pressed:bg-primary/10 aria-pressed:text-primary">
+      className="aria-pressed:bg-primary/10 aria-pressed:text-primary-texto">
       {children}
     </Button>
   )

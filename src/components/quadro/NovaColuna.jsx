@@ -44,7 +44,7 @@ export default function NovaColuna({ aoCriar }) {
   }
   return (
     <button type="button" onClick={() => setAberta(true)}
-      className="botao-animado flex w-[300px] shrink-0 items-center justify-center gap-2 self-start rounded-2xl border-2 border-dashed border-foreground/15 py-5 text-corpo font-semibold text-muted-foreground outline-none transition-[color,background-color,border-color,translate,scale] duration-150 hover:-translate-y-px hover:border-primary/40 hover:bg-primary/5 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-[0.97]">
+      className="botao-animado flex w-[300px] shrink-0 items-center justify-center gap-2 self-start rounded-2xl border-2 border-dashed border-foreground/15 py-5 text-corpo font-semibold text-muted-foreground outline-none transition-[color,background-color,border-color,translate,scale] duration-150 hover:-translate-y-px hover:border-primary/40 hover:bg-primary/5 hover:text-primary-texto focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-[0.97]">
       <Plus className="size-4" aria-hidden="true" /> Nova coluna
     </button>
   )

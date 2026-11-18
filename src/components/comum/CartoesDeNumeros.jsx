@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 
 // Cor do quadradinho do ícone.
 const TONS = {
-  azul: 'bg-primary/10 text-primary',
+  azul: 'bg-primary/10 text-primary-texto',
   ceu: 'bg-sky-500/10 text-sky-600 dark:text-sky-300',
   aviso: 'bg-notice-soft text-notice',
   positivo: 'bg-positive-soft text-positive',

@@ -73,7 +73,7 @@ export default function Trilho({ aoNavegar }) {
           data-item-trilho="" onClick={() => setPerfilAberto(true)}
           className="group flex w-16 flex-col items-center gap-1 py-0.5 outline-none focus-visible:[&>span:first-child]:ring-2 focus-visible:[&>span:first-child]:ring-ring">
           <span style={foto ? undefined : { backgroundColor: cor, color: corDoTextoSobre(cor) }}
-            className={cn('anim-pulsar grid size-8 place-items-center overflow-hidden rounded-full text-rotulo font-bold ring-1 ring-primary/25 transition-shadow group-hover:ring-2 group-hover:ring-primary/50', foto && 'bg-primary/10 text-primary')}>
+            className={cn('anim-pulsar grid size-8 place-items-center overflow-hidden rounded-full text-rotulo font-bold ring-1 ring-primary/25 transition-shadow group-hover:ring-2 group-hover:ring-primary/50', foto && 'bg-primary/10 text-primary-texto')}>
             {foto ? <img src={foto} alt="" className="size-full object-cover" /> : iniciais(perfil.nome)}
           </span>
           <span className={rotulo(false)}>{primeiroNome(perfil.nome)}</span>

@@ -7,7 +7,7 @@ import { juntar, plural } from '@/lib/nomes'
 import { BarraDeProgresso } from './CartaoDoModelo'
 import { diaCurto, feitaPorEm, mesmaSituacao } from './situacao'
 
-const SELO_ANDAMENTO = 'border-transparent bg-accent text-primary'
+const SELO_ANDAMENTO = 'border-transparent bg-accent text-primary-texto'
 const SELO_ATRASADA = 'border-transparent bg-destructive/10 text-destructive'
 const SELO_BLOQUEADA = 'border-transparent bg-muted text-muted-foreground'
 const SELO_SESSAO = 'border-transparent bg-sky-500/10 text-sky-700 dark:text-sky-300'
@@ -110,7 +110,7 @@ export default function ListaDoChecklist({ etapas, tarefas, situacoes, filtro, p
     return (
       <section key={etapa.id} aria-label={nome} className="card min-w-0 overflow-hidden">
         <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3">
-          <span className="bg-primary/10 text-primary grid size-7 shrink-0 place-items-center rounded-lg text-rotulo font-bold tabular-nums">
+          <span className="bg-primary/10 text-primary-texto grid size-7 shrink-0 place-items-center rounded-lg text-rotulo font-bold tabular-nums">
             {i + 1}
           </span>
           <h3 className="min-w-0 flex-1 text-subtitulo font-semibold break-words">{etapa.nome}</h3>

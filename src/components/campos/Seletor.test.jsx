@@ -208,3 +208,14 @@ describe('Seletor', () => {
     })
   })
 })
+
+describe('Seletor: contraste da opção escolhida', () => {
+  it('a opção escolhida fica no azul de realce (text-primary-texto, 4,5:1 sobre o azul-claro), não no text-primary', async () => {
+    render(<Seletor id="s" valor="b" aoMudar={() => {}} opcoes={OPCOES} />)
+    await userEvent.click(screen.getByRole('combobox'))
+    const escolhida = screen.getByRole('option', { name: 'Bruno Lima' })
+    expect(escolhida.className).toMatch(/bg-primary\/10|bg-accent/) // escolhida (e, ao abrir, também a ativa)
+    expect(screen.getAllByText('Bruno Lima').find((el) => escolhida.contains(el))).toHaveClass('text-primary-texto')
+    expect(escolhida.innerHTML).not.toMatch(/text-primary(?![-\w])/)
+  })
+})

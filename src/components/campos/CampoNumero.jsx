@@ -42,7 +42,7 @@ export default function CampoNumero({ id, valor, aoMudar, min = 0, max = 9999, p
         <div className="flex flex-wrap gap-1.5 pointer-coarse:gap-2" role="group" aria-label="Atalhos">
           {atalhos.map((a) => (
             <BotaoCampo key={a} onClick={() => aoMudar(escrever(a))} disabled={desabilitado} aria-pressed={n === a} title={unidade ? `${a} ${unidade}` : String(a)}
-              className={cn('min-w-9 rounded-md px-2 py-1 text-rotulo font-medium tabular-nums pointer-coarse:min-h-11 pointer-coarse:min-w-11', n === a ? 'bg-primary/10 text-primary ring-primary/30 ring-1' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground')}>
+              className={cn('min-w-9 rounded-md px-2 py-1 text-rotulo font-medium tabular-nums pointer-coarse:min-h-11 pointer-coarse:min-w-11', n === a ? 'bg-primary/10 text-primary-texto ring-primary/30 ring-1' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground')}>
               {a}
             </BotaoCampo>
           ))}
