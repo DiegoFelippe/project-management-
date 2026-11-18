@@ -20,16 +20,17 @@ function subtitulo(perfil) {
 // 17/11); com duas ou mais, abas de página guardadas em ?aba= (a primeira é a padrão).
 export function SecoesDeCheckins({ secoes }) {
   if (secoes.length === 1) return secoes[0].conteudo
-  return <AbasDoCliente rotulo="Seções de Check-ins" abas={secoes} />
+  return <AbasDoCliente rotulo="Seções de Check-lists" abas={secoes} />
 }
 
-// Item "Check-ins" do trilho, para todos os papéis: Andamento (a primeira; o consultor vê os clientes dele) e Modelos. O
-// cabeçalho não tem botões: a ação principal fica no fim da barra de filtros de cada seção.
+// Item "Check-lists" do trilho (/checklists; era "Check-ins": auditoria, G3), para todos os papéis: Andamento (a primeira;
+// o consultor vê os clientes dele) e Modelos. O cabeçalho não tem botões: a ação principal fica no fim da barra de
+// filtros de cada seção. "Check-in" fica só para as horas (a aba Check-ins do cliente).
 export default function Checkins() {
   const { perfil } = useAuth()
   return (
     <>
-      <Cabecalho titulo="Check-ins" descricao={subtitulo(perfil)} />
+      <Cabecalho titulo="Check-lists" descricao={subtitulo(perfil)} />
       <SecoesDeCheckins secoes={[
         { id: 'andamento', rotulo: 'Andamento', conteudo: <AndamentoDosClientes perfil={perfil} /> },
         { id: 'modelos', rotulo: 'Modelos', conteudo: <ModelosDeCheckin perfil={perfil} /> },

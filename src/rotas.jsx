@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router'
+import { Navigate, Route, Routes, useLocation } from 'react-router'
 import RotaProtegida from '@/auth/RotaProtegida'
 import Moldura from '@/components/shell/Moldura'
 import Calendario from '@/pages/Calendario'
@@ -19,6 +19,12 @@ import TrocarSenha from '@/pages/TrocarSenha'
 import Usuarios from '@/pages/Usuarios'
 import VerificarCodigo from '@/pages/VerificarCodigo'
 
+// O endereço antigo do menu Check-ins vai para /checklists com a mesma busca (?aba=) e âncora (auditoria, G3).
+function ParaChecklists() {
+  const { search, hash } = useLocation()
+  return <Navigate to={`/checklists${search}${hash}`} replace />
+}
+
 export default function Rotas() {
   return (
     <Routes>
@@ -35,7 +41,8 @@ export default function Rotas() {
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/clientes/:id" element={<Cliente />} />
           <Route path="/calendario" element={<Calendario />} />
-          <Route path="/checkins" element={<Checkins />} />
+          <Route path="/checklists" element={<Checkins />} />
+          <Route path="/checkins" element={<ParaChecklists />} />
           <Route path="/quadros" element={<Quadros />} />
           <Route path="/quadros/:id" element={<Quadros />} />
           <Route element={<RotaProtegida papeis={['dono', 'central', 'admin', 'gestor']} />}>

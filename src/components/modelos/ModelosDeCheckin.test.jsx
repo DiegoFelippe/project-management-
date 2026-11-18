@@ -56,7 +56,7 @@ const gestor = { id: 'g1', papel: 'gestor', consultoria_id: 'c1', consultoria: {
 const consultor = { id: 'p1', papel: 'pessoa', consultoria_id: 'c1', consultoria: { nome: 'STI Consult' } }
 const comoCentral = (linha) => ({ ...linha, pode_editar: true })
 
-const tela = (perfil) => renderizarTela(<ModelosDeCheckin perfil={perfil} />, { perfil, endereco: '/checkins' })
+const tela = (perfil) => renderizarTela(<ModelosDeCheckin perfil={perfil} />, { perfil, endereco: '/checklists' })
 const linha = (nome) => screen.getByRole('row', { name: new RegExp(nome) })
 const botoesDoRodape = (janela) =>
   within(janela.querySelector('[data-slot="dialog-footer"]')).getAllByRole('button').map((b) => b.textContent.trim())

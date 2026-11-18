@@ -64,11 +64,11 @@ describe('AbasDoCliente', () => {
     const { unmount } = tela()
     expect(screen.getByRole('tablist', { name: 'Seções do cliente' })).toBeInTheDocument()
     unmount()
-    renderizarTela(<AbasDoCliente abas={ABAS} rotulo="Seções de Check-ins" />, { perfil: {}, endereco: '/checkins' })
-    expect(screen.getByRole('tablist', { name: 'Seções de Check-ins' })).toBeInTheDocument()
+    renderizarTela(<AbasDoCliente abas={ABAS} rotulo="Seções de Check-lists" />, { perfil: {}, endereco: '/checklists' })
+    expect(screen.getByRole('tablist', { name: 'Seções de Check-lists' })).toBeInTheDocument()
   })
 
-  it('sem `barra`, as abas ficam soltas (sem cartão nem região), como em Check-ins', () => {
+  it('sem `barra`, as abas ficam soltas (sem cartão nem região), como em Check-lists', () => {
     tela()
     expect(screen.queryByRole('region')).not.toBeInTheDocument()
     expect(screen.getByRole('tablist').closest('.card')).toBeNull()
