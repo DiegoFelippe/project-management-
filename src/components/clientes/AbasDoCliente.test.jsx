@@ -60,6 +60,14 @@ describe('AbasDoCliente', () => {
     expect(screen.getByLabelText('endereço')).not.toHaveTextContent('aba=')
   })
 
+  it('o nome da lista de abas é "Seções do cliente", ou o que a página der (rotulo)', () => {
+    const { unmount } = tela()
+    expect(screen.getByRole('tablist', { name: 'Seções do cliente' })).toBeInTheDocument()
+    unmount()
+    renderizarTela(<AbasDoCliente abas={ABAS} rotulo="Seções de Check-ins" />, { perfil: {}, endereco: '/checkins' })
+    expect(screen.getByRole('tablist', { name: 'Seções de Check-ins' })).toBeInTheDocument()
+  })
+
   it('setas movem a seleção e o foco, com tabindex móvel', async () => {
     tela()
     screen.getByRole('tab', { name: 'Geral' }).focus()

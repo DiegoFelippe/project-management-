@@ -6,11 +6,11 @@ const ids = (papel) => itensDoMenu(papel).map((item) => item.id)
 
 describe('itensDoMenu', () => {
   it('cada papel vê os seus itens', () => {
-    expect(ids('pessoa')).toEqual(['inicio', 'clientes', 'calendario'])
-    expect(ids('gestor')).toEqual(['inicio', 'clientes', 'calendario', 'times', 'usuarios'])
-    expect(ids('admin')).toEqual(['inicio', 'clientes', 'calendario', 'times', 'usuarios', 'integracoes'])
-    expect(ids('central')).toEqual(['inicio', 'clientes', 'calendario', 'times', 'usuarios', 'consultorias'])
-    expect(ids('dono')).toEqual(['inicio', 'clientes', 'calendario', 'times', 'usuarios', 'consultorias', 'integracoes'])
+    expect(ids('pessoa')).toEqual(['inicio', 'clientes', 'calendario', 'checkins'])
+    expect(ids('gestor')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'times', 'usuarios'])
+    expect(ids('admin')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'times', 'usuarios', 'integracoes'])
+    expect(ids('central')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'times', 'usuarios', 'consultorias'])
+    expect(ids('dono')).toEqual(['inicio', 'clientes', 'calendario', 'checkins', 'times', 'usuarios', 'consultorias', 'integracoes'])
   })
 
   it('o menu não tem mais Projetos nem itens "em breve" (pedido do Diego, 16/11)', () => {
@@ -36,6 +36,7 @@ describe('tituloDaRota', () => {
     expect(tituloDaRota('/consultorias')).toBe('Consultorias')
     expect(tituloDaRota('/integracoes')).toBe('Integrações')
     expect(tituloDaRota('/calendario')).toBe('Calendário')
+    expect(tituloDaRota('/checkins')).toBe('Check-ins')
   })
 })
 
@@ -62,6 +63,25 @@ describe('animação no hover', () => {
     }
     expect(ANIMACOES_DO_MENU).toContain('folhear')
     expect(itensDoMenu('dono').filter((item) => item.animacao === 'folhear')).toHaveLength(1)
+  })
+
+  it('Check-ins, para todos os papéis, logo depois do Calendário, abre (a animação que estava livre, só dele)', () => {
+    for (const papel of ['pessoa', 'gestor', 'admin', 'central', 'dono']) {
+      const itens = itensDoMenu(papel)
+      const checkins = itens.find((item) => item.id === 'checkins')
+      expect(checkins).toMatchObject({ rotulo: 'Check-ins', rota: '/checkins', animacao: 'abrir' })
+      expect(itens[itens.indexOf(checkins) - 1].id).toBe('calendario')
+    }
+    expect(ANIMACOES_DO_MENU).toContain('abrir')
+    expect(itensDoMenu('dono').filter((item) => item.animacao === 'abrir')).toHaveLength(1)
+    const css = readFileSync('src/index.css', 'utf8')
+    expect(css).toMatch(/@keyframes icone-abrir \{/)
+    expect(css).toMatch(/\.group:hover \.anim-abrir, \.group:focus-visible \.anim-abrir \{ animation: icone-abrir/)
+  })
+
+  it('cada animação aparece no trilho uma vez só', () => {
+    const usadas = itensDoMenu('dono').map((item) => item.animacao)
+    expect(new Set(usadas).size).toBe(usadas.length)
   })
 
   it('a animação folhear tem keyframes e as regras de hover e de foco em src/index.css', () => {

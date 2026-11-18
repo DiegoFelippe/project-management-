@@ -7,6 +7,7 @@ vi.mock('@/auth/RotaProtegida', () => ({ default: () => <Outlet /> }))
 vi.mock('@/components/shell/Moldura', () => ({ default: () => <Outlet /> }))
 vi.mock('@/pages/Usuarios', () => ({ default: () => <p>Tela de Usuários</p> }))
 vi.mock('@/pages/Calendario', () => ({ default: () => <p>Tela do Calendário</p> }))
+vi.mock('@/pages/Checkins', () => ({ default: () => <p>Tela dos Check-ins</p> }))
 vi.mock('@/pages/Cliente', () => ({ default: () => null }))
 vi.mock('@/pages/Clientes', () => ({ default: () => null }))
 vi.mock('@/pages/Consultorias', () => ({ default: () => null }))
@@ -23,6 +24,11 @@ describe('rotas', () => {
   it('/calendario abre o Calendário (para todos os papéis; o Google volta para lá)', () => {
     render(<MemoryRouter initialEntries={['/calendario?code=abc&state=xyz']}><Rotas /></MemoryRouter>)
     expect(screen.getByText('Tela do Calendário')).toBeInTheDocument()
+  })
+
+  it('/checkins abre os Check-ins (para todos os papéis)', () => {
+    render(<MemoryRouter initialEntries={['/checkins?aba=modelos']}><Rotas /></MemoryRouter>)
+    expect(screen.getByText('Tela dos Check-ins')).toBeInTheDocument()
   })
 
   it('/capacidade vai para Usuários, onde o resumo do mês agora fica', () => {

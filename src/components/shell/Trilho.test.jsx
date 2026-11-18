@@ -21,13 +21,17 @@ describe('Trilho', () => {
       </AuthContext.Provider>,
     )
     const itens = container.querySelectorAll('[data-item-trilho]')
-    expect(itens.length).toBe(9) // 7 itens do dono + bolinha + Sair
+    expect(itens.length).toBe(10) // 8 itens do dono + bolinha + Sair
     for (const item of itens) {
       expect(item.querySelector('[class*="anim-"]'), item.textContent).not.toBeNull()
     }
     const calendario = [...itens].find((item) => item.textContent === 'Calendário')
     expect(calendario).toHaveAttribute('href', '/calendario')
     expect(calendario.querySelector('.anim-folhear')).not.toBeNull()
+    const checkins = [...itens].find((item) => item.textContent === 'Check-ins')
+    expect(checkins).toHaveAttribute('href', '/checkins')
+    expect(checkins.querySelector('.anim-abrir')).not.toBeNull()
+    expect(checkins.previousElementSibling).toBe(calendario)
   })
 
   it('a bolinha usa a cor escolhida (ou a automática) quando não há foto, e mantém a animação', () => {

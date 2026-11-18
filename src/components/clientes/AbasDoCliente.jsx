@@ -2,9 +2,10 @@ import { useId } from 'react'
 import { useSearchParams } from 'react-router'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 
-// Abas da página do cliente. `abas` é a lista, na ordem em que aparecem: { id, rotulo, conteudo }. A escolhida
-// vive em ?aba= (a primeira é a padrão; valor desconhecido volta para ela). Só o painel aberto monta o conteúdo.
-export default function AbasDoCliente({ abas }) {
+// Abas de página (as do cliente e as de Check-ins). `abas` é a lista, na ordem em que aparecem: { id, rotulo, conteudo }.
+// A escolhida vive em ?aba= (a primeira é a padrão; valor desconhecido volta para ela). Só o painel aberto monta o
+// conteúdo. `rotulo` é o nome da lista de abas para o leitor de tela.
+export default function AbasDoCliente({ abas, rotulo = 'Seções do cliente' }) {
   const [parametros, setParametros] = useSearchParams()
   const base = useId()
   const pedida = parametros.get('aba')
@@ -22,7 +23,7 @@ export default function AbasDoCliente({ abas }) {
   return (
     <div className="grid grid-cols-1 gap-4">
       <div>
-        <AbasSegmentadas comoAbas idBase={base} rotulo="Seções do cliente" valor={atual.id} aoMudar={escolher}
+        <AbasSegmentadas comoAbas idBase={base} rotulo={rotulo} valor={atual.id} aoMudar={escolher}
           abas={abas.map((a) => ({ valor: a.id, rotulo: a.rotulo }))} />
       </div>
       {abas.map((aba) => (
