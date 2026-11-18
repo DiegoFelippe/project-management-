@@ -6,13 +6,23 @@ import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { eventosDoCliente } from '@/data/agenda'
-import { diaEmSP, horarioNoDia } from '@/lib/calendario'
+import { diasDoEvento, horarioNoDia } from '@/lib/calendario'
 import { formatarDia } from '@/lib/mes'
 import { cn } from '@/lib/utils'
 import { situacaoDaReuniao } from './situacaoDaReuniao'
 
 const ROTULO = 'Eventos do cliente'
 const COLUNAS = ['Data', 'Horário', 'Título', 'Organizador', 'Situação']
+
+// A data da linha: o dia do início; no evento de dia inteiro de mais de um dia, até o último ("18–20/11/2026",
+// "30/11–02/12/2026", "30/12/2026–02/01/2027"). O de horário mostra o fim no Horário ("22:00 – 19/11 02:00").
+function dataDoEvento(evento, primeiro, ultimo) {
+  if (!evento.dia_inteiro || ultimo === primeiro) return formatarDia(primeiro)
+  const [inicio, fim] = [formatarDia(primeiro), formatarDia(ultimo)]
+  if (primeiro.slice(0, 4) !== ultimo.slice(0, 4)) return `${inicio}–${fim}`
+  if (primeiro.slice(0, 7) !== ultimo.slice(0, 7)) return `${inicio.slice(0, 5)}–${fim}`
+  return `${inicio.slice(0, 2)}–${fim}`
+}
 
 // O que a agenda mostra da reunião: Meet, gravação e a situação depois dela (os mesmos nomes do detalhe do evento).
 function Situacao({ evento, agora }) {
@@ -36,7 +46,9 @@ function Situacao({ evento, agora }) {
 // "Eventos do cliente", a visão Todos da agenda do cliente (pedido do Diego, 17/11): todos os eventos dele, de todas as
 // datas, numa tabela paginada no banco (15 por página, do mais novo para o mais antigo: o futuro em cima), rente dentro do
 // cartão do calendário. O de hoje e o próximo (o banco diz qual) ganham um selo. "Abrir" abre a mesma janela do
-// calendário. `versao` muda quando um evento é criado, editado ou apagado: a lista relê a página em que está.
+// calendário. `versao` muda quando um evento é criado, editado ou apagado: a lista relê a página em que está. O "Mostrar"
+// da barra não filtra esta lista: Todos mostra todos os eventos do cliente, de propósito (ele vale para as visões do
+// calendário).
 export default function EventosDoCliente({ clienteId, hoje, versao = 0, aoAbrir }) {
   const [pagina, setPagina] = useState(1)
   const [resultado, setResultado] = useState(null)
@@ -63,14 +75,16 @@ export default function EventosDoCliente({ clienteId, hoje, versao = 0, aoAbrir 
       <Tabela rotulo={ROTULO} semCartao colunas={COLUNAS} larguraMinima={760}
         paginacao={{ pagina, total: resultado.total, aoMudar: setPagina }}>
         {resultado.itens.map((evento) => {
-          const dia = diaEmSP(evento.inicio)
-          const deHoje = dia === hoje
+          const dias = diasDoEvento(evento)
+          const [dia, ultimo] = [dias[0], dias.at(-1)]
+          // Hoje: começa hoje ou está acontecendo (começou antes e ainda não acabou).
+          const deHoje = dia <= hoje && hoje <= ultimo
           const proximo = evento.id === resultado.proximoId
           const organizador = evento.consultor
           return (
             <Linha key={evento.id}>
               <Celula className="whitespace-nowrap">
-                <span className="tabular-nums">{formatarDia(dia)}</span>
+                <span className="tabular-nums">{dataDoEvento(evento, dia, ultimo)}</span>
                 {(deHoje || proximo) && (
                   <span className="ml-2 inline-flex gap-1 align-middle">
                     {deHoje && <Badge variant="notice">Hoje</Badge>}

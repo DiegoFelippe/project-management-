@@ -240,16 +240,44 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     expect(within(janela).getByLabelText('Título')).toHaveValue('Diagnóstico Alfa')
   })
 
-  it('salvar um evento relê a lista na mesma página', async () => {
+  it('salvar um evento relê a lista na mesma página (na 2, continua na 2)', async () => {
     const user = userEvent.setup()
+    vi.mocked(eventosDoCliente).mockResolvedValue({ itens: [EVENTO, DE_HOJE, ANTIGO], total: 18, proximoId: 'e1' })
     tela(consultor)
-    const tabela = await abrirTodos(user)
-    expect(eventosDoCliente).toHaveBeenCalledTimes(1)
+    await abrirTodos(user)
+    await user.click(within(await screen.findByRole('navigation', { name: 'Paginação' })).getByRole('button', { name: /Próxima/ }))
+    await waitFor(() => expect(screen.getByRole('navigation', { name: 'Paginação' })).toHaveTextContent('Página 2 de 2'))
+    expect(eventosDoCliente).toHaveBeenCalledTimes(2)
+    expect(eventosDoCliente).toHaveBeenLastCalledWith({ clienteId: 'k1', pagina: 2 })
+    const tabela = screen.getByRole('table', { name: 'Eventos do cliente' })
     await user.click(within(tabela).getByRole('button', { name: 'Abrir Kickoff Alfa' }))
     const janela = await screen.findByRole('dialog', { name: 'Editar evento' })
     await user.click(within(janela).getByRole('button', { name: 'Salvar alterações' }))
-    await waitFor(() => expect(eventosDoCliente).toHaveBeenCalledTimes(2))
-    expect(eventosDoCliente).toHaveBeenLastCalledWith({ clienteId: 'k1', pagina: 1 })
+    await waitFor(() => expect(eventosDoCliente).toHaveBeenCalledTimes(3))
+    expect(eventosDoCliente).toHaveBeenLastCalledWith({ clienteId: 'k1', pagina: 2 })
+    expect(screen.getByRole('navigation', { name: 'Paginação' })).toHaveTextContent('Página 2 de 2')
+  })
+
+  it('Todos, eventos de vários dias: o que está acontecendo hoje ganha "Hoje"; o de dia inteiro mostra até quando vai', async () => {
+    const user = userEvent.setup()
+    const imersao = { ...EVENTO, id: 'e3', titulo: 'Imersão', inicio: '2026-11-16T09:00:00-03:00', fim: '2026-11-18T18:00:00-03:00' }
+    const treino = { ...EVENTO, id: 'e4', titulo: 'Treinamento', dia_inteiro: true, inicio: '2026-11-18T00:00:00-03:00', fim: '2026-11-21T00:00:00-03:00' }
+    const virada = { ...EVENTO, id: 'e5', titulo: 'Virada', dia_inteiro: true, inicio: '2026-11-30T00:00:00-03:00', fim: '2026-12-03T00:00:00-03:00' }
+    const umDia = { ...EVENTO, id: 'e6', titulo: 'Feira', dia_inteiro: true, inicio: '2026-11-10T00:00:00-03:00', fim: '2026-11-11T00:00:00-03:00' }
+    vi.mocked(eventosDoCliente).mockResolvedValue({ itens: [virada, treino, imersao, umDia], total: 4, proximoId: null })
+    tela(gestora)
+    const tabela = await abrirTodos(user)
+    const linha = (titulo) => within(tabela).getByRole('row', { name: new RegExp(titulo) })
+    // Começou ontem e acaba amanhã: está acontecendo hoje.
+    expect(linha('Imersão')).toHaveTextContent('16/11/2026')
+    expect(within(linha('Imersão')).getByText('Hoje')).toBeInTheDocument()
+    // Dia inteiro de 18 a 20/11 (o fim é a meia-noite do dia 21): a data mostra o fim; ainda não é hoje.
+    expect(within(linha('Treinamento')).getByText('18–20/11/2026')).toBeInTheDocument()
+    expect(linha('Treinamento')).toHaveTextContent('Dia inteiro')
+    expect(within(linha('Treinamento')).queryByText('Hoje')).not.toBeInTheDocument()
+    expect(within(linha('Virada')).getByText('30/11–02/12/2026')).toBeInTheDocument()
+    // Dia inteiro de um dia só: só a data.
+    expect(within(linha('Feira')).getByText('10/11/2026')).toBeInTheDocument()
   })
 
   it('a barra não tem consultor, consultoria nem cliente; o Mostrar só tem reuniões e feriados (ausências nem são lidas)', async () => {
