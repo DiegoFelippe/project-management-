@@ -3,7 +3,7 @@
 -- ajudantes do Início (recorte, período, período anterior e a situação num instante). Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(99);
+select plan(114);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -219,6 +219,26 @@ select is(testes.aberto('duas'), testes.esperado('C', 'pessoa_c2', 9, now(), fal
 select is(testes.situacao('consultoria', 'C', null, now()), '(1,0,0,9.0)',
   'consultor e previsão de uma vez: continua um cliente, com a previsão nova');
 
+-- A gestão, no mesmo "Salvar", escolhe o consultor e muda a previsão de quem esperava: a entrada fica no trecho do meio
+-- (duração zero) e conta uma vez só.
+select testes.cliente('z1', 25, 'A', null);
+select testes.como('admin_a');
+update public.clientes set consultor_id = testes.id('pessoa_a'), horas_mes = 33 where id = testes.id('z1');
+reset role;
+select is((select count(*) filter (where entrou)::int from private.situacoes_dos_clientes where cliente_id = testes.id('z1')), 1,
+  'consultor e previsão no mesmo Salvar: entrou uma vez só');
+select ok((select bool_and(ate = de) from private.situacoes_dos_clientes where cliente_id = testes.id('z1') and entrou),
+  'consultor e previsão no mesmo Salvar: a entrada é o trecho de duração zero (consultor com a previsão antiga)');
+select is(testes.aberto('z1'), testes.esperado('A', 'pessoa_a', 33, now(), false),
+  'consultor e previsão no mesmo Salvar: o aberto tem os dois e não conta como entrada de novo');
+
+-- Reativar com o consultor (ele continua na consultoria): não havia trecho aberto, então entra de novo, sem espera.
+select testes.cliente('reat', 14, 'A', 'pessoa_a');
+select testes.mudar('reat', 'arquivado_em = now()');
+select testes.mudar('reat', 'arquivado_em = null');
+select is(testes.aberto('reat'), testes.esperado('A', 'pessoa_a', 14, null, true),
+  'reativar com consultor: entrou = true e espera nula');
+
 -- ── Espera e entrada (as regras, com instantes diferentes) ───────────────────
 select is(private.espera_do_trecho(true, testes.id('A'), null, '2026-01-05 10:00-03', testes.id('A'), null,
     '2026-02-01 10:00-03'), '2026-01-05 10:00-03'::timestamptz,
@@ -238,6 +258,46 @@ select ok(private.trecho_entrou(true, null, testes.id('pessoa_a')) and private.t
     and not private.trecho_entrou(true, testes.id('pessoa_a'), testes.id('pessoa_a2'))
     and not private.trecho_entrou(true, null, null),
   'entrou: só quando ganha consultor vindo de um trecho sem consultor (ou de nenhum)');
+
+-- ── O gatilho em instantes diferentes ────────────────────────────────────────
+-- Nesta transação tudo vale now(); para ver o gatilho ligar a espera do trecho anterior e respeitar o instante mais
+-- novo já gravado, o cliente começa com um trecho aberto escrito à mão (fora da conferência pelos eventos) e muda
+-- pelo gatilho. Os dois clientes saem antes das conferências do banco inteiro.
+create function testes.cliente_com_trecho(p_nome text, p_horas numeric, p_consultoria text, p_de timestamptz)
+returns uuid language plpgsql as $$
+declare v uuid;
+begin
+  perform set_config('request.jwt.claims', '', true);
+  insert into public.clientes (nome, horas_mes, consultoria_id)
+  values ('Cliente ' || p_nome, p_horas, testes.id(p_consultoria)) returning id into v;
+  delete from private.situacoes_dos_clientes where cliente_id = v;
+  insert into private.situacoes_dos_clientes (cliente_id, consultoria_id, consultor_id, horas_mes, de, ate, espera_desde, entrou)
+  values (v, testes.id(p_consultoria), null, p_horas, p_de, null, p_de, false);
+  insert into testes.fx values (p_nome, v);
+  return v;
+end $$;
+
+-- Esperando desde 05/01/1990: ao ganhar consultor, a espera é a de 1990 (não agora) e o trecho antigo fecha agora.
+select testes.cliente_com_trecho('g1', 10, 'H', '1990-01-05 00:00-03');
+select testes.mudar('g1', format('consultor_id = %L', testes.id('pessoa_h')));
+select is(testes.aberto('g1'), testes.esperado('H', 'pessoa_h', 10, '1990-01-05 00:00-03', true),
+  'instantes diferentes: o trecho que ganha consultor guarda a espera de 1990 e entra');
+select is((select ate from private.situacoes_dos_clientes where cliente_id = testes.id('g1') and de = '1990-01-05 00:00-03'),
+  now(), 'instantes diferentes: o trecho de espera fecha agora');
+
+-- Trecho aberto daqui a 1 hora (outra transação que começou depois e gravou antes): o tempo não volta; o novo começa
+-- nesse instante, sem violar ate >= de.
+select testes.cliente_com_trecho('g2', 10, 'H', now() + interval '1 hour');
+select lives_ok(format($$ update public.clientes set consultor_id = %L where id = %L $$, testes.id('pessoa_h'), testes.id('g2')),
+  'trecho aberto no futuro: mudar o cliente não quebra o check (ate >= de)');
+select is(testes.aberto('g2'), row(testes.id('H'), testes.id('pessoa_h'), 10::numeric(5, 1), now() + interval '1 hour',
+    now() + interval '1 hour', true)::text,
+  'trecho aberto no futuro: o novo começa no instante mais novo já gravado');
+select is((select ate from private.situacoes_dos_clientes where cliente_id = testes.id('g2') and ate is not null),
+  now() + interval '1 hour', 'trecho aberto no futuro: o antigo fecha nesse instante (duração zero)');
+
+select set_config('request.jwt.claims', '', true);
+delete from public.clientes where id in (testes.id('g1'), testes.id('g2'));
 
 -- ── situacao_no_instante(agora) bate com as telas ────────────────────────────
 select testes.como('central');
@@ -272,7 +332,7 @@ select is((select row(s.em_atendimento, s.a_distribuir, s.sem_consultor)::text
   (select row((valor ->> 'meus_clientes')::int, 0, 0)::text from testes.medidas where nome = 'pessoa_a'),
   'pessoa, agora: em atendimento = meus clientes');
 select is((select reservado from private.situacao_no_instante('pessoa', testes.id('A'), testes.id('pessoa_a'), now())),
-  70.0, 'pessoa, agora: reservado = previsões dos clientes dele (40 + 30; o arquivado fica fora)');
+  117.0, 'pessoa, agora: reservado = previsões dos clientes dele (40 + 30 + 33 + 14; o arquivado fica fora)');
 select throws_ok($$ select * from private.situacao_no_instante('outro', null, null, now()) $$, '42501', 'sem_recorte',
   'recorte desconhecido: recusa');
 
@@ -336,6 +396,20 @@ select ok(testes.cliente_mes('a2', '2025-04-01') = 0 and testes.dia('A', '2025-0
   'apagar: subtrai dos dois resumos');
 select ok(testes.resumos_conferem(), 'depois de apagar: os dois resumos batem com a soma direta');
 
+-- Mudar a consultoria de um check-in: sai do dia e do mês da antiga e entra nos da nova.
+select testes.como('pessoa_a');
+insert into public.checkins (cliente_id, inicio, fim, descricao) values
+  (testes.id('a1'), '2025-07-08 08:00-03', '2025-07-08 09:00-03', 'Julho');
+reset role;
+select set_config('request.jwt.claims', '', true);
+update public.checkins set consultoria_id = testes.id('B') where cliente_id = testes.id('a1') and inicio = '2025-07-08 08:00-03';
+select ok(testes.dia('A', '2025-07-08') = '(0,0)' and testes.dia('B', '2025-07-08') = '(1,3600)',
+  'mudar a consultoria do check-in: sai do dia da antiga e entra no da nova');
+select ok((select coalesce(sum(segundos) filter (where consultoria_id = testes.id('A')), 0) = 0
+      and coalesce(sum(segundos) filter (where consultoria_id = testes.id('B')), 0) = 3600
+    from private.checkins_horas_cliente_mes where cliente_id = testes.id('a1') and mes = '2025-07-01'),
+  'mudar a consultoria do check-in: o mês do cliente vai junto para a nova');
+
 -- A ferramenta de conserto (private.recalcular_horas_mes) refaz também os dois resumos novos.
 select testes.como('pessoa_a');
 insert into public.checkins (cliente_id, inicio, fim, descricao) values
@@ -383,7 +457,7 @@ select results_eq(
      from private.situacoes_dos_clientes where cliente_id = testes.id('passo') order by id $$,
   $$ select * from private.situacoes_pelos_eventos(testes.id('passo')) $$,
   'passo a passo: os eventos refazem os mesmos trechos, na mesma ordem');
-select is((select count(*)::int from testes.criados), 11, 'a conferência passou pelos 11 clientes do teste');
+select is((select count(*)::int from testes.criados), 13, 'a conferência passou pelos 13 clientes do teste');
 
 -- ── O preenchimento deixou exatamente o estado de agora ──────────────────────
 select is((select count(*)::int from public.clientes c
@@ -530,6 +604,33 @@ select results_eq($$ select * from private.periodo_do_inicio(null, null, null) $
   format($$ values (%L::date, %L::date, %L::date, %L::date, false, false) $$, testes.mes_atual(), testes.mes_atual(),
     (testes.mes_atual() + interval '1 month - 1 day')::date, testes.hoje()),
   'Mês atual (sem nada): de 1º até hoje, não passado');
+
+-- Período efetivo vazio (o comportamento de hoje, para as funções do Início tratarem): o efetivo termina antes de
+-- começar e não há período anterior.
+create function testes.fim_do_mes() returns date language sql stable as $$
+  select (testes.mes_atual() + interval '1 month - 1 day')::date
+$$;
+select results_eq(
+  format($$ select * from private.periodo_do_inicio(%L, null, null) $$, (testes.mes_atual() + interval '1 month')::date),
+  format($$ values (%L::date, %L::date, %L::date, %L::date, false, false) $$,
+    (testes.mes_atual() + interval '1 month')::date, (testes.mes_atual() + interval '1 month')::date,
+    (testes.mes_atual() + interval '2 months - 1 day')::date, testes.hoje()),
+  'Mês futuro: não é passado, e o efetivo (hoje) fica antes do começo');
+select is((select count(*)::int from private.periodo_do_inicio((testes.mes_atual() + interval '1 month')::date, null, null) p
+    cross join lateral private.periodo_anterior(p.de, p.ate_efetivo, not p.intervalo) a), 0,
+  'Mês futuro: sem período anterior');
+-- No último dia do mês não existe Personalizado que comece depois de hoje (ele vai no máximo até o fim do mês).
+select case when testes.hoje() < testes.fim_do_mes() then
+    is((select row(p.mes, p.de, p.ate, p.ate_efetivo, p.intervalo, p.passado)::text
+        from private.periodo_do_inicio(null, testes.hoje() + 1, testes.fim_do_mes()) p),
+      row(testes.mes_atual(), testes.hoje() + 1, testes.fim_do_mes(), testes.hoje(), true, true)::text,
+      'Personalizado que começa depois de hoje: a linha vem, com o efetivo (hoje) antes do começo')
+  else skip('último dia do mês: não há Personalizado que comece depois de hoje', 1) end;
+select case when testes.hoje() < testes.fim_do_mes() then
+    is((select count(*)::int from private.periodo_do_inicio(null, testes.hoje() + 1, testes.fim_do_mes()) p
+        cross join lateral private.periodo_anterior(p.de, p.ate_efetivo, not p.intervalo) a), 0,
+      'Personalizado que começa depois de hoje: sem período anterior')
+  else skip('último dia do mês: não há Personalizado que comece depois de hoje', 1) end;
 
 -- ── recorte_do_inicio ────────────────────────────────────────────────────────
 -- Chamado como seria de dentro de uma função security definer do Início.
