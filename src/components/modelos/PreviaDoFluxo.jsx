@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import Fluxograma from '@/components/checkins/Fluxograma'
+import { ehCelular } from '@/components/checkins/fluxo'
 
 const ORIENTACOES = [{ valor: 'deitado', rotulo: 'Deitado' }, { valor: 'em-pe', rotulo: 'Em pé' }]
 const NOME_DO_QUADRO = 'Prévia do fluxograma, role para ver tudo'
-const ehCelular = () => typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 639px)').matches
 
 // No modelo, toda tarefa ainda está "a fazer": a caixa diz o dia do prazo e se é obrigatória.
 const infoDoModelo = (t) => ({

@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import CampoData from '@/components/campos/CampoData'
 import CampoHora from '@/components/campos/CampoHora'
+import TarefasMarcadas from '@/components/checkins/TarefasMarcadas'
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { tarefasDoCheckin } from '@/data/checkins'
 import { CHECKIN_DE_MAIS_DE_24H } from '@/lib/erros'
 import { horasEntre } from '@/lib/horas'
 
@@ -36,8 +38,16 @@ const TEXTOS = {
   editar: { titulo: 'Editar check-in em', botao: 'Salvar', descricao: 'Corrija o horário ou o que foi feito.' },
 }
 
+const TITULO_DAS_TAREFAS = 'Tarefas marcadas nesta sessão'
+
+// "Tarefas concluídas: A; B." — o começo do "O que foi feito" no check-out.
+const textoDasTarefas = (tarefas) => `Tarefas concluídas: ${tarefas.map((t) => t.titulo).join('; ')}.`
+
 // Janela do check-in. modo: "checkout" (fim e o que foi feito), "lancar" (período passado) ou "editar"
 // (inclusive o check-in aberto, que fecha com o fim informado).
+// No check-out e no Editar, lê as tarefas do check-list marcadas no check-in (tarefasDoCheckin) e mostra "Tarefas
+// marcadas nesta sessão" (só para ler); no check-out com "O que foi feito" vazio, ele já vem com "Tarefas concluídas: A;
+// B." (o que a pessoa já digitou nunca é apagado). Lançar horas não tem tarefas.
 // aoSalvar recebe { descricao } e, em ISO, só os horários que valem gravar: no check-out e no check-in
 // aberto o fim; nos outros, o início e o fim que a pessoa mudou (sem mexer, ficam os guardados, com os
 // segundos). Devolve { erro }.
@@ -55,6 +65,25 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
   // Data do fim: sempre no check-out; nos outros, quando o check-in atravessa a meia-noite.
   const comDataDoFim = checkout || iniciais.dataFim !== iniciais.data
   const textos = TEXTOS[modo]
+  const [tarefas, setTarefas] = useState({ itens: [] })
+  const idDoCheckin = modo === 'lancar' ? null : checkin?.id
+
+  useEffect(() => {
+    if (!idDoCheckin) return undefined
+    let ativo = true
+    Promise.resolve()
+      .then(() => tarefasDoCheckin(idDoCheckin))
+      .then((lista) => {
+        if (!ativo) return
+        const itens = lista ?? []
+        setTarefas({ itens })
+        if (checkout && itens.length) setDescricao((atual) => (atual.trim() ? atual : textoDasTarefas(itens)))
+      })
+      .catch(() => ativo && setTarefas({ itens: [], erro: true }))
+    return () => {
+      ativo = false
+    }
+  }, [idDoCheckin, checkout])
 
   async function salvar(evento) {
     evento.preventDefault()
@@ -126,10 +155,20 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
             {comDataDoFim && <div className="col-span-3">{campoDataDoFim}</div>}
           </div>
         )}
+        {tarefas.itens.length > 0 && (
+          <div className="grid gap-2">
+            <p className="text-foreground/80 text-rotulo font-medium">{TITULO_DAS_TAREFAS}</p>
+            <TarefasMarcadas tarefas={tarefas.itens} rotulo={TITULO_DAS_TAREFAS} />
+          </div>
+        )}
+        {tarefas.erro && <p className="text-muted-foreground text-legenda">Não foi possível carregar as tarefas marcadas nesta sessão.</p>}
         <div className="grid gap-2">
           <Label htmlFor="checkin-descricao">O que foi feito</Label>
           <textarea id="checkin-descricao" rows={4} value={descricao} onChange={(e) => setDescricao(e.target.value)}
             className="border-input bg-card focus-visible:border-ring focus-visible:ring-ring/30 w-full rounded-md border px-3 py-2 texto-de-campo shadow-xs outline-none hover:border-primary/40 focus-visible:ring-4" />
+          {checkout && descricao.startsWith('Tarefas concluídas:') && (
+            <p className="text-muted-foreground text-legenda">Já vem com as tarefas marcadas; complete com o que mais foi feito.</p>
+          )}
         </div>
         {erro && <Aviso>{erro}</Aviso>}
       </form>

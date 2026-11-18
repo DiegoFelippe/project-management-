@@ -24,6 +24,18 @@ describe('Caixa', () => {
     render(<Caixa marcado={false} indeterminado aoMudar={() => {}} rotulo="Todos" />)
     expect(screen.getByRole('checkbox', { name: 'Todos' })).toBePartiallyChecked()
   })
+
+  it('descritoPor liga a caixa a um texto da tela (ex.: o motivo de ela estar desligada)', () => {
+    render(
+      <>
+        <Caixa nome="Mapa de custos" marcado={false} desabilitado descritoPor="motivo" aoMudar={() => {}} />
+        <p id="motivo">Bloqueada: espera Análise do DRE</p>
+      </>,
+    )
+    const caixa = screen.getByRole('checkbox', { name: 'Mapa de custos' })
+    expect(caixa).toBeDisabled()
+    expect(caixa).toHaveAccessibleDescription('Bloqueada: espera Análise do DRE')
+  })
 })
 
 describe('Chave', () => {

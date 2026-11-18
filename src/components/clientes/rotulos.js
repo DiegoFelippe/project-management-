@@ -19,7 +19,8 @@ export function lerHoras(texto) {
   return Number(limpo)
 }
 
-// Texto de cada evento do histórico. Nome nulo = o banco escondeu (é de outra consultoria).
+// Texto de cada evento do histórico. Nome nulo = o banco escondeu (é de outra consultoria). O nome do modelo de check-in
+// só vem para a Central e para a consultoria do check-list; sem ele, o texto fica sem o nome.
 export function textoDoEvento(e) {
   const consultoria = (nome) => nome ?? 'outra consultoria'
   const consultor = (nome) => nome ?? 'outro consultor'
@@ -39,6 +40,9 @@ export function textoDoEvento(e) {
     case 'reativado': return 'Reativado'
     case 'reuniao_realizada': return 'Reunião realizada'
     case 'pasta_da_reuniao_criada': return 'Pasta da reunião criada'
+    case 'modelo_aplicado': return e.modelo ? `Modelo de check-in aplicado: ${e.modelo}` : 'Modelo de check-in aplicado'
+    case 'modelo_trocado': return e.modelo ? `Modelo de check-in trocado para ${e.modelo}` : 'Modelo de check-in trocado'
+    case 'modelo_tirado': return e.modelo ? `Modelo de check-in tirado: ${e.modelo}` : 'Modelo de check-in tirado'
     default: return e.tipo
   }
 }

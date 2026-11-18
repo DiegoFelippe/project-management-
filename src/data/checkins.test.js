@@ -30,7 +30,9 @@ describe('listarCheckins', () => {
     const { itens } = await listarCheckins({ clienteId: 'k1' })
     expect(selecionado()).toContain('tarefas:checkin_tarefas(titulo)')
     expect(selecionado()).toContain('total_tarefas:checkin_tarefas(count)')
-    expect(banco.chamou('order', 'marcada_em', { referencedTable: 'tarefas' })).toBe(true)
+    // A mesma ordem das tarefas de um check-in em todo lugar (lista, check-out e a sessão do check-list).
+    const ordemDasTarefas = banco.chamadas.filter(([metodo, , opcoes]) => metodo === 'order' && opcoes?.referencedTable === 'tarefas')
+    expect(ordemDasTarefas.map(([, coluna]) => coluna)).toEqual(['marcada_em', 'titulo', 'tarefa_id'])
     expect(banco.chamou('limit', 3, { referencedTable: 'tarefas' })).toBe(true)
     expect(itens.map((k) => [k.tarefas, k.total_tarefas])).toEqual([[[{ titulo: 'Análise do DRE' }], 4], [[], 0]])
   })
@@ -43,7 +45,9 @@ describe('tarefasDoCheckin', () => {
     expect(banco.chamou('from', 'checkin_tarefas')).toBe(true)
     expect(banco.chamou('select', 'tarefa_id, titulo')).toBe(true)
     expect(banco.chamou('eq', 'checkin_id', 'c1')).toBe(true)
-    expect(banco.chamou('order', 'marcada_em')).toBe(true)
+    // marcada_em, titulo, tarefa_id: a mesma ordem da lista de check-ins e da sessão no check-list.
+    expect(banco.chamadas.filter(([metodo]) => metodo === 'order').map(([, coluna]) => coluna))
+      .toEqual(['marcada_em', 'titulo', 'tarefa_id'])
   })
 
   it('erro do banco sobe', async () => {

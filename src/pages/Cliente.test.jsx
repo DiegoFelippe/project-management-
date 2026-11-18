@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apagarCheckin, editarCheckin, listarCheckins, meuCheckinAberto } from '@/data/checkins'
 import { eventosDoCliente, eventosDoPeriodo, feriadosDoPeriodo, indicadoresDaAgenda, meuGoogle } from '@/data/agenda'
 import { limparPastaDoCliente, listarArquivos, listarPastas } from '@/data/arquivos'
+import { lerChecklist, marcarTarefa } from '@/data/checklists'
 import { apagarCliente, buscarCliente, checkinsPorSemana, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
 import { cartoesDoQuadro, limparQuadroDoCliente, quadroDoCliente } from '@/data/quadro'
 import { ouvirQuadro } from '@/data/quadroAoVivo'
@@ -42,6 +43,10 @@ vi.mock('@/data/quadro', () => ({
   criarCartao: vi.fn(), restaurarCartao: vi.fn(), apagarCartao: vi.fn(), criarColuna: vi.fn(), editarColuna: vi.fn(),
 }))
 vi.mock('@/data/quadroAoVivo', () => ({ ouvirQuadro: vi.fn(() => () => {}) }))
+vi.mock('@/data/checklists', () => ({
+  lerChecklist: vi.fn(), modelosParaAplicar: vi.fn(), aplicarModelo: vi.fn(), mudarInicio: vi.fn(), tirarModelo: vi.fn(),
+  marcarTarefa: vi.fn(), anotarTarefa: vi.fn(),
+}))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
 vi.mock('@/data/capacidade', () => ({ consultoriasPorOcupacao: vi.fn(), consultoresPorOcupacao: vi.fn() }))
 
@@ -65,6 +70,22 @@ const EVENTOS = [
   { id: 'e2', tipo: 'enviado', em: '2026-11-01T10:00:00Z', para_consultoria: 'STI Consult', autor: 'Central' },
   { id: 'e1', tipo: 'cadastrado', em: '2026-11-01T09:00:00Z', para_horas: 40, autor: 'Central' },
 ]
+// A aba Check-ins lê o check-list do cliente (sem modelo, por padrão).
+const SEM_MODELO = {
+  pode_aplicar: false, pode_marcar: false, consultor: { id: 'p1', nome: 'Ana' }, checklist: null, etapas: [], tarefas: [],
+  resumo: { tarefas: 0, feitas: 0, obrigatorias: 0, obrigatorias_feitas: 0, vencem_7_dias: 0, atrasadas: 0, proxima: null },
+  sessao: null, ultimo_checkin: null,
+}
+const COM_MODELO = {
+  ...SEM_MODELO, pode_marcar: true,
+  checklist: { id: 'cl1', modelo_id: 'm1', modelo_nome: 'Gestão financeira', inicio: '2026-11-10', aplicado_em: '2026-11-10T13:00:00Z', aplicado_por: { nome: 'Gil' } },
+  etapas: [{ id: 'e1', nome: 'Diagnóstico', posicao: 1, tarefas: 1, feitas: 0 }],
+  tarefas: [{
+    id: 't1', etapa_id: 'e1', posicao: 1, titulo: 'Análise do DRE', descricao: null, obrigatoria: true, prazo_dias: 10,
+    vence_em: '2099-11-20', estado: 'a_fazer', nota: null, feita_em: null, feita_por: null, depende_de: [], na_sessao: false,
+  }],
+  resumo: { tarefas: 1, feitas: 0, obrigatorias: 1, obrigatorias_feitas: 0, vencem_7_dias: 0, atrasadas: 0, proxima: { id: 't1', titulo: 'Análise do DRE', vence_em: '2099-11-20' } },
+}
 const central = { id: 'c0', papel: 'central', consultoria_id: null }
 const adminDaSti = { id: 'a1', papel: 'admin', consultoria_id: 's1' }
 const consultor = { id: 'p1', papel: 'pessoa', consultoria_id: 's1' }
@@ -90,6 +111,7 @@ beforeEach(() => {
   vi.mocked(listarArquivos).mockResolvedValue({ itens: [], total: 0 })
   vi.mocked(editarCheckin).mockResolvedValue({ erro: null })
   vi.mocked(apagarCheckin).mockResolvedValue({ erro: null })
+  vi.mocked(lerChecklist).mockResolvedValue(SEM_MODELO)
 })
 
 describe('Cliente (página)', () => {
@@ -179,7 +201,8 @@ describe('Cliente (página)', () => {
     const tabela = await screen.findByRole('table', { name: 'Check-ins' })
     expect(within(within(tabela).getByRole('row', { name: /Reunião/ })).getByText('Ana')).toBeInTheDocument()
     expect(within(within(tabela).getByRole('row', { name: /Ajuste/ })).getByText('Beto')).toBeInTheDocument()
-    expect(within(tabela).queryByText('—')).not.toBeInTheDocument()
+    // Nenhum nome escondido na coluna Consultor.
+    expect(within(tabela).getAllByRole('row').slice(1).map((r) => r.cells[1].textContent)).toEqual(['Ana', 'Beto'])
   })
 
   it('a central só vê os check-ins, sem Editar nem Apagar', async () => {
@@ -232,13 +255,74 @@ describe('Cliente (página)', () => {
     expect(editarCheckin).toHaveBeenCalledWith('c3', { fim: expect.any(String), descricao: 'Fechado pelo administrador' })
   })
 
-  it('Apagar check-in pede confirmação antes', async () => {
+  it('Apagar check-in pede confirmação antes, dizendo que as tarefas marcadas nele continuam feitas', async () => {
     tela(adminDaSti, '/clientes/k1?aba=checkins')
     const dele = within(await screen.findByRole('table', { name: 'Check-ins' })).getByRole('row', { name: /Reunião/ })
     await userEvent.click(within(dele).getByRole('button', { name: 'Apagar' }))
     expect(apagarCheckin).not.toHaveBeenCalled()
-    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apagar check-in' }))
+    const confirmar = screen.getByRole('alertdialog')
+    expect(confirmar).toHaveTextContent(
+      'As horas deste atendimento somem do realizado do cliente. As tarefas marcadas nele continuam feitas no check-list. Não dá para desfazer.')
+    await userEvent.click(within(confirmar).getByRole('button', { name: 'Apagar check-in' }))
     expect(apagarCheckin).toHaveBeenCalledWith('c1')
+  })
+
+  it('a aba Check-ins tem o check-list do cliente em cima da tabela de check-ins', async () => {
+    tela(consultor, '/clientes/k1?aba=checkins')
+    const modelo = await screen.findByRole('region', { name: 'Modelo de check-in' })
+    expect(lerChecklist).toHaveBeenCalledWith('k1')
+    const tabela = await screen.findByRole('table', { name: 'Check-ins' })
+    expect(modelo.compareDocumentPosition(tabela) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Check-in' })).toBeInTheDocument()
+  })
+
+  it('a tabela Check-ins tem a coluna Tarefas marcadas: até 3 e "+N"', async () => {
+    vi.mocked(listarCheckins).mockResolvedValue({
+      itens: [
+        { ...CHECKINS[0], tarefas: [{ titulo: 'Análise do DRE' }, { titulo: 'Mapa de custos' }, { titulo: 'Plano de ação' }], total_tarefas: 5 },
+        { ...CHECKINS[1], tarefas: [], total_tarefas: 0 },
+      ],
+      total: 2,
+    })
+    tela(central, '/clientes/k1?aba=checkins')
+    const tabela = await screen.findByRole('table', { name: 'Check-ins' })
+    expect(within(tabela).getAllByRole('columnheader').map((c) => c.textContent))
+      .toEqual(['Data', 'Consultor', 'Horas', 'Tarefas marcadas', 'O que foi feito', 'Ações'])
+    const comTarefas = within(within(tabela).getByRole('row', { name: /Reunião/ }))
+    expect(comTarefas.getAllByRole('listitem').map((i) => i.textContent)).toEqual(['Análise do DRE', 'Mapa de custos', 'Plano de ação', '+2'])
+    expect(within(within(tabela).getByRole('row', { name: /Ajuste/ })).queryByRole('list')).not.toBeInTheDocument()
+  })
+
+  it('marcar uma tarefa no check-list recarrega a página (o botão de check-in, a sessão e a tabela andam juntos)', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue(COM_MODELO)
+    vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'feita', liberadas: [], na_sessao: false, erro: null })
+    tela(consultor, '/clientes/k1?aba=checkins')
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Análise do DRE' }))
+    expect(marcarTarefa).toHaveBeenCalledWith('t1', 'feita')
+    await waitFor(() => expect(buscarCliente).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(listarCheckins).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
+  })
+
+  it('o histórico mostra aplicar, trocar e tirar o modelo de check-in, com o nome do modelo', async () => {
+    vi.mocked(listarEventos).mockResolvedValue({
+      itens: [
+        { id: 'e5', tipo: 'modelo_tirado', em: '2026-11-15T10:00:00Z', modelo: 'Sucesso do Cliente', autor: 'Gil' },
+        { id: 'e4', tipo: 'modelo_trocado', em: '2026-11-14T10:00:00Z', modelo: 'Sucesso do Cliente', autor: 'Gil' },
+        { id: 'e3', tipo: 'modelo_aplicado', em: '2026-11-13T10:00:00Z', modelo: 'Gestão financeira', autor: 'Gil' },
+        // O nome do modelo só vai para a Central e para a consultoria do check-list.
+        { id: 'e2', tipo: 'modelo_aplicado', em: '2026-11-12T10:00:00Z', modelo: null, autor: null },
+      ],
+      total: 4,
+    })
+    tela(central, '/clientes/k1?aba=historico')
+    const tabela = await screen.findByRole('table', { name: 'Histórico' })
+    expect(within(tabela).getAllByRole('row').slice(1).map((r) => r.cells[1].textContent)).toEqual([
+      'Modelo de check-in tirado: Sucesso do Cliente',
+      'Modelo de check-in trocado para Sucesso do Cliente',
+      'Modelo de check-in aplicado: Gestão financeira',
+      'Modelo de check-in aplicado',
+    ])
   })
 
   it('o título fica sozinho no topo; abas e ações ficam numa barra no estilo da de filtros (pedido do Diego, 17/11)', async () => {

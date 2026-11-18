@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rotuloDaSituacao, situacaoDaTarefa } from './situacao'
+import { diaCurto, feitaPorEm, quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa } from './situacao'
 
 const HOJE = '2026-11-17'
 const t = (id, campos = {}) => ({ id, titulo: id, estado: 'a_fazer', vence_em: '2026-11-25', depende_de: [], ...campos })
@@ -76,6 +76,61 @@ describe('rotuloDaSituacao', () => {
     expect(rotulo(BLOQUEADA)).toBe('Bloqueada')
     expect(rotulo(t('x', { vence_em: HOJE }))).toBe('A fazer, vence hoje')
     expect(rotulo(t('y', { vence_em: '2026-11-01' }))).toBe('A fazer, atrasada')
-    expect(rotulo(t('z', { estado: 'andamento', vence_em: '2026-11-01', depende_de: ['pendente'] }))).toBe('Bloqueada, atrasada')
+    expect(rotulo(t('z', { estado: 'andamento', vence_em: '2026-11-01', depende_de: ['pendente'] })))
+      .toBe('Em andamento · espera 1 tarefa, atrasada')
+  })
+
+  // Em andamento e bloqueada (uma dependência foi reaberta depois de ela começar): a cor é a de "em andamento", então o
+  // nome também diz "Em andamento" (e quantas ela espera), não "Bloqueada".
+  it('em andamento e bloqueada: cor e nome dizem "em andamento", com quantas tarefas ela espera', () => {
+    const uma = t('x', { estado: 'andamento', depende_de: ['pendente'] })
+    expect(situacao(uma).cor).toBe('andamento')
+    expect(rotulo(uma)).toBe('Em andamento · espera 1 tarefa')
+    const duas = t('y', { estado: 'andamento', depende_de: ['pendente', 'andamento', 'feita'] })
+    expect(rotulo(duas)).toBe('Em andamento · espera 2 tarefas')
+  })
+
+  it('o nome sempre combina com a cor: "andamento" diz Em andamento; "bloqueada" diz Bloqueada; "feita" diz Feita', () => {
+    const casos = []
+    for (const estado of ['a_fazer', 'andamento', 'feita']) {
+      for (const vence_em of ['2026-11-25', HOJE, '2026-11-01', null]) {
+        for (const depende_de of [[], ['feita'], ['pendente']]) casos.push(t('c', { estado, vence_em, depende_de }))
+      }
+    }
+    const comeco = { andamento: 'Em andamento', bloqueada: 'Bloqueada', feita: 'Feita', livre: 'A fazer' }
+    for (const caso of casos) {
+      const s = situacao(caso)
+      if (comeco[s.cor]) expect(rotulo(caso), JSON.stringify(caso)).toMatch(new RegExp(`^${comeco[s.cor]}`))
+    }
+  })
+})
+
+describe('datas e o resumo curto', () => {
+  it('diaCurto: dia e mês', () => {
+    expect(diaCurto('2026-11-05')).toBe('05/11')
+  })
+
+  it('feitaPorEm: quem e o dia (em São Paulo); sem o nome quando o banco o esconde', () => {
+    expect(feitaPorEm({ feita_em: '2026-11-13T02:00:00Z', feita_por: { nome: 'Ana Lima' } })).toBe('por Ana Lima em 12/11/2026')
+    expect(feitaPorEm({ feita_em: '2026-11-12T15:00:00Z', feita_por: { nome: null } })).toBe('feita em 12/11/2026')
+  })
+
+  it('quandoVence: "vence 20/11", "vence hoje" ou "venceu 12/11"', () => {
+    expect(quandoVence('2026-11-20', HOJE)).toBe('vence 20/11')
+    expect(quandoVence(HOJE, HOJE)).toBe('vence hoje')
+    expect(quandoVence('2026-11-12', HOJE)).toBe('venceu 12/11')
+  })
+
+  it('resumoDaSituacao: a linha de baixo da caixa do fluxograma, que combina com a cor', () => {
+    const resumo = (tarefa) => resumoDaSituacao(tarefa, situacao(tarefa))
+    // feita_em é um instante: o dia é o de São Paulo (23h de 12/11 em SP já é 13/11 em UTC).
+    expect(resumo(t('a', { estado: 'feita', feita_em: '2026-11-13T02:00:00Z' }))).toBe('Feita em 12/11')
+    expect(resumo(t('b', { vence_em: '2026-11-15' }))).toBe('Atrasada desde 15/11')
+    expect(resumo(t('c', { vence_em: HOJE, depende_de: ['pendente'] }))).toBe('Vence hoje')
+    expect(resumo(t('d', { estado: 'andamento', vence_em: '2026-11-20' }))).toBe('Em andamento · 20/11')
+    expect(resumo(t('e', { estado: 'andamento', depende_de: ['pendente', 'andamento'] }))).toBe('Em andamento · espera 2')
+    expect(resumo(t('f', { depende_de: ['pendente'] }))).toBe('Bloqueada · vence 25/11')
+    expect(resumo(t('g', { obrigatoria: true }))).toBe('A fazer · vence 25/11')
+    expect(resumo(t('h', { obrigatoria: false }))).toBe('Opcional · vence 25/11')
   })
 })

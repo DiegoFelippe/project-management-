@@ -5,7 +5,8 @@ import { buscarPagina } from './paginar'
 
 // consultor e cliente vêm das relações calculadas do banco: o gestor vê os check-ins da consultoria toda,
 // mas em perfis só enxerga quem criou e as pessoas dos times dele. As tarefas do check-list marcadas em cada check-in:
-// só as 3 primeiras (na ordem em que foram marcadas) e o total, contado no banco.
+// só as 3 primeiras e o total, contado no banco. A ordem das tarefas de um check-in é a mesma em todo lugar (aqui, em
+// tarefasDoCheckin e na sessão do checklist_do_cliente): marcada_em, titulo, tarefa_id.
 const CAMPOS_DA_LISTA =
   'id, inicio, fim, descricao, consultor_id, consultoria_id, consultor:consultor_do_checkin(nome), ' +
   'cliente:cliente_do_checkin(id, nome), tarefas:checkin_tarefas(titulo), total_tarefas:checkin_tarefas(count)'
@@ -72,6 +73,8 @@ export async function listarCheckins({ clienteId, consultorId, pagina = 1 } = {}
     .order('inicio', { ascending: false })
     .order('id')
     .order('marcada_em', { referencedTable: 'tarefas' })
+    .order('titulo', { referencedTable: 'tarefas' })
+    .order('tarefa_id', { referencedTable: 'tarefas' })
     .limit(TAREFAS_NA_LISTA, { referencedTable: 'tarefas' })
   if (clienteId) consulta = consulta.eq('cliente_id', clienteId)
   if (consultorId) consulta = consulta.eq('consultor_id', consultorId)
@@ -84,8 +87,8 @@ export async function listarCheckins({ clienteId, consultorId, pagina = 1 } = {}
   return { ...resultado, itens }
 }
 
-// As tarefas do check-list marcadas como feitas num check-in (o título guardado nele), na ordem em que foram marcadas:
-// [{ tarefa_id, titulo }]. Para o check-out e para editar o check-in.
+// As tarefas do check-list marcadas como feitas num check-in (o título guardado nele), na ordem em que foram marcadas
+// (desempate pelo título e pelo id): [{ tarefa_id, titulo }]. Para o check-out e para editar o check-in.
 export async function tarefasDoCheckin(checkinId) {
   const { data, error } = await supabase
     .from('checkin_tarefas')
@@ -93,6 +96,7 @@ export async function tarefasDoCheckin(checkinId) {
     .eq('checkin_id', checkinId)
     .order('marcada_em')
     .order('titulo')
+    .order('tarefa_id')
   if (error) throw error
   return data ?? []
 }

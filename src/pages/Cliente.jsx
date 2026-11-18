@@ -5,6 +5,7 @@ import { useAuth } from '@/auth/useAuth'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import Cabecalho from '@/components/comum/Cabecalho'
 import CalendarioDaAgenda from '@/components/calendario/CalendarioDaAgenda'
+import ChecklistDoCliente from '@/components/checkins/ChecklistDoCliente'
 import AbasDoCliente from '@/components/clientes/AbasDoCliente'
 import ArquivosDoCliente from '@/components/clientes/ArquivosDoCliente'
 import { AcoesDaLinha } from '@/components/clientes/AcoesDoCliente'
@@ -151,7 +152,17 @@ export default function Cliente() {
     { id: 'quadro', rotulo: 'Quadro', conteudo: <QuadroDoCliente key={cliente.id} cliente={cliente} perfil={perfil} /> },
     // O calendário do menu, só com os compromissos deste cliente (check-ins e histórico têm as abas deles).
     { id: 'agenda', rotulo: 'Agenda', conteudo: <CalendarioDaAgenda key={cliente.id} cliente={cliente} /> },
-    { id: 'checkins', rotulo: 'Check-ins', conteudo: <CheckinsDoCliente cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar} /> },
+    // O check-list do modelo aplicado (lista ou fluxograma, a sessão aberta) em cima da tabela de check-ins.
+    {
+      id: 'checkins',
+      rotulo: 'Check-ins',
+      conteudo: (
+        <div className="grid min-w-0 grid-cols-1 gap-6">
+          <ChecklistDoCliente key={cliente.id} cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar} />
+          <CheckinsDoCliente cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar} />
+        </div>
+      ),
+    },
     { id: 'arquivos', rotulo: 'Arquivos', conteudo: <ArquivosDoCliente cliente={cliente} perfil={perfil} /> },
     { id: 'historico', rotulo: 'Histórico', conteudo: <HistoricoDoCliente clienteId={cliente.id} versao={versao} /> },
   ]

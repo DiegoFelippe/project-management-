@@ -8,6 +8,9 @@
 // (rascunho do editor) ou para quem não está no desenho é ignorada aqui. Cada tarefa e cada dependência são vistas uma
 // vez: 500 tarefas desenham em poucos milissegundos.
 
+// Tela de celular (até 639 px): lá o fluxograma começa "Em pé".
+export const ehCelular = () => typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 639px)').matches
+
 export const LARGURA_DO_NO = 184
 export const ALTURA_DO_NO = 62
 // Em pé, a largura mínima do desenho (cabe no cartão de um celular de 360 px com uma tarefa por nível).

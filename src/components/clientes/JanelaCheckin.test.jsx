@@ -1,8 +1,16 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { tarefasDoCheckin } from '@/data/checkins'
 import { escolherData, escolherHora } from '@/test/campos'
 import JanelaCheckin from './JanelaCheckin'
+
+vi.mock('@/data/checkins', () => ({ tarefasDoCheckin: vi.fn() }))
+
+beforeEach(() => {
+  vi.mocked(tarefasDoCheckin).mockReset()
+  vi.mocked(tarefasDoCheckin).mockResolvedValue([])
+})
 
 async function preencher(_janela, { data, inicio, fim }) {
   await escolherData(userEvent, 'Data', data)
@@ -217,5 +225,74 @@ describe('JanelaCheckin: editar', () => {
       await salvar(janela)
       expect(aoSalvar).toHaveBeenCalledWith({ fim: new Date('2026-11-09T20:00').toISOString(), descricao: 'Migração' })
     })
+  })
+})
+
+describe('JanelaCheckin: tarefas do check-list marcadas no check-in', () => {
+  const TAREFAS = [{ tarefa_id: 't1', titulo: 'Análise do DRE' }, { tarefa_id: 't2', titulo: 'Mapa de custos' }]
+  const aberto = { id: 'a1', inicio: new Date(Date.now() - 3_600_000).toISOString(), fim: null }
+  const fechado = {
+    id: 'c1', inicio: new Date('2026-11-10T09:00').toISOString(), fim: new Date('2026-11-10T10:30').toISOString(), descricao: 'Reunião',
+  }
+  const abrir = (modo, checkin) => {
+    const aoSalvar = vi.fn().mockResolvedValue({ erro: null })
+    render(<JanelaCheckin aberto modo={modo} nomeDoCliente="Alfa" checkin={checkin} aoFechar={vi.fn()} aoSalvar={aoSalvar} />)
+    return { aoSalvar, janela: screen.getByRole('dialog') }
+  }
+  const itens = (janela) => within(within(janela).getByRole('list', { name: 'Tarefas marcadas nesta sessão' }))
+    .getAllByRole('listitem').map((i) => i.textContent)
+
+  it('check-out: mostra as tarefas marcadas nesta sessão e, com "O que foi feito" vazio, já vem com elas', async () => {
+    vi.mocked(tarefasDoCheckin).mockResolvedValue(TAREFAS)
+    const { janela, aoSalvar } = abrir('checkout', aberto)
+    await waitFor(() => expect(itens(janela)).toEqual(['Análise do DRE', 'Mapa de custos']))
+    expect(tarefasDoCheckin).toHaveBeenCalledWith('a1')
+    const campo = within(janela).getByLabelText('O que foi feito')
+    expect(campo).toHaveValue('Tarefas concluídas: Análise do DRE; Mapa de custos.')
+    expect(janela).toHaveTextContent('Já vem com as tarefas marcadas; complete com o que mais foi feito.')
+    await userEvent.type(campo, ' Revisei a planilha.')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Fazer check-out' }))
+    expect(aoSalvar).toHaveBeenCalledWith(expect.objectContaining({
+      descricao: 'Tarefas concluídas: Análise do DRE; Mapa de custos. Revisei a planilha.',
+    }))
+  })
+
+  it('check-out: o que a pessoa já digitou não é apagado quando as tarefas chegam depois', async () => {
+    let responder
+    vi.mocked(tarefasDoCheckin).mockImplementation(() => new Promise((r) => { responder = r }))
+    const { janela } = abrir('checkout', aberto)
+    const campo = within(janela).getByLabelText('O que foi feito')
+    await userEvent.type(campo, 'Treinei a equipe')
+    responder(TAREFAS)
+    await waitFor(() => expect(itens(janela)).toEqual(['Análise do DRE', 'Mapa de custos']))
+    expect(campo).toHaveValue('Treinei a equipe')
+  })
+
+  it('editar: mostra as tarefas (só para ler) e não mexe no que foi feito', async () => {
+    vi.mocked(tarefasDoCheckin).mockResolvedValue(TAREFAS)
+    const { janela } = abrir('editar', fechado)
+    await waitFor(() => expect(itens(janela)).toEqual(['Análise do DRE', 'Mapa de custos']))
+    expect(tarefasDoCheckin).toHaveBeenCalledWith('c1')
+    expect(within(janela).getByLabelText('O que foi feito')).toHaveValue('Reunião')
+    expect(within(within(janela).getByRole('list', { name: 'Tarefas marcadas nesta sessão' })).queryByRole('button')).toBeNull()
+  })
+
+  it('sem tarefas marcadas, a seção não aparece e o campo fica vazio', async () => {
+    const { janela } = abrir('checkout', aberto)
+    await waitFor(() => expect(tarefasDoCheckin).toHaveBeenCalledWith('a1'))
+    expect(within(janela).queryByRole('list', { name: 'Tarefas marcadas nesta sessão' })).not.toBeInTheDocument()
+    expect(within(janela).getByLabelText('O que foi feito')).toHaveValue('')
+  })
+
+  it('se a leitura das tarefas falha, o check-out continua funcionando (com um aviso discreto)', async () => {
+    vi.mocked(tarefasDoCheckin).mockRejectedValue(new Error('rede'))
+    const { janela } = abrir('checkout', aberto)
+    expect(await within(janela).findByText('Não foi possível carregar as tarefas marcadas nesta sessão.')).toBeInTheDocument()
+    expect(within(janela).getByRole('button', { name: 'Fazer check-out' })).toBeEnabled()
+  })
+
+  it('lançar horas não lê tarefas (um atendimento passado não tem sessão no check-list)', () => {
+    render(<JanelaCheckin aberto modo="lancar" nomeDoCliente="Alfa" aoFechar={vi.fn()} aoSalvar={vi.fn()} />)
+    expect(tarefasDoCheckin).not.toHaveBeenCalled()
   })
 })

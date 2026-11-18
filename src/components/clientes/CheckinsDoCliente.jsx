@@ -1,6 +1,7 @@
 import { Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import TarefasMarcadas from '@/components/checkins/TarefasMarcadas'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
@@ -21,7 +22,8 @@ function podeMexer(perfil, checkin) {
   return perfil.id === checkin.consultor_id || ['admin', 'gestor'].includes(perfil.papel)
 }
 
-// Tabela Check-ins do cliente (de todos os consultores), paginada no banco.
+// Tabela Check-ins do cliente (de todos os consultores), paginada no banco, com as tarefas do check-list marcadas em
+// cada check-in (até 3, as primeiras, e "+N", contado no banco).
 // aoMudar() avisa a página depois de editar ou apagar, para recarregar o realizado.
 export default function CheckinsDoCliente({ cliente, perfil, versao, aoMudar }) {
   const [pagina, setPagina] = useState(1)
@@ -71,7 +73,7 @@ export default function CheckinsDoCliente({ cliente, perfil, versao, aoMudar }) 
       {!erro && itens === null && <GraficoCarregando texto="Carregando os check-ins…" className="py-8" />}
       {itens?.length === 0 && <ListaVazia>Nenhum check-in neste cliente ainda.</ListaVazia>}
       {itens?.length > 0 && (
-        <Tabela rotulo="Check-ins" colunas={['Data', 'Consultor', 'Horas', 'O que foi feito']}
+        <Tabela rotulo="Check-ins" colunas={['Data', 'Consultor', 'Horas', 'Tarefas marcadas', 'O que foi feito']} larguraMinima={880}
           paginacao={{ pagina, total: resultado.total, aoMudar: setPagina }}>
           {itens.map((c) => {
             const inicio = new Date(c.inicio)
@@ -85,6 +87,11 @@ export default function CheckinsDoCliente({ cliente, perfil, versao, aoMudar }) 
                 <Celula className="font-medium">{c.consultor?.nome ?? '—'}</Celula>
                 <Celula className="tabular-nums">
                   {fim ? formatarHoras(horasEntre(inicio, fim)) : <Badge variant="notice">Em aberto</Badge>}
+                </Celula>
+                <Celula className="max-w-72 min-w-44">
+                  {c.tarefas?.length
+                    ? <TarefasMarcadas tarefas={c.tarefas} total={c.total_tarefas ?? c.tarefas.length} rotulo="Tarefas marcadas" />
+                    : <span className="text-muted-foreground">—</span>}
                 </Celula>
                 <Celula className="max-w-md truncate text-muted-foreground">{c.descricao || '—'}</Celula>
                 <CelulaAcoes>
@@ -102,7 +109,7 @@ export default function CheckinsDoCliente({ cliente, perfil, versao, aoMudar }) 
       )}
       {apagando && (
         <ConfirmarAcao aberto aoFechar={() => setApagando(null)} titulo="Apagar este check-in?"
-          descricao="As horas deste atendimento somem do realizado do cliente. Não dá para desfazer."
+          descricao="As horas deste atendimento somem do realizado do cliente. As tarefas marcadas nele continuam feitas no check-list. Não dá para desfazer."
           rotuloConfirmar="Apagar check-in" aoConfirmar={() => apagar(apagando)} />
       )}
     </section>

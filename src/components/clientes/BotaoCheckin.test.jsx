@@ -2,11 +2,11 @@ import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
-import { fazerCheckin, fazerCheckout } from '@/data/checkins'
+import { fazerCheckin, fazerCheckout, tarefasDoCheckin } from '@/data/checkins'
 import BotaoCheckin from './BotaoCheckin'
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
-vi.mock('@/data/checkins', () => ({ fazerCheckin: vi.fn(), fazerCheckout: vi.fn() }))
+vi.mock('@/data/checkins', () => ({ fazerCheckin: vi.fn(), fazerCheckout: vi.fn(), tarefasDoCheckin: vi.fn() }))
 
 const cliente = { id: 'k1', nome: 'Alfa' }
 const HORA = 3_600_000
@@ -15,6 +15,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(fazerCheckin).mockResolvedValue({ erro: null })
   vi.mocked(fazerCheckout).mockResolvedValue({ erro: null })
+  vi.mocked(tarefasDoCheckin).mockResolvedValue([])
 })
 afterEach(() => vi.useRealTimers())
 
