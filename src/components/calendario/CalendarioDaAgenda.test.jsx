@@ -72,6 +72,14 @@ function tela(perfil, { cliente = CLIENTE, endereco = '/clientes/k1?aba=agenda' 
   )
 }
 
+// A 4ª visão, só do cliente: "Todos" troca a grade pela tabela de todos os eventos dele.
+const visoes = () => within(screen.getByRole('group', { name: 'Visão do calendário' })).getAllByRole('button').map((b) => b.textContent)
+async function abrirTodos(user) {
+  await screen.findByRole('group', { name: 'Visão do calendário' })
+  await user.click(within(screen.getByRole('group', { name: 'Visão do calendário' })).getByRole('button', { name: 'Todos' }))
+  return screen.findByRole('table', { name: 'Eventos do cliente' })
+}
+
 function celular(sim) {
   vi.stubGlobal('matchMedia', vi.fn((consulta) => ({
     matches: !sim, media: consulta, addEventListener: vi.fn(), removeEventListener: vi.fn(),
@@ -111,19 +119,43 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     expect(screen.queryByRole('region', { name: 'Indicadores da agenda' })).not.toBeInTheDocument()
     expect(indicadoresDaAgenda).not.toHaveBeenCalled()
     expect(screen.queryByRole('heading', { name: 'Calendário', level: 1 })).not.toBeInTheDocument()
-    // Embaixo do calendário, a tabela dos eventos do cliente fica no lugar do detalhe do dia e dos próximos 7 dias.
-    expect(await screen.findByRole('table', { name: 'Eventos do cliente' })).toBeInTheDocument()
+    // Embaixo do calendário, nada a mais: nem o detalhe do dia, nem os próximos 7 dias, nem a tabela (que é a visão Todos).
     expect(screen.queryByRole('region', { name: 'Detalhe do dia' })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Próximos 7 dias' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Eventos do cliente' })).not.toBeInTheDocument()
+    expect(eventosDoCliente).not.toHaveBeenCalled()
   })
 
-  it('embaixo do calendário, uma tabela "Eventos do cliente" com todos os eventos dele, na ordem do banco', async () => {
+  it('a troca de visão tem uma 4ª opção, Todos; nas outras visões a tabela não aparece', async () => {
+    const user = userEvent.setup()
     tela(gestora)
-    const tabela = await screen.findByRole('table', { name: 'Eventos do cliente' })
+    await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    expect(visoes()).toEqual(['Mês', 'Semana', 'Agenda', 'Todos'])
+    for (const visao of ['Semana', 'Agenda']) {
+      await user.click(within(screen.getByRole('group', { name: 'Visão do calendário' })).getByRole('button', { name: visao }))
+      expect(screen.queryByRole('table', { name: 'Eventos do cliente' })).not.toBeInTheDocument()
+    }
+    expect(eventosDoCliente).not.toHaveBeenCalled()
+  })
+
+  it('Todos: a tabela "Eventos do cliente" no lugar da grade, com todos os eventos dele na ordem do banco', async () => {
+    const user = userEvent.setup()
+    tela(gestora)
+    await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    const pedidosDoPeriodo = vi.mocked(eventosDoPeriodo).mock.calls.length
+    const tabela = await abrirTodos(user)
     expect(eventosDoCliente).toHaveBeenCalledWith({ clienteId: 'k1', pagina: 1 })
-    expect(screen.getByRole('heading', { name: 'Eventos do cliente' })).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Visão do calendário' })).getByRole('button', { name: 'Todos' }))
+      .toHaveAttribute('aria-pressed', 'true')
+    // Dentro do cartão do calendário, no lugar da grade; o Hoje ‹ › não vale aqui e some; o período nem é lido.
     const calendario = screen.getByRole('region', { name: 'Calendário' })
-    expect(calendario.compareDocumentPosition(tabela) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(calendario).toContainElement(tabela)
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument()
+    expect(within(calendario).getByRole('heading', { name: 'Todos os eventos do cliente' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Hoje' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Período anterior' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Próximo período' })).not.toBeInTheDocument()
+    expect(eventosDoPeriodo).toHaveBeenCalledTimes(pedidosDoPeriodo)
     expect(within(tabela).getAllByRole('columnheader').map((c) => c.textContent))
       .toEqual(['Data', 'Horário', 'Título', 'Organizador', 'Situação', 'Ações'])
     const [, futuro, hoje, antigo] = within(tabela).getAllByRole('row')
@@ -156,11 +188,27 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     expect(screen.getByText('Dois cliques num dia criam um evento')).toBeInTheDocument()
   })
 
-  it('cliente sem eventos: a lista vazia diz isso', async () => {
+  it('Todos, cliente sem eventos: a lista vazia diz isso', async () => {
+    const user = userEvent.setup()
     vi.mocked(eventosDoCliente).mockResolvedValue({ itens: [], total: 0, proximoId: null })
     tela(consultor)
+    await screen.findByRole('group', { name: 'Visão do calendário' })
+    await user.click(within(screen.getByRole('group', { name: 'Visão do calendário' })).getByRole('button', { name: 'Todos' }))
     expect(await screen.findByText('Nenhum evento marcado para este cliente.')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Eventos do cliente' })).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Eventos do cliente' })).not.toBeInTheDocument()
+  })
+
+  it('Todos: "Novo evento" continua abrindo com o cliente travado; voltar ao Mês traz a grade', async () => {
+    const user = userEvent.setup()
+    tela(consultor)
+    await abrirTodos(user)
+    await user.click(screen.getByRole('button', { name: 'Novo evento' }))
+    const janela = await screen.findByRole('dialog', { name: 'Novo evento' })
+    expect(within(janela).getByLabelText('Cliente')).toBeDisabled()
+    expect(within(janela).getByLabelText('Cliente')).toHaveTextContent('Provedor Alfa')
+    await user.click(within(janela).getByRole('button', { name: 'Cancelar' }))
+    await user.click(within(screen.getByRole('group', { name: 'Visão do calendário' })).getByRole('button', { name: 'Mês' }))
+    expect(await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })).toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'Eventos do cliente' })).not.toBeInTheDocument()
   })
 
@@ -169,13 +217,14 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     const quinze = Array.from({ length: 15 }, (_, i) => ({ ...EVENTO, id: `r${i}`, titulo: `Reunião ${i + 1}` }))
     vi.mocked(eventosDoCliente).mockResolvedValue({ itens: quinze, total: 15, proximoId: null })
     const { unmount } = tela(gestora)
-    const tabela = await screen.findByRole('table', { name: 'Eventos do cliente' })
+    const tabela = await abrirTodos(user)
     expect(within(tabela).getAllByRole('row')).toHaveLength(16)
     expect(screen.queryByRole('navigation', { name: 'Paginação' })).not.toBeInTheDocument()
     unmount()
 
     vi.mocked(eventosDoCliente).mockResolvedValue({ itens: quinze, total: 16, proximoId: null })
     tela(gestora)
+    await abrirTodos(user)
     const paginacao = await screen.findByRole('navigation', { name: 'Paginação' })
     expect(paginacao).toHaveTextContent('1–15 de 16')
     await user.click(within(paginacao).getByRole('button', { name: /Próxima/ }))
@@ -185,7 +234,7 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
   it('"Abrir" na linha abre a janela do evento, a mesma do calendário', async () => {
     const user = userEvent.setup()
     tela(gestora)
-    const tabela = await screen.findByRole('table', { name: 'Eventos do cliente' })
+    const tabela = await abrirTodos(user)
     await user.click(within(tabela).getByRole('button', { name: 'Abrir Diagnóstico Alfa' }))
     const janela = await screen.findByRole('dialog', { name: 'Editar evento' })
     expect(within(janela).getByLabelText('Título')).toHaveValue('Diagnóstico Alfa')
@@ -194,7 +243,7 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
   it('salvar um evento relê a lista na mesma página', async () => {
     const user = userEvent.setup()
     tela(consultor)
-    const tabela = await screen.findByRole('table', { name: 'Eventos do cliente' })
+    const tabela = await abrirTodos(user)
     expect(eventosDoCliente).toHaveBeenCalledTimes(1)
     await user.click(within(tabela).getByRole('button', { name: 'Abrir Kickoff Alfa' }))
     const janela = await screen.findByRole('dialog', { name: 'Editar evento' })
@@ -318,13 +367,13 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
 })
 
 describe('Calendário do menu (sem cliente)', () => {
-  it('continua com o detalhe do dia e os próximos 7 dias, sem a tabela do cliente', async () => {
+  it('continua com o detalhe do dia e os próximos 7 dias, sem a visão Todos nem a tabela do cliente', async () => {
     tela(gestora, { cliente: null, endereco: '/calendario' })
     expect(await screen.findByRole('region', { name: 'Detalhe do dia' })).toBeInTheDocument()
+    expect(visoes()).toEqual(['Mês', 'Semana', 'Agenda'])
     expect(screen.getByRole('region', { name: 'Próximos 7 dias' })).toBeInTheDocument()
     expect(screen.getByText('Clique num dia para ver os detalhes abaixo · dois cliques criam um evento')).toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'Eventos do cliente' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Eventos do cliente' })).not.toBeInTheDocument()
     expect(eventosDoCliente).not.toHaveBeenCalled()
   })
 })

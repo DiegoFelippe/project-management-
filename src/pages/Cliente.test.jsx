@@ -140,7 +140,9 @@ describe('Cliente (página)', () => {
     expect(listarEventos).not.toHaveBeenCalled()
     expect(screen.queryByLabelText('Consultor')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Novo evento' })).toBeInTheDocument()
-    // Embaixo do calendário, os eventos do cliente de todas as datas (pedido do Diego, 17/11).
+    // Os eventos do cliente de todas as datas ficam na 4ª visão, Todos (pedido do Diego, 17/11): nada embaixo do calendário.
+    expect(eventosDoCliente).not.toHaveBeenCalled()
+    await userEvent.setup().click(within(screen.getByRole('group', { name: 'Visão do calendário' })).getByRole('button', { name: 'Todos' }))
     await waitFor(() => expect(eventosDoCliente).toHaveBeenCalledWith({ clienteId: 'k1', pagina: 1 }))
     expect(await screen.findByText('Nenhum evento marcado para este cliente.')).toBeInTheDocument()
   })

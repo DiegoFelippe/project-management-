@@ -231,10 +231,11 @@ Design: `docs/superpowers/specs/2026-11-16-calendario-design.md` (decisões da c
 - **Agenda dentro do cliente** (pedido do Diego, 17/11): a aba Agenda usa o mesmo calendário do menu
   (`CalendarioDaAgenda` com o cliente), recortado pelo cliente e **só com os eventos dele** — sem cartões de números (a aba Quadro
   e a aba Agenda do cliente não os têm, pedido do Diego, 17/11), a barra não tem consultor/consultoria/cliente, "Mostrar" tem reuniões e feriados e "Novo
-  evento" abre com o cliente travado. Embaixo do calendário, no lugar do detalhe do dia e dos próximos 7 dias, uma
-  tabela **"Eventos do cliente"** com todos os eventos dele, de todas as datas (15 por página, do mais novo para o mais
-  antigo, `eventos_do_cliente` no banco) — pedido do Diego, 17/11. Check-ins ficam na aba Check-ins e o histórico na aba
-  Histórico (que traz "Reunião realizada" e "Pasta da reunião criada").
+  evento" abre com o cliente travado. Embaixo do calendário não há nada (nem detalhe do dia nem próximos 7 dias): a troca
+  de visão ganha uma 4ª, **"Todos"** (só no cliente), com a tabela "Eventos do cliente" — todos os eventos dele, de todas
+  as datas (15 por página, do mais novo para o mais antigo, `eventos_do_cliente` no banco), no lugar da grade e sem o
+  "Hoje ‹ ›" — pedido do Diego, 17/11. Check-ins ficam na aba Check-ins e o histórico na aba Histórico (que traz
+  "Reunião realizada" e "Pasta da reunião criada").
 
 ## Layout
 

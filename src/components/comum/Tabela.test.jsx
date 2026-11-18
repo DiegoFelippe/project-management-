@@ -11,6 +11,12 @@ describe('Tabela (padrão das listas)', () => {
     expect(screen.getByRole('heading', { name: 'Quem espera' })).toBeInTheDocument()
   })
 
+  it('semCartao: a tabela entra no cartão de quem a usa, sem cartão próprio', () => {
+    const { container } = render(<Tabela rotulo="Eventos" semCartao colunas={['Título']}><Linha><Celula>Kickoff</Celula></Linha></Tabela>)
+    expect(screen.getByRole('table', { name: 'Eventos' })).toBeInTheDocument()
+    expect(container.querySelector('.card')).toBeNull()
+  })
+
   it('tem nome, as colunas, a coluna de ações e uma linha por item', () => {
     render(
       <Tabela rotulo="Times" colunas={['Time', 'Gestor']}>

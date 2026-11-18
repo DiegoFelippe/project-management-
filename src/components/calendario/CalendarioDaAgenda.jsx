@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlignLeft, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Loader2, X } from 'lucide-react'
+import { AlignLeft, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, List, Loader2, X } from 'lucide-react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
@@ -33,6 +33,8 @@ const VISOES = [
   { valor: 'semana', rotulo: 'Semana', icone: CalendarDays },
   { valor: 'agenda', rotulo: 'Agenda', icone: AlignLeft },
 ]
+// Dentro do cliente, uma 4ª visão (pedido do Diego, 17/11): Todos, a tabela com todos os eventos dele, de todas as datas.
+const VISOES_DO_CLIENTE = [...VISOES, { valor: 'todos', rotulo: 'Todos', icone: List }]
 // O que o Google pode pôr no endereço na volta do "Conectar Google" (sai dele depois de lido).
 const PARAMETROS_DO_GOOGLE = ['code', 'state', 'scope', 'authuser', 'prompt', 'hd', 'iss', 'error', 'error_description', 'error_uri']
 const SEM_FILTRO = { valor: '', nome: null }
@@ -82,13 +84,14 @@ function useItensDoPeriodo({ de, ate, filtros, mostrar, versao, ligado = true })
 }
 
 // O calendário, no layout do Hub: barra de filtros, 4 indicadores, Mês/Semana/Agenda e, embaixo, o detalhe do dia e os
-// próximos 7 dias (no cliente, a tabela "Eventos do cliente"). Cada pessoa vê o que o banco deixa (consultor: a própria agenda e os convites; gestão: a da
+// próximos 7 dias. Cada pessoa vê o que o banco deixa (consultor: a própria agenda e os convites; gestão: a da
 // consultoria; central: todas). Só o período visível é lido. ?evento=<id> no endereço abre o evento.
 // - Sem `cliente`: o menu Calendário. Aqui também termina a conexão do Google da pessoa (o Google volta para
 //   /calendario?code=…&state=…).
 // - Com `cliente` ({ id, nome, consultoria_id, arquivado, contato_nome, contato_email }, a aba Agenda do cliente): só os
-//   eventos daquele cliente, sem os cartões de números e, embaixo do calendário, no lugar do detalhe do dia e dos próximos
-//   7 dias, a tabela "Eventos do cliente" com todos os eventos dele, de todas as datas (pedido do Diego, 17/11); a barra fica sem consultor, consultoria e cliente, e o "Mostrar", só
+//   eventos daquele cliente, sem os cartões de números e sem nada embaixo do calendário; a troca de visão ganha a 4ª,
+//   Todos: a tabela "Eventos do cliente" com todos os eventos dele, de todas as datas, no lugar da grade (pedido do
+//   Diego, 17/11; ali o Hoje ‹ › não vale e some, e o período nem é lido); a barra fica sem consultor, consultoria e cliente, e o "Mostrar", só
 //   com reuniões e feriados; "Novo evento" já nasce no cliente (travado). Cliente arquivado ou sem consultoria não ganha
 //   evento novo.
 export default function CalendarioDaAgenda({ cliente = null }) {
@@ -121,6 +124,10 @@ export default function CalendarioDaAgenda({ cliente = null }) {
   const recarregar = () => setVersao((v) => v + 1)
 
   const clienteId = cliente?.id
+  const todos = Boolean(cliente) && visao === 'todos'
+  // O período que as visões do calendário leem. Na visão Todos não se lê nada dele; o Mês segue valendo de referência
+  // (o dia do "Novo evento" e a volta para uma visão do calendário).
+  const visaoDoPeriodo = todos ? 'mes' : visao
   const filtros = useMemo(() => ({
     consultorId: consultor.valor || undefined,
     consultoriaId: consultoria || undefined,
@@ -130,8 +137,8 @@ export default function CalendarioDaAgenda({ cliente = null }) {
   const deVariasPessoas = perfil.papel !== 'pessoa' && !consultor.valor
   const temFiltros = Boolean(consultor.valor || consultoria || clienteDoFiltro.valor) || tipos.some((t) => !mostrar[t.chave])
 
-  const periodo = useMemo(() => periodoDaVisao(visao, diaDaVisao, hoje), [visao, diaDaVisao, hoje])
-  const doPeriodo = useItensDoPeriodo({ de: periodo.de, ate: periodo.ate, filtros, mostrar, versao })
+  const periodo = useMemo(() => periodoDaVisao(visaoDoPeriodo, diaDaVisao, hoje), [visaoDoPeriodo, diaDaVisao, hoje])
+  const doPeriodo = useItensDoPeriodo({ de: periodo.de, ate: periodo.ate, filtros, mostrar, versao, ligado: !todos })
   // Próximos 7 dias (só no menu): do mesmo pedido quando o período visível já os cobre; senão, uma leitura só deles.
   const proximos = { de: hoje, ate: somarDias(hoje, 7) }
   const cobre = periodo.de <= proximos.de && periodo.ate >= proximos.ate
@@ -142,7 +149,7 @@ export default function CalendarioDaAgenda({ cliente = null }) {
 
   // O dia do detalhe: o clicado, se está no período; senão hoje (ou o primeiro dia do mês/período).
   const diaDoDetalhe = periodo.dias.includes(selecionado) ? selecionado
-    : periodo.dias.includes(hoje) ? hoje : visao === 'mes' ? `${diaDaVisao.slice(0, 7)}-01` : periodo.de
+    : periodo.dias.includes(hoje) ? hoje : visaoDoPeriodo === 'mes' ? `${diaDaVisao.slice(0, 7)}-01` : periodo.de
 
   // O meu Google (o selo da barra e o aviso da janela). Central e dono nunca organizam eventos: não leem.
   useEffect(() => {
@@ -233,7 +240,7 @@ export default function CalendarioDaAgenda({ cliente = null }) {
 
   function mudarVisao(nova) {
     setVisao(nova)
-    if (nova !== 'agenda') setDiaDaVisao(diaDoDetalhe)
+    if (nova !== 'agenda' && nova !== 'todos') setDiaDaVisao(diaDoDetalhe)
   }
 
   function limpar() {
@@ -251,7 +258,7 @@ export default function CalendarioDaAgenda({ cliente = null }) {
     recarregar()
   }
 
-  const rotulo = rotuloDoPeriodo(visao, diaDaVisao)
+  const rotulo = rotuloDoPeriodo(visaoDoPeriodo, diaDaVisao)
   const propsDaVisao = {
     dias: periodo.dias, porDia: doPeriodo.porDia, hoje, selecionado: diaDoDetalhe, deVariasPessoas,
     aoSelecionar: setSelecionado, aoCriar: criar, aoAbrir: abrir,
@@ -281,7 +288,9 @@ export default function CalendarioDaAgenda({ cliente = null }) {
       <div className="space-y-4">
         <section aria-label="Calendário" className="card min-w-0 overflow-hidden">
           <div className="flex flex-wrap items-center gap-2 border-b px-3 py-3 sm:px-4">
-            {visao !== 'agenda' ? (
+            {todos ? (
+              <h2 className="text-janela font-bold">Todos os eventos do cliente</h2>
+            ) : visao !== 'agenda' ? (
               <>
                 <Button type="button" variant="outline" size="sm" onClick={() => { setDiaDaVisao(hoje); setSelecionado(hoje) }}>Hoje</Button>
                 <Button type="button" variant="ghost" size="icon" aria-label="Período anterior" onClick={() => setDiaDaVisao((d) => navegar(visao, d, -1))}>
@@ -297,19 +306,21 @@ export default function CalendarioDaAgenda({ cliente = null }) {
             )}
             {doPeriodo.carregando && <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Carregando" />}
             <div className="ml-auto">
-              <AbasSegmentadas rotulo="Visão do calendário" abas={VISOES} valor={visao} aoMudar={mudarVisao} />
+              <AbasSegmentadas rotulo="Visão do calendário" abas={cliente ? VISOES_DO_CLIENTE : VISOES} valor={visao} aoMudar={mudarVisao} />
             </div>
           </div>
-          <div className="p-2 sm:p-4">
-            {doPeriodo.erro && <p role="alert" className="mb-3 text-corpo text-destructive">Não foi possível carregar a agenda. Tente de novo.</p>}
-            {visao === 'mes' && <VisaoMes {...propsDaVisao} mes={diaDaVisao.slice(0, 7)} rotulo={rotulo} mostrar={mostrar} detalheAbaixo={!cliente} />}
-            {visao === 'semana' && <VisaoSemana {...propsDaVisao} />}
-            {visao === 'agenda' && <VisaoAgenda {...propsDaVisao} />}
-          </div>
+          {todos ? (
+            <EventosDoCliente clienteId={cliente.id} hoje={hoje} versao={versao} aoAbrir={abrir} />
+          ) : (
+            <div className="p-2 sm:p-4">
+              {doPeriodo.erro && <p role="alert" className="mb-3 text-corpo text-destructive">Não foi possível carregar a agenda. Tente de novo.</p>}
+              {visao === 'mes' && <VisaoMes {...propsDaVisao} mes={diaDaVisao.slice(0, 7)} rotulo={rotulo} mostrar={mostrar} detalheAbaixo={!cliente} />}
+              {visao === 'semana' && <VisaoSemana {...propsDaVisao} />}
+              {visao === 'agenda' && <VisaoAgenda {...propsDaVisao} />}
+            </div>
+          )}
         </section>
-        {cliente ? (
-          <EventosDoCliente clienteId={cliente.id} hoje={hoje} versao={versao} aoAbrir={abrir} />
-        ) : (
+        {!cliente && (
           <div className="grid items-stretch gap-4 md:grid-cols-2">
             <DetalheDoDia dia={diaDoDetalhe} itens={doPeriodo.porDia.get(diaDoDetalhe) ?? []} deVariasPessoas={deVariasPessoas} aoCriar={criar} aoAbrir={abrir} />
             <ProximosDias dias={diasEntre(proximos.de, proximos.ate)} porDia={porDiaProximos} deVariasPessoas={deVariasPessoas}

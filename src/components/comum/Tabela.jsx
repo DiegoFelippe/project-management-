@@ -29,10 +29,11 @@ export function Paginacao({ pagina, total, porPagina = POR_PAGINA, aoMudar }) {
   )
 }
 
-// semAcoes: tabela só de leitura, sem a coluna de ações. titulo: cabeçalho dentro do cartão.
-export function Tabela({ rotulo, titulo, colunas, larguraMinima = 720, paginacao, semAcoes = false, children }) {
+// semAcoes: tabela só de leitura, sem a coluna de ações. titulo: cabeçalho dentro do cartão. semCartao: a tabela entra
+// rente no cartão de quem a usa (ex.: a visão Todos da agenda do cliente, dentro do cartão do calendário).
+export function Tabela({ rotulo, titulo, colunas, larguraMinima = 720, paginacao, semAcoes = false, semCartao = false, children }) {
   return (
-    <div className="card overflow-hidden">
+    <div className={cn('overflow-hidden', !semCartao && 'card')}>
       {titulo && <h2 className="px-4 pt-4 pb-2 text-subtitulo font-semibold text-muted-foreground">{titulo}</h2>}
       <div className="overflow-x-auto">
         <table aria-label={rotulo} className="w-full text-left text-corpo" style={{ minWidth: larguraMinima }}>
