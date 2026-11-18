@@ -1,13 +1,14 @@
 import { useCallback, useState } from 'react'
 import { SquarePlus, X } from 'lucide-react'
+import Campo from '@/components/campos/Campo'
 import CampoData from '@/components/campos/CampoData'
 import Seletor from '@/components/campos/Seletor'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import Avatar from '@/components/comum/Avatar'
 import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
-import { Button } from '@/components/ui/button'
+import { useAlterado } from '@/components/comum/useAlterado'
+import { useEnvio } from '@/components/comum/useEnvio'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { criarCartao, pessoasDoQuadro } from '@/data/quadro'
 import { atalhosDoPrazo, OPCOES_DE_PRIORIDADE } from './cores'
 
@@ -16,15 +17,16 @@ const PRIORIDADES = [{ valor: '', rotulo: 'Sem prioridade' }, ...OPCOES_DE_PRIOR
 // "Novo cartão" (como no Mochi): título, coluna, prioridade, prazo e responsáveis (quem pode ser responsável no quadro; a
 // lista vem do banco). Cria no fim da coluna. `aoCriado(id, colunaId, aviso?)`: o cartão já existe (aviso = um
 // responsável que o banco recusou; o cartão abre para corrigir). `aoRecusado()`: o banco recusou o cartão (sem
-// permissão, coluna que saiu); a janela mostra o motivo e quem chama relê o quadro.
+// permissão, coluna que saiu); a janela mostra o motivo e quem chama relê o quadro. O erro do título fica embaixo dele, e
+// fechar com algo digitado pergunta antes (usabilidade, U2 e U4).
 export default function JanelaNovoCartao({ quadro, colunaId, aoFechar, aoCriado, aoRecusado = () => {} }) {
   const [titulo, setTitulo] = useState('')
   const [coluna, setColuna] = useState(colunaId ?? quadro.colunas[0]?.id ?? '')
   const [prioridade, setPrioridade] = useState('')
   const [prazo, setPrazo] = useState('')
   const [responsaveis, setResponsaveis] = useState([])
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  const { erro, erros, conferir, enviando, enviar: enviarComAviso } = useEnvio()
+  const alterado = useAlterado({ titulo, coluna, prioridade, prazo, responsaveis: responsaveis.map((p) => p.id) })
   const [atalhos] = useState(() => atalhosDoPrazo())
 
   const buscar = useCallback(async (termo) => {
@@ -40,57 +42,46 @@ export default function JanelaNovoCartao({ quadro, colunaId, aoFechar, aoCriado,
   async function enviar(evento) {
     evento.preventDefault()
     if (enviando) return
-    if (!titulo.trim()) return setErro('Dê um título ao cartão.')
-    setErro(null)
-    setEnviando(true)
-    const resposta = await criarCartao({
-      colunaId: coluna, titulo: titulo.trim(), prioridade: prioridade || null, prazo: prazo || null,
-      responsaveis: responsaveis.map((p) => p.id), quadro,
+    if (!conferir(titulo.trim() ? {} : { titulo: 'Dê um título ao cartão.' })) return
+    await enviarComAviso(async () => {
+      const resposta = await criarCartao({
+        colunaId: coluna, titulo: titulo.trim(), prioridade: prioridade || null, prazo: prazo || null,
+        responsaveis: responsaveis.map((p) => p.id), quadro,
+      })
+      if (resposta.erro && !resposta.cartao) {
+        aoRecusado()
+        return resposta
+      }
+      if (resposta.erro) aoCriado(resposta.cartao.id, coluna, resposta.erro)
+      else aoCriado(resposta.cartao.id, coluna)
+      aoFechar()
+      return { erro: null }
     })
-    setEnviando(false)
-    if (resposta.erro && !resposta.cartao) {
-      setErro(resposta.erro)
-      aoRecusado()
-      return
-    }
-    if (resposta.erro) aoCriado(resposta.cartao.id, coluna, resposta.erro)
-    else aoCriado(resposta.cartao.id, coluna)
-    aoFechar()
   }
 
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo="Novo cartão" icone={SquarePlus} largura="lg" enviando={enviando}
-      descricao="Entra no fim da coluna. Descrição, checklist e anexos ficam no cartão, depois de criado."
-      rodape={(
-        <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
-          <Button type="submit" form="form-novo-cartao" disabled={enviando}>{enviando ? 'Criando…' : 'Criar cartão'}</Button>
-        </>
-      )}>
+      descricao="Entra no fim da coluna. Descrição, checklist e anexos ficam no cartão, depois de criado." erros={erros} alterado={alterado}
+      form="form-novo-cartao" rotuloEnviar="Criar cartão" rotuloEnviando="Criando…">
       <form id="form-novo-cartao" noValidate onSubmit={enviar} className="space-y-5">
         <SecaoFormulario>
-          <div className="grid gap-2">
-            <Label htmlFor="novo-cartao-titulo">Título</Label>
+          <Campo id="novo-cartao-titulo" rotulo="Título" erro={erros.titulo}>
             <Input id="novo-cartao-titulo" className="h-10" maxLength={200} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
-          </div>
+          </Campo>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="novo-cartao-coluna">Coluna</Label>
+            <Campo id="novo-cartao-coluna" rotulo="Coluna">
               <Seletor id="novo-cartao-coluna" valor={coluna} aoMudar={setColuna}
                 opcoes={quadro.colunas.map((c) => ({ valor: c.id, rotulo: c.nome }))} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="novo-cartao-prioridade">Prioridade</Label>
+            </Campo>
+            <Campo id="novo-cartao-prioridade" rotulo="Prioridade">
               <Seletor id="novo-cartao-prioridade" valor={prioridade} aoMudar={setPrioridade} opcoes={PRIORIDADES} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="novo-cartao-prazo">Prazo</Label>
+            </Campo>
+            <Campo id="novo-cartao-prazo" rotulo="Prazo">
               <CampoData id="novo-cartao-prazo" valor={prazo} aoMudar={setPrazo} atalhos={atalhos} placeholder="Sem prazo" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="novo-cartao-responsavel">Responsáveis</Label>
+            </Campo>
+            <Campo id="novo-cartao-responsavel" rotulo="Responsáveis">
               <Seletor id="novo-cartao-responsavel" valor="" aoMudar={incluir} buscar={buscar} placeholder="Adicionar responsável" />
-            </div>
+            </Campo>
           </div>
           {responsaveis.length > 0 && (
             <ul aria-label="Responsáveis escolhidos" className="flex flex-wrap gap-2">

@@ -3,6 +3,7 @@ import { Check, ChevronDown, Search } from 'lucide-react'
 import Avatar from '@/components/comum/Avatar'
 import { useAtraso } from '@/lib/useAtraso'
 import { cn } from '@/lib/utils'
+import { useCampo } from './contextoDoCampo'
 import Flutuante from './Flutuante'
 
 const ALTURA_LISTA = 288
@@ -25,6 +26,7 @@ export default function Seletor({
   multiplo = false, resumo = (n) => (n === 1 ? '1 escolhida' : `${n} escolhidas`),
 }) {
   const listaId = useId()
+  const campo = useCampo(id) // dentro de um Campo com erro: marcado e descrito pelo erro (usabilidade, U2)
   const [aberto, setAberto] = useState(false)
   const [termo, setTermo] = useState('')
   const [ativo, setAtivo] = useState(-1) // escolha de quem usa o teclado ou o mouse; -1 = ainda não escolheu
@@ -95,15 +97,16 @@ export default function Seletor({
   }
 
   const total = remoto?.total ?? 0
-  const campo = tamanho === 'sm' ? 'py-1.5 text-rotulo' : ''
+  const tamanhoDoCampo = tamanho === 'sm' ? 'py-1.5 text-rotulo' : ''
   const idOpcao = (i) => `${listaId}-${i}`
 
   return (
     <>
       <button ref={gatilho} id={id} type="button" role="combobox" disabled={desabilitado} aria-haspopup="listbox" aria-expanded={aberto} aria-controls={aberto ? listaId : undefined}
+        aria-invalid={campo.invalido || undefined} aria-describedby={campo.descritoPor}
         onClick={() => (aberto ? setAberto(false) : abrir())}
         onKeyDown={(e) => { if (e.key === 'ArrowDown' && !aberto) { e.preventDefault(); abrir() } }}
-        className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center gap-2 text-left', campo, (aberto || (selecionada && rotuloTodos != null && selecionada.valor !== '')) && 'border-primary/60', aberto && 'ring-primary/15 ring-2')}>
+        className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center gap-2 text-left', tamanhoDoCampo, !campo.invalido && (aberto || (selecionada && rotuloTodos != null && selecionada.valor !== '')) && 'border-primary/60', aberto && 'ring-primary/15 ring-2')}>
         {selecionada && <Marca opcao={selecionada} />}
         <span className={cn('min-w-0 flex-1 truncate', textoDoGatilho ? 'text-foreground font-medium' : 'text-muted-foreground')}>{textoDoGatilho ?? placeholder}</span>
         <ChevronDown className={cn('text-muted-foreground size-3.5 shrink-0 transition-transform', aberto && 'rotate-180')} aria-hidden="true" />

@@ -1,6 +1,10 @@
+import { juntarIds, useCampo } from "@/components/campos/contextoDoCampo";
 import { cn } from "@/lib/utils";
 
+// Dentro de um Campo com erro (usabilidade, U2), o campo do rótulo (o mesmo id) ganha aria-invalid (a borda vermelha
+// do .input) e aria-describedby com a dica e o erro.
 function Input({ className, type, ...props }) {
+  const campo = useCampo(props.id);
   return (
     <input
       type={type}
@@ -10,6 +14,8 @@ function Input({ className, type, ...props }) {
         className,
       )}
       {...props}
+      aria-invalid={props["aria-invalid"] ?? (campo.invalido || undefined)}
+      aria-describedby={juntarIds(props["aria-describedby"], campo.descritoPor)}
     />
   );
 }

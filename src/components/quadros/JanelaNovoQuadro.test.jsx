@@ -41,7 +41,9 @@ describe('JanelaNovoQuadro', () => {
     const { janela } = tela()
     expect(within(janela).getByLabelText('Nome')).toHaveAttribute('maxLength', '80')
     await user.click(screen.getByRole('button', { name: 'Criar quadro' }))
-    expect(await within(janela).findByRole('alert')).toHaveTextContent('Dê um nome ao quadro.')
+    // O erro fica embaixo do campo (usabilidade, U2), que recebe o foco.
+    expect(within(janela).getByLabelText('Nome')).toHaveAccessibleDescription('Dê um nome ao quadro.')
+    expect(within(janela).getByLabelText('Nome')).toHaveFocus()
     expect(criarQuadro).not.toHaveBeenCalled()
   })
 
@@ -52,7 +54,7 @@ describe('JanelaNovoQuadro', () => {
     await user.click(within(janela).getByText('Um time'))
     // Sem escolher o time, não envia.
     await user.click(screen.getByRole('button', { name: 'Criar quadro' }))
-    expect(await within(janela).findByRole('alert')).toHaveTextContent('Escolha o time.')
+    expect(within(janela).getByLabelText('Time')).toHaveAccessibleDescription('Escolha o time.')
     expect(criarQuadro).not.toHaveBeenCalled()
     // A lista vem do banco: sem busca, o primeiro; "impl" traz a Implantação.
     vi.mocked(timesParaNovoQuadro).mockImplementation(async ({ termo }) => (termo

@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 // Confirmação de apagar, desativar e arquivar: diz o que acontece e o que fica (regra CRUD do CLAUDE.md).
-// aoConfirmar devolve { erro }: com erro, a janela continua aberta mostrando o motivo.
-export default function ConfirmarAcao({ aberto, aoFechar, titulo, descricao, rotuloConfirmar, perigo = true, aoConfirmar }) {
+// aoConfirmar devolve { erro }: com erro, a janela continua aberta mostrando o motivo. `rotuloCancelar` troca o
+// "Cancelar" (ex.: "Continuar editando" na pergunta de descartar da JanelaFormulario).
+export default function ConfirmarAcao({ aberto, aoFechar, titulo, descricao, rotuloConfirmar, rotuloCancelar = 'Cancelar', perigo = true, aoConfirmar }) {
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
 
@@ -38,7 +39,7 @@ export default function ConfirmarAcao({ aberto, aoFechar, titulo, descricao, rot
         </DialogHeader>
         {erro && <Aviso>{erro}</Aviso>}
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={fechar}>Cancelar</Button>
+          <Button type="button" variant="outline" onClick={fechar}>{rotuloCancelar}</Button>
           <Button type="button" variant={perigo ? 'destructive' : 'default'} disabled={enviando} onClick={confirmar}>
             {rotuloConfirmar}
           </Button>

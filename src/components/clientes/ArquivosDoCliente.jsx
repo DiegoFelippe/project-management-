@@ -5,13 +5,14 @@ import { toast } from 'sonner'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import Campo from '@/components/campos/Campo'
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
+import { useAlterado } from '@/components/comum/useAlterado'
 import { useEnvio } from '@/components/comum/useEnvio'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   apagarArquivo, apagarPasta, buscarPasta, criarPasta, enviarArquivo, linkParaBaixar, listarArquivos, listarPastas, renomearPasta,
 } from '@/data/arquivos'
@@ -52,26 +53,28 @@ const lerArquivos = ({ clienteId, pastaId, pagina }) => listarArquivos(clienteId
 const quantosArquivos = (n) => (n === 1 ? 'O 1 arquivo dela some de vez.' : `Os ${n} arquivos dela somem de vez.`)
 
 // Nova pasta e Renomear: a mesma janela; com `pasta`, vem preenchida com o nome dela.
+// O erro fica embaixo do nome, e fechar com o nome mudado pergunta antes (usabilidade, U2 e U4).
 function FormularioDePasta({ pasta, aoFechar, aoSalvar }) {
   const [nome, setNome] = useState(pasta?.nome ?? '')
-  const { erro, setErro, enviando, enviar } = useEnvio(aoFechar)
+  const { erro, erros, conferir, enviando, enviar } = useEnvio(aoFechar)
+  const alterado = useAlterado(nome)
   const novo = !pasta
 
   async function salvar(evento) {
     evento.preventDefault()
-    if (!nome.trim()) return setErro('Dê um nome à pasta.')
+    if (!conferir(nome.trim() ? {} : { nome: 'Dê um nome à pasta.' })) return
     await enviar(() => aoSalvar(nome.trim()))
   }
 
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo={novo ? 'Nova pasta' : 'Renomear pasta'} icone={novo ? FolderPlus : Pencil}
       descricao={novo ? 'Agrupa arquivos deste cliente.' : 'O nome é único entre as pastas do cliente.'} enviando={enviando}
+      erros={erros} alterado={alterado}
       form="form-pasta" rotuloEnviar={novo ? 'Criar pasta' : 'Salvar'} rotuloEnviando={novo ? 'Criando…' : 'Salvando…'}>
       <form id="form-pasta" noValidate onSubmit={salvar} className="space-y-5">
-        <div className="grid gap-2">
-          <Label htmlFor="nome-da-pasta">Nome da pasta</Label>
+        <Campo id="nome-da-pasta" rotulo="Nome da pasta" erro={erros.nome}>
           <Input id="nome-da-pasta" className="h-10" maxLength={120} value={nome} onChange={(e) => setNome(e.target.value)} />
-        </div>
+        </Campo>
         {erro && <Aviso>{erro}</Aviso>}
       </form>
     </JanelaFormulario>

@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import FormularioCliente from './FormularioCliente'
@@ -120,5 +120,53 @@ describe('FormularioCliente', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(await screen.findByText('Já existe um cliente com este CNPJ.')).toBeInTheDocument()
     expect(aoFechar).not.toHaveBeenCalled()
+  })
+
+  // Usabilidade, U2: todos os erros de uma vez, cada um embaixo do seu campo, e o foco no primeiro.
+  it('CNPJ, telefone e e-mail errados: os três erros aparecem juntos, cada um no seu campo, e o foco vai para o primeiro', async () => {
+    const user = userEvent.setup()
+    const { aoSalvar } = abrir({ cliente: CLIENTE })
+    await user.clear(screen.getByLabelText('CNPJ (opcional)'))
+    await user.type(screen.getByLabelText('CNPJ (opcional)'), '11.222.333/0001-82')
+    await user.type(screen.getByLabelText('Telefone do contato (opcional)'), '49999')
+    await user.type(screen.getByLabelText('E-mail do contato (opcional)'), 'contato@')
+    await user.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(aoSalvar).not.toHaveBeenCalled()
+    const cnpj = screen.getByLabelText('CNPJ (opcional)')
+    const telefone = screen.getByLabelText('Telefone do contato (opcional)')
+    const email = screen.getByLabelText('E-mail do contato (opcional)')
+    for (const campo of [cnpj, telefone, email]) expect(campo).toHaveAttribute('aria-invalid', 'true')
+    expect(cnpj).toHaveAccessibleDescription('CNPJ inválido.')
+    expect(telefone).toHaveAccessibleDescription(/10 ou 11 números/)
+    expect(email).toHaveAccessibleDescription(/e-mail válido/)
+    expect(cnpj).toHaveFocus()
+    expect(screen.getByLabelText('Nome')).not.toHaveAttribute('aria-invalid')
+    // O pé da janela não repete os erros dos campos.
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('telefone com DDD (10 ou 11 números) e e-mail certo passam e vão como digitados', async () => {
+    const user = userEvent.setup()
+    const { aoSalvar } = abrir({ cliente: CLIENTE })
+    await user.type(screen.getByLabelText('Telefone do contato (opcional)'), '(49) 99988-7766')
+    await user.type(screen.getByLabelText('E-mail do contato (opcional)'), 'carla@alfa.com.br')
+    await user.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(aoSalvar).toHaveBeenCalledWith(expect.objectContaining({ contatoTelefone: '(49) 99988-7766', contatoEmail: 'carla@alfa.com.br' }))
+  })
+
+  // Usabilidade, U4: com algo digitado, fechar pergunta antes.
+  it('fechar com algo digitado pergunta antes de descartar; sem mudança fecha direto', async () => {
+    const user = userEvent.setup()
+    const { aoFechar, unmount } = abrir()
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(aoFechar).toHaveBeenCalledTimes(1)
+    unmount()
+    const outra = abrir()
+    await user.type(screen.getByLabelText('Nome'), 'Gama')
+    await user.keyboard('{Escape}')
+    const pergunta = screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })
+    expect(outra.aoFechar).not.toHaveBeenCalled()
+    await user.click(within(pergunta).getByRole('button', { name: 'Descartar' }))
+    expect(outra.aoFechar).toHaveBeenCalledTimes(1)
   })
 })

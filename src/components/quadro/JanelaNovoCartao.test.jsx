@@ -70,7 +70,9 @@ describe('JanelaNovoCartao', () => {
     const user = userEvent.setup()
     const { janela } = abrir()
     await user.click(within(janela).getByRole('button', { name: 'Criar cartão' }))
-    expect(within(janela).getByRole('alert')).toHaveTextContent('Dê um título ao cartão.')
+    // O erro fica embaixo do campo (usabilidade, U2), que recebe o foco.
+    expect(within(janela).getByLabelText('Título')).toHaveAccessibleDescription('Dê um título ao cartão.')
+    expect(within(janela).getByLabelText('Título')).toHaveFocus()
     expect(criarCartao).not.toHaveBeenCalled()
   })
 

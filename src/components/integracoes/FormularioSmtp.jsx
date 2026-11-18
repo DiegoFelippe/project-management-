@@ -2,10 +2,12 @@
 import { useState } from 'react'
 import CampoNumero from '@/components/campos/CampoNumero'
 import Seletor from '@/components/campos/Seletor'
+import Campo from '@/components/campos/Campo'
+import { useAlterado } from '@/components/comum/useAlterado'
 import { SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import { Input } from '@/components/ui/input'
-import Campo from './Campo'
 import { AVISO_DO_SEGREDO } from './constantes'
+import { erroDeEmail } from '@/lib/validacao'
 import JanelaIntegracao from './JanelaIntegracao'
 import { useEnvioDaIntegracao } from './useEnvioDaIntegracao'
 
@@ -25,7 +27,8 @@ export default function FormularioSmtp({ integracao, aoFechar, aoSalvar, aoTesta
   const [senha, setSenha] = useState('')
   const [remetente, setRemetente] = useState(atual.remetente ?? '')
   const [nomeRemetente, setNomeRemetente] = useState(atual.nome_remetente ?? '')
-  const { erro, enviando, testando, resultado, salvar, testar } = useEnvioDaIntegracao(montar, aoSalvar, aoTestar)
+  const { erro, erros, enviando, testando, resultado, salvar, testar } = useEnvioDaIntegracao(montar, aoSalvar, aoTestar)
+  const alterado = useAlterado({ host, porta, seguranca, usuario, senha, remetente, nomeRemetente })
 
   function trocarSeguranca(nova) {
     if (Number(porta) === PORTA_DA_SEGURANCA[seguranca]) setPorta(String(PORTA_DA_SEGURANCA[nova]))
@@ -34,10 +37,12 @@ export default function FormularioSmtp({ integracao, aoFechar, aoSalvar, aoTesta
 
   // O Testar manda um e-mail de teste para quem testa (o e-mail do seu acesso).
   function montar() {
-    if (!host.trim()) return { erro: 'Informe o servidor.' }
+    const erros = {}
+    if (!host.trim()) erros.host = 'Informe o servidor.'
     const numero = Number(porta)
-    if (!Number.isInteger(numero) || numero < 1 || numero > 65535) return { erro: 'Informe uma porta válida.' }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(remetente.trim())) return { erro: 'Informe o e-mail do remetente.' }
+    if (!Number.isInteger(numero) || numero < 1 || numero > 65535) erros.porta = 'Informe uma porta válida.'
+    if (erroDeEmail(remetente, { obrigatorio: true })) erros.remetente = 'Informe o e-mail do remetente, como contato@empresa.com.br.'
+    if (Object.keys(erros).length) return { erros }
     return {
       config: {
         host: host.trim(), porta: numero, seguranca, usuario: usuario.trim(),
@@ -48,15 +53,15 @@ export default function FormularioSmtp({ integracao, aoFechar, aoSalvar, aoTesta
   }
 
   return (
-    <JanelaIntegracao titulo="E-mail (SMTP)" aoFechar={aoFechar} aoSalvar={salvar} aoTestar={testar} erro={erro} enviando={enviando}
+    <JanelaIntegracao titulo="E-mail (SMTP)" aoFechar={aoFechar} aoSalvar={salvar} aoTestar={testar} erro={erro} erros={erros} alterado={alterado} enviando={enviando}
       testando={testando} resultado={resultado}
       descricao="O servidor de e-mail que o sistema usa para mandar mensagens em nome da consultoria.">
       <SecaoFormulario titulo="Servidor">
-        <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
-          <Campo id="smtp-host" rotulo="Servidor">
+        <div className="grid items-start gap-4 sm:grid-cols-[1fr_auto]">
+          <Campo id="smtp-host" rotulo="Servidor" erro={erros.host}>
             <Input id="smtp-host" className="h-10" placeholder="smtp.empresa.com.br" value={host} onChange={(e) => setHost(e.target.value)} />
           </Campo>
-          <Campo id="smtp-porta" rotulo="Porta">
+          <Campo id="smtp-porta" rotulo="Porta" erro={erros.porta}>
             <CampoNumero id="smtp-porta" valor={porta} aoMudar={setPorta} min={1} max={65535} />
           </Campo>
         </div>
@@ -65,7 +70,7 @@ export default function FormularioSmtp({ integracao, aoFechar, aoSalvar, aoTesta
         </Campo>
       </SecaoFormulario>
       <SecaoFormulario titulo="Acesso e remetente">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid items-start gap-4 sm:grid-cols-2">
           <Campo id="smtp-usuario" rotulo="Usuário">
             <Input id="smtp-usuario" className="h-10" autoComplete="off" value={usuario} onChange={(e) => setUsuario(e.target.value)} />
           </Campo>
@@ -73,7 +78,7 @@ export default function FormularioSmtp({ integracao, aoFechar, aoSalvar, aoTesta
             <Input id="smtp-senha" type="password" autoComplete="new-password" className="h-10" value={senha}
               placeholder={integracao ? AVISO_DO_SEGREDO : ''} onChange={(e) => setSenha(e.target.value)} />
           </Campo>
-          <Campo id="smtp-remetente" rotulo="E-mail do remetente">
+          <Campo id="smtp-remetente" rotulo="E-mail do remetente" erro={erros.remetente}>
             <Input id="smtp-remetente" type="email" className="h-10" placeholder="contato@empresa.com.br" value={remetente}
               onChange={(e) => setRemetente(e.target.value)} />
           </Campo>

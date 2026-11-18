@@ -7,6 +7,7 @@ import {
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import CampoHora from './CampoHora'
+import { juntarIds, useCampo } from './contextoDoCampo'
 import Flutuante, { BotaoCampo, BotaoLimpar } from './Flutuante'
 
 const SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
@@ -45,6 +46,7 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
   const grade = useRef(null)
   const focar = useRef(false) // o foco do teclado só vai para o dia quando a mudança veio das setas ou de uma escolha, não dos botões de mês
   const valorId = useId()
+  const campo = useCampo(id) // dentro de um Campo com erro: marcado e descrito pelo erro (usabilidade, U2)
 
   const dias = useMemo(() => eachDayOfInterval({ start: startOfWeek(startOfMonth(visao)), end: endOfWeek(endOfMonth(visao)) }), [visao])
   const chave = (d) => format(d, 'yyyy-MM-dd')
@@ -97,7 +99,7 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
   return (
     <>
       <div className="relative w-full">
-        <button ref={gatilho} id={id} type="button" disabled={desabilitado} onClick={alternar} aria-label={rotulo} aria-describedby={valorId} aria-haspopup="dialog" aria-expanded={aberto}
+        <button ref={gatilho} id={id} type="button" disabled={desabilitado} onClick={alternar} aria-label={rotulo} aria-describedby={juntarIds(valorId, campo.descritoPor)} aria-invalid={campo.invalido || undefined} aria-haspopup="dialog" aria-expanded={aberto}
           className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center gap-2 text-left', limpar && 'pr-10', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
           <CalendarDays className={cn('size-3.5 shrink-0', escolhida ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
           <span id={valorId} className={cn('min-w-0 flex-1 truncate', !escolhida && 'text-muted-foreground')}>

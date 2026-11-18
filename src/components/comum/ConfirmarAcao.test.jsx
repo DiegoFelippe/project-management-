@@ -22,4 +22,13 @@ describe('ConfirmarAcao', () => {
     expect(await screen.findByText(/ainda é gestora de times/)).toBeInTheDocument()
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
   })
+
+  it('rotuloCancelar troca o "Cancelar" (ex.: "Continuar editando" na pergunta de descartar)', async () => {
+    const aoFechar = vi.fn()
+    render(<ConfirmarAcao aberto titulo="Descartar?" descricao="x" rotuloConfirmar="Descartar" rotuloCancelar="Continuar editando"
+      aoConfirmar={vi.fn()} aoFechar={aoFechar} />)
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar editando' }))
+    expect(aoFechar).toHaveBeenCalledTimes(1)
+  })
 })

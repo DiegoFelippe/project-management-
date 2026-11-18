@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { juntarIds, useCampo } from './contextoDoCampo'
 import Flutuante, { BotaoCampo, BotaoLimpar } from './Flutuante'
 
 const HORAS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
@@ -29,6 +30,7 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
   const gatilho = useRef(null)
   const colunas = useRef(null)
   const valorId = useId()
+  const campo = useCampo(id) // dentro de um Campo com erro: marcado e descrito pelo erro (usabilidade, U2)
   const base = Array.from({ length: Math.ceil(60 / passo) }, (_, i) => String(i * passo).padStart(2, '0'))
   const minutos = atual && !base.includes(atual.m) ? [...base, atual.m].sort() : base
 
@@ -51,7 +53,7 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
   return (
     <>
       <div className="relative w-full">
-        <button ref={gatilho} id={id} type="button" disabled={desabilitado} aria-label={rotulo} aria-describedby={valorId} aria-haspopup="dialog" aria-expanded={aberto}
+        <button ref={gatilho} id={id} type="button" disabled={desabilitado} aria-label={rotulo} aria-describedby={juntarIds(valorId, campo.descritoPor)} aria-invalid={campo.invalido || undefined} aria-haspopup="dialog" aria-expanded={aberto}
           onClick={() => { setDigitado(''); setAberto((a) => !a) }}
           className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center text-left', compacto ? 'gap-1.5 py-1.5 text-rotulo' : 'gap-2', limparNoCampo && 'pr-10', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
           <Clock className={cn('shrink-0', compacto ? 'size-3' : 'size-3.5', atual ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />

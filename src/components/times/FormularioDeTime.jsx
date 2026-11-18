@@ -1,12 +1,13 @@
 import { UsersRound } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import Campo from '@/components/campos/Campo'
 import { buscarComoOpcoes, comoOpcaoDePessoa } from '@/components/campos/opcoesDePessoa'
 import Seletor from '@/components/campos/Seletor'
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
+import { useAlterado } from '@/components/comum/useAlterado'
 import { useEnvio } from '@/components/comum/useEnvio'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import EscolhaDePessoas from './EscolhaDePessoas'
 
@@ -15,6 +16,7 @@ import EscolhaDePessoas from './EscolhaDePessoas'
 // devolve { itens: [pessoa], total }; o gestor de agora já vem na lista); o gestor que cria é o gestor do time. No Novo
 // time, "Pessoas" (opcional) leva várias de uma vez (usabilidade, U7): `buscarPessoas(termo, excluirIds)` busca no banco
 // as da consultoria, sem o gestor escolhido. `aoSalvar(dados)` devolve { erro } (a janela fica aberta) ou fecha.
+// Os erros ficam embaixo de cada campo, todos de uma vez, e fechar com algo digitado pergunta antes (U2 e U4).
 export default function FormularioDeTime({ time, papel, buscarGestores, buscarPessoas, aoFechar, aoSalvar }) {
   const novo = !time
   const escolheGestor = papel === 'admin'
@@ -25,15 +27,20 @@ export default function FormularioDeTime({ time, papel, buscarGestores, buscarPe
   const [descricao, setDescricao] = useState(time?.descricao ?? '')
   const [gestorId, setGestorId] = useState(time?.gestor_id ?? '')
   const [pessoas, setPessoas] = useState([])
-  const [erroNome, setErroNome] = useState(null)
-  const { erro, setErro, enviando, enviar } = useEnvio(aoFechar)
+  const { erro, erros, conferir, enviando, enviar } = useEnvio(aoFechar)
+  const alterado = useAlterado({ nome, descricao, gestorId, pessoas: pessoas.map((p) => p.id) })
   const buscarDisponiveis = useCallback((termo) => buscarPessoas(termo, gestorId ? [gestorId] : []), [buscarPessoas, gestorId])
+
+  function errosDoTime() {
+    const achados = {}
+    if (nome.trim().length < 2) achados.nome = 'Use pelo menos 2 caracteres.'
+    if (novo && escolheGestor && !gestorId) achados.gestor = 'Escolha o gestor do time.'
+    return achados
+  }
 
   async function salvar(evento) {
     evento.preventDefault()
-    if (nome.trim().length < 2) return setErroNome('Use pelo menos 2 caracteres.')
-    setErroNome(null)
-    if (novo && escolheGestor && !gestorId) return setErro('Escolha o gestor do time.')
+    if (!conferir(errosDoTime())) return
     const dados = { nome: nome.trim(), descricao: descricao.trim() }
     if (escolheGestor) dados.gestorId = gestorId
     // Quem virou gestor não entra também como pessoa do time.
@@ -47,29 +54,24 @@ export default function FormularioDeTime({ time, papel, buscarGestores, buscarPe
 
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo={novo ? 'Novo time' : 'Editar time'} icone={UsersRound} enviando={enviando}
-      descricao={descricaoDaJanela} form="form-do-time" rotuloEnviar={novo ? 'Criar time' : 'Salvar'} rotuloEnviando={novo ? 'Criando…' : 'Salvando…'}>
+      descricao={descricaoDaJanela} erros={erros} alterado={alterado}
+      form="form-do-time" rotuloEnviar={novo ? 'Criar time' : 'Salvar'} rotuloEnviando={novo ? 'Criando…' : 'Salvando…'}>
       <form id="form-do-time" noValidate onSubmit={salvar} className="space-y-5">
-        <div className="grid gap-2">
-          <Label htmlFor="time-nome">Nome do time</Label>
-          <Input id="time-nome" maxLength={80} className="h-10" value={nome} onChange={(e) => setNome(e.target.value)}
-            aria-invalid={erroNome ? true : undefined} aria-describedby={erroNome ? 'time-nome-erro' : undefined} />
-          {erroNome && <p id="time-nome-erro" className="text-rotulo text-destructive">{erroNome}</p>}
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="time-descricao">Descrição (opcional)</Label>
+        <Campo id="time-nome" rotulo="Nome do time" erro={erros.nome}>
+          <Input id="time-nome" maxLength={80} className="h-10" value={nome} onChange={(e) => setNome(e.target.value)} />
+        </Campo>
+        <Campo id="time-descricao" rotulo="Descrição (opcional)">
           <Textarea id="time-descricao" maxLength={500} rows={2} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
-        </div>
+        </Campo>
         {escolheGestor && (
-          <div className="grid gap-2">
-            <Label htmlFor="time-gestor">Gestor do time</Label>
+          <Campo id="time-gestor" rotulo="Gestor do time" erro={erros.gestor}>
             <Seletor id="time-gestor" valor={gestorId} aoMudar={setGestorId} opcoes={gestorAtual} buscar={opcoesDeGestor} placeholder="Escolha…" />
-          </div>
+          </Campo>
         )}
         {novo && buscarPessoas && (
-          <div className="grid gap-2">
-            <Label htmlFor="time-pessoas">Pessoas (opcional)</Label>
+          <Campo id="time-pessoas" rotulo="Pessoas (opcional)">
             <EscolhaDePessoas id="time-pessoas" escolhidas={pessoas} aoMudar={setPessoas} buscar={buscarDisponiveis} />
-          </div>
+          </Campo>
         )}
         {erro && <Aviso>{erro}</Aviso>}
       </form>

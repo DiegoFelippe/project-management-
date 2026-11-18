@@ -5,8 +5,8 @@ import { buscarConsultoriasComoOpcoes } from '@/components/campos/opcoesDeConsul
 import Seletor from '@/components/campos/Seletor'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import CartoesDeOpcao from '@/components/comum/CartoesDeOpcao'
-import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
-import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import JanelaFormulario, { BotaoCancelar, SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import { useAlterado } from '@/components/comum/useAlterado'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -47,7 +47,8 @@ function ParaFixo({ nome, dica }) {
 
 // Janela do modelo de check-in (Padrão Hub, larga, duas colunas): à esquerda nome, descrição, tipo, para quem, resumo e o
 // aviso de quem já usa; à direita, nas abas, as etapas e tarefas ou a prévia do fluxograma. Nada vai ao banco antes de
-// Salvar (uma chamada só, com o modelo inteiro) e Cancelar descarta o rascunho.
+// Salvar (uma chamada só, com o modelo inteiro) e Cancelar descarta o rascunho: com mudanças, a JanelaFormulario
+// pergunta antes (`alterado`; usabilidade, U4).
 // `modelo` (modelo_completo): editar. `origem` (modelo_completo): duplicar ("Cópia de X", salva como modelo novo). Sem
 // os dois: novo. `clientesUsando`: os clientes que quem edita vê usando (para o aviso). `aoSalvar({ id, nome, novo })`.
 // "para": a Central escolhe (todas ou uma); editando um modelo da gestão de uma consultoria, vai o id dela (o banco
@@ -67,9 +68,8 @@ export default function JanelaModelo({ modelo, origem, clientesUsando = 0, aoFec
     const r = fonte ? rascunhoDe(fonte, { duplicar: !editando }) : rascunhoNovo('todas')
     return paraFixo ? { ...r, para: paraFixo.id } : r
   })
-  // O rascunho como abriu: fechar com mudanças pergunta antes de descartar.
-  const inicial = useRef(rascunho)
-  const [descartando, setDescartando] = useState(false)
+  // Comparado com o rascunho como abriu: fechar com mudanças pergunta antes de descartar (a pergunta é a da JanelaFormulario).
+  const alterado = useAlterado(rascunho)
   // Nome de cada consultoria já mostrada (a do modelo e as escolhidas no Seletor, que vêm do banco): o campo mostra
   // sempre o nome do "para" atual, então o nome e o que vai ser salvo não se separam.
   const [nomesDasConsultorias, setNomesDasConsultorias] = useState(
@@ -118,13 +118,6 @@ export default function JanelaModelo({ modelo, origem, clientesUsando = 0, aoFec
     aoSalvar({ id: resposta.id, nome: rascunho.nome.trim(), novo: !editando })
   }
 
-  // Esc, o X e Cancelar: sem mudanças fecha; com mudanças pergunta (nada vai ao banco antes de Salvar).
-  function pedirFechar() {
-    if (salvando) return
-    if (JSON.stringify(rascunho) === JSON.stringify(inicial.current)) return aoFechar()
-    setDescartando(true)
-  }
-
   const etapasDaPrevia = useMemo(() => rascunho.etapas.map((e) => ({ id: e.id, nome: e.nome })), [rascunho.etapas])
   const tarefasDaPrevia = useMemo(() => tarefasEmOrdem(rascunho), [rascunho])
 
@@ -134,8 +127,8 @@ export default function JanelaModelo({ modelo, origem, clientesUsando = 0, aoFec
 
   return (
     <>
-      <JanelaFormulario aberto aoFechar={pedirFechar} titulo={editando ? 'Editar modelo de check-in' : 'Novo modelo de check-in'}
-        descricao={descricao} icone={ListChecks} largura="7xl" alturaFixa enviando={salvando}
+      <JanelaFormulario aberto aoFechar={aoFechar} titulo={editando ? 'Editar modelo de check-in' : 'Novo modelo de check-in'}
+        descricao={descricao} icone={ListChecks} largura="7xl" alturaFixa enviando={salvando} alterado={alterado}
         abas={(
           <AbasSegmentadas rotulo="Partes do modelo" comoAbas idBase={idBase} valor={aba} aoMudar={trocarAba} abas={[
             { valor: 'tarefas', rotulo: 'Etapas e tarefas', icone: ListOrdered, erro: erroNasTarefas },
@@ -145,7 +138,7 @@ export default function JanelaModelo({ modelo, origem, clientesUsando = 0, aoFec
         rodape={(
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
             {mensagem && <p role="alert" className="text-destructive min-w-0 basis-full text-rotulo sm:mr-auto sm:basis-0 sm:flex-1">{mensagem}</p>}
-            <Button type="button" variant="outline" onClick={pedirFechar} disabled={salvando}>Cancelar</Button>
+            <BotaoCancelar />
             <Button type="submit" form="form-modelo" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar modelo'}</Button>
           </div>
         )}>
@@ -217,11 +210,6 @@ export default function JanelaModelo({ modelo, origem, clientesUsando = 0, aoFec
           )}
         </form>
       </JanelaFormulario>
-      {descartando && (
-        <ConfirmarAcao aberto aoFechar={() => setDescartando(false)} titulo="Descartar as mudanças do modelo?"
-          descricao="O que você mudou neste modelo se perde: nada foi salvo." rotuloConfirmar="Descartar"
-          aoConfirmar={() => { aoFechar(); return { erro: null } }} />
-      )}
     </>
   )
 }

@@ -1,21 +1,25 @@
 import { Building2 } from 'lucide-react'
 import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import Campo from '@/components/campos/Campo'
+import CampoSenha from '@/components/campos/CampoSenha'
 import EscolhaForma from '@/components/comum/EscolhaForma'
 import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import { useAlterado } from '@/components/comum/useAlterado'
 import { useEnvio } from '@/components/comum/useEnvio'
-import CampoSenha from '@/components/campos/CampoSenha'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { avaliarSenha } from '@/lib/senha'
+import { erroDeEmail } from '@/lib/validacao'
 
 const VAZIO = { nome: '', forma: 'convite', adminNome: '', adminEmail: '', senha: '' }
 
-// Só o dono: a consultoria que contratou a plataforma e o primeiro administrador dela.
+// Só o dono: a consultoria que contratou a plataforma e o primeiro administrador dela. A janela fica montada (só abre e
+// fecha) e `fechar` limpa tudo. Os erros ficam embaixo de cada campo, todos de uma vez, e fechar com algo digitado
+// pergunta antes (usabilidade, U2 e U4): a pergunta da JanelaFormulario vem antes do `fechar`, que limpa.
 export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
   const [dados, setDados] = useState(VAZIO)
-  const [erros, setErros] = useState({})
-  const { erro, setErro, enviando, enviar } = useEnvio(fechar)
+  const { erro, setErro, erros, setErros, conferir, enviando, enviar } = useEnvio(fechar)
+  const alterado = useAlterado(dados)
   const mudar = (campo) => (evento) => setDados((d) => ({ ...d, [campo]: evento.target.value }))
 
   function fechar() {
@@ -25,36 +29,33 @@ export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
     aoFechar()
   }
 
-  function validar() {
+  function errosDaConsultoria() {
     const achados = {}
     if (dados.nome.trim().length < 2) achados.nome = 'Use pelo menos 2 caracteres.'
     if (dados.adminNome.trim().length < 2) achados.adminNome = 'Use pelo menos 2 caracteres.'
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dados.adminEmail.trim())) achados.adminEmail = 'Digite um e-mail válido.'
+    const email = erroDeEmail(dados.adminEmail, { obrigatorio: true })
+    if (email) achados.adminEmail = email
     if (dados.forma === 'senha' && !avaliarSenha(dados.senha).forte) achados.senha = 'A senha provisória precisa ser forte: confira as regras abaixo do campo.'
-    setErros(achados)
-    return Object.keys(achados).length === 0
+    return achados
   }
 
   async function criar(evento) {
     evento.preventDefault()
-    if (enviando || !validar()) return
+    if (enviando || !conferir(errosDaConsultoria())) return
     const admin = { forma: dados.forma, nome: dados.adminNome.trim(), email: dados.adminEmail.trim() }
     if (dados.forma === 'senha') admin.senha = dados.senha
     await enviar(() => aoCriar({ nome: dados.nome.trim(), admin }))
   }
 
   const campo = (id, rotulo, chave, extra = {}) => (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{rotulo}</Label>
-      <Input id={id} autoComplete="off" className="h-10" aria-invalid={erros[chave] ? true : undefined}
-        value={dados[chave]} onChange={mudar(chave)} {...extra} />
-      {erros[chave] && <p className="text-rotulo text-destructive">{erros[chave]}</p>}
-    </div>
+    <Campo id={id} rotulo={rotulo} erro={erros[chave]}>
+      <Input id={id} autoComplete="off" className="h-10" value={dados[chave]} onChange={mudar(chave)} {...extra} />
+    </Campo>
   )
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={fechar} titulo="Nova consultoria" icone={Building2} largura="lg" enviando={enviando}
-      descricao="A consultoria que contratou a plataforma e quem vai administrá-la."
+      descricao="A consultoria que contratou a plataforma e quem vai administrá-la." erros={erros} alterado={alterado}
       form="form-nova-consultoria" rotuloEnviar="Criar consultoria" rotuloEnviando="Criando…">
       <form id="form-nova-consultoria" noValidate onSubmit={criar} className="space-y-5">
         <SecaoFormulario titulo="Consultoria">
@@ -62,16 +63,14 @@ export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
         </SecaoFormulario>
         <SecaoFormulario titulo="Primeiro administrador">
           <EscolhaForma nome="forma-admin" valor={dados.forma} aoMudar={(forma) => setDados((d) => ({ ...d, forma }))} />
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid items-start gap-4 sm:grid-cols-2">
             {campo('admin-nome', 'Nome', 'adminNome', { maxLength: 120 })}
             {campo('admin-email', 'E-mail', 'adminEmail', { type: 'email' })}
           </div>
           {dados.forma === 'senha' && (
-            <div className="grid gap-2">
-              <Label htmlFor="admin-senha">Senha provisória</Label>
-              <CampoSenha id="admin-senha" valor={dados.senha} invalido={!!erros.senha} aoMudar={(senha) => setDados((d) => ({ ...d, senha }))} />
-              {erros.senha && <p className="text-rotulo text-destructive">{erros.senha}</p>}
-            </div>
+            <Campo id="admin-senha" rotulo="Senha provisória" erro={erros.senha}>
+              <CampoSenha id="admin-senha" valor={dados.senha} aoMudar={(senha) => setDados((d) => ({ ...d, senha }))} />
+            </Campo>
           )}
         </SecaoFormulario>
         {erro && <Aviso>{erro}</Aviso>}

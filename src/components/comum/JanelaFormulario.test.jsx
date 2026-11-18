@@ -1,9 +1,12 @@
-import { render, screen } from '@testing-library/react'
+import { useState } from 'react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Users } from 'lucide-react'
 import { describe, expect, it, vi } from 'vitest'
+import Campo from '@/components/campos/Campo'
 import CampoNumero from '@/components/campos/CampoNumero'
-import JanelaFormulario, { SecaoFormulario } from './JanelaFormulario'
+import { Input } from '@/components/ui/input'
+import JanelaFormulario, { BotaoCancelar, SecaoFormulario } from './JanelaFormulario'
 
 function montar(props = {}) {
   const aoFechar = vi.fn()
@@ -203,5 +206,140 @@ describe('JanelaFormulario', () => {
   it('o foco inicial não cai no input de arquivo', () => {
     render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A"><input type="file" aria-label="Arquivo" /><input aria-label="Nome" /></JanelaFormulario>)
     expect(screen.getByLabelText('Nome')).toHaveFocus()
+  })
+
+  // Usabilidade, U2: ao salvar com erros, o foco vai para o primeiro campo marcado (na ordem da tela).
+  describe('erros dos campos', () => {
+    function ComErros() {
+      const [erros, setErros] = useState({})
+      return (
+        <JanelaFormulario aberto aoFechar={() => {}} titulo="Novo cliente" erros={erros} form="f" rotuloEnviar="Salvar">
+          <form id="f" onSubmit={(e) => { e.preventDefault(); setErros({ email: 'E-mail errado.', nome: 'Nome curto.' }) }}>
+            <Campo id="j-nome" rotulo="Nome" erro={erros.nome}><Input id="j-nome" /></Campo>
+            <Campo id="j-cidade" rotulo="Cidade"><Input id="j-cidade" /></Campo>
+            <Campo id="j-email" rotulo="E-mail" erro={erros.email}><Input id="j-email" /></Campo>
+          </form>
+        </JanelaFormulario>
+      )
+    }
+
+    it('todos aparecem de uma vez e o foco vai para o primeiro campo errado da tela', async () => {
+      const user = userEvent.setup()
+      render(<ComErros />)
+      await user.click(screen.getByLabelText('E-mail'))
+      await user.click(screen.getByRole('button', { name: 'Salvar' }))
+      expect(screen.getByText('Nome curto.')).toBeInTheDocument()
+      expect(screen.getByText('E-mail errado.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Nome')).toHaveFocus()
+      // Salvar de novo com os mesmos erros leva o foco de volta ao primeiro.
+      await user.click(screen.getByLabelText('E-mail'))
+      await user.click(screen.getByRole('button', { name: 'Salvar' }))
+      expect(screen.getByLabelText('Nome')).toHaveFocus()
+    })
+
+    it('sem erros, o foco não sai do lugar', () => {
+      render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A" erros={{}}><Input aria-label="Nome" /></JanelaFormulario>)
+      expect(screen.getByLabelText('Nome')).toHaveFocus()
+    })
+  })
+
+  // Usabilidade, U4: fechar com algo digitado pergunta antes de descartar (Cancelar, Esc e o X; clique fora não fecha).
+  describe('pergunta ao descartar', () => {
+    function montarAlterado(props = {}) {
+      const aoFechar = vi.fn()
+      const user = userEvent.setup()
+      render(
+        <JanelaFormulario aberto aoFechar={aoFechar} titulo="Novo evento" form="f" rotuloEnviar="Criar evento" alterado {...props}>
+          <form id="f"><input aria-label="Título" defaultValue="Reunião" /></form>
+        </JanelaFormulario>,
+      )
+      return { aoFechar, user }
+    }
+    const pergunta = () => screen.queryByRole('alertdialog', { name: 'Descartar o que você digitou?' })
+
+    it('sem mudança, Cancelar, Esc e o X fecham direto', async () => {
+      const user = userEvent.setup()
+      const aoFechar = vi.fn()
+      const { rerender } = render(<JanelaFormulario aberto aoFechar={aoFechar} titulo="A" form="f" rotuloEnviar="Salvar" alterado={false}><form id="f" /></JanelaFormulario>)
+      await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+      await user.keyboard('{Escape}')
+      await user.click(screen.getByRole('button', { name: 'Fechar' }))
+      expect(aoFechar).toHaveBeenCalledTimes(3)
+      expect(pergunta()).toBeNull()
+      rerender(<JanelaFormulario aberto aoFechar={aoFechar} titulo="A" form="f" rotuloEnviar="Salvar"><form id="f" /></JanelaFormulario>)
+      await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+      expect(aoFechar).toHaveBeenCalledTimes(4)
+    })
+
+    it('com mudança, Cancelar pergunta; "Continuar editando" volta à janela sem fechar', async () => {
+      const { aoFechar, user } = montarAlterado()
+      await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+      const dialogo = pergunta()
+      expect(dialogo).toBeInTheDocument()
+      expect(within(dialogo).getByText(/se perde/)).toBeInTheDocument()
+      expect(within(dialogo).getByRole('button', { name: 'Continuar editando' })).toHaveFocus()
+      await user.click(within(dialogo).getByRole('button', { name: 'Continuar editando' }))
+      expect(pergunta()).toBeNull()
+      expect(aoFechar).not.toHaveBeenCalled()
+      expect(screen.getByRole('dialog', { name: 'Novo evento' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Título')).toHaveValue('Reunião')
+    })
+
+    it('com mudança, "Descartar" fecha a janela (uma vez)', async () => {
+      const { aoFechar, user } = montarAlterado()
+      await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+      await user.click(within(pergunta()).getByRole('button', { name: 'Descartar' }))
+      expect(aoFechar).toHaveBeenCalledTimes(1)
+    })
+
+    it('com mudança, Esc pergunta; outro Esc volta à janela', async () => {
+      const { aoFechar, user } = montarAlterado()
+      await user.keyboard('{Escape}')
+      expect(pergunta()).toBeInTheDocument()
+      await user.keyboard('{Escape}')
+      expect(pergunta()).toBeNull()
+      expect(aoFechar).not.toHaveBeenCalled()
+      expect(screen.getByRole('dialog', { name: 'Novo evento' })).toBeInTheDocument()
+    })
+
+    it('com mudança, o X do cabeçalho pergunta', async () => {
+      const { aoFechar, user } = montarAlterado()
+      await user.click(screen.getByRole('button', { name: 'Fechar' }))
+      expect(pergunta()).toBeInTheDocument()
+      expect(aoFechar).not.toHaveBeenCalled()
+    })
+
+    it('clique fora continua sem fechar e sem perguntar', async () => {
+      const { aoFechar, user } = montarAlterado()
+      await user.click(document.querySelector('[data-slot="dialog-overlay"]'))
+      expect(pergunta()).toBeNull()
+      expect(aoFechar).not.toHaveBeenCalled()
+    })
+
+    it('enquanto envia, nada fecha nem pergunta', async () => {
+      const { aoFechar, user } = montarAlterado({ enviando: true })
+      await user.keyboard('{Escape}')
+      await user.click(screen.getByRole('button', { name: 'Fechar' }))
+      expect(pergunta()).toBeNull()
+      expect(aoFechar).not.toHaveBeenCalled()
+    })
+
+    it('o BotaoCancelar de um rodapé diferente passa pela mesma pergunta', async () => {
+      const aoFechar = vi.fn()
+      const user = userEvent.setup()
+      render(
+        <JanelaFormulario aberto aoFechar={aoFechar} titulo="Integração" alterado
+          rodape={<><BotaoCancelar /><button type="button">Testar</button></>}><p>x</p></JanelaFormulario>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+      expect(pergunta()).toBeInTheDocument()
+      await user.click(within(pergunta()).getByRole('button', { name: 'Descartar' }))
+      expect(aoFechar).toHaveBeenCalledTimes(1)
+    })
+
+    it('o BotaoCancelar fica desligado enquanto envia', () => {
+      render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A" enviando rodape={<BotaoCancelar />}><p>x</p></JanelaFormulario>)
+      expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled()
+    })
   })
 })

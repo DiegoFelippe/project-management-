@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import NovaConsultoria from './NovaConsultoria'
@@ -57,5 +57,34 @@ describe('NovaConsultoria', () => {
       nome: 'Acme Consultoria',
       admin: { forma: 'senha', nome: 'Rita Alves', email: 'rita@acme.com.br', senha: 'Provisoria-1!' },
     })
+  })
+
+  // Usabilidade, U2: todos de uma vez, embaixo de cada campo, e o foco no primeiro.
+  it('vazia: os três erros aparecem juntos, cada um no seu campo, com o foco no primeiro', async () => {
+    const aoCriar = vi.fn()
+    render(<NovaConsultoria aberto aoFechar={vi.fn()} aoCriar={aoCriar} />)
+    await userEvent.type(screen.getByLabelText('E-mail'), 'rita@')
+    await userEvent.click(screen.getByRole('button', { name: 'Criar consultoria' }))
+    expect(screen.getByLabelText('Nome da consultoria')).toHaveAccessibleDescription('Use pelo menos 2 caracteres.')
+    expect(screen.getByLabelText('Nome')).toHaveAccessibleDescription('Use pelo menos 2 caracteres.')
+    expect(screen.getByLabelText('E-mail')).toHaveAccessibleDescription(/e-mail válido/)
+    expect(screen.getByLabelText('Nome da consultoria')).toHaveFocus()
+    expect(aoCriar).not.toHaveBeenCalled()
+  })
+
+  // Usabilidade, U4: a janela fica montada (só fecha); o que foi digitado pergunta antes de sumir.
+  it('Cancelar com algo digitado pergunta; Descartar limpa e fecha, e ao reabrir vem vazia', async () => {
+    const aoFechar = vi.fn()
+    const { rerender } = render(<NovaConsultoria aberto aoFechar={aoFechar} aoCriar={vi.fn()} />)
+    await userEvent.type(screen.getByLabelText('Nome da consultoria'), 'Acme')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(aoFechar).not.toHaveBeenCalled()
+    await userEvent.click(within(screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })).getByRole('button', { name: 'Descartar' }))
+    expect(aoFechar).toHaveBeenCalledTimes(1)
+    rerender(<NovaConsultoria aberto={false} aoFechar={aoFechar} aoCriar={vi.fn()} />)
+    rerender(<NovaConsultoria aberto aoFechar={aoFechar} aoCriar={vi.fn()} />)
+    expect(screen.getByLabelText('Nome da consultoria')).toHaveValue('')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(aoFechar).toHaveBeenCalledTimes(2)
   })
 })

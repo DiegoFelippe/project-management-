@@ -92,6 +92,27 @@ describe('FormularioDeTime: Novo time', () => {
     expect(screen.getByText('Escolha o gestor do time.')).toBeInTheDocument()
     expect(aoSalvar).not.toHaveBeenCalled()
   })
+
+  // Usabilidade, U2: os dois erros de uma vez, cada um no seu campo, e o foco no primeiro.
+  it('sem nome e sem gestor: os dois erros aparecem juntos, cada um no seu campo', async () => {
+    const { aoSalvar } = montar({ papel: 'admin' })
+    await userEvent.click(screen.getByRole('button', { name: 'Criar time' }))
+    expect(screen.getByLabelText('Nome do time')).toHaveAccessibleDescription('Use pelo menos 2 caracteres.')
+    expect(screen.getByLabelText('Gestor do time')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Gestor do time')).toHaveAccessibleDescription('Escolha o gestor do time.')
+    expect(screen.getByLabelText('Nome do time')).toHaveFocus()
+    expect(aoSalvar).not.toHaveBeenCalled()
+  })
+
+  // Usabilidade, U4.
+  it('fechar com o nome digitado pergunta antes de descartar', async () => {
+    const { aoFechar } = montar({ papel: 'gestor' })
+    await userEvent.type(screen.getByLabelText('Nome do time'), 'Projetos')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(aoFechar).not.toHaveBeenCalled()
+    await userEvent.click(within(screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })).getByRole('button', { name: 'Descartar' }))
+    expect(aoFechar).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('FormularioDeTime: Editar time', () => {

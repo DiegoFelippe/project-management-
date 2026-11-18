@@ -41,7 +41,8 @@ describe('JanelaRenomearQuadro (o Editar do quadro)', () => {
     const nome = within(janela).getByLabelText('Nome')
     await user.clear(nome)
     await user.click(screen.getByRole('button', { name: 'Salvar' }))
-    expect(await within(janela).findByRole('alert')).toHaveTextContent('Dê um nome ao quadro.')
+    // O erro fica embaixo do campo (usabilidade, U2).
+    expect(nome).toHaveAccessibleDescription('Dê um nome ao quadro.')
     expect(renomearQuadro).not.toHaveBeenCalled()
     await user.type(nome, 'Outro')
     await user.click(screen.getByRole('button', { name: 'Salvar' }))

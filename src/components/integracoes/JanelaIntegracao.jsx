@@ -1,21 +1,23 @@
 import { Plug, RefreshCw } from 'lucide-react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
-import JanelaFormulario from '@/components/comum/JanelaFormulario'
+import JanelaFormulario, { BotaoCancelar } from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
 
 // Moldura comum dos formulários de integração: título, campos, avisos e o rodapé Cancelar · Testar · Salvar.
-// O estado (salvando, testando, erro e o resultado do teste) vem do useEnvioDaIntegracao do formulário. Testar
-// (`aoTestar`) testa o que foi digitado sem gravar nada; o resultado aparece aqui. Salvar grava e o servidor testa de
-// novo (a situação da linha vem desse teste).
+// O estado (salvando, testando, erro, os erros dos campos e o resultado do teste) vem do useEnvioDaIntegracao do
+// formulário. Testar (`aoTestar`) testa o que foi digitado sem gravar nada; o resultado aparece aqui. Salvar grava e o
+// servidor testa de novo (a situação da linha vem desse teste). `erros` leva o foco ao primeiro campo marcado e
+// `alterado` faz o Cancelar, o Esc e o X perguntarem antes de descartar (usabilidade, U2 e U4).
 export default function JanelaIntegracao({
-  titulo, descricao, aoFechar, aoSalvar, aoTestar, erro, enviando, testando = false, resultado, children,
+  titulo, descricao, aoFechar, aoSalvar, aoTestar, erro, erros, alterado = false, enviando, testando = false, resultado, children,
 }) {
   const ocupado = enviando || testando
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo={titulo} descricao={descricao} icone={Plug} largura="lg" enviando={ocupado}
+      erros={erros} alterado={alterado}
       rodape={(
         <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={ocupado}>Cancelar</Button>
+          <BotaoCancelar />
           {aoTestar && (
             <Button type="button" variant="outline" onClick={aoTestar} disabled={ocupado}>
               <RefreshCw className={testando ? 'animate-spin' : ''} /> {testando ? 'Testando…' : 'Testar'}
