@@ -111,7 +111,10 @@ Design: `docs/superpowers/specs/2026-11-17-kanban-do-cliente-design.md` (inclui 
 
 Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/2026-11-16-padrao-hub.md`.
 
-- **Cores continuam as da consultoria** (`--primary` etc. em `src/index.css`); do Hub vem só o layout.
+- **Cores continuam as da consultoria** (`--primary` etc. em `src/index.css`); do Hub vem só o layout. **Contraste mínimo
+  4,5:1** em todo texto (auditoria, pedido do Diego 17/11): fundo azul com texto branco é `bg-primary-cheio` (no escuro o
+  `--primary` é o azul claro, só para texto, foco e barras); texto sobre a cor da pessoa ou do evento usa
+  `corDoTextoSobre` (`src/lib/cores.js`). `src/lib/contraste.test.js` confere os tokens e varre o código.
 - **Todo formulário é uma `JanelaFormulario`** (`src/components/comum/JanelaFormulario.jsx`), com o corpo em
   `SecaoFormulario`. Rodapé: **Cancelar** (outline) + botão principal, que mostra a ação em andamento enquanto
   grava ("Salvando…", "Criando…", "Testando…"). O botão de enviar fica no rodapé e liga ao formulário por
@@ -241,8 +244,8 @@ Design: `docs/superpowers/specs/2026-11-16-calendario-design.md` (decisões da c
 
 - Telas internas ocupam a largura toda: nada de `max-w-*` + `mx-auto` no conteúdo da página.
   Limite só campos pequenos (um select, uma janela). Em telas largas, grades ganham colunas.
-- Visual "claro e azul" (cores em `:root` de `src/index.css`); a logo da IXC Consult é quadrada, sem
-  cantos arredondados.
+- Visual "claro e azul" (cores em `:root` de `src/index.css`, contraste mínimo 4,5:1: auditoria, pedido do Diego
+  17/11); a logo da IXC Consult é quadrada, sem cantos arredondados.
 
 ## Dados do Diego: nunca apagar sem perguntar
 

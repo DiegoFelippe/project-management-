@@ -16,7 +16,8 @@ function Marca({ opcao }) {
 // pessoa { id, nome, foto }). Com `buscar` (async termo => ({ itens, total })) a lista vem do banco, nunca inteira:
 // `opcoes` só precisa trazer a escolha atual, e o rodapé diz "N de TOTAL" quando há mais do que o mostrado.
 // Sem `buscar`, a busca (a partir de 8 opções) filtra `opcoes` na tela. `rotuloTodos` acrescenta a opção vazia
-// dos filtros. `tamanho`: "sm" nas barras de filtro, "md" nos formulários.
+// dos filtros. `tamanho`: "sm" nas barras de filtro, "md" nos formulários. No toque (pointer-coarse), o campo (.input) e cada opção
+// têm 44 px de altura.
 export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotuloTodos, tamanho = 'md', placeholder = 'Selecione', desabilitado = false }) {
   const listaId = useId()
   const [aberto, setAberto] = useState(false)
@@ -112,7 +113,7 @@ export default function Seletor({ id, valor, aoMudar, opcoes = [], buscar, rotul
               return (
                 <div key={o.valor} id={idOpcao(i)} role="option" aria-selected={marcada} onClick={() => escolher(o)} onMouseMove={() => ativoNaLista !== i && setAtivo(i)}
                   ref={(el) => { if (el && i === ativoNaLista) el.scrollIntoView?.({ block: 'nearest' }) }}
-                  className={cn('flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5', marcada && 'bg-primary/10', i === ativoNaLista && 'bg-accent')}>
+                  className={cn('flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 pointer-coarse:min-h-11', marcada && 'bg-primary/10', i === ativoNaLista && 'bg-accent')}>
                   <Marca opcao={o} />
                   <span className="min-w-0 flex-1">
                     <span className={cn('block truncate text-rotulo', marcada ? 'text-primary font-medium' : 'text-foreground')}>{o.rotulo}</span>

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 // `contador` é o número na pílula ao lado do rótulo (só quando a tela já o tem do banco); `pendente` pinta a pílula de âmbar.
 // Nas listas, são botões de alternância (aria-pressed). Com `comoAbas` (página do cliente) viram role="tablist"/"tab":
 // aria-selected, aria-controls (`idBase`), tabindex móvel e setas. `idBase` combina os ids com os painéis:
-// `${idBase}-aba-<valor>` e `${idBase}-painel-<valor>`.
+// `${idBase}-aba-<valor>` e `${idBase}-painel-<valor>`. No toque (pointer-coarse), cada aba tem 44 px e 8 px entre elas.
 export default function AbasSegmentadas({ rotulo, abas, valor, aoMudar, comoAbas = false, idBase }) {
   function aoTeclar(e, indice) {
     const passo = { ArrowRight: 1, ArrowLeft: -1 }[e.key]
@@ -18,7 +18,7 @@ export default function AbasSegmentadas({ rotulo, abas, valor, aoMudar, comoAbas
 
   return (
     <div role={comoAbas ? 'tablist' : 'group'} aria-label={rotulo}
-      className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-muted p-1 text-rotulo font-semibold">
+      className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-muted p-1 text-rotulo font-semibold pointer-coarse:gap-2">
       {abas.map((aba, i) => {
         const ativa = aba.valor === valor
         const propriedades = comoAbas
@@ -30,7 +30,7 @@ export default function AbasSegmentadas({ rotulo, abas, valor, aoMudar, comoAbas
         return (
           <button key={aba.valor} type="button" {...propriedades} data-erro={aba.erro ? '' : undefined} onClick={() => aoMudar(aba.valor)}
             className={cn(
-              'botao-animado inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 transition-[background-color,color,box-shadow,translate,scale] outline-none hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50',
+              'botao-animado inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 transition-[background-color,color,box-shadow,translate,scale] outline-none hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50 pointer-coarse:min-h-11',
               ativa ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
             )}>
             {aba.icone && <aba.icone className="size-[13px]" aria-hidden="true" />}

@@ -361,7 +361,7 @@ describe('Cliente (página)', () => {
     expect(barra.getByRole('button', { name: 'Mover' })).toBeInTheDocument()
     expect(barra.getByRole('button', { name: 'Editar' })).toHaveClass('border')
     expect(barra.getByRole('button', { name: 'Apagar' })).toHaveClass('border')
-    expect(barra.getByRole('button', { name: 'Apagar' })).not.toHaveClass('bg-primary')
+    expect(barra.getByRole('button', { name: 'Apagar' })).not.toHaveClass('bg-primary-cheio')
     expect(barra.getByRole('button', { name: 'Apagar' })).toHaveClass('hover:text-destructive')
   })
 
@@ -375,7 +375,7 @@ describe('Cliente (página)', () => {
     for (const nome of ['Trocar consultor', 'Ajustar previsão']) {
       const botao = barra.getByRole('button', { name: nome })
       expect(botao).toHaveClass('border')
-      expect(botao).not.toHaveClass('bg-primary')
+      expect(botao).not.toHaveClass('bg-primary-cheio')
       expect(botao.className).not.toMatch(/text-muted-foreground/)
     }
   })
@@ -386,9 +386,9 @@ describe('Cliente (página)', () => {
     expect(await barra.findByRole('button', { name: 'Fazer check-in' })).toBeInTheDocument()
     expect(barra.getAllByRole('button').map((b) => b.textContent.trim())).toEqual(['Fazer check-in', 'Lançar horas'])
     // Padrão Hub: a principal do contexto cheia, as demais outline.
-    expect(barra.getByRole('button', { name: 'Fazer check-in' })).toHaveClass('bg-primary')
+    expect(barra.getByRole('button', { name: 'Fazer check-in' })).toHaveClass('bg-primary-cheio')
     expect(barra.getByRole('button', { name: 'Lançar horas' })).toHaveClass('border')
-    expect(barra.getByRole('button', { name: 'Lançar horas' })).not.toHaveClass('bg-primary')
+    expect(barra.getByRole('button', { name: 'Lançar horas' })).not.toHaveClass('bg-primary-cheio')
     unmount()
     tela(outraPessoa)
     await screen.findByRole('heading', { name: 'Provedor Alfa' })

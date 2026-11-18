@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react'
-import { Clock, X } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import Flutuante, { BotaoCampo } from './Flutuante'
+import Flutuante, { BotaoCampo, BotaoLimpar } from './Flutuante'
 
 const HORAS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const LARGURA = 252
@@ -44,24 +44,21 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
     setDigitado('')
   }
 
-  const celula = (marcada) => cn('h-8 w-full rounded-lg text-rotulo tabular-nums', marcada ? 'bg-primary text-primary-foreground font-semibold' : 'text-foreground hover:bg-primary/10')
+  const celula = (marcada) => cn('h-8 w-full rounded-lg text-rotulo tabular-nums', marcada ? 'bg-primary-cheio text-primary-foreground font-semibold' : 'text-foreground hover:bg-primary/10')
   const limpar = !obrigatorio && atual && !desabilitado
+  const limparNoCampo = limpar && !compacto // "Limpar horário" fora do gatilho, como o "Limpar data" (auditoria, R13)
 
   return (
     <>
-      <button ref={gatilho} id={id} type="button" disabled={desabilitado} aria-label={rotulo} aria-describedby={valorId} aria-haspopup="dialog" aria-expanded={aberto}
-        onClick={() => { setDigitado(''); setAberto((a) => !a) }}
-        className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center text-left', compacto ? 'gap-1.5 py-1.5 text-rotulo' : 'gap-2', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
-        <Clock className={cn('shrink-0', compacto ? 'size-3' : 'size-3.5', atual ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
-        <span id={valorId} className={cn('min-w-0 flex-1 truncate tabular-nums', !atual && 'text-muted-foreground')}>{atual ? `${atual.h}:${atual.m}` : placeholder}</span>
-        {limpar && !compacto && (
-          <span role="button" tabIndex={0} aria-label="Limpar horário" onClick={(e) => { e.stopPropagation(); aoMudar('') }}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); aoMudar('') } }}
-            className="text-muted-foreground hover:text-foreground rounded p-0.5">
-            <X className="size-3.5" aria-hidden="true" />
-          </span>
-        )}
-      </button>
+      <div className="relative w-full">
+        <button ref={gatilho} id={id} type="button" disabled={desabilitado} aria-label={rotulo} aria-describedby={valorId} aria-haspopup="dialog" aria-expanded={aberto}
+          onClick={() => { setDigitado(''); setAberto((a) => !a) }}
+          className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center text-left', compacto ? 'gap-1.5 py-1.5 text-rotulo' : 'gap-2', limparNoCampo && 'pr-10', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
+          <Clock className={cn('shrink-0', compacto ? 'size-3' : 'size-3.5', atual ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
+          <span id={valorId} className={cn('min-w-0 flex-1 truncate tabular-nums', !atual && 'text-muted-foreground')}>{atual ? `${atual.h}:${atual.m}` : placeholder}</span>
+        </button>
+        {limparNoCampo && <BotaoLimpar rotulo="Limpar horário" aoLimpar={() => { aoMudar(''); gatilho.current?.focus() }} />}
+      </div>
 
       {aberto && (
         <Flutuante ancora={gatilho} aoFechar={() => setAberto(false)} aoAbrir={centralizar} largura={LARGURA} altura={330} rotulo="Escolher horário" className="p-3">
@@ -79,8 +76,8 @@ export default function CampoHora({ id, rotulo, valor, aoMudar, passo = 5, compa
             ))}
           </div>
           <div className="mt-2.5 flex items-center justify-between border-t pt-2.5">
-            {limpar ? <BotaoCampo onClick={() => { aoMudar(''); setAberto(false) }} className="text-muted-foreground hover:text-destructive rounded text-rotulo font-medium">Limpar</BotaoCampo> : <span />}
-            <BotaoCampo onClick={() => setAberto(false)} className="bg-primary text-primary-foreground rounded-lg px-2.5 py-1 text-rotulo font-semibold">Pronto</BotaoCampo>
+            {limpar ? <BotaoCampo onClick={() => { aoMudar(''); setAberto(false) }} className="text-muted-foreground hover:text-destructive rounded text-rotulo font-medium pointer-coarse:min-h-11 pointer-coarse:px-2">Limpar</BotaoCampo> : <span />}
+            <BotaoCampo onClick={() => setAberto(false)} className="bg-primary-cheio text-primary-foreground rounded-lg px-2.5 py-1 text-rotulo font-semibold pointer-coarse:min-h-11 pointer-coarse:px-4">Pronto</BotaoCampo>
           </div>
         </Flutuante>
       )}

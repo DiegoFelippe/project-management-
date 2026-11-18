@@ -1,7 +1,7 @@
 // Cores do Calendário. As 8 cores do evento são as do Hub em tons que seguram texto branco com contraste de pelo menos
 // 4,5:1 (âmbar, verde, turquesa e laranja no tom 700 do Tailwind; o azul é o --primary da consultoria; cores.test.js
 // confere). O banco guarda o número (agenda_eventos.cor, 0 a 7): a ordem não muda.
-import { corDaPessoa } from '@/lib/cores'
+import { corDaPessoa, corDoTextoSobre } from '@/lib/cores'
 
 export const CORES_DO_EVENTO = [
   { valor: '#2563eb', nome: 'Azul' },
@@ -20,6 +20,12 @@ export const corDoEvento = (indice) => (CORES_DO_EVENTO[indice] ?? CORES_DO_EVEN
 // privada, a cor escolhida no evento (design, "Quem vê o quê").
 export const corDoChip = (evento, deVariasPessoas) =>
   (deVariasPessoas ? corDaPessoa(evento.consultor ?? { id: evento.consultor_id }) : corDoEvento(evento.cor))
+
+// Fundo e texto do chip: a cor do consultor pode ser clara (mostarda, verde...), e aí o texto fica escuro (4,5:1).
+export function estiloDoChip(evento, deVariasPessoas) {
+  const fundo = corDoChip(evento, deVariasPessoas)
+  return { backgroundColor: fundo, color: corDoTextoSobre(fundo) }
+}
 
 // O que a barra deixa mostrar ou esconder, com a bolinha de cada um (a mesma da legenda e dos chips).
 export const TIPOS = [

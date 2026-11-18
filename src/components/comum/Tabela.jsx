@@ -29,13 +29,15 @@ export function Paginacao({ pagina, total, porPagina = POR_PAGINA, aoMudar }) {
   )
 }
 
-// semAcoes: tabela só de leitura, sem a coluna de ações. titulo: cabeçalho dentro do cartão. semCartao: a tabela entra
-// rente no cartão de quem a usa (ex.: a visão Todos da agenda do cliente, dentro do cartão do calendário).
+// semAcoes: tabela só de leitura, sem a coluna de ações; a rolagem para o lado (no celular) recebe o foco do teclado e
+// tem nome, porque na tabela não há nada que receba o foco (auditoria, R13). titulo: cabeçalho dentro do cartão.
+// semCartao: a tabela entra rente no cartão de quem a usa (ex.: a visão Todos da agenda do cliente, dentro do cartão do calendário).
 export function Tabela({ rotulo, titulo, colunas, larguraMinima = 720, paginacao, semAcoes = false, semCartao = false, children }) {
   return (
     <div className={cn('overflow-hidden', !semCartao && 'card')}>
       {titulo && <h2 className="px-4 pt-4 pb-2 text-subtitulo font-semibold text-muted-foreground">{titulo}</h2>}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto focus-visible:-outline-offset-2"
+        {...(semAcoes ? { role: 'region', 'aria-label': `Tabela ${rotulo}`, tabIndex: 0 } : {})}>
         <table aria-label={rotulo} className="w-full text-left text-corpo" style={{ minWidth: larguraMinima }}>
           <thead className="border-b bg-muted/50 text-rotulo text-muted-foreground">
             <tr>
@@ -61,8 +63,9 @@ export function Celula({ className, children }) {
   return <td className={cn('px-4 py-3', className)}>{children}</td>
 }
 
+// No toque (pointer-coarse), 8 px entre uma ação e outra (cada botão de ícone já tem 44 px lá).
 export function CelulaAcoes({ children }) {
-  return <td className="bg-card group-hover:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))] sticky right-0 border-l px-4 py-3 text-right whitespace-nowrap">{children}</td>
+  return <td className="bg-card group-hover:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))] sticky right-0 border-l px-4 py-3 text-right whitespace-nowrap pointer-coarse:[&>*+*]:ml-2">{children}</td>
 }
 
 export function ListaVazia({ children }) {

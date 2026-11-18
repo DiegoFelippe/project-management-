@@ -11,6 +11,18 @@ describe('Tabela (padrão das listas)', () => {
     expect(screen.getByRole('heading', { name: 'Quem espera' })).toBeInTheDocument()
   })
 
+  it('só de leitura (semAcoes): a rolagem para o lado recebe o foco do teclado e tem nome (auditoria, R13)', () => {
+    render(<Tabela rotulo="Histórico" semAcoes colunas={['Quando']}><Linha><Celula>ontem</Celula></Linha></Tabela>)
+    const rolagem = screen.getByRole('region', { name: 'Tabela Histórico' })
+    expect(rolagem).toHaveAttribute('tabindex', '0')
+    expect(rolagem).toContainElement(screen.getByRole('table', { name: 'Histórico' }))
+  })
+
+  it('com ações, a rolagem não vira mais uma parada do Tab (as ações já recebem o foco)', () => {
+    render(<Tabela rotulo="Pessoas" colunas={['Nome']}><Linha><Celula>Ana</Celula><CelulaAcoes><button type="button" className="botao-animado">Editar</button></CelulaAcoes></Linha></Tabela>)
+    expect(screen.queryByRole('region')).toBeNull()
+  })
+
   it('semCartao: a tabela entra no cartão de quem a usa, sem cartão próprio', () => {
     const { container } = render(<Tabela rotulo="Eventos" semCartao colunas={['Título']}><Linha><Celula>Kickoff</Celula></Linha></Tabela>)
     expect(screen.getByRole('table', { name: 'Eventos' })).toBeInTheDocument()

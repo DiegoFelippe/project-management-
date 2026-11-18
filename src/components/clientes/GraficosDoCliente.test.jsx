@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { checkinsPorSemana, horasPorConsultor, horasPorMes } from '@/data/clientes'
@@ -35,10 +35,18 @@ describe('GraficosDoCliente', () => {
     const meses = await screen.findByRole('img', { name: /Horas por mês/ })
     expect(meses).toHaveAccessibleName(/jun\/26: 0 h.*jul\/26: 12 h.*ago\/26: 20,5 h.*nov\/26: 8,5 h/)
     expect(meses).toHaveAccessibleName(/Previsão: 32,5 h/)
-    const consultores = await screen.findByRole('img', { name: /Horas por consultor/ })
-    expect(consultores).toHaveAccessibleName(/Ana Souza: 6,5 h.*outro consultor: 2 h/)
-    const semanas = await screen.findByRole('img', { name: /Check-ins por semana/ })
-    expect(semanas).toHaveAccessibleName(/sem\. de 02\/11: 2 check-ins, 3,5 h.*sem\. de 09\/11: 0 check-ins.*sem\. de 16\/11: 4 check-ins, 5 h/)
+  })
+
+  it('horas por consultor e check-ins por semana são listas de verdade, um item por linha (auditoria, R13)', async () => {
+    render(<GraficosDoCliente cliente={CLIENTE} />)
+    const consultores = await screen.findByRole('list', { name: /Horas por consultor/ })
+    expect(within(consultores).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Ana Souza: 6,5 h', 'outro consultor: 2 h'])
+    const semanas = screen.getByRole('list', { name: /Check-ins por semana/ })
+    expect(within(semanas).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'sem. de 02/11: 2 check-ins · 3,5 h', 'sem. de 09/11: 0 check-ins', 'sem. de 16/11: 4 check-ins · 5 h',
+    ])
+    // Nenhum item de lista fica pendurado num papel que não é lista (o axe acusava 70).
+    for (const li of document.querySelectorAll('li')) expect(li.parentElement.matches('ul:not([role]), ol:not([role]), [role="list"]'), li.textContent).toBe(true)
   })
 
   it('desenha a previsão atual como linha de referência com o rótulo', async () => {
@@ -50,7 +58,7 @@ describe('GraficosDoCliente', () => {
 
   it('mostra os números e os nomes na tela', async () => {
     render(<GraficosDoCliente cliente={CLIENTE} />)
-    await screen.findByRole('img', { name: /Horas por consultor/ })
+    await screen.findByRole('list', { name: /Horas por consultor/ })
     expect(screen.getByText('Ana Souza')).toBeInTheDocument()
     expect(screen.getByText('outro consultor')).toBeInTheDocument()
     expect(screen.getByText('sem. de 16/11')).toBeInTheDocument()
@@ -58,7 +66,7 @@ describe('GraficosDoCliente', () => {
 
   it('os rótulos são HTML na escala (text-legenda), não <text> de SVG', async () => {
     const { container } = render(<GraficosDoCliente cliente={CLIENTE} />)
-    await screen.findByRole('img', { name: /Horas por consultor/ })
+    await screen.findByRole('list', { name: /Horas por consultor/ })
     expect(container.querySelectorAll('svg text')).toHaveLength(0)
     expect(screen.getByText('nov/26').parentElement).toHaveClass('text-legenda')
     expect(screen.getByText('Previsão: 32,5 h')).toHaveClass('text-legenda')
@@ -83,7 +91,7 @@ describe('GraficosDoCliente', () => {
   it('trocar o mês chama as funções com o mês novo; Próximo não passa do mês atual', async () => {
     const usuario = userEvent.setup()
     render(<GraficosDoCliente cliente={CLIENTE} />)
-    await screen.findByRole('img', { name: /Horas por consultor/ })
+    await screen.findByRole('list', { name: /Horas por consultor/ })
     expect(horasPorConsultor).toHaveBeenLastCalledWith('k1', mesAtual())
     expect(screen.getByRole('button', { name: 'Próximo mês' })).toBeDisabled()
     await usuario.click(screen.getByRole('button', { name: 'Mês anterior' }))

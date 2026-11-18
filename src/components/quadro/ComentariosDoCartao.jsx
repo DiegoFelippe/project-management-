@@ -3,6 +3,7 @@ import { ChevronsUp, MessageSquare, Pencil, Send, Trash2 } from 'lucide-react'
 import Avatar from '@/components/comum/Avatar'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { apagarComentario, comentar, comentariosDoCartao, editarComentario } from '@/data/quadro'
 import { FUSO } from '@/lib/mes'
 import { useEscNoCampo } from './useEscNoCampo'
@@ -10,7 +11,7 @@ import { useEscNoCampo } from './useEscNoCampo'
 const QUANDO = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, dateStyle: 'short', timeStyle: 'short' })
 const quando = (instante) => QUANDO.format(new Date(instante))
 const MAXIMO = 2000
-const CAMPO_TEXTO = 'input texto-de-campo min-h-[4.5rem] resize-y leading-relaxed'
+const CAMPO_TEXTO = 'min-h-[4.5rem] leading-relaxed'
 const BOTAO_PERIGO = 'hover:bg-destructive/10 hover:text-destructive'
 
 // Comentários do cartão (texto simples, até 2000), como no Mochi: os 30 mais recentes, do mais antigo para o mais novo, e
@@ -145,7 +146,7 @@ export default function ComentariosDoCartao({ cartaoId, perfil, podeMexer, podeG
                   </div>
                   {editando?.id === c.id ? (
                     <div ref={campoEdicao} className="mt-1.5 grid gap-1.5">
-                      <textarea autoFocus aria-label="Texto do comentário" maxLength={MAXIMO} rows={3} value={editando.texto} className={CAMPO_TEXTO}
+                      <Textarea autoFocus aria-label="Texto do comentário" maxLength={MAXIMO} rows={3} value={editando.texto} className={CAMPO_TEXTO}
                         onChange={(e) => setEditando({ id: c.id, texto: e.target.value })}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -180,7 +181,7 @@ export default function ComentariosDoCartao({ cartaoId, perfil, podeMexer, podeG
 
       {podeMexer && (
         <div className="grid gap-2">
-          <textarea aria-label="Novo comentário" placeholder="Escreva um comentário… (Ctrl + Enter envia)" maxLength={MAXIMO} rows={2}
+          <Textarea aria-label="Novo comentário" placeholder="Escreva um comentário… (Ctrl + Enter envia)" maxLength={MAXIMO} rows={2}
             value={texto} className={CAMPO_TEXTO} onChange={(e) => setTexto(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {

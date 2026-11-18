@@ -240,7 +240,7 @@ export default function EditorDeEtapas({ rascunho, mudar, erros }) {
           <section key={e.id} aria-label={`Etapa ${n}`} data-erro={erroDaEtapa || undefined}
             className={cn('bg-muted/40 min-w-0 space-y-3 rounded-2xl border p-2.5 sm:p-3', erroDaEtapa && 'border-destructive/60 ring-destructive/15 ring-2')}>
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              <span className="bg-primary text-primary-foreground grid size-6 shrink-0 place-items-center rounded-md text-mini tabular-nums">{n}</span>
+              <span className="bg-primary-cheio text-primary-foreground grid size-6 shrink-0 place-items-center rounded-md text-mini tabular-nums">{n}</span>
               <Input id={`${base}-en-${e.id}`} aria-label={`Nome da etapa ${n}`} value={e.nome} maxLength={LIMITES.etapa}
                 placeholder="Nome da etapa (ex.: Diagnóstico)" aria-invalid={(erroDaEtapa && !e.nome.trim()) || undefined}
                 className="min-w-40 flex-1 basis-40 font-semibold" onChange={(ev) => acoes.etapa(e.id, ev.target.value)} />

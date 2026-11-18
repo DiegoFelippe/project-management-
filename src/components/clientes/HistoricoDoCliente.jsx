@@ -35,7 +35,7 @@ export default function HistoricoDoCliente({ clienteId, versao }) {
       {!erro && itens === null && <GraficoCarregando texto="Carregando o histórico…" className="py-8" />}
       {itens?.length === 0 && <ListaVazia>Nada no histórico ainda.</ListaVazia>}
       {itens?.length > 0 && (
-        <Tabela rotulo="Histórico" colunas={['Quando', 'O quê', 'Quem']} larguraMinima={520}
+        <Tabela rotulo="Histórico" colunas={['Quando', 'O quê', 'Quem']} larguraMinima={520} semAcoes
           paginacao={{ pagina, total: resultado.total, aoMudar: setPagina }}>
           {itens.map((e) => (
             <Linha key={e.id}>

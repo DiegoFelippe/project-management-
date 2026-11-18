@@ -20,6 +20,13 @@ describe('Caixa', () => {
     expect(aoMudar).toHaveBeenLastCalledWith(false)
   })
 
+  it('a caixa é quadrada (cantos de 5 px), não redonda como a de escolha única (auditoria, R1)', () => {
+    render(<Caixa marcado aoMudar={() => {}} rotulo="Fiscal" />)
+    const caixa = screen.getByRole('checkbox', { name: 'Fiscal' }).nextElementSibling
+    expect(caixa).toHaveClass('size-[18px]', 'rounded-[5px]')
+    expect(caixa).not.toHaveClass('rounded-md')
+  })
+
   it('indeterminado aparece como misto', () => {
     render(<Caixa marcado={false} indeterminado aoMudar={() => {}} rotulo="Todos" />)
     expect(screen.getByRole('checkbox', { name: 'Todos' })).toBePartiallyChecked()

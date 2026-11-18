@@ -6,10 +6,9 @@ import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaForm
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { cnpjValido, formatarCnpj, normalizarCnpj } from '@/lib/cnpj'
 import { lerHoras, MAXIMO_DE_HORAS_NO_MES } from './rotulos'
-
-const CAMPO_TEXTO = 'w-full rounded-md border border-input bg-card px-3 py-2 texto-de-campo shadow-xs outline-none focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/30'
 
 function Campo({ id, rotulo, children }) {
   return (
@@ -113,7 +112,7 @@ export default function FormularioCliente({ aberto, aoFechar, cliente, aoSalvar 
             <CampoNumero id="cliente-horas" valor={horas} aoMudar={setHoras} min={0} max={999} passo={0.5} decimal unidade="h" />
           </Campo>
           <Campo id="cliente-observacoes" rotulo="Observações (opcional)">
-            <textarea id="cliente-observacoes" rows={2} maxLength={1000} className={CAMPO_TEXTO}
+            <Textarea id="cliente-observacoes" rows={2} maxLength={1000}
               value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />
           </Campo>
         </SecaoFormulario>

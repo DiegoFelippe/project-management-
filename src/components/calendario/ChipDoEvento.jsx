@@ -1,7 +1,7 @@
 import { Folder, Video } from 'lucide-react'
 import { horaDoChip, textoDoItem } from '@/lib/calendario'
 import { cn } from '@/lib/utils'
-import { ESTILO_DO_CHIP, corDoChip } from './cores'
+import { ESTILO_DO_CHIP, estiloDoChip } from './cores'
 
 // Nome acessível do chip do evento: título, hora e o que ele tem (Meet, pasta da reunião).
 function nomeDoEvento(evento, hora) {
@@ -15,7 +15,7 @@ const TAMANHOS = {
 }
 
 // Chip do calendário, como no Hub: o evento com fundo na cor (do evento, ou do consultor na visão de mais de uma
-// pessoa), texto branco, vídeo quando tem Meet e pasta quando a pasta da reunião já existe; ausência e feriado em
+// pessoa), texto branco (escuro nas cores claras), vídeo quando tem Meet e pasta quando a pasta da reunião já existe; ausência e feriado em
 // tons suaves (não abrem nada: o detalhe do dia mostra). `comHora`: a hora de início ao lado do título. `compacto`:
 // no celular vira só uma faixa de cor (o texto fica para o leitor de tela), para o mês caber em 360 px.
 export default function ChipDoEvento({ item, dia, deVariasPessoas, comHora = false, compacto = false, tamanho = 'mini', aoAbrir, className }) {
@@ -36,9 +36,9 @@ export default function ChipDoEvento({ item, dia, deVariasPessoas, comHora = fal
   const icone = cn('size-3 shrink-0', compacto && 'max-sm:hidden')
   return (
     <button type="button" aria-label={nomeDoEvento(evento, hora)} title={evento.consultor?.nome ? `${evento.titulo} · ${evento.consultor.nome}` : evento.titulo}
-      style={{ backgroundColor: corDoChip(evento, deVariasPessoas) }}
+      style={estiloDoChip(evento, deVariasPessoas)}
       onClick={(e) => { e.stopPropagation(); aoAbrir?.(evento) }} onDoubleClick={(e) => e.stopPropagation()}
-      className={cn(base, 'botao-animado text-white transition-[filter,translate,scale] hover:-translate-y-px hover:brightness-110 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none')}>
+      className={cn(base, 'botao-animado transition-[filter,translate,scale] hover:-translate-y-px hover:brightness-110 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none')}>
       {(evento.meet_link || evento.com_meet) && <Video className={icone} strokeWidth={2.2} aria-hidden="true" />}
       {evento.pasta_id && <Folder className={icone} strokeWidth={2.2} aria-hidden="true" />}
       <span className={cn('min-w-0 flex-1 truncate', someNoCelular)}>{evento.titulo}</span>

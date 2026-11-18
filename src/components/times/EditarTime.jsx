@@ -7,6 +7,7 @@ import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 
 // Editar time: nome e descrição (gestor do time e administrador); trocar o gestor só o administrador, escolhendo
 // numa busca no banco (`buscarGestores(termo)` devolve { itens: [pessoa], total }); o gestor de agora já vem na lista.
@@ -50,8 +51,7 @@ export default function EditarTime({ aberto, aoFechar, time, papelDeQuemEdita, b
         </div>
         <div className="grid gap-2">
           <Label htmlFor="editar-time-descricao">Descrição (opcional)</Label>
-          <textarea id="editar-time-descricao" rows={2} maxLength={500}
-            className="w-full rounded-md border border-input bg-card px-3 py-2 texto-de-campo shadow-xs outline-none focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/30"
+          <Textarea id="editar-time-descricao" rows={2} maxLength={500}
             value={descricao} onChange={(e) => setDescricao(e.target.value)} />
         </div>
         {trocaGestor && (

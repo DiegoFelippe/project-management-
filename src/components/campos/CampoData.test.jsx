@@ -87,6 +87,23 @@ describe('CampoData', () => {
     expect(screen.getByRole('button', { name: /Escolher data/ })).toBeInTheDocument()
   })
 
+  it('"Limpar data" fica fora do campo (um controle não fica dentro do outro), com 24 px e pelo teclado (auditoria, R13)', async () => {
+    const aoMudar = vi.fn()
+    render(<Controlado inicial="2026-11-16" rotulo="Prazo" aoMudar={aoMudar} />)
+    const campo = screen.getByRole('button', { name: 'Prazo' })
+    const limpar = screen.getByRole('button', { name: 'Limpar data' })
+    expect(limpar.tagName).toBe('BUTTON')
+    expect(campo).not.toContainElement(limpar)
+    expect(limpar).toHaveClass('size-6')
+    campo.focus()
+    await userEvent.tab()
+    expect(limpar).toHaveFocus()
+    await userEvent.keyboard('{Enter}')
+    expect(aoMudar).toHaveBeenCalledWith('')
+    expect(screen.queryByRole('button', { name: 'Limpar data' })).toBeNull()
+    expect(campo).toHaveFocus()
+  })
+
   it('obrigatória não oferece limpar', async () => {
     render(<Controlado inicial="2026-11-16" obrigatorio />)
     expect(screen.queryByRole('button', { name: 'Limpar data' })).toBeNull()

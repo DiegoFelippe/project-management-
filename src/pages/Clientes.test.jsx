@@ -221,7 +221,7 @@ describe('Clientes: distribuir e escolher consultor', () => {
   // Padrão Hub: nas linhas da tabela as ações continuam ghost sm (cheio e outline são só do cabeçalho da página).
   const ehGhostSm = (botao) => {
     expect(botao).toHaveClass('text-muted-foreground', 'h-8')
-    expect(botao).not.toHaveClass('bg-primary')
+    expect(botao).not.toHaveClass('bg-primary-cheio')
     expect(botao).not.toHaveClass('border')
   }
 

@@ -3,6 +3,7 @@
 import { Camera, ImagePlus, Trash2 } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { corDoTextoSobre } from '@/lib/cores'
 import { TIPOS_ACEITOS, validarImagem } from '@/lib/imagem'
 import { cn } from '@/lib/utils'
 
@@ -40,7 +41,7 @@ export default function CampoImagem({ rotulo, atual, reserva, reservaCor, aparen
           <div className="bg-muted text-muted-foreground grid size-24 place-items-center overflow-hidden rounded-2xl text-destaque font-bold">
             {mostrada
               ? <img src={mostrada} alt={`Prévia da ${rotulo}`} className="size-full object-cover" />
-              : <span className="grid size-full place-items-center text-white" style={reservaCor ? { backgroundColor: reservaCor } : undefined}>{reserva}</span>}
+              : <span className="grid size-full place-items-center text-white" style={reservaCor ? { backgroundColor: reservaCor, color: corDoTextoSobre(reservaCor) } : undefined}>{reserva}</span>}
           </div>
           <Button type="button" size="icon" aria-label={`Trocar a ${rotulo}`} title={`Trocar a ${rotulo}`}
             className="ring-card absolute -right-2 -bottom-2 size-9 rounded-xl ring-4" onClick={() => entrada.current?.click()}>
@@ -61,7 +62,7 @@ export default function CampoImagem({ rotulo, atual, reserva, reservaCor, aparen
 
   return (
     <div className="flex items-center gap-4">
-      <div style={!mostrada && reservaCor ? { backgroundColor: reservaCor } : undefined}
+      <div style={!mostrada && reservaCor ? { backgroundColor: reservaCor, color: corDoTextoSobre(reservaCor) } : undefined}
         className={cn('grid size-16 shrink-0 place-items-center overflow-hidden text-janela font-bold',
           !mostrada && reservaCor ? 'text-white' : 'text-muted-foreground',
           redondo ? 'rounded-full bg-muted' : 'rounded-lg border bg-white')}>

@@ -3,7 +3,7 @@ import Avatar from '@/components/comum/Avatar'
 import { Button } from '@/components/ui/button'
 import { diaEMes, horarioNoDia, nomeDoDia } from '@/lib/calendario'
 import { cn } from '@/lib/utils'
-import { ESTILO_DO_CHIP, corDoChip } from './cores'
+import { ESTILO_DO_CHIP, estiloDoChip } from './cores'
 
 // "Detalhe do dia" (o dia clicado), como no Hub: feriado, quem está ausente e os eventos com o horário. Clicar num
 // evento abre a janela dele; o "+" cria um evento naquele dia.
@@ -45,8 +45,8 @@ export default function DetalheDoDia({ dia, itens, deVariasPessoas, aoCriar, aoA
             const { evento } = item
             return (
               <li key={`evento-${evento.id}`}>
-                <button type="button" onClick={() => aoAbrir(evento)} style={{ backgroundColor: corDoChip(evento, deVariasPessoas) }}
-                  className="botao-animado flex w-full min-w-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-white transition-[filter,translate,scale] outline-none hover:-translate-y-px hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:scale-[0.97]">
+                <button type="button" onClick={() => aoAbrir(evento)} style={estiloDoChip(evento, deVariasPessoas)}
+                  className="botao-animado flex w-full min-w-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-[filter,translate,scale] outline-none hover:-translate-y-px hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:scale-[0.97]">
                   {(evento.meet_link || evento.com_meet) && <Video className="size-3.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />}
                   {evento.pasta_id && <Folder className="size-3.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />}
                   <span className="min-w-0 flex-1">

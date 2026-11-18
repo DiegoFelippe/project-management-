@@ -64,22 +64,29 @@ function GraficoDeMeses({ meses, previsao }) {
   )
 }
 
-// Uma linha por item: rótulo à esquerda, número à direita (HTML) e a barra embaixo.
+// Uma linha por item: rótulo à esquerda, número à direita (HTML) e a barra embaixo. É uma lista de verdade (role="list"
+// porque o Safari tira o papel de lista sem marcadores), e o leitor de tela lê "nome: número" item a item (auditoria, R13).
 function GraficoDeBarras({ itens, rotuloGeral }) {
   const maximo = Math.max(...itens.map((i) => i.valor), 1)
   return (
-    <ul role="img" aria-label={`${rotuloGeral}. ${itens.map((i) => `${i.rotulo}: ${i.detalhe.replace(' · ', ', ')}`).join('; ')}.`} className="grid gap-2.5">
-      {itens.map((item) => (
-        <li key={item.chave}>
-          <div className="flex items-baseline justify-between gap-3 text-legenda">
-            <span className="min-w-0 truncate">{cortar(item.rotulo, 24)}</span>
-            <span className="shrink-0 tabular-nums text-muted-foreground">{item.detalhe}</span>
-          </div>
-          <div aria-hidden="true" className="mt-1 h-2 overflow-hidden rounded-full bg-input/50">
-            {item.valor > 0 && <div className="h-full min-w-2 rounded-full bg-primary" style={{ width: `${(item.valor * 100) / maximo}%` }} />}
-          </div>
-        </li>
-      ))}
+    <ul role="list" aria-label={rotuloGeral} className="grid gap-2.5">
+      {itens.map((item) => {
+        const nome = cortar(item.rotulo, 24)
+        return (
+          <li key={item.chave}>
+            <div className="flex items-baseline justify-between gap-3 text-legenda">
+              {nome === item.rotulo
+                ? <span className="min-w-0 truncate">{nome}</span>
+                : <span className="min-w-0 truncate" title={item.rotulo}><span aria-hidden="true">{nome}</span><span className="sr-only">{item.rotulo}</span></span>}
+              <span className="sr-only">: </span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{item.detalhe}</span>
+            </div>
+            <div aria-hidden="true" className="mt-1 h-2 overflow-hidden rounded-full bg-input/50">
+              {item.valor > 0 && <div className="h-full min-w-2 rounded-full bg-primary" style={{ width: `${(item.valor * 100) / maximo}%` }} />}
+            </div>
+          </li>
+        )
+      })}
     </ul>
   )
 }

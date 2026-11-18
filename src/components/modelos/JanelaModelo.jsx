@@ -8,6 +8,7 @@ import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaForm
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { buscarConsultoriasAtivas } from '@/data/consultorias'
 import { salvarModelo } from '@/data/modelos'
 import { plural } from '@/lib/nomes'
@@ -17,8 +18,6 @@ import { cn } from '@/lib/utils'
 import EditorDeEtapas from './EditorDeEtapas'
 import { LIMITES, paraSalvar, rascunhoDe, rascunhoNovo, resumoDoRascunho, tarefasEmOrdem, validarModelo } from './modelo'
 import PreviaDoFluxo from './PreviaDoFluxo'
-
-const CAMPO_TEXTO = 'input texto-de-campo min-h-20 w-full resize-y py-2'
 
 // Consultorias ativas (as arquivadas não recebem modelo), buscadas no banco pelo nome.
 const buscarConsultoria = async (termo) => {
@@ -50,7 +49,7 @@ function EscolhaDoPara({ valor, aoMudar }) {
             onClick={() => aoMudar(o.valor)} onKeyDown={(e) => teclar(e, i)}
             className={cn('botao-animado flex items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow,translate,scale] outline-none hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50',
               escolhida ? 'border-primary bg-primary/5 ring-primary/15 ring-2' : 'bg-card hover:border-primary/40')}>
-            <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', escolhida ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+            <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', escolhida ? 'bg-primary-cheio text-primary-foreground' : 'bg-muted text-muted-foreground')}>
               <o.icone className="size-4" aria-hidden="true" />
             </span>
             <span className="min-w-0">
@@ -194,8 +193,8 @@ export default function JanelaModelo({ modelo, origem, clientesUsando = 0, aoFec
               </div>
               <div className="grid gap-2">
                 <Label htmlFor={`${idBase}-descricao`}>Descrição (opcional)</Label>
-                <textarea id={`${idBase}-descricao`} rows={3} maxLength={LIMITES.descricao} placeholder="Para que serve e quando aplicar"
-                  className={CAMPO_TEXTO} value={rascunho.descricao} onChange={(e) => mudar((r) => ({ ...r, descricao: e.target.value }))} />
+                <Textarea id={`${idBase}-descricao`} rows={3} maxLength={LIMITES.descricao} placeholder="Para que serve e quando aplicar"
+                  className="min-h-20" value={rascunho.descricao} onChange={(e) => mudar((r) => ({ ...r, descricao: e.target.value }))} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor={`${idBase}-tipo`}>Tipo de consultoria</Label>

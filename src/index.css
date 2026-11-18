@@ -7,7 +7,9 @@
 /* Visual "claro e azul" (opção C), no conceito do app de música e do Hub:
    a moldura (trilho e barra de cima) é branca; o conteúdo fica num painel rebaixado cinza-azulado;
    uma cor de ação só, o azul (botão principal, item aberto do menu, seleção, foco, links).
-   Cores no formato do shadcn/ui. */
+   Cores no formato do shadcn/ui. Contraste mínimo de 4,5:1 nos pares do dia a dia (auditoria, pedido do Diego 17/11;
+   src/lib/contraste.test.js confere): --primary-cheio é o fundo azul com texto branco (o botão principal), igual ao
+   --primary no claro; --domingo e --sabado são os dias do fim de semana no Calendário. */
 :root {
   --radius: 0.75rem;
   --moldura: #ffffff;
@@ -19,11 +21,12 @@
   --popover: #ffffff;
   --popover-foreground: #0f172a;
   --primary: #2563eb;
+  --primary-cheio: #2563eb;
   --primary-foreground: #ffffff;
   --secondary: #f1f5f9;
   --secondary-foreground: #0f172a;
   --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --muted-foreground: #566174;
   --accent: #eff6ff;
   --accent-foreground: #1e3a8a;
   --destructive: #dc2626;
@@ -35,11 +38,14 @@
   --notice-soft: #fef3c7;
   --positive: #15803d;
   --positive-soft: #dcfce7;
+  --domingo: #be123c;
+  --sabado: #6d28d9;
   color-scheme: light;
 }
 
 /* Modo escuro (classe .dark no <html>; botão de tema na barra de cima). Mesmo conceito: moldura um tom
-   acima do painel rebaixado, um azul só de destaque, um pouco mais claro para manter o contraste. */
+   acima do painel rebaixado, um azul só de destaque, um pouco mais claro para manter o contraste do texto azul e do
+   foco. O fundo cheio com texto branco (botão principal) fica no azul da consultoria: o claro dá 3,7:1 com o branco. */
 .dark {
   --moldura: #0e1424;
   --painel: #080c17;
@@ -50,6 +56,7 @@
   --popover: #121a2c;
   --popover-foreground: #e5e9f0;
   --primary: #3b82f6;
+  --primary-cheio: #2563eb;
   --primary-foreground: #ffffff;
   --secondary: #1b2438;
   --secondary-foreground: #e5e9f0;
@@ -66,6 +73,8 @@
   --notice-soft: rgb(251 191 36 / 0.14);
   --positive: #4ade80;
   --positive-soft: rgb(74 222 128 / 0.14);
+  --domingo: #fb7185;
+  --sabado: #a78bfa;
   color-scheme: dark;
 }
 
@@ -85,6 +94,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-cheio: var(--primary-cheio);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -101,6 +111,8 @@
   --color-notice-soft: var(--notice-soft);
   --color-positive: var(--positive);
   --color-positive-soft: var(--positive-soft);
+  --color-domingo: var(--domingo);
+  --color-sabado: var(--sabado);
   --animate-page-enter: page-enter 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   --animate-barra: barra 1.1s ease-in-out infinite;
 }
@@ -242,8 +254,9 @@
   /* Campos de digitar: 16 px no celular (o iPhone dá zoom abaixo disso) e text-corpo a partir de sm.
      Vale para o .input e para todo campo escrito à mão (<textarea>, campos internos). */
   .input, .texto-de-campo { @apply text-base sm:text-corpo; }
+  /* No toque (pointer-coarse), o campo tem 44 px de altura (auditoria, G5); no computador nada muda. */
   .input {
-    @apply bg-card border-input text-foreground placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 transition-[color,box-shadow,border-color] outline-none;
+    @apply bg-card border-input text-foreground placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 transition-[color,box-shadow,border-color] outline-none pointer-coarse:min-h-11;
     @apply hover:border-primary/40 focus:border-primary/60 focus:ring-primary/15 focus:ring-2 disabled:bg-muted disabled:cursor-not-allowed disabled:opacity-60;
     @apply aria-invalid:border-destructive aria-invalid:ring-destructive/20;
   }

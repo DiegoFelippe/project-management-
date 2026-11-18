@@ -19,7 +19,7 @@ export default function VisaoSemana({ dias, porDia, hoje, selecionado, deVariasP
               dia === selecionado && !ehHoje && 'border-primary/30 bg-accent')}>
             <button type="button" onClick={() => aoSelecionar(dia)} aria-label={`Ver o detalhe de ${nomeDoDia(dia)}`}
               className="botao-animado mb-2 flex items-baseline gap-2 rounded-lg text-left transition-[translate,scale] outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97] sm:block">
-              <span className={cn('block text-legenda font-semibold', semana === 0 ? 'text-rose-500' : semana === 6 ? 'text-violet-500' : 'text-muted-foreground')}>
+              <span className={cn('block text-legenda font-semibold', semana === 0 ? 'text-domingo' : semana === 6 ? 'text-sabado' : 'text-muted-foreground')}>
                 {DIAS_DA_SEMANA[semana]}
               </span>
               <span className={cn('block text-titulo leading-tight font-bold tabular-nums', ehHoje ? 'text-primary' : 'text-foreground')}>

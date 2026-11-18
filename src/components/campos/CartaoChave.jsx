@@ -16,7 +16,7 @@ export default function CartaoChave({ id, ligada, aoMudar, titulo, dica, icone: 
           ? cn('focus-visible:ring-inset', ligada ? 'bg-primary/5' : 'hover:bg-muted/40')
           : cn('rounded-xl border', ligada ? 'border-primary/50 bg-primary/5' : 'bg-card hover:border-primary/40'))}>
       {Icone && (
-        <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', ligada ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+        <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', ligada ? 'bg-primary-cheio text-primary-foreground' : 'bg-muted text-muted-foreground')}>
           <Icone className="size-4" aria-hidden="true" />
         </span>
       )}

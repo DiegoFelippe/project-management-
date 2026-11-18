@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { apagarEvento, novoIdDeEvento, pessoasParaConvidar, responderConvite, salvarEvento } from '@/data/agenda'
 import { consultoresPorOcupacao } from '@/data/capacidade'
 import { buscarClientes } from '@/data/clientes'
@@ -435,7 +436,7 @@ function FormularioDoEvento({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="evento-descricao">Descrição</Label>
-              <textarea id="evento-descricao" rows={2} maxLength={5000} value={descricao} placeholder="Pauta, o que levar…" onChange={(e) => setDescricao(e.target.value)} className="input texto-de-campo resize-none" />
+              <Textarea id="evento-descricao" rows={2} maxLength={5000} value={descricao} placeholder="Pauta, o que levar…" onChange={(e) => setDescricao(e.target.value)} className="resize-none" />
             </div>
             {(central || gestao) && (
               <div className="grid gap-2">
@@ -455,7 +456,7 @@ function FormularioDoEvento({
               {atalhosDeData().map((a) => (
                 <button key={a.rotulo} type="button" aria-pressed={data === a.dia} onClick={() => { setData(a.dia); if (dataFim && dataFim < a.dia) setDataFim('') }}
                   className={cn('botao-animado rounded-md px-2 py-1 text-legenda font-medium transition-[background-color,color,translate,scale] outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]',
-                    data === a.dia ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary hover:bg-primary/15')}>
+                    data === a.dia ? 'bg-primary-cheio text-primary-foreground' : 'bg-primary/10 text-primary hover:bg-primary/15')}>
                   {a.rotulo}
                 </button>
               ))}

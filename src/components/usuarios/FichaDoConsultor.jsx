@@ -110,7 +110,7 @@ function EscolhaDeAcesso({ valor, aoMudar }) {
             tabIndex={escolhida ? 0 : -1} onClick={() => aoMudar(o.valor)} onKeyDown={(e) => teclar(e, i)}
             className={cn('botao-animado flex items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow,translate,scale] outline-none hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50',
               escolhida ? 'border-primary bg-primary/5 ring-primary/15 ring-2' : 'bg-card hover:border-primary/40')}>
-            <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', escolhida ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+            <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', escolhida ? 'bg-primary-cheio text-primary-foreground' : 'bg-muted text-muted-foreground')}>
               <o.icone className="size-4" aria-hidden="true" />
             </span>
             <span className="min-w-0">

@@ -34,6 +34,21 @@ describe('Trilho', () => {
     expect(checkins.previousElementSibling).toBe(calendario)
   })
 
+  it('o nome que não cabe quebra em duas linhas, sem reticências e com a mesma letra (auditoria, R3)', () => {
+    const perfil = { nome: 'Diego Felippe', email: 'diego@exemplo.test', papel: 'dono' }
+    const { container } = render(
+      <AuthContext.Provider value={{ perfil, sair: () => {} }}>
+        <MemoryRouter>
+          <Trilho />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    )
+    const consultorias = [...container.querySelectorAll('[data-item-trilho]')].find((item) => item.textContent === 'Consultorias')
+    const nome = within(consultorias).getByText('Consultorias')
+    expect(nome).not.toHaveClass('truncate')
+    expect(nome).toHaveClass('text-mini', 'line-clamp-2', 'hyphens-auto', 'text-center')
+  })
+
   it('a bolinha usa a cor escolhida (ou a automática) quando não há foto, e mantém a animação', () => {
     const base = { id: 'me', nome: 'Diego Felippe', email: 'diego@exemplo.test', papel: 'admin' }
     const { rerender } = render(

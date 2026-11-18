@@ -6,16 +6,18 @@ import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import MinhaFicha from '@/components/usuarios/MinhaFicha'
-import { corDaPessoa } from '@/lib/cores'
+import { corDaPessoa, corDoTextoSobre } from '@/lib/cores'
 import { urlPublica } from '@/lib/imagem'
 import { iniciais, primeiroNome } from '@/lib/nomes'
 import { cn } from '@/lib/utils'
 import Logo from './Logo'
 import { itensDoMenu } from './menu'
 
+// O nome que não cabe em 64 px quebra em duas linhas (com hífen do português e pelo menos 5 letras de cada lado:
+// "Consul-torias", não "Consultori-as"), sem mudar a letra e sem reticências (auditoria, R3).
 const rotulo = (aceso) =>
   cn(
-    'max-w-[64px] truncate text-mini leading-none font-semibold',
+    'line-clamp-2 max-w-[64px] text-center text-mini leading-tight font-semibold hyphens-auto [hyphenate-limit-chars:auto_5_5] [overflow-wrap:anywhere]',
     aceso ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground',
   )
 
@@ -24,7 +26,7 @@ function Quadro({ icone: Icone, animacao, aceso, perigo }) {
     <span
       className={cn(
         'grid size-9 place-items-center rounded-[11px] transition-[color,background-color,box-shadow] duration-200',
-        aceso && 'bg-primary text-primary-foreground shadow-[0_6px_16px_-6px] shadow-primary/70',
+        aceso && 'bg-primary-cheio text-primary-foreground shadow-[0_6px_16px_-6px] shadow-primary/70',
         !aceso && !perigo && 'text-muted-foreground group-hover:bg-accent group-hover:text-accent-foreground',
         perigo && 'text-muted-foreground group-hover:bg-destructive/10 group-hover:text-destructive',
       )}
@@ -53,6 +55,7 @@ export default function Trilho({ aoNavegar }) {
   const navigate = useNavigate()
   const [perfilAberto, setPerfilAberto] = useState(false)
   const foto = urlPublica('fotos', perfil.foto)
+  const cor = corDaPessoa(perfil)
 
   return (
     <div className="trilho flex h-full w-[72px] flex-none flex-col bg-moldura">
@@ -69,8 +72,8 @@ export default function Trilho({ aoNavegar }) {
         <button type="button" title={`Meu perfil: ${perfil.nome} (${perfil.email})`} aria-label={`Meu perfil (${perfil.nome})`}
           data-item-trilho="" onClick={() => setPerfilAberto(true)}
           className="group flex w-16 flex-col items-center gap-1 py-0.5 outline-none focus-visible:[&>span:first-child]:ring-2 focus-visible:[&>span:first-child]:ring-ring">
-          <span style={foto ? undefined : { backgroundColor: corDaPessoa(perfil) }}
-            className={cn('anim-pulsar grid size-8 place-items-center overflow-hidden rounded-full text-rotulo font-bold ring-1 ring-primary/25 transition-shadow group-hover:ring-2 group-hover:ring-primary/50', foto ? 'bg-primary/10 text-primary' : 'text-white')}>
+          <span style={foto ? undefined : { backgroundColor: cor, color: corDoTextoSobre(cor) }}
+            className={cn('anim-pulsar grid size-8 place-items-center overflow-hidden rounded-full text-rotulo font-bold ring-1 ring-primary/25 transition-shadow group-hover:ring-2 group-hover:ring-primary/50', foto && 'bg-primary/10 text-primary')}>
             {foto ? <img src={foto} alt="" className="size-full object-cover" /> : iniciais(perfil.nome)}
           </span>
           <span className={rotulo(false)}>{primeiroNome(perfil.nome)}</span>

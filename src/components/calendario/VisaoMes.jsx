@@ -38,7 +38,7 @@ export default function VisaoMes({
         <div role="row" className="grid grid-cols-7">
           {DIAS_DA_SEMANA.map((d, i) => (
             <div key={d} role="columnheader" className={cn('py-1.5 text-center text-legenda font-semibold tracking-wide uppercase',
-              i === 0 ? 'text-rose-500' : i === 6 ? 'text-violet-500' : 'text-muted-foreground')}>
+              i === 0 ? 'text-domingo' : i === 6 ? 'text-sabado' : 'text-muted-foreground')}>
               {d}
             </div>
           ))}
@@ -66,7 +66,7 @@ export default function VisaoMes({
                   )}>
                   <div className="mb-1 flex items-center justify-between gap-0.5">
                     <span className={cn('grid size-6 place-items-center rounded-full text-rotulo font-semibold tabular-nums',
-                      ehHoje ? 'bg-primary text-primary-foreground' : semana === 0 ? 'text-rose-500' : semana === 6 ? 'text-violet-500' : 'text-foreground/80')}>
+                      ehHoje ? 'bg-primary-cheio text-primary-foreground' : semana === 0 ? 'text-domingo' : semana === 6 ? 'text-sabado' : 'text-foreground/80')}>
                       {Number(dia.slice(8, 10))}
                     </span>
                     {mais > 0 && <span className="text-mini font-semibold text-muted-foreground" aria-hidden="true">+{mais}</span>}

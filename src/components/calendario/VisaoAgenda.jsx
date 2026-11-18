@@ -29,9 +29,9 @@ export default function VisaoAgenda({ dias, porDia, hoje, deVariasPessoas, aoSel
                 {Number(dia.slice(8, 10))}
               </span>
               <span className="min-w-0">
-                <span className={cn('block text-rotulo font-semibold first-letter:uppercase', ehHoje ? 'text-primary' : 'text-foreground/80')}>
+                <span className={cn('block text-rotulo font-semibold first-letter:uppercase', ehHoje ? 'text-foreground' : 'text-foreground/80')}>
                   {diaDaSemanaPorExtenso(dia)}
-                  {ehHoje && <span className="ml-2 rounded-full bg-primary px-1.5 py-0.5 text-mini text-primary-foreground">Hoje</span>}
+                  {ehHoje && <span className="ml-2 rounded-full bg-primary-cheio px-1.5 py-0.5 text-mini text-primary-foreground">Hoje</span>}
                 </span>
                 <span className="block text-legenda text-muted-foreground">{mesEAno(dia)}</span>
               </span>

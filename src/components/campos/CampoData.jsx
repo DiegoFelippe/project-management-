@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   addDays, addMonths, addYears, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, isToday,
   isValid, parseISO, setMonth, setYear, startOfMonth, startOfWeek,
@@ -7,7 +7,7 @@ import {
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import CampoHora from './CampoHora'
-import Flutuante, { BotaoCampo } from './Flutuante'
+import Flutuante, { BotaoCampo, BotaoLimpar } from './Flutuante'
 
 const SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 const LARGURA = 296
@@ -21,7 +21,7 @@ function ler(valor, comHora) {
 
 const celula = (marcada, fora, hoje, dentro = true) => cn(
   'rounded-lg tabular-nums disabled:cursor-not-allowed',
-  marcada ? 'bg-primary text-primary-foreground font-semibold'
+  marcada ? 'bg-primary-cheio text-primary-foreground font-semibold'
     : fora ? 'text-muted-foreground/40'
       : cn(dentro ? 'text-foreground' : 'text-muted-foreground/60', 'hover:bg-primary/10', hoje && 'text-primary ring-primary/60 font-semibold ring-1 ring-inset'),
 )
@@ -29,6 +29,9 @@ const celula = (marcada, fora, hoje, dentro = true) => cn(
 // Calendário do padrão Hub no lugar do <input type="date">. O valor é texto "yyyy-MM-dd" (com `comHora`,
 // "yyyy-MM-ddTHH:mm"), vazio quando não há data; `aoMudar` recebe o texto. `min`/`max` em "yyyy-MM-dd".
 // `atalhos`: [{ rotulo, valor }] além do "Hoje". Data opcional por padrão (Limpar volta a ''); `obrigatorio` tira o Limpar.
+// O "Limpar data" do campo é um botão ao lado do gatilho, por cima da borda direita (não dentro dele: um controle dentro
+// do outro some para o teclado e o leitor de tela), com 24 px. No toque (pointer-coarse), atalhos, setas e botões da
+// lista têm 44 px, com 8 px entre os atalhos (auditoria, G5 e R13).
 export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHora = false, atalhos = [], obrigatorio = false, desabilitado = false, placeholder = 'Escolher data' }) {
   const escolhida = ler(valor, comHora)
   const minimo = ler(min, false)
@@ -86,37 +89,35 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
     setFoco(alvo)
   }
   const nomeSeta = (dir) => (modo === 'dias' ? (dir < 0 ? 'Mês anterior' : 'Próximo mês') : modo === 'meses' ? (dir < 0 ? 'Ano anterior' : 'Próximo ano') : (dir < 0 ? 'Anos anteriores' : 'Próximos anos'))
-  const botaoTitulo = 'hover:bg-accent rounded-lg px-2 py-1 text-corpo font-semibold tabular-nums'
+  const botaoTitulo = 'hover:bg-accent rounded-lg px-2 py-1 text-corpo font-semibold tabular-nums pointer-coarse:min-h-11'
+  const seta = 'text-muted-foreground hover:bg-accent grid size-8 place-items-center rounded-lg pointer-coarse:size-11'
+  const atalho = 'rounded-lg px-2.5 py-1 text-rotulo pointer-coarse:min-h-11 pointer-coarse:px-3.5'
   const limpar = !obrigatorio && escolhida && !desabilitado
 
   return (
     <>
-      <button ref={gatilho} id={id} type="button" disabled={desabilitado} onClick={alternar} aria-label={rotulo} aria-describedby={valorId} aria-haspopup="dialog" aria-expanded={aberto}
-        className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center gap-2 text-left', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
-        <CalendarDays className={cn('size-3.5 shrink-0', escolhida ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
-        <span id={valorId} className={cn('min-w-0 flex-1 truncate', !escolhida && 'text-muted-foreground')}>
-          {escolhida ? format(escolhida, comHora ? "d 'de' MMM 'de' yyyy', ' HH:mm" : "d 'de' MMM 'de' yyyy", { locale: ptBR }) : placeholder}
-        </span>
-        {limpar && (
-          <span role="button" tabIndex={0} aria-label="Limpar data" onClick={(e) => { e.stopPropagation(); emitir('') }}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); emitir('') } }}
-            className="text-muted-foreground hover:text-foreground rounded p-0.5">
-            <X className="size-3.5" aria-hidden="true" />
+      <div className="relative w-full">
+        <button ref={gatilho} id={id} type="button" disabled={desabilitado} onClick={alternar} aria-label={rotulo} aria-describedby={valorId} aria-haspopup="dialog" aria-expanded={aberto}
+          className={cn('input texto-de-campo botao-animado flex cursor-pointer items-center gap-2 text-left', limpar && 'pr-10', aberto && 'border-primary/60 ring-primary/15 ring-2')}>
+          <CalendarDays className={cn('size-3.5 shrink-0', escolhida ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
+          <span id={valorId} className={cn('min-w-0 flex-1 truncate', !escolhida && 'text-muted-foreground')}>
+            {escolhida ? format(escolhida, comHora ? "d 'de' MMM 'de' yyyy', ' HH:mm" : "d 'de' MMM 'de' yyyy", { locale: ptBR }) : placeholder}
           </span>
-        )}
-      </button>
+        </button>
+        {limpar && <BotaoLimpar rotulo="Limpar data" aoLimpar={() => { emitir(''); gatilho.current?.focus() }} />}
+      </div>
 
       {aberto && (
         <Flutuante ancora={gatilho} aoFechar={() => setAberto(false)} aoAbrir={() => grade.current?.querySelector('[tabindex="0"]')?.focus()} largura={LARGURA} altura={comHora ? 420 : 370} rotulo="Escolher data" className="p-3">
           <div className="mb-2 flex items-center gap-1">
-            <BotaoCampo onClick={() => mover(-1)} aria-label={nomeSeta(-1)} className="text-muted-foreground hover:bg-accent grid size-8 place-items-center rounded-lg"><ChevronLeft className="size-4" aria-hidden="true" /></BotaoCampo>
+            <BotaoCampo onClick={() => mover(-1)} aria-label={nomeSeta(-1)} className={seta}><ChevronLeft className="size-4" aria-hidden="true" /></BotaoCampo>
             <div className="flex flex-1 items-center justify-center gap-1">
               {modo === 'dias' && <BotaoCampo onClick={() => setModo('meses')} title="Escolher mês" className={botaoTitulo}>{maiuscula(format(visao, 'MMMM', { locale: ptBR }))}</BotaoCampo>}
               {modo === 'anos'
                 ? <span className="px-2 py-1 text-corpo font-semibold tabular-nums">{inicioAnos} a {inicioAnos + 11}</span>
                 : <BotaoCampo onClick={() => setModo('anos')} title="Escolher ano" className={botaoTitulo}>{format(visao, 'yyyy')}</BotaoCampo>}
             </div>
-            <BotaoCampo onClick={() => mover(1)} aria-label={nomeSeta(1)} className="text-muted-foreground hover:bg-accent grid size-8 place-items-center rounded-lg"><ChevronRight className="size-4" aria-hidden="true" /></BotaoCampo>
+            <BotaoCampo onClick={() => mover(1)} aria-label={nomeSeta(1)} className={seta}><ChevronRight className="size-4" aria-hidden="true" /></BotaoCampo>
           </div>
 
           {modo === 'meses' && (
@@ -176,17 +177,17 @@ export default function CampoData({ id, rotulo, valor, aoMudar, min, max, comHor
             </div>
           )}
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-1.5 border-t pt-3">
-            {limpar ? <BotaoCampo onClick={() => { emitir(''); setAberto(false) }} className="text-muted-foreground hover:text-destructive rounded text-rotulo font-medium">Limpar</BotaoCampo> : <span />}
-            <div className="flex flex-wrap items-center gap-1.5">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-1.5 border-t pt-3 pointer-coarse:gap-2">
+            {limpar ? <BotaoCampo onClick={() => { emitir(''); setAberto(false) }} className="text-muted-foreground hover:text-destructive rounded text-rotulo font-medium pointer-coarse:min-h-11 pointer-coarse:px-2">Limpar</BotaoCampo> : <span />}
+            <div className="flex flex-wrap items-center gap-1.5 pointer-coarse:gap-2">
               {atalhos.map((a) => (
                 <BotaoCampo key={a.rotulo} disabled={fora(ler(a.valor, false) ?? hoje)} onClick={() => { emitir(a.valor); if (!comHora) setAberto(false) }}
-                  className="bg-muted text-foreground hover:bg-accent rounded-lg px-2.5 py-1 text-rotulo font-medium disabled:opacity-40">{a.rotulo}</BotaoCampo>
+                  className={cn(atalho, 'bg-muted text-foreground hover:bg-accent font-medium disabled:opacity-40')}>{a.rotulo}</BotaoCampo>
               ))}
               {!fora(hoje) && (
-                <BotaoCampo onClick={() => { setVisao(hoje); setFoco(hoje); escolher(hoje) }} className="bg-primary/10 text-primary hover:bg-primary/20 rounded-lg px-2.5 py-1 text-rotulo font-semibold">Hoje</BotaoCampo>
+                <BotaoCampo onClick={() => { setVisao(hoje); setFoco(hoje); escolher(hoje) }} className={cn(atalho, 'bg-primary/10 text-primary hover:bg-primary/20 font-semibold')}>Hoje</BotaoCampo>
               )}
-              {comHora && <BotaoCampo onClick={() => setAberto(false)} className="bg-primary text-primary-foreground rounded-lg px-2.5 py-1 text-rotulo font-semibold">Pronto</BotaoCampo>}
+              {comHora && <BotaoCampo onClick={() => setAberto(false)} className={cn(atalho, 'bg-primary-cheio text-primary-foreground font-semibold')}>Pronto</BotaoCampo>}
             </div>
           </div>
         </Flutuante>

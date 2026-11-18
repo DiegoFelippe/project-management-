@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { calcular, JANELA } from './posicao'
 
@@ -17,6 +18,17 @@ export function BotaoCampo({ className, ...props }) {
       className={cn('botao-animado transition-[color,background-color,translate,scale] duration-150 hover:-translate-y-px active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-primary/50', className)}
       {...props}
     />
+  )
+}
+
+// "Limpar" do campo (data, hora): um botão ao lado do gatilho, por cima da borda direita dele, com 24 px (no toque,
+// 36 px). Fica fora do gatilho para não ser um controle dentro do outro (auditoria, R13). O pai é o `relative`.
+export function BotaoLimpar({ rotulo, aoLimpar }) {
+  return (
+    <button type="button" aria-label={rotulo} title={rotulo} onClick={aoLimpar}
+      className="botao-animado text-muted-foreground hover:text-foreground hover:bg-accent absolute inset-y-0 right-2 my-auto grid size-6 place-items-center rounded-md transition-[color,background-color,translate,scale] duration-150 outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-[0.97] pointer-coarse:right-1 pointer-coarse:size-9">
+      <X className="size-3.5" aria-hidden="true" />
+    </button>
   )
 }
 

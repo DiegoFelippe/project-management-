@@ -18,11 +18,12 @@ export default function CampoNumero({ id, valor, aoMudar, min = 0, max = 9999, p
   const limitar = (v) => Math.min(max, Math.max(min, v))
   const mudar = (v) => aoMudar(escrever(limitar(v)))
   const somar = (dir) => mudar(n == null ? min : n + dir * passo)
-  const lado = 'text-muted-foreground hover:bg-accent hover:text-foreground flex w-9 items-center justify-center disabled:pointer-events-none disabled:opacity-35'
+  // No toque (pointer-coarse), o campo tem 44 px de altura, menos e mais 44 px de largura e os atalhos 44 px, com 8 px entre eles.
+  const lado = 'text-muted-foreground hover:bg-accent hover:text-foreground flex w-9 items-center justify-center disabled:pointer-events-none disabled:opacity-35 pointer-coarse:min-w-11'
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <div className={cn('bg-card border-input hover:border-primary/40 focus-within:border-primary/60 focus-within:ring-primary/15 inline-flex w-fit items-stretch overflow-hidden rounded-xl border transition-[box-shadow,border-color] focus-within:ring-2', desabilitado && 'opacity-60')}>
+      <div className={cn('bg-card border-input hover:border-primary/40 focus-within:border-primary/60 focus-within:ring-primary/15 inline-flex w-fit items-stretch overflow-hidden rounded-xl border transition-[box-shadow,border-color] focus-within:ring-2 pointer-coarse:min-h-11', desabilitado && 'opacity-60')}>
         <BotaoCampo onClick={() => somar(-1)} disabled={desabilitado || (n != null && n <= min)} aria-label="Diminuir" title="Diminuir" className={lado}>
           <Minus className="size-3.5" aria-hidden="true" />
         </BotaoCampo>
@@ -38,10 +39,10 @@ export default function CampoNumero({ id, valor, aoMudar, min = 0, max = 9999, p
         </BotaoCampo>
       </div>
       {atalhos?.length > 0 && (
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Atalhos">
+        <div className="flex flex-wrap gap-1.5 pointer-coarse:gap-2" role="group" aria-label="Atalhos">
           {atalhos.map((a) => (
             <BotaoCampo key={a} onClick={() => aoMudar(escrever(a))} disabled={desabilitado} aria-pressed={n === a} title={unidade ? `${a} ${unidade}` : String(a)}
-              className={cn('min-w-9 rounded-md px-2 py-1 text-rotulo font-medium tabular-nums', n === a ? 'bg-primary/10 text-primary ring-primary/30 ring-1' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground')}>
+              className={cn('min-w-9 rounded-md px-2 py-1 text-rotulo font-medium tabular-nums pointer-coarse:min-h-11 pointer-coarse:min-w-11', n === a ? 'bg-primary/10 text-primary ring-primary/30 ring-1' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground')}>
               {a}
             </BotaoCampo>
           ))}
