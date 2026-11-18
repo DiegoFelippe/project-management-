@@ -19,6 +19,17 @@ export async function eventosDoPeriodo({ de, ate, consultorId, consultoriaId, cl
   return { itens: data?.itens ?? [], haMais: Boolean(data?.ha_mais) }
 }
 
+// A tabela "Eventos do cliente" (embaixo da agenda do cliente): uma página (15) de todos os eventos do cliente, de todas
+// as datas, do mais novo para o mais antigo, no formato de eventosDoPeriodo: { itens, total, proximoId } (proximoId = o
+// primeiro que ainda não começou, ou null). O banco decide quem vê o quê (o mesmo da agenda do cliente) e pagina por
+// índice. Página que deixou de existir (apagou o último evento dela) volta com foraDaFaixa.
+export async function eventosDoCliente({ clienteId, pagina = 1 } = {}) {
+  const { data, error } = await supabase.rpc('eventos_do_cliente', { p_cliente: clienteId, p_pagina: pagina })
+  if (error) throw error
+  const resultado = { itens: data?.itens ?? [], total: data?.total ?? 0, proximoId: data?.proximo ?? null }
+  return pagina > 1 && !resultado.itens.length ? { ...resultado, foraDaFaixa: true } : resultado
+}
+
 // Quem a janela do evento oferece para convidar: as pessoas ativas da consultoria do evento, pelo nome (busca no banco,
 // sem acento), `limite` por vez: { itens: [{ id, nome, cor }], total }. O consultor não lê os colegas direto; a função
 // do banco devolve só isso, e só da consultoria de quem pergunta (a central, de qualquer uma). total = os que vieram.

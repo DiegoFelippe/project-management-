@@ -8,6 +8,7 @@ import {
   concluirGoogle,
   conectarGoogle,
   desconectarGoogle,
+  eventosDoCliente,
   eventosDoPeriodo,
   feriadosDoPeriodo,
   indicadoresDaAgenda,
@@ -71,6 +72,30 @@ describe('eventosDoPeriodo', () => {
     expect(await eventosDoPeriodo({ de: 'a', ate: 'b' })).toEqual({ itens: [], haMais: false })
     vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'x' } })
     await expect(eventosDoPeriodo({ de: 'a', ate: 'b' })).rejects.toEqual({ message: 'x' })
+  })
+})
+
+describe('eventosDoCliente', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('pede ao banco a página dos eventos do cliente e devolve { itens, total, proximoId }', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: { itens: [{ id: 'e1' }], total: 16, proximo: 'e1' }, error: null })
+    expect(await eventosDoCliente({ clienteId: 'k1', pagina: 2 })).toEqual({ itens: [{ id: 'e1' }], total: 16, proximoId: 'e1' })
+    expect(supabase.rpc).toHaveBeenCalledTimes(1)
+    expect(supabase.rpc).toHaveBeenCalledWith('eventos_do_cliente', { p_cliente: 'k1', p_pagina: 2 })
+  })
+
+  it('sem página pede a 1; resposta vazia vira lista vazia; o erro do banco sobe', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null })
+    expect(await eventosDoCliente({ clienteId: 'k1' })).toEqual({ itens: [], total: 0, proximoId: null })
+    expect(supabase.rpc).toHaveBeenCalledWith('eventos_do_cliente', { p_cliente: 'k1', p_pagina: 1 })
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'x' } })
+    await expect(eventosDoCliente({ clienteId: 'k1' })).rejects.toEqual({ message: 'x' })
+  })
+
+  it('página que deixou de existir (apagou o último evento dela) volta com foraDaFaixa', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: { itens: [], total: 15, proximo: null }, error: null })
+    expect(await eventosDoCliente({ clienteId: 'k1', pagina: 2 })).toEqual({ itens: [], total: 15, proximoId: null, foraDaFaixa: true })
   })
 })
 

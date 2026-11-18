@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apagarCheckin, editarCheckin, listarCheckins, meuCheckinAberto } from '@/data/checkins'
-import { eventosDoPeriodo, feriadosDoPeriodo, indicadoresDaAgenda, meuGoogle } from '@/data/agenda'
+import { eventosDoCliente, eventosDoPeriodo, feriadosDoPeriodo, indicadoresDaAgenda, meuGoogle } from '@/data/agenda'
 import { limparPastaDoCliente, listarArquivos, listarPastas } from '@/data/arquivos'
 import { apagarCliente, buscarCliente, checkinsPorSemana, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
 import { cartoesDoQuadro, limparQuadroDoCliente, quadroDoCliente } from '@/data/quadro'
@@ -25,7 +25,7 @@ vi.mock('@/data/agenda', async (importOriginal) => {
   const real = await importOriginal()
   return {
     voltaDoGoogle: real.voltaDoGoogle,
-    eventosDoPeriodo: vi.fn(), buscarEvento: vi.fn(), indicadoresDaAgenda: vi.fn(), ausenciasDoPeriodo: vi.fn(),
+    eventosDoPeriodo: vi.fn(), eventosDoCliente: vi.fn(), buscarEvento: vi.fn(), indicadoresDaAgenda: vi.fn(), ausenciasDoPeriodo: vi.fn(),
     feriadosDoPeriodo: vi.fn(), meuGoogle: vi.fn(), conectarGoogle: vi.fn(), concluirGoogle: vi.fn(),
     desconectarGoogle: vi.fn(), salvarEvento: vi.fn(), apagarEvento: vi.fn(), responderConvite: vi.fn(),
     novoIdDeEvento: vi.fn(), buscarAgora: vi.fn(), tentarDeNovo: vi.fn(), pessoasParaConvidar: vi.fn(),
@@ -79,6 +79,7 @@ beforeEach(() => {
   vi.mocked(listarCheckins).mockResolvedValue({ itens: CHECKINS, total: 2 })
   vi.mocked(listarEventos).mockResolvedValue({ itens: EVENTOS, total: 2 })
   vi.mocked(eventosDoPeriodo).mockResolvedValue({ itens: [], haMais: false })
+  vi.mocked(eventosDoCliente).mockResolvedValue({ itens: [], total: 0, proximoId: null })
   vi.mocked(indicadoresDaAgenda).mockResolvedValue({ semana: 0, mes: 0, aguardando: 0, pastas_no_mes: 0 })
   vi.mocked(feriadosDoPeriodo).mockResolvedValue([])
   vi.mocked(meuGoogle).mockResolvedValue({ conectado: false, email: null, erro: null })
@@ -139,6 +140,9 @@ describe('Cliente (página)', () => {
     expect(listarEventos).not.toHaveBeenCalled()
     expect(screen.queryByLabelText('Consultor')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Novo evento' })).toBeInTheDocument()
+    // Embaixo do calendário, os eventos do cliente de todas as datas (pedido do Diego, 17/11).
+    await waitFor(() => expect(eventosDoCliente).toHaveBeenCalledWith({ clienteId: 'k1', pagina: 1 }))
+    expect(await screen.findByText('Nenhum evento marcado para este cliente.')).toBeInTheDocument()
   })
 
   it('o histórico mostra o que aconteceu, com quem fez', async () => {

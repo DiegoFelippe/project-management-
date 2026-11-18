@@ -1,17 +1,10 @@
 import { useState } from 'react'
-import { CaptionsOff, CircleAlert, FolderCheck, FolderOpen, Hourglass, Loader2, PlayCircle, RefreshCw, Video, VideoOff } from 'lucide-react'
+import { FolderOpen, Loader2, PlayCircle, RefreshCw, Video } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { buscarAgora, tentarDeNovo } from '@/data/agenda'
 import { cn } from '@/lib/utils'
-
-// Situação da reunião depois que ela acaba (rotina reunioes-depois). "agendada" que já terminou também está esperando.
-const SITUACOES = {
-  aguardando: { rotulo: 'Aguardando a transcrição', icone: Hourglass, tom: 'bg-notice-soft text-notice', acao: 'Buscar agora' },
-  pasta_criada: { rotulo: 'Pasta criada', icone: FolderCheck, tom: 'bg-positive-soft text-positive' },
-  sem_artefatos: { rotulo: 'Sem gravação/transcrição', icone: VideoOff, tom: 'bg-muted text-muted-foreground', acao: 'Tentar de novo' },
-  erro: { rotulo: 'Erro', icone: CircleAlert, tom: 'bg-destructive/10 text-destructive', acao: 'Tentar de novo' },
-}
+import { situacaoDaReuniao } from './situacaoDaReuniao'
 
 const situacaoDe = (evento) => ({
   reuniao: evento.reuniao, reuniao_erro: evento.reuniao_erro, pasta_id: evento.pasta_id, gravacao_url: evento.gravacao_url,
@@ -25,15 +18,8 @@ export default function DetalheDoEvento({ evento, podeEditar, aoMudar }) {
   const [buscando, setBuscando] = useState(false)
   const [erro, setErro] = useState(null)
   const [agora] = useState(() => Date.now())
-  const terminou = Date.parse(evento.fim) <= agora
-  const comRotina = Boolean(evento.com_meet && evento.cliente_id)
-  const estado = situacao.reuniao === 'agendada' ? (terminou ? 'aguardando' : null) : situacao.reuniao
-  // Gravou, mas a transcrição não veio: a gravação está aí ("Abrir gravação"); falta só a transcrição.
-  const info = comRotina && estado
-    ? (estado === 'sem_artefatos' && situacao.gravacao_url
-      ? { ...SITUACOES.sem_artefatos, rotulo: 'Sem transcrição', icone: CaptionsOff }
-      : SITUACOES[estado])
-    : null
+  // A situação vem do evento ou, depois do "Buscar agora", da resposta da rotina.
+  const { estado, info } = situacaoDaReuniao({ ...evento, ...situacao }, agora)
   const pasta = situacao.pasta_id && evento.cliente_id ? `/clientes/${evento.cliente_id}?aba=arquivos&pasta=${situacao.pasta_id}` : null
 
   async function buscar() {

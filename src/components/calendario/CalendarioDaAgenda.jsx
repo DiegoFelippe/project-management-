@@ -19,6 +19,7 @@ import { veTudo } from '@/lib/papeis'
 import { useLeitura } from '@/lib/useLeitura'
 import BarraDoCalendario from './BarraDoCalendario'
 import DetalheDoDia from './DetalheDoDia'
+import EventosDoCliente from './EventosDoCliente'
 import IndicadoresDaAgenda from './IndicadoresDaAgenda'
 import JanelaEvento from './JanelaEvento'
 import ProximosDias from './ProximosDias'
@@ -81,12 +82,13 @@ function useItensDoPeriodo({ de, ate, filtros, mostrar, versao, ligado = true })
 }
 
 // O calendário, no layout do Hub: barra de filtros, 4 indicadores, Mês/Semana/Agenda e, embaixo, o detalhe do dia e os
-// próximos 7 dias. Cada pessoa vê o que o banco deixa (consultor: a própria agenda e os convites; gestão: a da
+// próximos 7 dias (no cliente, a tabela "Eventos do cliente"). Cada pessoa vê o que o banco deixa (consultor: a própria agenda e os convites; gestão: a da
 // consultoria; central: todas). Só o período visível é lido. ?evento=<id> no endereço abre o evento.
 // - Sem `cliente`: o menu Calendário. Aqui também termina a conexão do Google da pessoa (o Google volta para
 //   /calendario?code=…&state=…).
 // - Com `cliente` ({ id, nome, consultoria_id, arquivado, contato_nome, contato_email }, a aba Agenda do cliente): só os
-//   eventos daquele cliente, sem os cartões de números; a barra fica sem consultor, consultoria e cliente, e o "Mostrar", só
+//   eventos daquele cliente, sem os cartões de números e, embaixo do calendário, no lugar do detalhe do dia e dos próximos
+//   7 dias, a tabela "Eventos do cliente" com todos os eventos dele, de todas as datas (pedido do Diego, 17/11); a barra fica sem consultor, consultoria e cliente, e o "Mostrar", só
 //   com reuniões e feriados; "Novo evento" já nasce no cliente (travado). Cliente arquivado ou sem consultoria não ganha
 //   evento novo.
 export default function CalendarioDaAgenda({ cliente = null }) {
@@ -130,10 +132,10 @@ export default function CalendarioDaAgenda({ cliente = null }) {
 
   const periodo = useMemo(() => periodoDaVisao(visao, diaDaVisao, hoje), [visao, diaDaVisao, hoje])
   const doPeriodo = useItensDoPeriodo({ de: periodo.de, ate: periodo.ate, filtros, mostrar, versao })
-  // Próximos 7 dias: do mesmo pedido quando o período visível já os cobre; senão, uma leitura só deles.
+  // Próximos 7 dias (só no menu): do mesmo pedido quando o período visível já os cobre; senão, uma leitura só deles.
   const proximos = { de: hoje, ate: somarDias(hoje, 7) }
   const cobre = periodo.de <= proximos.de && periodo.ate >= proximos.ate
-  const daSemana = useItensDoPeriodo({ ...proximos, filtros, mostrar, versao, ligado: !cobre })
+  const daSemana = useItensDoPeriodo({ ...proximos, filtros, mostrar, versao, ligado: !cliente && !cobre })
   const porDiaProximos = cobre ? doPeriodo.porDia : daSemana.porDia
   // Dentro do cliente a agenda não tem cartões de números (pedido do Diego, 17/11): nem lê.
   const indicadores = useLeitura(lerIndicadores, cliente ? null : { dia: hoje, versao })
@@ -300,16 +302,20 @@ export default function CalendarioDaAgenda({ cliente = null }) {
           </div>
           <div className="p-2 sm:p-4">
             {doPeriodo.erro && <p role="alert" className="mb-3 text-corpo text-destructive">Não foi possível carregar a agenda. Tente de novo.</p>}
-            {visao === 'mes' && <VisaoMes {...propsDaVisao} mes={diaDaVisao.slice(0, 7)} rotulo={rotulo} mostrar={mostrar} />}
+            {visao === 'mes' && <VisaoMes {...propsDaVisao} mes={diaDaVisao.slice(0, 7)} rotulo={rotulo} mostrar={mostrar} detalheAbaixo={!cliente} />}
             {visao === 'semana' && <VisaoSemana {...propsDaVisao} />}
             {visao === 'agenda' && <VisaoAgenda {...propsDaVisao} />}
           </div>
         </section>
-        <div className="grid items-stretch gap-4 md:grid-cols-2">
-          <DetalheDoDia dia={diaDoDetalhe} itens={doPeriodo.porDia.get(diaDoDetalhe) ?? []} deVariasPessoas={deVariasPessoas} aoCriar={criar} aoAbrir={abrir} />
-          <ProximosDias dias={diasEntre(proximos.de, proximos.ate)} porDia={porDiaProximos} deVariasPessoas={deVariasPessoas}
-            aoSelecionar={(dia) => { setSelecionado(dia); if (!periodo.dias.includes(dia)) setDiaDaVisao(dia) }} aoAbrir={abrir} />
-        </div>
+        {cliente ? (
+          <EventosDoCliente clienteId={cliente.id} hoje={hoje} versao={versao} aoAbrir={abrir} />
+        ) : (
+          <div className="grid items-stretch gap-4 md:grid-cols-2">
+            <DetalheDoDia dia={diaDoDetalhe} itens={doPeriodo.porDia.get(diaDoDetalhe) ?? []} deVariasPessoas={deVariasPessoas} aoCriar={criar} aoAbrir={abrir} />
+            <ProximosDias dias={diasEntre(proximos.de, proximos.ate)} porDia={porDiaProximos} deVariasPessoas={deVariasPessoas}
+              aoSelecionar={(dia) => { setSelecionado(dia); if (!periodo.dias.includes(dia)) setDiaDaVisao(dia) }} aoAbrir={abrir} />
+          </div>
+        )}
       </div>
       {janela && (
         <JanelaEvento key={janela.evento?.id ?? `novo-${janela.dia}`} aberto evento={janela.evento ?? null} diaInicial={janela.dia ?? hoje}

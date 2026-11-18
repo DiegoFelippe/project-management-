@@ -9,7 +9,10 @@ const CHIPS_POR_DIA = 3
 // Mês, como no Hub: grade de 7 colunas começando no domingo, até 3 chips por dia e "+N", hoje em destaque, fora do mês
 // apagado. Clicar seleciona o dia (o detalhe aparece embaixo), dois cliques criam evento. Setas andam entre os dias.
 // No celular as células encolhem e os chips viram faixas de cor, para a grade caber em 360 px sem rolar de lado.
-export default function VisaoMes({ dias, mes, rotulo, porDia, hoje, selecionado, deVariasPessoas, mostrar, aoSelecionar, aoCriar, aoAbrir }) {
+// `detalheAbaixo` false (a agenda do cliente, que tem a tabela dos eventos no lugar do detalhe): a dica não o promete.
+export default function VisaoMes({
+  dias, mes, rotulo, porDia, hoje, selecionado, deVariasPessoas, mostrar, detalheAbaixo = true, aoSelecionar, aoCriar, aoAbrir,
+}) {
   const base = useId()
   const semanas = Array.from({ length: dias.length / 7 }, (_, i) => dias.slice(i * 7, i * 7 + 7))
   const focavel = dias.includes(selecionado) ? selecionado : dias.includes(hoje) ? hoje : `${mes}-01`
@@ -85,9 +88,11 @@ export default function VisaoMes({ dias, mes, rotulo, porDia, hoje, selecionado,
             <span className={cn('size-2 rounded-full', t.bolinha)} aria-hidden="true" />{t.rotulo}
           </span>
         ))}
-        <span className="text-legenda text-muted-foreground sm:ml-auto">
-          Clique num dia para ver os detalhes abaixo{aoCriar ? ' · dois cliques criam um evento' : ''}
-        </span>
+        {detalheAbaixo ? (
+          <span className="text-legenda text-muted-foreground sm:ml-auto">
+            Clique num dia para ver os detalhes abaixo{aoCriar ? ' · dois cliques criam um evento' : ''}
+          </span>
+        ) : aoCriar && <span className="text-legenda text-muted-foreground sm:ml-auto">Dois cliques num dia criam um evento</span>}
       </div>
     </>
   )

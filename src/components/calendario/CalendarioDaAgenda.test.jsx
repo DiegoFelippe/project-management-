@@ -4,7 +4,8 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '@/auth/useAuth'
 import {
-  ausenciasDoPeriodo, buscarEvento, eventosDoPeriodo, feriadosDoPeriodo, indicadoresDaAgenda, meuGoogle, salvarEvento,
+  ausenciasDoPeriodo, buscarEvento, eventosDoCliente, eventosDoPeriodo, feriadosDoPeriodo, indicadoresDaAgenda, meuGoogle,
+  salvarEvento,
 } from '@/data/agenda'
 import { consultoresPorOcupacao } from '@/data/capacidade'
 import { buscarClientes } from '@/data/clientes'
@@ -16,7 +17,7 @@ vi.mock('@/data/agenda', async (importOriginal) => {
   const real = await importOriginal()
   return {
     voltaDoGoogle: real.voltaDoGoogle,
-    eventosDoPeriodo: vi.fn(), buscarEvento: vi.fn(), indicadoresDaAgenda: vi.fn(), ausenciasDoPeriodo: vi.fn(),
+    eventosDoPeriodo: vi.fn(), eventosDoCliente: vi.fn(), buscarEvento: vi.fn(), indicadoresDaAgenda: vi.fn(), ausenciasDoPeriodo: vi.fn(),
     feriadosDoPeriodo: vi.fn(), meuGoogle: vi.fn(), conectarGoogle: vi.fn(), concluirGoogle: vi.fn(),
     desconectarGoogle: vi.fn(), salvarEvento: vi.fn(), apagarEvento: vi.fn(), responderConvite: vi.fn(),
     novoIdDeEvento: vi.fn(() => 'novo-1'), buscarAgora: vi.fn(), tentarDeNovo: vi.fn(), pessoasParaConvidar: vi.fn(),
@@ -37,6 +38,16 @@ const EVENTO = {
   gravar: true, meet_link: 'https://meet.google.com/abc-defg-hij', meet_codigo: 'abc-defg-hij', google_evento_id: 'g1',
   reuniao: 'agendada', reuniao_erro: null, gravacao_url: null, pasta_id: null, criado_por: 'p1',
   consultor: { id: 'p1', nome: 'Ana Souza', cor: '#16a34a' }, cliente: { id: 'k1', nome: 'Provedor Alfa' }, participantes: [],
+}
+// Os da tabela "Eventos do cliente": um de hoje que já passou (8h; agora é meio-dia) e um antigo, com pasta e gravação.
+const DE_HOJE = {
+  ...EVENTO, id: 'e2', titulo: 'Alinhamento rápido', inicio: '2026-11-17T08:00:00-03:00', fim: '2026-11-17T08:30:00-03:00',
+  com_meet: false, gravar: false, meet_link: null, meet_codigo: null,
+}
+const ANTIGO = {
+  ...EVENTO, id: 'e0', titulo: 'Diagnóstico Alfa', inicio: '2026-11-03T09:00:00-03:00', fim: '2026-11-03T10:30:00-03:00',
+  reuniao: 'pasta_criada', pasta_id: 'pa1', gravacao_url: 'https://drive.google.com/gravacao', consultor_id: 'p2',
+  consultor: { id: 'p2', nome: 'Bruno Lima', cor: null },
 }
 const consultor = { id: 'p1', nome: 'Ana Souza', papel: 'pessoa', consultoria_id: 's1' }
 const gestora = { id: 'g1', nome: 'Gabi Rocha', papel: 'gestor', consultoria_id: 's1' }
@@ -73,6 +84,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-17T15:00:00Z')) // terça, 17/11, meio-dia em São Paulo
   celular(false)
   vi.mocked(eventosDoPeriodo).mockResolvedValue({ itens: [EVENTO], haMais: false })
+  vi.mocked(eventosDoCliente).mockResolvedValue({ itens: [EVENTO, DE_HOJE, ANTIGO], total: 3, proximoId: 'e1' })
   vi.mocked(ausenciasDoPeriodo).mockResolvedValue({ itens: [], haMais: false })
   vi.mocked(feriadosDoPeriodo).mockResolvedValue(['2026-11-20'])
   vi.mocked(indicadoresDaAgenda).mockResolvedValue({ semana: 1, mes: 2, aguardando: 0, pastas_no_mes: 1 })
@@ -99,8 +111,96 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     expect(screen.queryByRole('region', { name: 'Indicadores da agenda' })).not.toBeInTheDocument()
     expect(indicadoresDaAgenda).not.toHaveBeenCalled()
     expect(screen.queryByRole('heading', { name: 'Calendário', level: 1 })).not.toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Detalhe do dia' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Próximos 7 dias' })).toBeInTheDocument()
+    // Embaixo do calendário, a tabela dos eventos do cliente fica no lugar do detalhe do dia e dos próximos 7 dias.
+    expect(await screen.findByRole('table', { name: 'Eventos do cliente' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Detalhe do dia' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Próximos 7 dias' })).not.toBeInTheDocument()
+  })
+
+  it('embaixo do calendário, uma tabela "Eventos do cliente" com todos os eventos dele, na ordem do banco', async () => {
+    tela(gestora)
+    const tabela = await screen.findByRole('table', { name: 'Eventos do cliente' })
+    expect(eventosDoCliente).toHaveBeenCalledWith({ clienteId: 'k1', pagina: 1 })
+    expect(screen.getByRole('heading', { name: 'Eventos do cliente' })).toBeInTheDocument()
+    const calendario = screen.getByRole('region', { name: 'Calendário' })
+    expect(calendario.compareDocumentPosition(tabela) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(tabela).getAllByRole('columnheader').map((c) => c.textContent))
+      .toEqual(['Data', 'Horário', 'Título', 'Organizador', 'Situação', 'Ações'])
+    const [, futuro, hoje, antigo] = within(tabela).getAllByRole('row')
+    // O próximo (o banco diz qual) e o de hoje ganham o selo; datas e horas no relógio de São Paulo.
+    expect(futuro).toHaveTextContent('20/11/2026')
+    expect(futuro).toHaveTextContent('14:00 – 15:00')
+    expect(futuro).toHaveTextContent('Kickoff Alfa')
+    expect(futuro).toHaveTextContent('Ana Souza')
+    expect(within(futuro).getByText('Próximo')).toBeInTheDocument()
+    expect(within(futuro).getByText('Meet')).toBeInTheDocument()
+    expect(within(futuro).queryByText('Hoje')).not.toBeInTheDocument()
+    expect(hoje).toHaveTextContent('17/11/2026')
+    expect(hoje).toHaveTextContent('08:00 – 08:30')
+    expect(within(hoje).getByText('Hoje')).toBeInTheDocument()
+    expect(within(hoje).queryByText('Próximo')).not.toBeInTheDocument()
+    expect(within(hoje).queryByText('Meet')).not.toBeInTheDocument()
+    expect(antigo).toHaveTextContent('03/11/2026')
+    expect(antigo).toHaveTextContent('09:00 – 10:30')
+    expect(antigo).toHaveTextContent('Bruno Lima')
+    // A situação da reunião com os mesmos nomes do detalhe do evento.
+    expect(within(antigo).getByText('Gravação')).toBeInTheDocument()
+    expect(within(antigo).getByText('Pasta criada')).toBeInTheDocument()
+    expect(within(tabela).getAllByRole('button', { name: /^Abrir/ })).toHaveLength(3)
+  })
+
+  it('a dica do mês não promete o detalhe do dia embaixo (no cliente ele não existe)', async () => {
+    tela(gestora)
+    await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    expect(screen.queryByText(/detalhes abaixo/)).not.toBeInTheDocument()
+    expect(screen.getByText('Dois cliques num dia criam um evento')).toBeInTheDocument()
+  })
+
+  it('cliente sem eventos: a lista vazia diz isso', async () => {
+    vi.mocked(eventosDoCliente).mockResolvedValue({ itens: [], total: 0, proximoId: null })
+    tela(consultor)
+    expect(await screen.findByText('Nenhum evento marcado para este cliente.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Eventos do cliente' })).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Eventos do cliente' })).not.toBeInTheDocument()
+  })
+
+  it('paginação do banco: some com 15, aparece com 16 ("1–15 de 16") e Próxima pede a página 2', async () => {
+    const user = userEvent.setup()
+    const quinze = Array.from({ length: 15 }, (_, i) => ({ ...EVENTO, id: `r${i}`, titulo: `Reunião ${i + 1}` }))
+    vi.mocked(eventosDoCliente).mockResolvedValue({ itens: quinze, total: 15, proximoId: null })
+    const { unmount } = tela(gestora)
+    const tabela = await screen.findByRole('table', { name: 'Eventos do cliente' })
+    expect(within(tabela).getAllByRole('row')).toHaveLength(16)
+    expect(screen.queryByRole('navigation', { name: 'Paginação' })).not.toBeInTheDocument()
+    unmount()
+
+    vi.mocked(eventosDoCliente).mockResolvedValue({ itens: quinze, total: 16, proximoId: null })
+    tela(gestora)
+    const paginacao = await screen.findByRole('navigation', { name: 'Paginação' })
+    expect(paginacao).toHaveTextContent('1–15 de 16')
+    await user.click(within(paginacao).getByRole('button', { name: /Próxima/ }))
+    await waitFor(() => expect(eventosDoCliente).toHaveBeenLastCalledWith({ clienteId: 'k1', pagina: 2 }))
+  })
+
+  it('"Abrir" na linha abre a janela do evento, a mesma do calendário', async () => {
+    const user = userEvent.setup()
+    tela(gestora)
+    const tabela = await screen.findByRole('table', { name: 'Eventos do cliente' })
+    await user.click(within(tabela).getByRole('button', { name: 'Abrir Diagnóstico Alfa' }))
+    const janela = await screen.findByRole('dialog', { name: 'Editar evento' })
+    expect(within(janela).getByLabelText('Título')).toHaveValue('Diagnóstico Alfa')
+  })
+
+  it('salvar um evento relê a lista na mesma página', async () => {
+    const user = userEvent.setup()
+    tela(consultor)
+    const tabela = await screen.findByRole('table', { name: 'Eventos do cliente' })
+    expect(eventosDoCliente).toHaveBeenCalledTimes(1)
+    await user.click(within(tabela).getByRole('button', { name: 'Abrir Kickoff Alfa' }))
+    const janela = await screen.findByRole('dialog', { name: 'Editar evento' })
+    await user.click(within(janela).getByRole('button', { name: 'Salvar alterações' }))
+    await waitFor(() => expect(eventosDoCliente).toHaveBeenCalledTimes(2))
+    expect(eventosDoCliente).toHaveBeenLastCalledWith({ clienteId: 'k1', pagina: 1 })
   })
 
   it('a barra não tem consultor, consultoria nem cliente; o Mostrar só tem reuniões e feriados (ausências nem são lidas)', async () => {
@@ -214,5 +314,17 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     tela(gestora)
     const aviso = await screen.findByText(/mais eventos neste período do que o calendário mostra/)
     expect(aviso).not.toHaveTextContent(/consultor|cliente/)
+  })
+})
+
+describe('Calendário do menu (sem cliente)', () => {
+  it('continua com o detalhe do dia e os próximos 7 dias, sem a tabela do cliente', async () => {
+    tela(gestora, { cliente: null, endereco: '/calendario' })
+    expect(await screen.findByRole('region', { name: 'Detalhe do dia' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Próximos 7 dias' })).toBeInTheDocument()
+    expect(screen.getByText('Clique num dia para ver os detalhes abaixo · dois cliques criam um evento')).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Eventos do cliente' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Eventos do cliente' })).not.toBeInTheDocument()
+    expect(eventosDoCliente).not.toHaveBeenCalled()
   })
 })
