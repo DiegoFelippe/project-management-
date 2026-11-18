@@ -136,8 +136,8 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
 - **Campos só de `src/components/campos/`**: `Seletor`, `CampoData`, `CampoHora`, `CampoNumero`, `Caixa`, `Chave`.
   **Nunca** `<select>` nem `type="date|time|number|datetime-local"` nativos.
 - **`Seletor` com muitas opções** usa `buscar` (busca no banco), nunca a lista inteira.
-- **Todo menu do trilho abre com `BarraDeFiltros`** (Início, Clientes, Calendário, Times, Usuários, Consultorias,
-  Integrações), e a barra **sempre começa com o ícone e a palavra "Filtros"** (como no Calendário; o componente já
+- **Todo menu do trilho abre com `BarraDeFiltros`** (Início, Clientes, Calendário, Check-ins, Times, Usuários,
+  Consultorias, Integrações), e a barra **sempre começa com o ícone e a palavra "Filtros"** (como no Calendário; o componente já
   traz, não repita na tela). Pedido do Diego (2026-11-17). Nada de prop para esconder o rótulo. Depois vêm abas,
   busca, filtros e o botão principal no fim. Tela sem filtro natural ainda ganha a barra com o recorte que faz
   sentido (Início: o período — Mês com a `NavegacaoDoMes`, Últimos 30/90 dias, Este ano ou Personalizado com De e
@@ -148,7 +148,8 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   não têm cartões, pedido do Diego, 17/11 e 18/11). Os cartões (pedido do Diego, 17/11) são o
   `CartoesDeNumeros` (`src/components/comum/`): até 4, logo depois da barra, com "—" enquanto carregam, **contados no
   banco** por uma função por tela (`indicadores_de_clientes`, `_de_times`, `_de_usuarios`, `_de_consultorias`,
-  `_de_integracoes`; Início e Calendário: `painel_do_inicio` e `indicadores_da_agenda`), no recorte de quem vê e
+  `_de_integracoes`; Check-ins: `indicadores_de_checkins` no Andamento e `indicadores_de_modelos` em Modelos; Início e
+  Calendário: `painel_do_inicio` e `indicadores_da_agenda`), no recorte de quem vê e
   seguindo os filtros de consultoria/consultor (e o período) da barra; situação/abas e busca não mudam os cartões. Leitura
   em `src/data/indicadores.js`, uma por tela, pelo `useLeitura`. **Os cartões animam ao passar o mouse**: sobem 1px
   com sombra e o ícone dá o pulinho dos botões (`.cartao-animado` em `src/index.css`; "reduzir movimento" para). No
@@ -265,6 +266,52 @@ Design: `docs/superpowers/specs/2026-11-16-calendario-design.md` (decisões da c
   as datas (15 por página, do mais novo para o mais antigo, `eventos_do_cliente` no banco), no lugar da grade e sem o
   "Hoje ‹ ›" — pedido do Diego, 17/11. Check-ins ficam na aba Check-ins e o histórico na aba Histórico (que traz
   "Reunião realizada" e "Pasta da reunião criada").
+
+## Check-list e modelos de check-in
+
+Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as aprovações do Diego). Pedido do Diego
+(17/11): a Central ou a gestão monta o modelo, aplica no cliente, e o consultor segue como check-list.
+
+- **Quem faz o quê** (regra do banco, nunca só da tela): **modelos** — a Central cria, edita, arquiva e apaga todos (para
+  todas as consultorias ou para uma); o administrador e o gestor, só os da própria consultoria (os da Central eles
+  duplicam e adaptam); o consultor só lê. **Check-list do cliente** — a Central e a gestão aplicam, trocam, tiram e
+  mudam o início dos prazos; **só o consultor do cliente marca** as tarefas e escreve a nota (a Central e a gestão
+  acompanham, só leem; o gestor só marca se for o consultor do cliente). Cliente arquivado: só leitura.
+- **Escrita só por funções do banco** (`salvar_modelo`, `aplicar_modelo`, `mudar_inicio_do_checklist`, `tirar_modelo`,
+  `marcar_tarefa`, `anotar_tarefa`); direto na tabela, só arquivar, reativar e apagar modelo (pela RLS). A aba do cliente
+  vem numa leitura só (`checklist_do_cliente`, até 500 tarefas). Na tela: `src/data/modelos.js` e
+  `src/data/checklists.js`.
+- **Sem ciclo pela ordem:** "depende de" só aponta para tarefa que vem antes na lista do modelo (da mesma etapa ou de
+  uma anterior). O banco recusa o resto (`dependencia_invalida`) e o editor mostra o erro antes de salvar
+  (`src/components/modelos/modelo.js`). Toda seta anda para trás: nem o modelo nem a cópia têm ciclo.
+- **Salvar regrava o modelo inteiro numa chamada**, com o `atualizado_em` que o editor leu: se alguém salvou no meio, o
+  banco recusa (`modelo_mudou`) em vez de apagar o que a outra pessoa fez. Modelo arquivado não se edita nem se aplica.
+  Modelo em uso (com check-list ativo) não se apaga (`modelo_em_uso`): arquiva. Limites: 50 etapas, 500 tarefas e 30
+  dependências por tarefa.
+- **Aplicar copia:** o cliente recebe etapas, tarefas e dependências; o "dia N" vira data (início + N, dias corridos;
+  "hoje" é o dia em São Paulo). Editar, arquivar ou apagar o modelo depois nunca muda um check-list.
+- **Um check-list ativo por cliente.** Trocar encerra o ativo e começa outro do zero; tirar encerra sem pôr outro; o
+  encerrado fica como histórico (nunca se apaga) e segura o cliente (apagar cliente com check-list dá 23503 e a tela
+  manda arquivar). **Cliente que muda de consultoria (ou volta à Central) tem o check-list ativo encerrado na hora**
+  (gatilho no banco, `cliente_movido`): a consultoria nova começa sem modelo e o antigo não volta.
+- **O que entra no check-in:** tarefa marcada pelo consultor com o check-in aberto **neste** cliente entra no resumo dele
+  (`checkin_tarefas`, com o título copiado); desmarcar com ele aberto tira. Sem check-in aberto (ou com ele em outro
+  cliente) a tarefa fica feita, fora de uma sessão. O check-out mostra "Tarefas marcadas nesta sessão" e, com "O que foi
+  feito" vazio, já vem com "Tarefas concluídas: A; B."; apagar o check-in não desmarca as tarefas.
+- **Uso no recorte de quem vê:** "N clientes que você vê usam" (a Central conta todos). Uma consultoria nunca vê modelos,
+  check-lists, clientes ou nomes de outra; o Histórico só diz o nome do modelo para a Central e para a consultoria dele.
+- **Menu Check-ins** (`/checkins`, todos os papéis): abas Andamento (o consultor vê só os clientes dele) e Modelos, cada
+  uma no molde (barra → cartões → `Tabela` de 15 vinda do banco). Com uma seção só, a página não mostra abas (pedido
+  do Diego, 17/11).
+- **Exceções aprovadas pelo Diego (17/11, "Pode ser assim"):** as tarefas do check-list do cliente não se criam nem se
+  apagam uma a uma (vêm do modelo: muda-se o modelo e troca); o check-list é uma visão de trabalho (cartões por etapa e
+  fluxograma), não uma `Tabela`; e os filtros Todas/Pendentes/Feitas e Deitado/Em pé rodam na tela (o check-list
+  inteiro já vem numa leitura, porque o fluxograma precisa dele todo).
+- **Fluxograma sem biblioteca** (`src/components/checkins/Fluxograma.jsx`): desenho calculado uma vez por mudança, SVG
+  com os tokens de cor e texto de no mínimo 11 px, rolando dentro do cartão; no celular começa "Em pé".
+- **Exemplo local:** `npm run exemplo:local` cria dois modelos da Central (só para a Consultoria Exemplo) e um da
+  Consultoria Exemplo, e aplica "Gestão financeira" no "Provedor Teste Navegador" com tarefas feitas; rodar de novo não
+  muda nada.
 
 ## Layout
 

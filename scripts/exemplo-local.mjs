@@ -1,6 +1,7 @@
 // Dados de exemplo só para o Supabase local: npm run exemplo:local
 // Cria a "Consultoria Exemplo" com admin, gestor, duas pessoas e o time Implantação,
 // e a central de exemplo (central@exemplo.test, fora de qualquer consultoria).
+// Depois: eventos na agenda, um quadro e os modelos de check-in (com um check-list num cliente), só na Consultoria Exemplo.
 // Contas NOVAS entram com a senha abaixo (logins @exemplo.test); o Auth exige senha forte desde 16/11.
 // Contas que já existem são puladas e não mudam: as criadas antes de 16/11 seguem com exemplo-123.
 // Nunca rode isto na nuvem.
@@ -71,6 +72,7 @@ if (jaExiste) {
 }
 await eventosDeExemplo()
 await quadroDeExemplo()
+await checklistsDeExemplo()
 process.exit(0)
 
 async function criarConsultoria() {
@@ -253,4 +255,210 @@ async function quadroDeExemplo() {
   console.log(criados
     ? `Quadro de exemplo (${cliente.nome}): ${criados} cartões criados.`
     : `Quadro de exemplo (${cliente.nome}): já tinha os cartões, nada foi alterado.`)
+}
+
+// Modelos de check-in de exemplo: [título, descrição, obrigatória, prazo (dia N a partir do início), chaves de que
+// depende]. "Depende de" só aponta para tarefa que vem antes (a regra do banco). Os mesmos do protótipo
+// (docs/prototipo/checkins-modelo-poc.html); os da Central valem só para a Consultoria Exemplo. Função (e não const)
+// porque o código de cima roda antes de chegar aqui.
+function modelosDeExemplo() {
+  return [
+    { chave: 'financeira', dono: 'central', nome: 'Gestão financeira', tipo: 'gestao',
+      descricao: 'Diagnóstico das finanças do provedor, plano de ação e rotina de acompanhamento.',
+      etapas: [
+        ['Diagnóstico', [
+          ['f1', 'Reunião de alinhamento', 'Objetivos, escopo e quem participa do lado do cliente.', true, 2],
+          ['f2', 'Coleta dos documentos financeiros', 'DRE, balancetes, extratos e contas a pagar e receber dos últimos 12 meses.', true, 5, ['f1']],
+          ['f3', 'Análise do DRE', 'Receita, custos, margem bruta e EBITDA mês a mês; apontar desvios.', true, 10, ['f2']],
+          ['f4', 'Levantamento do fluxo de caixa', 'Entradas e saídas reais dos últimos 6 meses, por categoria.', true, 10, ['f2']],
+          ['f5', 'Análise de inadimplência', 'Taxa de inadimplência por plano e faixa de atraso.', false, 12, ['f2']],
+        ]],
+        ['Plano de ação', [
+          ['f6', 'Mapa de custos fixos e variáveis', 'Separar os custos e achar cortes e renegociações.', true, 14, ['f3']],
+          ['f7', 'Revisão da precificação dos planos', 'Margem por plano comparada com a concorrência da região.', false, 18, ['f3', 'f6']],
+          ['f8', 'Plano de ação financeiro', 'Metas, responsáveis e prazos das ações do diagnóstico.', true, 20, ['f4', 'f6']],
+          ['f9', 'Apresentação do plano à diretoria', 'Validar o plano e as metas com os sócios.', true, 22, ['f8']],
+        ]],
+        ['Implantação', [
+          ['f10', 'Fluxo de caixa projetado', 'Projeção de 90 dias, atualizada toda semana.', true, 30, ['f4', 'f9']],
+          ['f11', 'Rotina de conciliação bancária', 'Treinar o financeiro e fixar o dia da conciliação.', true, 35, ['f10']],
+          ['f12', 'Política de cobrança', 'Régua de cobrança e regras para negociar débitos.', false, 35, ['f5', 'f9']],
+        ]],
+        ['Acompanhamento', [
+          ['f13', 'Indicadores do mês', 'Margem, caixa, inadimplência e custo por assinante.', true, 45, ['f10', 'f11']],
+          ['f14', 'Reunião de resultados', 'Comparar os indicadores com as metas e ajustar o plano.', true, 60, ['f13']],
+        ]],
+      ] },
+    { chave: 'sucesso', dono: 'central', nome: 'Sucesso do Cliente — onboarding', tipo: 'sucesso_do_cliente',
+      descricao: 'Organizar a jornada do assinante nos primeiros 90 dias para reduzir cancelamentos.',
+      etapas: [
+        ['Diagnóstico', [
+          ['s1', 'Reunião de kickoff', 'Apresentar a metodologia e combinar a agenda.', true, 1],
+          ['s2', 'Mapa da jornada do assinante', 'Da venda à instalação e ao primeiro boleto: onde o assinante trava.', true, 7, ['s1']],
+          ['s3', 'Análise de NPS e reclamações', 'Últimos 3 meses de NPS, Reclame Aqui e chamados.', true, 5, ['s1']],
+          ['s4', 'Mapa de processos do atendimento', 'Fluxos de suporte, retenção e cancelamento.', true, 10, ['s2']],
+        ]],
+        ['Plano de ação', [
+          ['s5', 'Régua de relacionamento', 'Contatos programados nos primeiros 90 dias.', true, 15, ['s2', 's3']],
+          ['s6', 'Roteiro de boas-vindas', 'Mensagem, ligação e checklist depois da instalação.', false, 15, ['s2']],
+        ]],
+        ['Implantação', [
+          ['s7', 'Treinamento do atendimento', 'Novo roteiro e régua, com simulações.', true, 25, ['s4', 's5']],
+          ['s8', 'Pesquisa de NPS automática', 'Disparo após a instalação e a cada 90 dias.', true, 25, ['s5']],
+        ]],
+        ['Acompanhamento', [
+          ['s9', 'Indicadores do mês', 'NPS, churn, tempo de instalação e chamados por assinante.', true, 35, ['s8']],
+          ['s10', 'Reunião de resultados', 'Resultados do onboarding e próximos passos.', true, 45, ['s7', 's9']],
+        ]],
+      ] },
+    { chave: 'pessoas', dono: 'gestor', nome: 'Gestão de Pessoas', tipo: 'gestao_de_pessoas',
+      descricao: 'Estrutura de cargos, clima e rituais de liderança — o jeito da Consultoria Exemplo de tocar pessoas.',
+      etapas: [
+        ['Diagnóstico', [
+          ['p1', 'Reunião de alinhamento com a diretoria', 'Expectativas e prioridades da diretoria.', true, 2],
+          ['p2', 'Organograma atual', 'Quem responde a quem, por área.', true, 7, ['p1']],
+          ['p3', 'Pesquisa de clima', 'Questionário anônimo com toda a equipe.', true, 15, ['p1']],
+        ]],
+        ['Plano de ação', [
+          ['p4', 'Descrição de cargos', 'Responsabilidades e requisitos de cada cargo.', true, 25, ['p2']],
+          ['p5', 'Plano de cargos e salários', 'Faixas salariais e critérios de promoção.', false, 40, ['p4']],
+          ['p6', 'Plano de treinamento', 'Trilhas por área, a partir da pesquisa de clima.', true, 40, ['p3', 'p4']],
+        ]],
+        ['Implantação', [
+          ['p7', 'Avaliação de desempenho', 'Primeiro ciclo com os líderes.', true, 60, ['p4']],
+          ['p8', 'Rituais de feedback', 'Reuniões 1:1 mensais dos líderes com a equipe.', true, 65, ['p6', 'p7']],
+        ]],
+        ['Acompanhamento', [
+          ['p9', 'Indicadores de pessoas', 'Turnover, absenteísmo e horas de treinamento.', true, 80, ['p8']],
+        ]],
+      ] },
+  ]
+}
+
+// O formato que o editor de modelos manda para salvar_modelo.
+function dadosDoModelo(modelo, para) {
+  return {
+    nome: modelo.nome,
+    descricao: modelo.descricao,
+    tipo: modelo.tipo,
+    para,
+    etapas: modelo.etapas.map(([nome, tarefas]) => ({
+      nome,
+      tarefas: tarefas.map(([chave, titulo, descricao, obrigatoria, prazo_dias, depende_de = []]) =>
+        ({ chave, titulo, descricao, obrigatoria, prazo_dias, depende_de })),
+    })),
+  }
+}
+
+// "Hoje" em São Paulo (a regra do banco) mais N dias, como 'aaaa-mm-dd'.
+function diaEmSaoPaulo(dias) {
+  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+  const dia = new Date(`${hoje}T12:00:00Z`)
+  dia.setUTCDate(dia.getUTCDate() + dias)
+  return dia.toISOString().slice(0, 10)
+}
+
+// Entra com uma conta de exemplo (a senha nova ou, nas contas de antes de 16/11, a antiga), sem guardar sessão. Nunca
+// chama signOut: o padrão dele encerra todas as sessões da conta (as do navegador também).
+async function entrarComoExemplo(email) {
+  for (const senha of [SENHA_EXEMPLO, 'exemplo-123']) {
+    const cliente = createClient(status.API_URL, status.PUBLISHABLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+    const { error } = await cliente.auth.signInWithPassword({ email, password: senha })
+    if (!error) return cliente
+  }
+  return null
+}
+
+// Modelos de check-in e um check-list de exemplo, pelas mesmas funções do banco que a tela usa (salvar_modelo,
+// aplicar_modelo, checklist_do_cliente, marcar_tarefa, anotar_tarefa) e entrando com as contas de exemplo (nunca com a
+// chave secreta), para valer a regra de quem faz o quê: a central de exemplo cria "Gestão financeira" e "Sucesso do
+// Cliente — onboarding" (da Central, só para a Consultoria Exemplo: as consultorias de verdade não os veem); o gestor de
+// exemplo cria "Gestão de Pessoas" (da consultoria) e aplica a Gestão financeira no cliente do quadro de exemplo, com o
+// início 12 dias atrás; e o consultor do cliente (só ele marca), se for uma das contas de exemplo, deixa 3 tarefas feitas,
+// uma em andamento e uma nota. Rodar de novo não muda nada: modelo com o mesmo nome na consultoria de exemplo é pulado, e
+// cliente que já tem check-list ativo (este ou outro) também.
+async function checklistsDeExemplo() {
+  const comoCentral = await entrarComoExemplo(CENTRAL.email)
+  const comoGestor = await entrarComoExemplo('gestor@exemplo.test')
+  if (!comoCentral || !comoGestor) {
+    console.log('Check-lists de exemplo: não consegui entrar como a central e o gestor de exemplo; nada criado.')
+    return
+  }
+
+  const modelos = {}
+  const novos = []
+  for (const modelo of modelosDeExemplo()) {
+    const como = modelo.dono === 'central' ? comoCentral : comoGestor
+    const { data: ja, error } = await como.from('modelos').select('id')
+      .eq('nome', modelo.nome).eq('consultoria_id', consultoria.id).eq('da_central', modelo.dono === 'central').limit(1)
+    if (error) parar(`Não consegui procurar o modelo "${modelo.nome}": ${error.message}`)
+    if (ja.length) {
+      modelos[modelo.chave] = ja[0].id
+      continue
+    }
+    const { data: id, error: erroSalvar } = await como.rpc('salvar_modelo', { p_id: null, p_dados: dadosDoModelo(modelo, consultoria.id) })
+    if (erroSalvar) parar(`Não consegui criar o modelo "${modelo.nome}": ${erroSalvar.message}`)
+    modelos[modelo.chave] = id
+    novos.push(modelo.nome)
+  }
+  console.log(novos.length
+    ? `Modelos de check-in de exemplo criados: ${novos.join(', ')}.`
+    : 'Modelos de check-in de exemplo: já existiam, nada foi alterado.')
+
+  // O mesmo cliente do quadro de exemplo.
+  let { data: cliente } = await admin.from('clientes').select('id, nome, consultor_id')
+    .eq('consultoria_id', consultoria.id).eq('nome', 'Provedor Teste Navegador').is('arquivado_em', null).maybeSingle()
+  if (!cliente) {
+    const { data } = await admin.from('clientes').select('id, nome, consultor_id')
+      .eq('consultoria_id', consultoria.id).is('arquivado_em', null).order('criado_em').limit(1)
+    cliente = data?.[0]
+  }
+  if (!cliente) {
+    console.log('Check-list de exemplo: a consultoria de exemplo não tem cliente ativo; nada aplicado.')
+    return
+  }
+  const { data: ativo, error: erroAtivo } = await comoGestor.from('cliente_checklists').select('modelo_nome')
+    .eq('cliente_id', cliente.id).is('encerrado_em', null).maybeSingle()
+  if (erroAtivo) parar(`Não consegui ler o check-list de ${cliente.nome}: ${erroAtivo.message}`)
+  if (ativo) {
+    console.log(`Check-list de exemplo (${cliente.nome}): já tem o check-list "${ativo.modelo_nome}", nada foi alterado.`)
+    return
+  }
+  const { error: erroAplicar } = await comoGestor.rpc('aplicar_modelo', {
+    p_cliente: cliente.id,
+    p_modelo: modelos.financeira,
+    p_inicio: diaEmSaoPaulo(-12),
+  })
+  if (erroAplicar) parar(`Não consegui aplicar "Gestão financeira" em ${cliente.nome}: ${erroAplicar.message}`)
+
+  // Só o consultor do cliente marca: entra como ele quando é uma das contas de exemplo. Se ele estiver com o check-in
+  // aberto neste cliente, as tarefas entram no resumo daquele check-in (como na tela).
+  const { data: consultor } = cliente.consultor_id
+    ? await admin.from('perfis').select('email').eq('id', cliente.consultor_id).eq('ativo', true).maybeSingle()
+    : { data: null }
+  const comoConsultor = PESSOAS.some((p) => p.email === consultor?.email) ? await entrarComoExemplo(consultor.email) : null
+  if (!comoConsultor) {
+    console.log(`Check-list de exemplo (${cliente.nome}): "Gestão financeira" aplicado, sem tarefas feitas (o consultor do cliente não é uma conta de exemplo).`)
+    return
+  }
+  const { data: lido, error: erroLer } = await comoConsultor.rpc('checklist_do_cliente', { p_cliente: cliente.id })
+  if (erroLer) parar(`Não consegui ler o check-list de ${cliente.nome}: ${erroLer.message}`)
+  const tarefa = Object.fromEntries((lido?.tarefas ?? []).map((t) => [t.titulo, t.id]))
+  // Na ordem: cada uma depende das de cima.
+  const marcas = [
+    ['Reunião de alinhamento', 'feita'],
+    ['Coleta dos documentos financeiros', 'feita'],
+    ['Análise do DRE', 'feita'],
+    ['Levantamento do fluxo de caixa', 'andamento'],
+  ]
+  for (const [titulo, estado] of marcas) {
+    const { error } = await comoConsultor.rpc('marcar_tarefa', { p_tarefa: tarefa[titulo], p_estado: estado })
+    if (error) parar(`Não consegui marcar "${titulo}": ${error.message}`)
+  }
+  const { error: erroNota } = await comoConsultor.rpc('anotar_tarefa', {
+    p_tarefa: tarefa['Análise do DRE'],
+    p_nota: 'Margem bruta caiu 4 pontos no 2º trimestre; o custo de link puxou a queda.',
+  })
+  if (erroNota) parar(`Não consegui escrever a nota de "Análise do DRE": ${erroNota.message}`)
+  console.log(`Check-list de exemplo (${cliente.nome}): "Gestão financeira" aplicado pelo gestor, com 3 tarefas feitas e 1 em andamento.`)
 }
