@@ -1,7 +1,7 @@
 // Padrão das listas do app (regras no CLAUDE.md): tabela em cartão, uma linha por item e, na última
 // coluna, as ações da linha (Editar abre o formulário com aquele item já preenchido). Acima de 15
 // registros, a paginação (feita no banco) aparece embaixo da tabela.
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { POR_PAGINA } from '@/data/paginar'
@@ -30,11 +30,13 @@ export function Paginacao({ pagina, total, porPagina = POR_PAGINA, aoMudar }) {
   )
 }
 
-// Diz se o contêiner rola para o lado agora (mede de novo quando ele ou a janela mudam de tamanho).
+// Diz se o contêiner rola para o lado agora (mede de novo quando ele ou a janela mudam de tamanho). Mede no
+// useLayoutEffect: a primeira medida vale já na primeira pintura (com useEffect, a tabela aparecia um quadro sem a
+// região e a parada do Tab, e o teste do Histórico oscilava conforme o efeito rodava antes ou depois de ela aparecer).
 function useRolaParaOLado(ativo) {
   const ref = useRef(null)
   const [rola, setRola] = useState(false)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current
     if (!ativo || !el) return undefined
     const medir = () => setRola(el.scrollWidth > el.clientWidth + 1)
