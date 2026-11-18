@@ -29,9 +29,9 @@ describe('Textarea', () => {
   })
 })
 
-// Varredura: <textarea> escrito à mão só no próprio componente. PENDENTES: arquivos do check-list do cliente, que outro
-// trabalho mexia quando o Textarea entrou (trocar na próxima mexida neles e tirar daqui).
-const PENDENTES = ['components/checkins/JanelaDaTarefa.jsx', 'components/clientes/JanelaCheckin.jsx']
+// Varredura: <textarea> escrito à mão só no próprio componente. PENDENTES: arquivo que ainda não trocou (trocar na
+// próxima mexida nele e tirar daqui). A janela da tarefa e a do check-in trocaram no lote F (18/11).
+const PENDENTES = []
 
 function arquivosJsx(pasta) {
   return readdirSync(pasta).flatMap((nome) => {
