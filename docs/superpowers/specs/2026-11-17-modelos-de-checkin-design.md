@@ -349,3 +349,32 @@ isso para a auditoria saber. Proposta aprovada ("Pode fazer", 18/11 08:50):
 - **Visual:** cinza, com ícone próprio (nunca o check verde), na lista, no fluxograma, na janela da tarefa e na legenda
   do fluxograma do cliente. O modelo em si não muda: quem decide é o consultor, no cliente (a prévia do modelo não tem
   situação de tarefa, então não tem legenda a mudar).
+
+## Acréscimo de 18/11 (2): a linha da tarefa, Pausar e o formulário Editar
+
+Pedido do Diego (18/11): cada linha do check-list só com o check no começo; o prazo como botão na linha, com Iniciar,
+Pausar, Não se aplica e Comentário. Protótipo `docs/prototipo/checklist-linha-poc.html` (v2, Variante A) aprovado
+("Pode construir", 18/11 10:34), com as três recomendações do controlador.
+
+- **A linha:** check · título em texto puro (sem link; clicar no título não abre nada) · descrição embaixo, quando há ·
+  um selo da situação (Em andamento com o tempo correndo, Pausada com os minutos feitos, Bloqueada, Não se aplica,
+  Opcional; Feita é o check verde). À direita: o **prazo como botão** (vermelho se venceu, âmbar em 7 dias; abre um
+  balão com a data e "faltam N dias"), **Iniciar / Pausar / Retomar**, **Não se aplica** (pede o motivo na hora),
+  **💬 N** (só quando há comentários) e **Editar** (lápis). No celular, as ações vão para um "⋯" (o Editar junto).
+  Saem da linha: o motivo, a nota, o "feita por" e o botão de comentário.
+- **Pausada** (`estado = 'pausada'`) é situação nova: Iniciar abre um trecho de tempo e põe "em andamento"; Pausar fecha
+  o trecho e põe "pausada"; Retomar abre outro. Feita, não se aplica e reabrir fecham o trecho aberto. O **tempo de cada
+  tarefa** é a soma dos trechos (fica no selo e no Editar). Quem inicia e pausa: o consultor do cliente, como marcar, com
+  ou sem check-in aberto. Pausada é pendente como "em andamento": entra em atrasadas, vencem em 7 dias e próxima, e
+  segura as que dependem dela.
+- **Editar tarefa** (formulário, `JanelaFormulario`): situação em abas (A fazer · Em andamento · Pausada · Feita · Não se
+  aplica; Bloqueada desligada com "Espera: …"); **motivo** só em Não se aplica — **trocar o motivo é ali** e o Histórico
+  ganha "Motivo trocado" (substitui "reabrir e marcar de novo"); prazo só para ler; nota (como hoje); **comentários**
+  (conversa); um histórico curto da tarefa (as últimas linhas do Histórico desta tarefa e os tempos). Fechar com algo
+  digitado pergunta "Descartar o que você digitou?". Título e descrição vêm do modelo (só leitura).
+- **Comentários da tarefa** (CRUD): criar, ler, editar e apagar. Comentam o consultor do cliente e a gestão (admin e
+  gestor da consultoria); central e dono só leem. Cada um edita e apaga os seus; a gestão apaga qualquer um (como no
+  Quadro). "Comentar" grava na hora, sem o Salvar. A regra é do banco (RLS ou funções), com o recorte de quem vê o
+  check-list.
+- **Decisão do controlador:** o balão do prazo não oferece "Mudar prazo" (não existe mudar o prazo de uma tarefa; só o
+  início dos prazos do check-list, como hoje).

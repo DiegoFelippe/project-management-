@@ -419,3 +419,41 @@ apagar check-in pela aba continuam funcionando (os testes de `CheckinsDoCliente`
 
 - [ ] Commit `Check-ins do cliente: aba Check-ins ao lado de Lista e Fluxograma`.
 
+### Task 10: Banco — Pausada, tempo por tarefa, comentários e motivo no Editar (acréscimo de 18/11)
+
+Desenho: "Acréscimo de 18/11 (2)". Migração nova `tarefa_pausada_tempos_comentarios` a partir dos corpos mais novos
+(`20261118125931` e o que vier depois), com "Mesmo corpo de …" e os grants.
+
+**Produz:** `estado` aceita `'pausada'` (pendente como `'andamento'`: atrasadas, vencem em 7 dias, próxima, cadeia,
+índice parcial das pendentes, Andamento e indicadores); tabela `checklist_tarefa_tempos(id, tarefa_id, pessoa_id,
+inicio, fim)` com no máximo um trecho aberto por tarefa (índice único parcial) e RLS pelo `vejo_checklist`;
+`marcar_tarefa` abre/fecha trechos (andamento abre; pausada, feita, não se aplica e a_fazer fecham) e devolve
+`tempo_segundos`; `trocar_motivo(p_tarefa, p_motivo)` (só o consultor, só em não se aplica, 1–500, Histórico "Motivo
+trocado"); `tarefa_reaberta` só quando volta para a_fazer; tabela `checklist_comentarios(id, tarefa_id, autor_id, texto
+1–2000, criado_em, editado_em)` com RLS (ler: quem vê o check-list; criar: consultor do cliente e gestão da
+consultoria, cliente ativo; editar: o autor; apagar: o autor ou a gestão) ou funções `comentar_tarefa`,
+`editar_comentario`, `apagar_comentario`; `checklist_do_cliente` traz por tarefa `tempo_segundos`, `trecho_aberto_desde`
+e `comentarios` (contagem); `historico_da_tarefa(p_tarefa)` (últimas 10 linhas do Histórico desta tarefa, no recorte).
+Carry-overs da revisão da T8: teste da cadeia com mais de um elo; `andamento_volume` com "não se aplica" e pausadas;
+comentários desatualizados (`ListaDoChecklist.jsx:122`, `src/data/clientes.js:137`, design :121).
+
+**Testes (pgTAP, volume, integração, `src/data/checklists.js`):** pausar/retomar somam o tempo; um trecho aberto só;
+feita fecha o trecho; pausada conta como pendente (atrasada, próxima, cadeia); trocar motivo grava a linha e recusa
+quem não pode; comentários: quem cria, edita e apaga cada um, central só lê, outra consultoria não vê; contagem de
+comentários e tempo na leitura do check-list de 500 tarefas dentro dos limites.
+
+### Task 11: Tela — a linha da tarefa e o formulário Editar (acréscimo de 18/11)
+
+Desenho: "Acréscimo de 18/11 (2)"; protótipo `docs/prototipo/checklist-linha-poc.html` (v2). Depois da T10.
+
+**Arquivos:** `src/components/checkins/{ListaDoChecklist,ChecklistDoCliente,JanelaDaTarefa (vira o "Editar tarefa"),
+situacao,Fluxograma,PainelDaSessao}*`, componentes novos `LinhaDaTarefa`, `PrazoDaTarefa`, `ComentariosDaTarefa`,
+`src/data/checklists.js`, `CLAUDE.md` (seção do check-list). A janela segue a `JanelaFormulario` com os erros embaixo do
+campo e a pergunta ao descartar (lote F).
+
+**Testes de tela:** a linha tem só o check no começo, título sem link, selo da situação, prazo-botão com o balão,
+Iniciar/Pausar/Retomar trocando, Não se aplica com motivo, 💬 N só com comentários, Editar abrindo o formulário com a
+tarefa; no celular o "⋯"; o formulário troca a situação, troca o motivo, edita a nota, comenta/edita/apaga comentário
+(só o que pode), mostra o histórico curto e pergunta ao descartar; bloqueada desliga Iniciar e mostra "Espera: …";
+fluxograma e legenda com Pausada. Conferência no navegador (consultor, gestor, central; 1440/390/360; claro e escuro).
+
