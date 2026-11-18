@@ -332,14 +332,20 @@ isso para a auditoria saber. Proposta aprovada ("Pode fazer", 18/11 08:50):
 
 - **Terceiro jeito de fechar uma tarefa**, ao lado de "feita": **"Não se aplica"** (`estado = 'nao_se_aplica'`).
 - **Quem marca:** o consultor do cliente, como "feita", com ou sem check-in aberto; volta para "a fazer" pelo mesmo
-  caminho (o motivo sai junto).
+  caminho (o motivo sai junto, e o Histórico ganha a linha "Tarefa reaberta", com quem). **Trocar o motivo = reabrir e
+  marcar de novo** (marcar de novo com outro motivo é recusado e a tela diz isso; a nota da tarefa continua editável
+  sem mexer no motivo).
 - **Motivo obrigatório** (1 a 500 letras, o que o auditor lê), guardado à parte da nota da tarefa; fica quem marcou e
   quando, e o Histórico do cliente ganha uma linha (tarefa, motivo, quem).
 - **Vale também para tarefa obrigatória**, desde que tenha motivo (decisão do controlador; o Diego pode travar depois).
-- **Libera as que dependem dela**, como "feita".
+- **Libera as que dependem dela**, como "feita" — pela cadeia. **Pedido do Diego, 18/11 ("Pode, com cuidado"):
+  bloqueada pode ser não se aplica; as que dependem dela esperam as dependências dela.** A que não se aplica só libera
+  quando as dependências dela também estão resolvidas (feitas, ou não se aplicam sem nada pendente atrás). Ex.: C depende
+  de B, B de A; B vira "não se aplica" com A pendente: C continua esperando A, e fica livre quando A for resolvida.
 - **Progresso:** conta como resolvida, mas aparece separada ("4 de 5 resolvidas: 3 feitas, 1 não se aplica"). Não
   entra em "atrasadas", "vencem em 7 dias" nem vira a "próxima"; a aba Andamento e os números seguem a mesma regra.
 - **No check-in:** marcada com o check-in aberto, entra no resumo da sessão e no texto do check-out como
   "Não se aplica: <tarefa> (<motivo>)".
-- **Visual:** cinza, com ícone próprio (nunca o check verde), na lista, no fluxograma, na janela da tarefa e nas
-  legendas (inclusive a prévia do modelo). O modelo em si não muda: quem decide é o consultor, no cliente.
+- **Visual:** cinza, com ícone próprio (nunca o check verde), na lista, no fluxograma, na janela da tarefa e na legenda
+  do fluxograma do cliente. O modelo em si não muda: quem decide é o consultor, no cliente (a prévia do modelo não tem
+  situação de tarefa, então não tem legenda a mudar).

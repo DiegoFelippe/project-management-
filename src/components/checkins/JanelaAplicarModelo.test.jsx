@@ -72,6 +72,12 @@ describe('JanelaAplicarModelo', () => {
     expect(aplicarModelo).not.toHaveBeenCalled()
   })
 
+  it('trocar com tarefas que não se aplicam: o aviso conta as resolvidas, com a concordância certa', () => {
+    abrir({ checklist: { id: 'cl1', modelo_id: 'm1', modelo_nome: 'Gestão financeira', tarefas: 14, feitas: 5, nao_se_aplica: 2 } })
+    expect(screen.getByRole('dialog', { name: 'Trocar o modelo de Provedor Alfa' }))
+      .toHaveTextContent('O check-list atual (7 de 14 resolvidas: 5 feitas, 2 não se aplicam) é trocado pelo do modelo novo')
+  })
+
   it('trocar: título, o aviso de que começa do zero (com o que já foi feito), o atual marcado e o botão Trocar modelo', async () => {
     abrir({ checklist: { id: 'cl1', modelo_id: 'm1', modelo_nome: 'Gestão financeira', tarefas: 14, feitas: 5 } })
     const janela = screen.getByRole('dialog', { name: 'Trocar o modelo de Provedor Alfa' })

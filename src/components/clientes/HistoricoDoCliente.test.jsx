@@ -33,8 +33,10 @@ describe('HistoricoDoCliente', () => {
       itens: [
         { id: 'e2', tipo: 'tarefa_nao_se_aplica', em: '2026-11-18T10:00:00Z', tarefa: 'Inventário', motivo: 'O cliente não tem estoque', autor: 'Ana Lima' },
         { id: 'e1', tipo: 'tarefa_nao_se_aplica', em: '2026-11-17T10:00:00Z', tarefa: null, motivo: null, autor: null },
+        { id: 'e0', tipo: 'tarefa_reaberta', em: '2026-11-16T10:00:00Z', tarefa: 'Inventário', motivo: null, autor: 'Ana Lima' },
+        { id: 'e9', tipo: 'tarefa_reaberta', em: '2026-11-15T10:00:00Z', tarefa: null, motivo: null, autor: null },
       ],
-      total: 2,
+      total: 4,
     })
     render(<HistoricoDoCliente clienteId="k1" versao={0} />)
     const tabela = await screen.findByRole('table', { name: 'Histórico' })
@@ -42,6 +44,8 @@ describe('HistoricoDoCliente', () => {
     expect(linhas).toEqual([
       ['Tarefa não se aplica: Inventário (O cliente não tem estoque)', 'Ana Lima'],
       ['Tarefa do check-list marcada como não se aplica', '—'],
+      ['Tarefa reaberta: Inventário (desfeito o "não se aplica")', 'Ana Lima'],
+      ['Tarefa do check-list reaberta (desfeito o "não se aplica")', '—'],
     ])
   })
 

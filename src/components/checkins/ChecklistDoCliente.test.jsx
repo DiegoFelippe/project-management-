@@ -521,6 +521,46 @@ describe('ChecklistDoCliente: não se aplica', () => {
     expect(item).not.toHaveTextContent('Atrasada')
   })
 
+  it('a etapa diz "resolvidas" como o fluxograma; Tirar e Trocar modelo contam também as que não se aplicam', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue({ ...COM_NSA, pode_aplicar: true, pode_marcar: false })
+    vi.mocked(modelosParaAplicar).mockResolvedValue({ itens: [], total: 0 })
+    tela(gestor)
+    expect(await screen.findByRole('region', { name: '2 · Plano' })).toHaveTextContent('1 de 3 resolvidas')
+    expect(screen.getByRole('region', { name: '1 · Diagnóstico' })).toHaveTextContent('1 de 3 feitas')
+    await userEvent.click(screen.getByRole('button', { name: 'Tirar modelo' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('O check-list sai da aba (2 de 6 resolvidas: 1 feita, 1 não se aplica).')
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Trocar modelo' }))
+    expect(screen.getByRole('dialog', { name: 'Trocar o modelo de Provedor Alfa' }))
+      .toHaveTextContent('O check-list atual (2 de 6 resolvidas: 1 feita, 1 não se aplica) é trocado')
+  })
+
+  it('cadeia: a que depende de uma "não se aplica" presa fica bloqueada, esperando a pendente de verdade', async () => {
+    const presa = tarefa('t6', 'e2', 6, 'Inventário', { estado: 'nao_se_aplica', motivo: 'Sem estoque', depende_de: ['t2'] })
+    const depois = tarefa('t7', 'e2', 7, 'Contagem', { depende_de: ['t6'] })
+    vi.mocked(lerChecklist).mockResolvedValue({ ...COM_NSA, tarefas: [...TAREFAS, presa, depois] })
+    tela(consultor)
+    const caixa = await screen.findByRole('checkbox', { name: 'Contagem' })
+    expect(caixa).toBeDisabled()
+    expect(caixa).toHaveAccessibleDescription('Bloqueada espera Análise do DRE')
+  })
+
+  it('marcar "não se aplica" numa tarefa que já estava (tela velha, outro motivo): avisa, fecha e relê', async () => {
+    vi.mocked(marcarTarefa).mockResolvedValue({
+      erro: 'Esta tarefa já está como não se aplica. Para trocar o motivo, reabra e marque de novo.', desatualizado: true,
+    })
+    const { aoMudar } = tela(consultor)
+    await userEvent.click(await screen.findByRole('button', { name: 'Análise do DRE' }))
+    const janela = screen.getByRole('dialog', { name: 'Análise do DRE' })
+    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    await userEvent.type(within(janela).getByRole('textbox', { name: 'Motivo' }), 'Outro motivo')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(toast.error).toHaveBeenCalledWith('Esta tarefa já está como não se aplica. Para trocar o motivo, reabra e marque de novo.')
+    await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
+    expect(aoMudar).toHaveBeenCalled()
+  })
+
   it('caixa Modelo aplicado: "2 de 6 resolvidas: 1 feita, 1 não se aplica" e o % conta as duas', async () => {
     vi.mocked(lerChecklist).mockResolvedValue(COM_NSA)
     tela(consultor)

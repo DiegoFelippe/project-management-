@@ -2,8 +2,8 @@ import { CalendarCog, ListChecks, Replace, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { diaEmSP } from '@/lib/calendario'
 import { formatarDia } from '@/lib/mes'
-import { plural } from '@/lib/nomes'
 import { cn } from '@/lib/utils'
+import { progressoEmPalavras } from './situacao'
 
 const BOTAO_PERIGO = 'hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive'
 
@@ -32,13 +32,6 @@ function Topo({ rotulo, titulo, children, fim }) {
       {fim}
     </div>
   )
-}
-
-// O progresso em palavras: "3 de 5 feitas" ou, com alguma que não se aplica, "4 de 5 resolvidas: 3 feitas, 1 não se
-// aplica" (resolvida = feita ou não se aplica; as duas contam no %).
-function progressoEmPalavras({ tarefas, feitas, nao_se_aplica: naoSeAplica = 0 }) {
-  if (!naoSeAplica) return `${feitas} de ${tarefas} feitas`
-  return `${feitas + naoSeAplica} de ${tarefas} resolvidas: ${plural(feitas, 'feita', 'feitas')}, ${naoSeAplica} não se aplica`
 }
 
 // Caixa do modelo na aba Check-ins do cliente. Com check-list: "Modelo aplicado" (nome, quem aplicou e quando, de quando

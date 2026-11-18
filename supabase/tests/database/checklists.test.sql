@@ -7,7 +7,7 @@
 -- apaga; modelo em uso não se apaga; "clientes usando" nas listas e números dos modelos. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(265);
+select plan(286);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -982,6 +982,20 @@ begin
   return v;
 end $$;
 
+-- As linhas "tarefa reaberta" do histórico do cliente, como a pessoa: "tarefa (autor)" em ordem de texto.
+create function testes.historico_reaberta(p_quem text, p_cliente text) returns text[] language plpgsql as $$
+declare v text[];
+begin
+  perform testes.como(p_quem);
+  select coalesce(array_agg(x.linha order by x.linha collate "C"), '{}') into v
+  from (select coalesce(h.tarefa, '—') || ' (' || coalesce(h.autor, '—') || ')' || coalesce(' ' || h.motivo, '') as linha
+    from public.historico_do_cliente(testes.id(p_cliente), 50) h
+    where h.tipo = 'tarefa_reaberta') x;
+  reset role;
+  perform testes.sistema();
+  return v;
+end $$;
+
 select hasnt_function('public', 'marcar_tarefa', array['uuid', 'text'],
   'marcar_tarefa tem só a assinatura com o motivo (a API não fica em dúvida entre duas)');
 
@@ -1002,8 +1016,8 @@ select is(testes.nsa('pessoa_a2', testes.id('n_analise'), 'Não precisa') ->> 'e
   'nem outro consultor');
 select is(testes.nsa('gestor_b', testes.id('n_analise'), 'Não precisa') ->> 'erro', 'P0001 sem_permissao',
   'nem outra consultoria');
-select is(testes.nsa('pessoa_n', testes.id('n_mapa'), 'Não precisa') ->> 'erro', 'P0001 tarefa_bloqueada',
-  'tarefa bloqueada não se marca "não se aplica" (como "feita")');
+select is(testes.marcar('pessoa_n', testes.id('n_mapa'), 'feita') ->> 'erro', 'P0001 tarefa_bloqueada',
+  'a bloqueada continua sem poder ser feita (o "não se aplica" dela está na cadeia, mais abaixo)');
 select is(testes.gravada(testes.id('n_analise')), 'a_fazer | — | — | —', 'as recusas não mudam a tarefa');
 select is(testes.chamar('pessoa_n', 'public.indicadores_de_checkins()'),
   '{"recorte": "pessoa", "clientes": 1, "com_modelo": 1, "progresso_medio": 0, "atrasadas": 1, "vencem_7_dias": 1}'::jsonb,
@@ -1064,8 +1078,10 @@ select is((testes.ler('pessoa_n', 'c_nsa') -> 'sessao') -> 'tarefas',
   jsonb_build_array(jsonb_build_object('tarefa_id', testes.id('n_mapa'), 'titulo', 'Mapa de custos',
     'estado', 'nao_se_aplica', 'motivo', 'Sem custos fixos')),
   'a sessão da leitura traz o estado e o motivo');
-select is(testes.nsa('pessoa_n', testes.id('n_mapa'), 'Outro motivo') ->> 'estado', 'nao_se_aplica',
-  'marcar de novo no mesmo estado não muda nada');
+select is(testes.nsa('pessoa_n', testes.id('n_mapa'), ' Sem custos fixos ') ->> 'estado', 'nao_se_aplica',
+  'marcar de novo com o mesmo motivo não muda nada (dois cliques)');
+select is(testes.nsa('pessoa_n', testes.id('n_mapa'), 'Outro motivo') ->> 'erro', 'P0001 ja_nao_se_aplica',
+  'com outro motivo, recusa: para trocar o motivo, reabre e marca de novo');
 select is((select motivo from public.checklist_tarefas where id = testes.id('n_mapa')), 'Sem custos fixos',
   'o motivo fica o primeiro');
 select is(testes.marcar('pessoa_n', testes.id('n_mapa'), 'a_fazer') -> 'na_sessao', 'false'::jsonb,
@@ -1078,6 +1094,10 @@ select is(testes.nsa('pessoa_n', testes.id('n_mapa'), 'Sem custos fixos') -> 'na
 select is((select (estado, motivo)::text from public.checkin_tarefas
     where checkin_id = testes.id('kn') and tarefa_id = testes.id('n_mapa')),
   ('nao_se_aplica', 'Sem custos fixos')::text, 'com o estado novo no check-in');
+select is(testes.fazer('pessoa_n', format($$public.anotar_tarefa(%L, 'Conferi com a contabilidade')$$, testes.id('n_mapa'))),
+  'ok', 'a que não se aplica também recebe nota');
+select is((select (estado, motivo, nota)::text from public.checklist_tarefas where id = testes.id('n_mapa')),
+  ('nao_se_aplica', 'Sem custos fixos', 'Conferi com a contabilidade')::text, 'e a nota não apaga nem troca o motivo');
 
 -- Voltar para a fazer bloqueia de novo as que dependem dela.
 select is(testes.marcar('pessoa_n', testes.id('n_analise'), 'a_fazer') - 'liberadas',
@@ -1087,6 +1107,17 @@ select is(testes.marcar('pessoa_n', testes.id('n_plano'), 'feita') ->> 'erro', '
   'e a que dependia dela volta a ficar bloqueada');
 select is((select (nao_se_aplica, proximo_vencimento)::text from public.cliente_checklists where id = testes.id('cl_nsa')),
   (1, testes.hoje() - 2)::text, 'os contadores voltam');
+-- O Mapa (vence em 3 dias) continua "não se aplica" e a Análise voltou atrasada (o check-list entra na conta dos
+-- prazos): a que não se aplica não vence em 7 dias, nem no resumo nem nos números.
+select is((select jsonb_build_object('vencem', r -> 'vencem_7_dias', 'atrasadas', r -> 'atrasadas')
+    from (select testes.ler('pessoa_n', 'c_nsa') -> 'resumo' as r) x),
+  '{"vencem": 0, "atrasadas": 1}'::jsonb, 'resumo: a que não se aplica dentro dos 7 dias não conta em "vencem em 7 dias"');
+select is((select jsonb_build_object('vencem', r -> 'vencem_7_dias', 'atrasadas', r -> 'atrasadas')
+    from testes.chamar('pessoa_n', 'public.indicadores_de_checkins()') r),
+  '{"vencem": 0, "atrasadas": 1}'::jsonb, 'números: também não conta');
+select is(testes.historico_reaberta('gestor_a', 'c_nsa'),
+  array['Análise do DRE (Pessoa pessoa_n)', 'Mapa de custos (Pessoa pessoa_n)'],
+  'desfazer o "não se aplica" grava "tarefa reaberta" no Histórico, com quem (sem motivo)');
 select testes.checkout('pessoa_n', 'kn', now());
 select is(testes.marcar('pessoa_n', testes.id('n_mapa'), 'a_fazer') -> 'na_sessao', 'false'::jsonb,
   'depois do check-out, desfazer não mexe no check-in');
@@ -1119,6 +1150,54 @@ reset role;
 select testes.sistema();
 select is(testes.historico_nsa('gestor_b', 'c_nsa'), array['—: — (—)', '—: — (—)', '—: — (—)'],
   'outra consultoria nunca vê a tarefa, o motivo nem quem marcou');
+select is(testes.historico_reaberta('central1', 'c_nsa'),
+  array['Análise do DRE (Pessoa pessoa_n)', 'Mapa de custos (Pessoa pessoa_n)', 'Mapa de custos (Pessoa pessoa_n)'],
+  'cada "não se aplica" desfeito é uma linha "tarefa reaberta" (a Central vê)');
+select is(testes.historico_reaberta('gestor_b', 'c_nsa'), array['— (—)', '— (—)', '— (—)'],
+  'outra consultoria também não vê qual tarefa foi reaberta nem quem reabriu');
+select is((select count(*)::int from public.cliente_eventos where tipo = 'tarefa_reaberta' and cliente_id <> testes.id('c_nsa')),
+  0, 'reabrir uma tarefa feita não grava "tarefa reaberta" (só desfazer o "não se aplica")');
+
+-- ── Não se aplica numa bloqueada: a cadeia (pedido do Diego, 18/11) ──────────
+-- C depende de B, B depende de A. B (bloqueada) vira "não se aplica" com A pendente: C continua esperando A. C vence
+-- antes de todas (dia 1), então ela seria a próxima se B liberasse sozinha.
+
+select testes.perfil('pessoa_k', 'pessoa', 'A');
+select testes.cliente('c_cadeia', 'A', 'pessoa_k');
+select testes.criar('gestor_a', 'm_cadeia', jsonb_build_object('nome', 'Zqc Cadeia', 'para', 'todas',
+  'etapas', jsonb_build_array(jsonb_build_object('nome', 'Única', 'tarefas', jsonb_build_array(
+    jsonb_build_object('chave', 'a', 'titulo', 'Tarefa A', 'prazo_dias', 20),
+    jsonb_build_object('chave', 'b', 'titulo', 'Tarefa B', 'prazo_dias', 10, 'depende_de', jsonb_build_array('a')),
+    jsonb_build_object('chave', 'c', 'titulo', 'Tarefa C', 'prazo_dias', 1, 'depende_de', jsonb_build_array('b')))))));
+select is(testes.aplicar('gestor_a', testes.id('c_cadeia'), testes.id('m_cadeia'), testes.hoje(), 'cl_cadeia'), 'ok',
+  'cadeia: o check-list do cenário');
+insert into testes.fx
+select 'ca_' || k, testes.tarefa(testes.id('cl_cadeia'), t)
+from (values ('a', 'Tarefa A'), ('b', 'Tarefa B'), ('c', 'Tarefa C')) x(k, t);
+
+select is(testes.nsa('pessoa_k', testes.id('ca_b'), 'O cliente já faz isso') - 'feita_em',
+  '{"estado": "nao_se_aplica", "liberadas": [], "na_sessao": false}'::jsonb,
+  'a bloqueada pode ser "não se aplica" (com motivo), e não libera ninguém enquanto A está pendente');
+select is(testes.marcar('pessoa_k', testes.id('ca_c'), 'feita') ->> 'erro', 'P0001 tarefa_bloqueada',
+  'C continua bloqueada: espera A pela cadeia');
+select is(testes.marcar('pessoa_k', testes.id('ca_c'), 'andamento') ->> 'erro', 'P0001 tarefa_bloqueada',
+  'nem começa');
+select is(testes.ler('pessoa_k', 'c_cadeia') #>> '{resumo,proxima,titulo}', 'Tarefa A',
+  'a próxima é A (C vence antes, mas não está livre)');
+select is(testes.chamar('pessoa_k', 'public.andamento_dos_clientes()') #>> '{itens,0,checklist,proxima,titulo}', 'Tarefa A',
+  'no Andamento também');
+select is(testes.marcar('pessoa_k', testes.id('ca_a'), 'feita') -> 'liberadas',
+  jsonb_build_array(jsonb_build_object('id', testes.id('ca_c'), 'titulo', 'Tarefa C')),
+  'A feita libera C, através de B (não se aplica)');
+select is(testes.ler('pessoa_k', 'c_cadeia') #>> '{resumo,proxima,titulo}', 'Tarefa C', 'e C vira a próxima');
+select is(testes.marcar('pessoa_k', testes.id('ca_b'), 'a_fazer') ->> 'estado', 'a_fazer', 'reabrir B');
+select is(testes.marcar('pessoa_k', testes.id('ca_c'), 'feita') ->> 'erro', 'P0001 tarefa_bloqueada',
+  'reaberta B, C volta a ficar bloqueada');
+select is(testes.nsa('pessoa_k', testes.id('ca_b'), 'O cliente já faz isso') -> 'liberadas',
+  jsonb_build_array(jsonb_build_object('id', testes.id('ca_c'), 'titulo', 'Tarefa C')),
+  'com A feita, B "não se aplica" libera C na hora');
+select is(testes.historico_reaberta('gestor_a', 'c_cadeia'), array['Tarefa B (Pessoa pessoa_k)'],
+  'reabrir B fica no Histórico');
 
 -- ── Nenhuma seta para a frente ───────────────────────────────────────────────
 

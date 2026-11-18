@@ -229,6 +229,10 @@ describe('check-list do cliente contra o banco de verdade', () => {
     expect(lido.tarefas[1]).toMatchObject({
       estado: 'nao_se_aplica', motivo: 'Sem custos fixos', feita_por: { nome: expect.any(String) },
     })
+    // De novo com outro motivo: a tela estava velha (trocar o motivo é reabrir e marcar de novo).
+    expect(await marcarTarefa(tarefa['Mapa de custos'], 'nao_se_aplica', 'Outro motivo')).toEqual({
+      erro: 'Esta tarefa já está como não se aplica. Para trocar o motivo, reabra e marque de novo.', desatualizado: true,
+    })
     expect(lido.resumo).toMatchObject({ tarefas: 3, feitas: 1, nao_se_aplica: 1, resolvidas: 2 })
     expect(lido.sessao.tarefas).toEqual([
       { tarefa_id: tarefa['Mapa de custos'], titulo: 'Mapa de custos', estado: 'nao_se_aplica', motivo: 'Sem custos fixos' },
@@ -257,6 +261,15 @@ describe('check-list do cliente contra o banco de verdade', () => {
     expect(await marcarTarefa(tarefa['Mapa de custos'], 'a_fazer')).toMatchObject({ estado: 'a_fazer', na_sessao: false })
     expect((await lerChecklist(clienteId)).tarefas[1]).toMatchObject({ estado: 'a_fazer', motivo: null, feita_por: null })
     expect((await tarefasDoCheckin(novo))[0]).toMatchObject({ estado: 'nao_se_aplica', motivo: 'Sem custos fixos' })
+
+    // A bloqueada (Plano espera o Mapa) também pode ser "não se aplica"; desfeita, o Histórico diz "tarefa reaberta".
+    expect(await marcarTarefa(tarefa['Plano de ação'], 'nao_se_aplica', 'Plano já existe')).toMatchObject({
+      estado: 'nao_se_aplica', liberadas: [], erro: null,
+    })
+    expect(await marcarTarefa(tarefa['Plano de ação'], 'a_fazer')).toMatchObject({ estado: 'a_fazer', erro: null })
+    entrar('gestor')
+    const { itens: depois } = await listarEventos(clienteId)
+    expect(depois.filter((e) => e.tipo === 'tarefa_reaberta').map((e) => e.tarefa).sort()).toEqual(['Mapa de custos', 'Plano de ação'])
   })
 
   it('quem só acompanha não marca; o consultor escreve a nota; os erros vêm traduzidos', async () => {

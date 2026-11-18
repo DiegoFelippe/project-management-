@@ -21,7 +21,7 @@ import { useListaPaginada } from '@/lib/useListaPaginada'
 import { cn } from '@/lib/utils'
 import { BarraDeProgresso } from './CartaoDoModelo'
 import JanelaAplicarModelo from './JanelaAplicarModelo'
-import { quandoVence } from './situacao'
+import { naoSeAplicaEmPalavras, quandoVence } from './situacao'
 
 const SITUACOES = [
   { valor: 'todos', rotulo: 'Todos' },
@@ -78,7 +78,7 @@ function Progresso({ cliente, checklist }) {
       <BarraDeProgresso pct={checklist.pct} rotulo={`Progresso de ${cliente.nome}`} className="mt-1.5" />
       {naoSeAplica > 0 && (
         <p className="text-muted-foreground mt-1 text-legenda tabular-nums whitespace-nowrap">
-          {numero(naoSeAplica)} {naoSeAplica === 1 ? 'não se aplica' : 'não se aplicam'}
+          {naoSeAplicaEmPalavras(naoSeAplica)}
         </p>
       )}
     </div>

@@ -16,7 +16,9 @@ import JanelaInicioDosPrazos from './JanelaInicioDosPrazos'
 import ListaDoChecklist from './ListaDoChecklist'
 import PainelDaSessao from './PainelDaSessao'
 import { ehCelular } from './fluxo'
-import { entraNoFiltro, estaResolvida, quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa } from './situacao'
+import {
+  contagemDaEtapa, entraNoFiltro, progressoEmPalavras, quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa,
+} from './situacao'
 
 // Lista e Fluxograma mostram as tarefas; Check-ins, a tabela de check-ins do cliente (acréscimo de 18/11).
 const VISOES = [
@@ -37,13 +39,6 @@ function avisoDaMarcacao(tarefa, estado, resposta) {
   }
   const sessao = resposta.na_sessao ? ' Entrou no resumo deste check-in.' : ' Sem check-in aberto neste cliente: fica feita, fora de uma sessão.'
   return `${tarefa.titulo} feita.${liberadas}${sessao}`
-}
-
-// "Feitas" de uma etapa no fluxograma: "1 de 3 feitas" ou, com alguma que não se aplica, "2 de 3 resolvidas".
-function contagemDaEtapa(_etapa, daEtapa) {
-  const resolvidas = daEtapa.filter(estaResolvida).length
-  if (daEtapa.some((t) => t.estado === 'nao_se_aplica')) return `${resolvidas} de ${daEtapa.length} resolvidas`
-  return `${resolvidas} de ${daEtapa.length} feitas`
 }
 
 // A releitura traz objetos novos para todas as tarefas; as que não mudaram ficam com o objeto de antes, para a lista
@@ -230,7 +225,9 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
   )
   const janelaDeAplicar = janela?.tipo === 'aplicar' && (
     <JanelaAplicarModelo cliente={{ ...cliente, consultor: dados.consultor ?? cliente.consultor }}
-      checklist={checklist ? { ...checklist, tarefas: resumo.tarefas, feitas: resumo.feitas } : null}
+      checklist={checklist
+        ? { ...checklist, tarefas: resumo.tarefas, feitas: resumo.feitas, nao_se_aplica: resumo.nao_se_aplica ?? 0 }
+        : null}
       aoFechar={fechar}
       aoAplicar={({ modelo }) => {
         toast.success(checklist
@@ -305,7 +302,7 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
         <section aria-label="Fluxograma" className="card min-w-0 overflow-hidden">
           <Fluxograma etapas={dados.etapas} tarefas={tarefas} vertical={vertical} infoDaTarefa={infoNoFluxo}
             selecionada={tarefaAberta?.id ?? null} aoEscolher={abrirTarefa} rotulo={`Fluxograma das tarefas de ${cliente.nome}`}
-            contagemDaEtapa={contagemDaEtapa} />
+            contagemDaEtapa={(_etapa, daEtapa) => contagemDaEtapa(daEtapa)} />
           <LegendaDoFluxo dica={`Clique numa tarefa para ${dados.pode_marcar ? 'ver os detalhes e marcar' : 'ver os detalhes'}. Arraste o quadro para os lados.`} />
         </section>
       )}
@@ -325,7 +322,7 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
       )}
       {janela?.tipo === 'tirar' && (
         <ConfirmarAcao aberto aoFechar={fechar} titulo={`Tirar "${checklist.modelo_nome}" de ${cliente.nome}?`}
-          descricao={`O check-list sai da aba (${resumo.feitas} de ${resumo.tarefas} feitas). O que foi feito continua nos check-ins e no Histórico.`}
+          descricao={`O check-list sai da aba (${progressoEmPalavras(resumo)}). O que foi feito continua nos check-ins e no Histórico.`}
           rotuloConfirmar="Tirar modelo"
           aoConfirmar={async () => {
             const resposta = await tirarModelo(checklist.id)

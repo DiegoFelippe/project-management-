@@ -8,9 +8,11 @@ import { supabase } from '@/lib/supabase'
 const traduzir = (error) => traduzirErroBanco(error, { sobre: 'checklist' })
 
 // Recusas que dizem que a tela ficou velha: o check-list foi trocado ou tirado, o consultor do cliente mudou, o cliente
-// foi arquivado, a pessoa perdeu o acesso ou uma dependência foi reaberta. Com elas a resposta traz desatualizado: true,
-// e quem chama relê o check-list.
-const DESATUALIZADO = new Set(['checklist_encerrado', 'so_o_consultor_marca', 'sem_permissao', 'cliente_arquivado', 'tarefa_bloqueada'])
+// foi arquivado, a pessoa perdeu o acesso, uma dependência foi reaberta ou a tarefa já estava "não se aplica" (com outro
+// motivo). Com elas a resposta traz desatualizado: true, e quem chama relê o check-list.
+const DESATUALIZADO = new Set([
+  'checklist_encerrado', 'so_o_consultor_marca', 'sem_permissao', 'cliente_arquivado', 'tarefa_bloqueada', 'ja_nao_se_aplica',
+])
 const recusa = (error) => (DESATUALIZADO.has(error?.message) ? { erro: traduzir(error), desatualizado: true } : { erro: traduzir(error) })
 
 async function ler(funcao, argumentos) {

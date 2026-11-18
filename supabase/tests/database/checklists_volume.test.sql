@@ -8,7 +8,7 @@
 -- cresce com o número de check-lists. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(24);
 
 create schema testes;
 grant usage on schema testes to authenticated;
@@ -220,6 +220,23 @@ select is(jsonb_array_length(public.checklist_do_cliente(testes.id('cliente_gran
   'o check-list grande vem inteiro numa leitura');
 select is(jsonb_array_length(public.checklist_do_cliente(testes.id('cliente_grande')) #> '{sessao,tarefas}'), 30,
   'com a sessão aberta');
+-- 30 tarefas bloqueadas (101 a 130, cada uma espera a anterior e a de 10 antes) viram "não se aplica": a leitura e o
+-- marcar passam pela cadeia (presas) em todos os tempos abaixo.
+reset role;
+select set_config('request.jwt.claims', '', true);
+insert into testes.fx select 'grande_t130', id from public.checklist_tarefas
+where checklist_id = testes.id('grande_ativo') and posicao = 130;
+select testes.como('consultor1');
+do $$
+declare v_tarefa uuid;
+begin
+  for v_tarefa in select t.id from public.checklist_tarefas t
+    where t.checklist_id = testes.id('grande_ativo') and t.posicao between 101 and 130 order by t.posicao loop
+    perform public.marcar_tarefa(v_tarefa, 'nao_se_aplica', 'Volume: não se aplica');
+  end loop;
+end $$;
+select is((public.checklist_do_cliente(testes.id('cliente_grande')) #>> '{resumo,nao_se_aplica}')::int, 30,
+  'as 30 bloqueadas viraram "não se aplica" (a cadeia continua esperando a tarefa 31)');
 select diag('consultor, check-list de 500: '
   || testes.media_ms(format('select public.checklist_do_cliente(%L)', testes.id('cliente_grande'))) || ' ms; de 40: '
   || testes.media_ms(format('select public.checklist_do_cliente(%L)', testes.id('cliente_40'))) || ' ms; marcar e desmarcar: '
@@ -277,25 +294,64 @@ select ok(not testes.varre('checklist_tarefas', format($$
   select t.id, t.estado from public.checklist_tarefas t where t.checklist_id = %L order by t.posicao $$,
     testes.id('grande_ativo')))
   and not testes.varre('checklist_tarefas', format($$
+  with recursive tarefas as materialized (
+    select t.id, t.posicao, t.estado, t.estado in ('a_fazer', 'andamento') as pendente
+    from public.checklist_tarefas t where t.checklist_id = %1$L
+  ), presas(id) as (
+    select d.tarefa_id from tarefas n
+    join public.checklist_dependencias d on d.tarefa_id = n.id
+    join tarefas p on p.id = d.depende_de
+    where n.estado = 'nao_se_aplica' and p.pendente
+    union
+    select d.tarefa_id from presas pr
+    join public.checklist_dependencias d on d.depende_de = pr.id
+    join tarefas n on n.id = d.tarefa_id
+    where n.estado = 'nao_se_aplica'
+  )
   select d.tarefa_id, jsonb_agg(d.depende_de order by dt.posicao),
-    bool_and(dt.estado in ('feita', 'nao_se_aplica'))
-  from public.checklist_tarefas t
+    bool_and(dt.estado = 'feita' or (dt.estado = 'nao_se_aplica' and pr.id is null))
+  from tarefas t
   join public.checklist_dependencias d on d.tarefa_id = t.id
   join public.checklist_tarefas dt on dt.id = d.depende_de
-  where t.checklist_id = %L group by d.tarefa_id $$, testes.id('grande_ativo')))
+  left join presas pr on pr.id = d.depende_de
+  group by d.tarefa_id $$, testes.id('grande_ativo')))
   and not testes.varre('checklist_dependencias', format($$
   select d.tarefa_id from public.checklist_tarefas t join public.checklist_dependencias d on d.tarefa_id = t.id
   where t.checklist_id = %L $$, testes.id('grande_ativo'))),
   'o check-list inteiro (tarefas e "depende de") sai por índice, sem Seq Scan');
 select ok(not testes.varre('checklist_tarefas', format($$
-  select t.id, t.titulo from public.checklist_dependencias d
-  join public.checklist_tarefas t on t.id = d.tarefa_id
-  where d.depende_de = %L and t.estado in ('a_fazer', 'andamento')
-    and not exists (select 1 from public.checklist_dependencias d2 join public.checklist_tarefas t2 on t2.id = d2.depende_de
-      where d2.tarefa_id = t.id and t2.estado in ('a_fazer', 'andamento')) $$, testes.id('grande_t1')))
+  with recursive acima(id, estado) as (
+    select t.id, t.estado from public.checklist_dependencias d join public.checklist_tarefas t on t.id = d.tarefa_id
+    where d.depende_de = %L
+    union
+    select t.id, t.estado from acima a
+    join public.checklist_dependencias d on d.depende_de = a.id
+    join public.checklist_tarefas t on t.id = d.tarefa_id
+    where a.estado = 'nao_se_aplica'
+  )
+  select t.id, t.titulo
+  from (select distinct a.id from acima a where a.estado in ('a_fazer', 'andamento')) x
+  join public.checklist_tarefas t on t.id = x.id
+  where not exists (select 1 from public.checklist_dependencias d2 join public.checklist_tarefas t2 on t2.id = d2.depende_de
+    where d2.tarefa_id = t.id
+      and (t2.estado in ('a_fazer', 'andamento')
+        or (t2.estado = 'nao_se_aplica' and private.nao_se_aplica_espera(t2.id)))) $$, testes.id('grande_t1')))
   and not testes.varre('checklist_dependencias', format($$
   select 1 from public.checklist_dependencias d join public.checklist_tarefas t on t.id = d.depende_de
-  where d.tarefa_id = %L and t.estado in ('a_fazer', 'andamento') $$, testes.id('grande_t450')))
+  where d.tarefa_id = %L
+    and (t.estado in ('a_fazer', 'andamento') or (t.estado = 'nao_se_aplica' and private.nao_se_aplica_espera(t.id))) $$,
+    testes.id('grande_t450')))
+  and not testes.varre('checklist_tarefas', format($$
+  with recursive cadeia(id, estado) as (
+    select dt.id, dt.estado from public.checklist_dependencias d join public.checklist_tarefas dt on dt.id = d.depende_de
+    where d.tarefa_id = %L
+    union
+    select dt.id, dt.estado from cadeia c
+    join public.checklist_dependencias d on d.tarefa_id = c.id
+    join public.checklist_tarefas dt on dt.id = d.depende_de
+    where c.estado = 'nao_se_aplica'
+  )
+  select exists (select 1 from cadeia c where c.estado in ('a_fazer', 'andamento')) $$, testes.id('grande_t130')))
   and not testes.varre('checklist_tarefas', format($$
   select count(*), count(*) filter (where t.estado = 'feita'), count(*) filter (where t.estado = 'nao_se_aplica'),
     min(t.vence_em) filter (where t.estado in ('a_fazer', 'andamento'))

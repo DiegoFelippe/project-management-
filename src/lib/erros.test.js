@@ -202,6 +202,7 @@ describe('traduzirErroBanco com contexto', () => {
     // "Não se aplica": o motivo é obrigatório (22023) e vai até 500 letras (a regra da coluna, 23514).
     expect(msg('motivo_obrigatorio', '22023')).toBe('Conte por que esta tarefa não se aplica.')
     expect(MOTIVO_OBRIGATORIO).toBe('Conte por que esta tarefa não se aplica.')
+    expect(msg('ja_nao_se_aplica')).toBe('Esta tarefa já está como não se aplica. Para trocar o motivo, reabra e marque de novo.')
     expect(msg('new row for relation "checklist_tarefas" violates check constraint "checklist_tarefas_motivo_check"', '23514'))
       .toBe('O motivo vai até 500 letras.')
     // Fora do check-list, estado_invalido e o 23514 continuam os de sempre.

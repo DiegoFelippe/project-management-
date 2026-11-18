@@ -14,6 +14,8 @@ import { estaResolvida, feitaPorEm, rotuloDaSituacao } from './situacao'
 
 const MAXIMO_DA_NOTA = 500
 const MAXIMO_DO_MOTIVO = 500
+// Botão só com o ícone no celular (os secundários do rodapé): no toque, 44 px de largura.
+const SO_ICONE = 'max-sm:pointer-coarse:min-w-11'
 
 // A cor de cada situação (a bolinha das tarefas relacionadas), a mesma do fluxograma.
 const PINTA = {
@@ -93,7 +95,8 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
   const naoSeAplica = tarefa.estado === 'nao_se_aplica'
   const resolvida = feita || naoSeAplica
   const bloqueada = !resolvida && s.bloqueada
-  const podeNaoSeAplica = podeMarcar && !resolvida && !bloqueada
+  // A bloqueada também pode ser "não se aplica" (pedido do Diego, 18/11): as que dependem dela esperam o que ela espera.
+  const podeNaoSeAplica = podeMarcar && !resolvida
   const numeroDaEtapa = etapas.findIndex((e) => e.id === tarefa.etapa_id) + 1
   const etapa = etapas[numeroDaEtapa - 1]
   const porId = new Map(tarefas.map((t) => [t.id, t]))
@@ -132,8 +135,8 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
   let principal = null
   if (podeMarcar) {
     if (resolvida) [secundarias, principal] = [['reabrir'], 'nota']
-    else if (bloqueada) [secundarias, principal] = [tarefa.estado === 'andamento' ? ['voltar'] : [], 'nota']
     else if (comMotivo) [secundarias, principal] = [[], 'naoSeAplica']
+    else if (bloqueada) [secundarias, principal] = [tarefa.estado === 'andamento' ? ['voltar'] : [], 'nota']
     else [secundarias, principal] = [[tarefa.estado === 'andamento' ? 'voltar' : 'comecar'], 'feita']
   }
   // No celular os botões secundários ficam só com o ícone (o nome continua para o leitor de tela), como na janela do
@@ -152,12 +155,12 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
         <>
           <Button type="button" variant="outline" onClick={aoFechar} disabled={Boolean(acao)}>Cancelar</Button>
           {comMotivo && (
-            <Button type="button" variant="outline" disabled={Boolean(acao)} onClick={sairDoMotivo}>
+            <Button type="button" variant="outline" className={SO_ICONE} disabled={Boolean(acao)} onClick={sairDoMotivo}>
               <Undo2 /> <span className="max-sm:sr-only">Voltar</span>
             </Button>
           )}
           {secundarias.map((chave) => (
-            <Button key={chave} type="button" variant="outline" disabled={Boolean(acao)} onClick={() => agir(chave)}>
+            <Button key={chave} type="button" variant="outline" className={SO_ICONE} disabled={Boolean(acao)} onClick={() => agir(chave)}>
               {conteudoDoBotao(chave, true)}
             </Button>
           ))}
@@ -174,7 +177,7 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
         {bloqueada && podeMarcar && (
           <p className="bg-muted/60 flex items-start gap-2 rounded-xl border px-3 py-2 text-rotulo">
             <Lock className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span className="min-w-0">Ainda não dá para marcar: espera {juntar(s.espera.map((d) => d.titulo))}.</span>
+            <span className="min-w-0">Ainda não dá para marcar como feita: espera {juntar(s.espera.map((d) => d.titulo))}.</span>
           </p>
         )}
         <div className="grid gap-3 sm:grid-cols-2">
@@ -227,8 +230,10 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
               }} />
             {erroDoMotivo && <p id={`${idMotivo}-erro`} className="text-rotulo text-destructive">{erroDoMotivo}</p>}
             <p id={`${idMotivo}-ajuda`} className="text-muted-foreground text-legenda">
-              A tarefa fecha sem ser feita e libera as que dependem dela. O motivo fica na tarefa e no Histórico do cliente,
-              para a auditoria.
+              {bloqueada
+                ? `A tarefa fecha sem ser feita. As que dependem dela continuam esperando ${juntar(s.espera.map((d) => d.titulo))}.`
+                : 'A tarefa fecha sem ser feita e libera as que dependem dela.'}
+              {' '}O motivo fica na tarefa e no Histórico do cliente, para a auditoria.
             </p>
           </div>
         )}

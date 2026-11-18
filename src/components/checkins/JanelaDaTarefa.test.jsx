@@ -97,7 +97,7 @@ describe('JanelaDaTarefa', () => {
 
   it('bloqueada: só Salvar nota, com o aviso do que ela espera; vence hoje na situação', () => {
     const { botoes, janela } = abrir('t3')
-    expect(janela).toHaveTextContent('Ainda não dá para marcar: espera Análise do DRE.')
+    expect(janela).toHaveTextContent('Ainda não dá para marcar como feita: espera Análise do DRE.')
     expect(janela).toHaveTextContent('Vence hoje')
     expect(janela).toHaveTextContent('Provedor Alfa · etapa 2, Plano · opcional')
     expect(botoes()).toEqual(['Cancelar', 'Salvar nota'])
@@ -108,7 +108,7 @@ describe('JanelaDaTarefa', () => {
     const selos = janela.querySelector('[data-selos]')
     expect(selos).toHaveTextContent('Em andamento · espera 2 tarefas')
     expect(selos).not.toHaveTextContent('Bloqueada')
-    expect(janela).toHaveTextContent('Ainda não dá para marcar: espera Análise do DRE e Mapa de custos.')
+    expect(janela).toHaveTextContent('Ainda não dá para marcar como feita: espera Análise do DRE e Mapa de custos.')
     expect(botoes()).toEqual(['Cancelar', 'Voltar para a fazer', 'Salvar nota'])
   })
 
@@ -194,10 +194,36 @@ describe('JanelaDaTarefa', () => {
       expect(aoFechar).not.toHaveBeenCalled()
     })
 
-    it('bloqueada, feita ou para quem só acompanha: sem "Não se aplica"', () => {
-      expect(within(abrir('t3').janela).queryByRole('button', { name: 'Não se aplica' })).not.toBeInTheDocument()
+    it('feita ou para quem só acompanha: sem "Não se aplica"', () => {
       expect(within(abrir('t1').janela).queryByRole('button', { name: 'Não se aplica' })).not.toBeInTheDocument()
       expect(within(abrir('t2', { podeMarcar: false }).janela).queryByRole('button', { name: 'Não se aplica' })).not.toBeInTheDocument()
+    })
+
+    // Pedido do Diego (18/11): a bloqueada pode ser "não se aplica"; as que dependem dela esperam as dependências dela.
+    it('bloqueada: oferece "Não se aplica"; o motivo avisa que as que dependem dela continuam esperando', async () => {
+      const { janela, rodape, botoes, aoAgir } = abrir('t3')
+      expect(botoes()).toEqual(['Cancelar', 'Salvar nota'])
+      await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+      expect(janela).toHaveTextContent('A tarefa fecha sem ser feita. As que dependem dela continuam esperando Análise do DRE.')
+      expect(botoes()).toEqual(['Cancelar', 'Voltar', 'Não se aplica'])
+      await userEvent.type(within(janela).getByRole('textbox', { name: 'Motivo' }), 'Opcional e o cliente não quer')
+      await userEvent.click(within(rodape).getByRole('button', { name: 'Não se aplica' }))
+      expect(aoAgir).toHaveBeenCalledWith({ estado: 'nao_se_aplica', nota: '', motivo: 'Opcional e o cliente não quer' })
+    })
+
+    it('a que depende de uma "não se aplica" presa diz o que espera de verdade (a pendente da cadeia)', () => {
+      const presa = t('t8', 'e2', 'Inventário', { estado: 'nao_se_aplica', motivo: 'x', depende_de: ['t2'] })
+      const tarefas = [...TAREFAS, presa, t('t9', 'e2', 'Contagem', { depende_de: ['t8'] })]
+      const { janela, botoes } = abrir('t9', { tarefas })
+      expect(janela).toHaveTextContent('Ainda não dá para marcar como feita: espera Análise do DRE.')
+      expect(botoes()).toEqual(['Cancelar', 'Salvar nota'])
+    })
+
+    it('no celular os secundários só com ícone têm 44 px no toque', async () => {
+      const { janela, rodape } = abrir('t2')
+      expect(within(rodape).getByRole('button', { name: 'Começar' })).toHaveClass('max-sm:pointer-coarse:min-w-11')
+      await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+      expect(within(rodape).getByRole('button', { name: 'Voltar' })).toHaveClass('max-sm:pointer-coarse:min-w-11')
     })
 
     it('a que não se aplica: selo cinza com ícone próprio (nunca o check), o motivo, quem e quando; Reabrir volta para a fazer', async () => {

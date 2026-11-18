@@ -152,7 +152,8 @@ describe('escritas do check-list', () => {
   })
 
   it('recusa de tela velha (trocado, tirado, outro consultor, arquivado, sem acesso, dependência reaberta) diz para reler', async () => {
-    for (const codigo of ['checklist_encerrado', 'so_o_consultor_marca', 'sem_permissao', 'cliente_arquivado', 'tarefa_bloqueada']) {
+    for (const codigo of ['checklist_encerrado', 'so_o_consultor_marca', 'sem_permissao', 'cliente_arquivado', 'tarefa_bloqueada',
+      'ja_nao_se_aplica']) {
       rpcResponde(null, { code: 'P0001', message: codigo })
       expect((await marcarTarefa('t1', 'feita')).desatualizado, codigo).toBe(true)
       expect((await anotarTarefa('t1', 'nota')).desatualizado, codigo).toBe(true)

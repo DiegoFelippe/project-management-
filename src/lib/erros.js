@@ -111,6 +111,8 @@ const ERROS_MENSAGEM_BANCO = {
   tarefa_bloqueada: 'Esta tarefa depende de outras que ainda não foram feitas.',
   // "Não se aplica" sem motivo (ou só com espaços): 22023
   motivo_obrigatorio: MOTIVO_OBRIGATORIO,
+  // "Não se aplica" de novo, com outro motivo (a tela estava velha): trocar o motivo é reabrir e marcar de novo
+  ja_nao_se_aplica: 'Esta tarefa já está como não se aplica. Para trocar o motivo, reabra e marque de novo.',
   // Quadros do menu (pessoais e de time)
   time_invalido: 'Esse time não está mais disponível para você. Escolha outro time.',
   quadro_arquivado: 'Este quadro está arquivado: restaure antes de renomear.',

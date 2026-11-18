@@ -47,6 +47,9 @@ export function textoDoEvento(e) {
     case 'tarefa_nao_se_aplica': return e.tarefa
       ? `Tarefa não se aplica: ${e.tarefa}${e.motivo ? ` (${e.motivo})` : ''}`
       : 'Tarefa do check-list marcada como não se aplica'
+    case 'tarefa_reaberta': return e.tarefa
+      ? `Tarefa reaberta: ${e.tarefa} (desfeito o "não se aplica")`
+      : 'Tarefa do check-list reaberta (desfeito o "não se aplica")'
     default: return e.tipo
   }
 }

@@ -5,7 +5,7 @@ import { ListaVazia } from '@/components/comum/Tabela'
 import { Badge } from '@/components/ui/badge'
 import { juntar, plural } from '@/lib/nomes'
 import { BarraDeProgresso } from './CartaoDoModelo'
-import { diaCurto, entraNoFiltro, estaResolvida, feitaPorEm, mesmaSituacao } from './situacao'
+import { contagemDaEtapa, diaCurto, entraNoFiltro, estaResolvida, feitaPorEm, mesmaSituacao } from './situacao'
 
 const SELO_ANDAMENTO = 'border-transparent bg-accent text-primary-texto'
 const SELO_ATRASADA = 'border-transparent bg-destructive/10 text-destructive'
@@ -146,7 +146,7 @@ export default function ListaDoChecklist({ etapas, tarefas, situacoes, filtro, p
           </span>
           <h3 className="min-w-0 flex-1 text-subtitulo font-semibold break-words">{etapa.nome}</h3>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-legenda font-semibold tabular-nums">{resolvidas} de {todas.length}</span>
+            <span className="text-muted-foreground text-legenda font-semibold tabular-nums">{contagemDaEtapa(todas)}</span>
             <BarraDeProgresso pct={pct} rotulo={`Progresso de ${etapa.nome}`} className="h-1.5 w-20 sm:w-28" />
           </div>
         </header>

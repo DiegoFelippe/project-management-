@@ -10,6 +10,7 @@ import { aplicarModelo, modelosParaAplicar } from '@/data/checklists'
 import { somarDias } from '@/lib/calendario'
 import { formatarDia, hoje } from '@/lib/mes'
 import { plural } from '@/lib/nomes'
+import { progressoEmPalavras } from './situacao'
 
 // A linha de baixo de cada modelo na lista: tamanho, de onde vem e se é o atual ou do tipo do consultor.
 function detalheDoModelo(m, atualId) {
@@ -91,7 +92,7 @@ export default function JanelaAplicarModelo({ cliente, checklist = null, aoFecha
           <p className="bg-notice-soft flex items-start gap-2 rounded-xl px-3 py-2 text-rotulo">
             <TriangleAlert className="text-notice mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span className="min-w-0">
-              O check-list atual ({checklist.feitas} de {checklist.tarefas} feitas) é trocado pelo do modelo novo, começando do
+              O check-list atual ({progressoEmPalavras(checklist)}) é trocado pelo do modelo novo, começando do
               zero. O que já foi feito continua nos check-ins e no Histórico.
             </span>
           </p>

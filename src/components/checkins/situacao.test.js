@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  diaCurto, estaResolvida, feitaPorEm, mesmaSituacao, quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa,
+  contagemDaEtapa, diaCurto, estaResolvida, feitaPorEm, mesmaSituacao, naoSeAplicaEmPalavras, progressoEmPalavras,
+  quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa,
 } from './situacao'
 
 const HOJE = '2026-11-17'
@@ -64,6 +65,30 @@ describe('situacaoDaTarefa', () => {
     const naoSeAplica = t('nsa', { estado: 'nao_se_aplica', motivo: 'Não precisa' })
     const depende = t('d', { depende_de: ['feita', 'nsa'] })
     expect(situacaoDaTarefa(depende, { ...POR_ID, nsa: naoSeAplica }, HOJE)).toMatchObject({ cor: 'livre', bloqueada: false })
+  })
+
+  // Pedido do Diego (18/11): a bloqueada pode ser "não se aplica"; as que dependem dela esperam as dependências dela.
+  it('cadeia: C depende de B (não se aplica), B depende de A (pendente): C espera A; A feita libera C', () => {
+    const A = t('A')
+    const B = t('B', { estado: 'nao_se_aplica', motivo: 'x', depende_de: ['A'] })
+    const C = t('C', { depende_de: ['B'] })
+    expect(situacaoDaTarefa(C, { A, B, C }, HOJE)).toMatchObject({ cor: 'bloqueada', bloqueada: true })
+    expect(situacaoDaTarefa(C, { A, B, C }, HOJE).espera.map((x) => x.id)).toEqual(['A'])
+    expect(situacaoDaTarefa(C, { A: { ...A, estado: 'feita' }, B, C }, HOJE)).toMatchObject({ cor: 'livre', espera: [] })
+    // Reaberta B (pendente): C espera B.
+    expect(situacaoDaTarefa(C, { A, B: { ...B, estado: 'a_fazer' }, C }, HOJE).espera.map((x) => x.id)).toEqual(['B'])
+  })
+
+  it('cadeia longa e em losango: atravessa várias que não se aplicam, sem repetir quem ela espera', () => {
+    const A = t('A', { estado: 'andamento' })
+    const X = t('X', { estado: 'nao_se_aplica', depende_de: ['A'] })
+    const Y = t('Y', { estado: 'nao_se_aplica', depende_de: ['A', 'X'] })
+    const F = t('F', { estado: 'feita', depende_de: ['A'] })
+    const C = t('C', { depende_de: ['X', 'Y', 'F'] })
+    const s = situacaoDaTarefa(C, { A, X, Y, F, C }, HOJE)
+    expect(s.espera.map((x) => x.id)).toEqual(['A'])
+    // A feita interrompe a cadeia (feita conta sozinha, como antes).
+    expect(situacaoDaTarefa(t('D', { depende_de: ['F'] }), { A, F }, HOJE).bloqueada).toBe(false)
   })
 
   it('estaResolvida: feita ou não se aplica', () => {
@@ -133,6 +158,21 @@ describe('rotuloDaSituacao', () => {
       const s = situacao(caso)
       if (comeco[s.cor]) expect(rotulo(caso), JSON.stringify(caso)).toMatch(new RegExp(`^${comeco[s.cor]}`))
     }
+  })
+})
+
+describe('progresso em palavras', () => {
+  it('"3 de 5 feitas"; com alguma que não se aplica, "resolvidas" e a concordância certa', () => {
+    expect(progressoEmPalavras({ tarefas: 5, feitas: 3 })).toBe('3 de 5 feitas')
+    expect(progressoEmPalavras({ tarefas: 5, feitas: 3, nao_se_aplica: 1 })).toBe('4 de 5 resolvidas: 3 feitas, 1 não se aplica')
+    expect(progressoEmPalavras({ tarefas: 6, feitas: 1, nao_se_aplica: 2 })).toBe('3 de 6 resolvidas: 1 feita, 2 não se aplicam')
+    expect(naoSeAplicaEmPalavras(1)).toBe('1 não se aplica')
+    expect(naoSeAplicaEmPalavras(1200)).toBe('1.200 não se aplicam')
+  })
+
+  it('contagemDaEtapa: "1 de 3 feitas" ou, com alguma que não se aplica, "2 de 3 resolvidas"', () => {
+    expect(contagemDaEtapa([t('a', { estado: 'feita' }), t('b'), t('c')])).toBe('1 de 3 feitas')
+    expect(contagemDaEtapa([t('a', { estado: 'feita' }), t('b', { estado: 'nao_se_aplica' }), t('c')])).toBe('2 de 3 resolvidas')
   })
 })
 

@@ -1,7 +1,9 @@
 // Situação de uma tarefa do check-list do cliente (a mesma conta na lista, no fluxograma e na janela da tarefa; os números
-// do resumo vêm do banco com a mesma regra): Feita · Não se aplica · Em andamento · A fazer · Bloqueada (alguma de que
-// depende não está resolvida) · Atrasada (pendente e o dia já passou) · Vence hoje. Resolvida = feita ou não se aplica
-// (as duas liberam as que dependem dela); pendente = a fazer ou em andamento. `hoje` é o dia em São Paulo ('aaaa-mm-dd'),
+// do resumo vêm do banco com a mesma regra): Feita · Não se aplica · Em andamento · A fazer · Bloqueada (espera alguma
+// pendente) · Atrasada (pendente e o dia já passou) · Vence hoje. Resolvida = feita ou não se aplica; pendente = a fazer
+// ou em andamento. Pela cadeia (pedido do Diego, 18/11: a bloqueada pode ser "não se aplica"; as que dependem dela esperam
+// as dependências dela): a dependência feita libera; a que não se aplica só libera quando as dependências dela também
+// estão resolvidas, e a tarefa espera as pendentes que ficam atrás dela. `hoje` é o dia em São Paulo ('aaaa-mm-dd'),
 // vindo de quem chama; a conta dos dias é em UTC, então o fuso do computador não muda nada.
 import { diaEmSP } from '@/lib/calendario'
 import { formatarDia } from '@/lib/mes'
@@ -16,6 +18,45 @@ const emUtc = (dia) => {
 // Feita ou não se aplica: a tarefa está fechada.
 export const estaResolvida = (tarefa) => tarefa.estado === 'feita' || tarefa.estado === 'nao_se_aplica'
 
+const numero = (n) => n.toLocaleString('pt-BR')
+
+// "1 não se aplica" ou "2 não se aplicam" (a mesma concordância em todo lugar).
+export const naoSeAplicaEmPalavras = (n) => `${numero(n)} ${n === 1 ? 'não se aplica' : 'não se aplicam'}`
+
+// O progresso em palavras (caixa do modelo, Tirar e Trocar modelo): "3 de 5 feitas" ou, com alguma que não se aplica,
+// "4 de 5 resolvidas: 3 feitas, 1 não se aplica" (resolvida = feita ou não se aplica; as duas contam no %).
+export function progressoEmPalavras({ tarefas, feitas, nao_se_aplica: naoSeAplica = 0 }) {
+  if (!naoSeAplica) return `${numero(feitas)} de ${numero(tarefas)} feitas`
+  const partes = `${plural(feitas, 'feita', 'feitas')}, ${naoSeAplicaEmPalavras(naoSeAplica)}`
+  return `${numero(feitas + naoSeAplica)} de ${numero(tarefas)} resolvidas: ${partes}`
+}
+
+// A conta de uma etapa (cabeçalho na lista e no fluxograma): "1 de 3 feitas" ou, com alguma que não se aplica, "2 de 3
+// resolvidas".
+export function contagemDaEtapa(tarefasDaEtapa) {
+  const resolvidas = tarefasDaEtapa.filter(estaResolvida).length
+  const palavra = tarefasDaEtapa.some((t) => t.estado === 'nao_se_aplica') ? 'resolvidas' : 'feitas'
+  return `${numero(resolvidas)} de ${numero(tarefasDaEtapa.length)} ${palavra}`
+}
+
+// As pendentes que a tarefa espera, pela cadeia: as dependências pendentes e, atrás das que não se aplicam, as pendentes
+// delas (cada uma uma vez, na ordem em que aparecem). A feita interrompe a cadeia.
+function pendentesPelaCadeia(tarefa, pegar) {
+  const vistas = new Set()
+  const espera = []
+  const fila = [...(tarefa.depende_de ?? [])]
+  while (fila.length) {
+    const id = fila.shift()
+    if (vistas.has(id)) continue
+    vistas.add(id)
+    const d = pegar(id)
+    if (!d || d.estado === 'feita') continue
+    if (d.estado === 'nao_se_aplica') fila.push(...(d.depende_de ?? []))
+    else espera.push(d)
+  }
+  return espera
+}
+
 // Se a tarefa entra no filtro "Mostrar" da barra: todas; pendentes (a fazer ou em andamento); feitas; não se aplica.
 export function entraNoFiltro(tarefa, filtro) {
   if (filtro === 'pendentes') return !estaResolvida(tarefa)
@@ -29,7 +70,7 @@ export function entraNoFiltro(tarefa, filtro) {
 export function situacaoDaTarefa(tarefa, porId, hoje) {
   const resolvida = estaResolvida(tarefa)
   const pegar = porId instanceof Map ? (id) => porId.get(id) : (id) => porId?.[id]
-  const espera = resolvida ? [] : (tarefa.depende_de ?? []).map(pegar).filter((d) => d && !estaResolvida(d))
+  const espera = resolvida ? [] : pendentesPelaCadeia(tarefa, pegar)
   const faltam = tarefa.vence_em && hoje ? Math.round((emUtc(tarefa.vence_em) - emUtc(hoje)) / DIA_MS) : null
   const bloqueada = espera.length > 0
   const atrasada = !resolvida && faltam !== null && faltam < 0

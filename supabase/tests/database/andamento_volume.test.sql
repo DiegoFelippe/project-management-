@@ -291,14 +291,19 @@ select ok(not testes.varre('checklist_tarefas', format($$
   where t.checklist_id = %L and t.estado in ('a_fazer', 'andamento')
     and not exists (select 1 from public.checklist_dependencias d
       join public.checklist_tarefas dt on dt.id = d.depende_de
-      where d.tarefa_id = t.id and dt.estado in ('a_fazer', 'andamento'))
+      where d.tarefa_id = t.id
+        and (dt.estado in ('a_fazer', 'andamento')
+          or (dt.estado = 'nao_se_aplica' and private.nao_se_aplica_espera(dt.id))))
   order by t.vence_em, t.posicao limit 1 $$, testes.id('checklist_atrasado')))
   and not testes.varre('checklist_dependencias', format($$
   select 1 from public.checklist_tarefas t
   where t.checklist_id = %L and t.estado in ('a_fazer', 'andamento')
     and not exists (select 1 from public.checklist_dependencias d
       join public.checklist_tarefas dt on dt.id = d.depende_de
-      where d.tarefa_id = t.id and dt.estado in ('a_fazer', 'andamento')) $$, testes.id('checklist_atrasado'))),
+      where d.tarefa_id = t.id
+        and (dt.estado in ('a_fazer', 'andamento')
+          or (dt.estado = 'nao_se_aplica' and private.nao_se_aplica_espera(dt.id)))) $$,
+    testes.id('checklist_atrasado'))),
   'atrasadas e próxima tarefa de cada linha: por índice, sem Seq Scan nas tarefas e dependências');
 select ok(not testes.ordena(format($$
   select jsonb_build_object('titulo', t.titulo, 'vence_em', t.vence_em)
@@ -306,7 +311,9 @@ select ok(not testes.ordena(format($$
   where t.checklist_id = %L and t.estado in ('a_fazer', 'andamento')
     and not exists (select 1 from public.checklist_dependencias d
       join public.checklist_tarefas dt on dt.id = d.depende_de
-      where d.tarefa_id = t.id and dt.estado in ('a_fazer', 'andamento'))
+      where d.tarefa_id = t.id
+        and (dt.estado in ('a_fazer', 'andamento')
+          or (dt.estado = 'nao_se_aplica' and private.nao_se_aplica_espera(dt.id))))
   order by t.vence_em, t.posicao limit 1 $$, testes.id('checklist_atrasado'))),
   'a próxima tarefa sai na ordem do índice (vencimento e posição), sem ordenar: para na primeira livre');
 
