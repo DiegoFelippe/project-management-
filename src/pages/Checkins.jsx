@@ -15,17 +15,21 @@ function subtitulo(perfil) {
   return 'Os check-lists que a Central e a gestão preparam. Em cada cliente você segue o modelo que foi aplicado.'
 }
 
-// Item "Check-ins" do trilho, para todos os papéis: abas de página guardadas em ?aba=. Por enquanto só Modelos; o
-// Andamento dos clientes entra na frente dela. O cabeçalho não tem botões: a ação principal fica no fim da barra de
-// filtros de cada aba.
+// As seções da página: com uma só, o conteúdo vem direto (uma barra com uma aba só não diz nada — pedido do Diego,
+// 17/11); com duas ou mais, abas de página guardadas em ?aba= (a primeira é a padrão).
+export function SecoesDeCheckins({ secoes }) {
+  if (secoes.length === 1) return secoes[0].conteudo
+  return <AbasDoCliente rotulo="Seções de Check-ins" abas={secoes} />
+}
+
+// Item "Check-ins" do trilho, para todos os papéis. Por enquanto só Modelos; o Andamento dos clientes entra na frente
+// (e aí as abas aparecem). O cabeçalho não tem botões: a ação principal fica no fim da barra de filtros de cada seção.
 export default function Checkins() {
   const { perfil } = useAuth()
   return (
     <>
       <Cabecalho titulo="Check-ins" descricao={subtitulo(perfil)} />
-      <AbasDoCliente rotulo="Seções de Check-ins" abas={[
-        { id: 'modelos', rotulo: 'Modelos', conteudo: <ModelosDeCheckin perfil={perfil} /> },
-      ]} />
+      <SecoesDeCheckins secoes={[{ id: 'modelos', rotulo: 'Modelos', conteudo: <ModelosDeCheckin perfil={perfil} /> }]} />
     </>
   )
 }
