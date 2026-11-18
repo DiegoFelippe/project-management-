@@ -4,6 +4,7 @@ import {
   anotarTarefa,
   aplicarModelo,
   lerChecklist,
+  listarAndamento,
   marcarTarefa,
   modelosParaAplicar,
   mudarInicio,
@@ -47,11 +48,39 @@ describe('leituras do check-list (funções do banco)', () => {
     expect(await usoDoModelo('m2')).toBeNull()
   })
 
+  it('listarAndamento pede a página ao banco com os filtros da barra e devolve { itens, total }', async () => {
+    const itens = [{ cliente: { id: 'k1', nome: 'Padaria' }, checklist: null }]
+    rpcResponde({ itens, total: 16 })
+    expect(await listarAndamento({ consultoriaId: 'c1', consultorId: 'p1', situacao: 'com_atraso', busca: ' dre ', pagina: 2 }))
+      .toEqual({ itens, total: 16 })
+    expect(supabase.rpc).toHaveBeenCalledWith('andamento_dos_clientes', {
+      p_consultoria: 'c1', p_consultor: 'p1', p_situacao: 'com_atraso', p_busca: 'dre', p_pagina: 2,
+    })
+  })
+
+  it('listarAndamento sem filtros: todos, página 1 e o resto nulo', async () => {
+    rpcResponde({ itens: [], total: 0 })
+    expect(await listarAndamento()).toEqual({ itens: [], total: 0 })
+    expect(supabase.rpc).toHaveBeenCalledWith('andamento_dos_clientes', {
+      p_consultoria: null, p_consultor: null, p_situacao: 'todos', p_busca: null, p_pagina: 1,
+    })
+    await listarAndamento({ consultoriaId: '', consultorId: '', busca: '   ' })
+    expect(supabase.rpc).toHaveBeenLastCalledWith('andamento_dos_clientes', {
+      p_consultoria: null, p_consultor: null, p_situacao: 'todos', p_busca: null, p_pagina: 1,
+    })
+  })
+
+  it('listarAndamento: página que deixou de existir volta com foraDaFaixa', async () => {
+    rpcResponde({ itens: [], total: 15 })
+    expect(await listarAndamento({ pagina: 2 })).toEqual({ itens: [], total: 15, foraDaFaixa: true })
+  })
+
   it('erro do banco nas leituras sobe', async () => {
     rpcResponde(null, { code: 'P0001', message: 'sem_permissao' })
     await expect(lerChecklist('k1')).rejects.toEqual({ code: 'P0001', message: 'sem_permissao' })
     await expect(modelosParaAplicar({ clienteId: 'k1' })).rejects.toEqual({ code: 'P0001', message: 'sem_permissao' })
     await expect(usoDoModelo('m1')).rejects.toEqual({ code: 'P0001', message: 'sem_permissao' })
+    await expect(listarAndamento()).rejects.toEqual({ code: 'P0001', message: 'sem_permissao' })
   })
 })
 

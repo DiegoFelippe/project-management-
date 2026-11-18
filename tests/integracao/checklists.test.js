@@ -1,7 +1,7 @@
-// O check-list do cliente contra o Supabase local de verdade: roda as funções de src/data/checklists.js e
-// src/data/checkins.js (as mesmas chamadas que o app faz) como cada tipo de usuário. Pega o que um mock esconde: função
-// que a API não enxerga, permissão que falta, a lista de check-ins com as tarefas embutidas e a tradução do erro que o
-// banco devolve de verdade.
+// O check-list do cliente contra o Supabase local de verdade: roda as funções de src/data/checklists.js,
+// src/data/checkins.js e o Andamento (as mesmas chamadas que o app faz) como cada tipo de usuário. Pega o que um mock
+// esconde: função que a API não enxerga, permissão que falta, a lista de check-ins com as tarefas embutidas e a tradução
+// do erro que o banco devolve de verdade.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   clienteAdmin,
@@ -23,8 +23,11 @@ vi.mock('@/lib/supabase', () => ({
   }),
 }))
 
-const { anotarTarefa, aplicarModelo, lerChecklist, marcarTarefa, modelosParaAplicar, mudarInicio, tirarModelo, usoDoModelo } =
-  await import('../../src/data/checklists.js')
+const {
+  anotarTarefa, aplicarModelo, lerChecklist, listarAndamento, marcarTarefa, modelosParaAplicar, mudarInicio, tirarModelo,
+  usoDoModelo,
+} = await import('../../src/data/checklists.js')
+const { indicadoresDeCheckins } = await import('../../src/data/indicadores.js')
 const { fazerCheckin, fazerCheckout, listarCheckins, meuCheckinAberto, tarefasDoCheckin } =
   await import('../../src/data/checkins.js')
 const { salvarModelo } = await import('../../src/data/modelos.js')
@@ -128,10 +131,38 @@ describe('check-list do cliente contra o banco de verdade', () => {
     expect(lido.tarefas[2].depende_de).toEqual([tarefa['Análise do DRE'], tarefa['Mapa de custos']])
   })
 
+  it('o Andamento pela API: a gestão e o consultor veem a linha com o check-list; outra consultoria, não', async () => {
+    entrar('gestor')
+    expect(await listarAndamento({ busca: marca })).toEqual({
+      itens: [{
+        cliente: { id: clienteId, nome: `${marca} Cliente`, cidade: null, uf: null },
+        consultor: expect.objectContaining({ id: pessoas.pessoa.id }),
+        consultoria: null,
+        pode_aplicar: true,
+        checklist: {
+          id: checklistId, modelo_nome: `${marca} Modelo um`, tarefas: 3, feitas: 0, pct: 0, atrasadas: 0,
+          proxima: { titulo: 'Análise do DRE', vence_em: somarDias(hoje(), 5) },
+        },
+      }],
+      total: 1,
+    })
+    expect(await listarAndamento({ busca: marca, situacao: 'sem_modelo' })).toEqual({ itens: [], total: 0 })
+    expect(await indicadoresDeCheckins()).toEqual({
+      recorte: 'consultoria', clientes: 1, com_modelo: 1, progresso_medio: 0, atrasadas: 0, vencem_7_dias: 1,
+    })
+    entrar('pessoa')
+    expect((await listarAndamento()).itens.map((l) => [l.cliente.id, l.pode_aplicar])).toEqual([[clienteId, false]])
+    entrar('central')
+    expect((await listarAndamento({ consultoriaId: A })).itens[0].consultoria).toMatchObject({ id: A })
+    entrar('gestorB')
+    expect(await listarAndamento({ busca: marca })).toEqual({ itens: [], total: 0 })
+    expect((await indicadoresDeCheckins()).clientes).toBe(0)
+  })
+
   it('marcar sem check-in aberto: fica feita, fora de uma sessão, e diz o que liberou', async () => {
     entrar('pessoa')
     expect(await marcarTarefa(tarefa['Mapa de custos'], 'feita')).toEqual({
-      erro: 'Esta tarefa depende de outras que ainda não foram feitas.',
+      erro: 'Esta tarefa depende de outras que ainda não foram feitas.', desatualizado: true,
     })
     const feita = await marcarTarefa(tarefa['Análise do DRE'], 'feita')
     expect(feita).toMatchObject({
@@ -174,7 +205,8 @@ describe('check-list do cliente contra o banco de verdade', () => {
 
   it('quem só acompanha não marca; o consultor escreve a nota; os erros vêm traduzidos', async () => {
     entrar('gestor')
-    expect(await marcarTarefa(tarefa['Plano de ação'], 'feita')).toEqual({ erro: 'Só o consultor do cliente marca as tarefas.' })
+    expect(await marcarTarefa(tarefa['Plano de ação'], 'feita'))
+      .toEqual({ erro: 'Só o consultor do cliente marca as tarefas.', desatualizado: true })
     expect((await lerChecklist(clienteId)).pode_marcar).toBe(false)
     entrar('pessoa')
     expect(await anotarTarefa(tarefa['Plano de ação'], ' Esperando o DRE ')).toEqual({ erro: null })
@@ -198,7 +230,7 @@ describe('check-list do cliente contra o banco de verdade', () => {
     expect((await lerChecklist(clienteId)).checklist.id).toBe(trocado.id)
     entrar('pessoa')
     expect(await marcarTarefa(tarefa['Plano de ação'], 'feita')).toEqual({
-      erro: 'Este check-list foi trocado ou tirado. Atualize a página para ver o atual.',
+      erro: 'Este check-list foi trocado ou tirado. Atualize a página para ver o atual.', desatualizado: true,
     })
 
     entrar('gestor')

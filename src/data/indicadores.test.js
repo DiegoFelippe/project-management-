@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import {
-  indicadoresDeClientes, indicadoresDeConsultorias, indicadoresDeIntegracoes, indicadoresDeModelos, indicadoresDeTimes,
-  indicadoresDeUsuarios,
+  indicadoresDeCheckins, indicadoresDeClientes, indicadoresDeConsultorias, indicadoresDeIntegracoes, indicadoresDeModelos,
+  indicadoresDeTimes, indicadoresDeUsuarios,
 } from './indicadores'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { rpc: vi.fn() } }))
@@ -62,6 +62,15 @@ describe('cartões de números: uma chamada ao banco por tela', () => {
     expect(supabase.rpc).toHaveBeenLastCalledWith('indicadores_de_modelos', { p_consultoria: 'k1' })
     await indicadoresDeModelos()
     expect(supabase.rpc).toHaveBeenLastCalledWith('indicadores_de_modelos', { p_consultoria: null })
+  })
+
+  it('andamento dos check-ins: a consultoria e o consultor do filtro (vazio = todos)', async () => {
+    await indicadoresDeCheckins({ consultoriaId: 'k1', consultorId: 'p1' })
+    expect(supabase.rpc).toHaveBeenLastCalledWith('indicadores_de_checkins', { p_consultoria: 'k1', p_consultor: 'p1' })
+    await indicadoresDeCheckins({ consultoriaId: '', consultorId: '' })
+    expect(supabase.rpc).toHaveBeenLastCalledWith('indicadores_de_checkins', { p_consultoria: null, p_consultor: null })
+    await indicadoresDeCheckins()
+    expect(supabase.rpc).toHaveBeenLastCalledWith('indicadores_de_checkins', { p_consultoria: null, p_consultor: null })
   })
 
   it('erro do banco sobe', async () => {

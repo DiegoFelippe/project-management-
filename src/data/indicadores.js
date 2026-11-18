@@ -32,6 +32,12 @@ export const indicadoresDeConsultorias = ({ mes } = {}) => ler('indicadores_de_c
 export const indicadoresDeModelos = ({ consultoriaId } = {}) =>
   ler('indicadores_de_modelos', { p_consultoria: consultoriaId || null })
 
+// Aba Andamento de Check-ins: { recorte: 'tudo' | 'consultoria' | 'pessoa', clientes, com_modelo, progresso_medio (% ou
+// null sem check-list), atrasadas, vencem_7_dias }. Seguem a consultoria (Central) e o consultor do filtro; o consultor
+// sempre vê os dele (o banco ignora o filtro).
+export const indicadoresDeCheckins = ({ consultoriaId, consultorId } = {}) =>
+  ler('indicadores_de_checkins', { p_consultoria: consultoriaId || null, p_consultor: consultorId || null })
+
 // { conectadas, com_erro, nao_configuradas, ultimo_teste }.
 export const indicadoresDeIntegracoes = ({ consultoriaId } = {}) =>
   ler('indicadores_de_integracoes', { p_consultoria: consultoriaId || null })

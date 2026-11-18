@@ -6,24 +6,47 @@ import Checkins, { SecoesDeCheckins } from './Checkins'
 vi.mock('@/components/modelos/ModelosDeCheckin', () => ({
   default: ({ perfil }) => <p>Modelos para {perfil.papel}</p>,
 }))
+vi.mock('@/components/checkins/AndamentoDosClientes', () => ({
+  default: ({ perfil }) => <p>Andamento para {perfil.papel}</p>,
+}))
 
 const central = { id: 'u1', papel: 'central', consultoria_id: null }
 const gestor = { id: 'g1', papel: 'gestor', consultoria_id: 'c1', consultoria: { nome: 'STI Consult' } }
 const consultor = { id: 'p1', papel: 'pessoa', consultoria_id: 'c1', consultoria: { nome: 'STI Consult' } }
 
 describe('Check-ins', () => {
-  it('cabeçalho "Check-ins" sem botões; com uma seção só (Modelos), sem barra de abas: o conteúdo vem direto', () => {
+  it('cabeçalho "Check-ins" sem botões; abas Andamento (a primeira, aberta) e Modelos', () => {
     renderizarTela(<Checkins />, { perfil: central, endereco: '/checkins' })
     const titulo = screen.getByRole('heading', { level: 1, name: 'Check-ins' })
     expect(within(titulo.closest('.mb-5')).queryByRole('button')).not.toBeInTheDocument()
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
-    expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument()
-    expect(screen.getByText('Modelos para central')).toBeInTheDocument()
+    const abas = screen.getByRole('tablist', { name: 'Seções de Check-ins' })
+    expect(within(abas).getAllByRole('tab').map((a) => a.textContent)).toEqual(['Andamento', 'Modelos'])
+    expect(screen.getByRole('tab', { name: 'Andamento' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('Andamento para central')
+    expect(screen.queryByText('Modelos para central')).not.toBeInTheDocument()
   })
 
-  it('?aba=modelos (o endereço antigo) continua mostrando os Modelos', () => {
-    renderizarTela(<Checkins />, { perfil: gestor, endereco: '/checkins?aba=modelos' })
-    expect(screen.getByText('Modelos para gestor')).toBeInTheDocument()
+  it('o consultor também vê o Andamento (os clientes dele) e os Modelos', () => {
+    renderizarTela(<Checkins />, { perfil: consultor, endereco: '/checkins' })
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('Andamento para pessoa')
+    expect(screen.getByRole('tab', { name: 'Modelos' })).toBeInTheDocument()
+  })
+
+  it('?aba=modelos abre os Modelos; ?aba=andamento, o Andamento', async () => {
+    const { unmount } = renderizarTela(<Checkins />, { perfil: gestor, endereco: '/checkins?aba=modelos' })
+    expect(screen.getByRole('tab', { name: 'Modelos' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('Modelos para gestor')
+    unmount()
+    renderizarTela(<Checkins />, { perfil: gestor, endereco: '/checkins?aba=andamento' })
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('Andamento para gestor')
+  })
+
+  it('com uma seção só, sem barra de abas: o conteúdo vem direto', () => {
+    renderizarTela(<SecoesDeCheckins secoes={[{ id: 'modelos', rotulo: 'Modelos', conteudo: <p>Os modelos</p> }]} />,
+      { perfil: central, endereco: '/checkins' })
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument()
+    expect(screen.getByText('Os modelos')).toBeInTheDocument()
   })
 
   it('com duas seções ou mais, a barra de abas "Seções de Check-ins" aparece (a primeira aberta; ?aba= escolhe)', () => {
@@ -41,14 +64,17 @@ describe('Check-ins', () => {
     expect(screen.getByRole('tabpanel')).toHaveTextContent('Os modelos')
   })
 
-  it('o subtítulo diz o que cada papel faz com os modelos', () => {
+  it('o subtítulo diz o que cada papel acompanha e faz com os modelos', () => {
     const { unmount } = renderizarTela(<Checkins />, { perfil: central, endereco: '/checkins' })
-    expect(screen.getByText(/Você cria modelos para todas as consultorias ou para uma só/)).toBeInTheDocument()
+    expect(screen.getByText(/^O andamento do check-list em cada cliente.*Você cria modelos para todas as consultorias ou para uma só/))
+      .toBeInTheDocument()
     unmount()
     const outro = renderizarTela(<Checkins />, { perfil: gestor, endereco: '/checkins' })
-    expect(screen.getByText(/os da Central você duplica e adapta/)).toBeInTheDocument()
+    expect(screen.getByText(/^O andamento do check-list nos clientes da consultoria.*os da Central você duplica e adapta/))
+      .toBeInTheDocument()
     outro.unmount()
     renderizarTela(<Checkins />, { perfil: consultor, endereco: '/checkins' })
-    expect(screen.getByText(/Em cada cliente você segue o modelo que foi aplicado/)).toBeInTheDocument()
+    expect(screen.getByText(/^O que falta em cada cliente seu.*Em cada cliente você segue o modelo que foi aplicado/))
+      .toBeInTheDocument()
   })
 })

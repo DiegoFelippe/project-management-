@@ -874,15 +874,17 @@ select is((select (encerrado_em is not null, motivo)::text from public.cliente_c
 -- ── Uso do modelo ────────────────────────────────────────────────────────────
 -- m_todas tem check-list ativo em c_troca (A) e c_b (B); o de c_c (C) se encerrou.
 
+-- "Uma consultoria nunca vê clientes de outra" vale também para a contagem: cada um conta só os que vê (revisão da
+-- Task 2; o gatilho modelo_em_uso continua olhando todos para não deixar apagar).
 select is(testes.chamar('gestor_a', format('public.uso_do_modelo(%L)', testes.id('m_todas'))),
-  '{"clientes": 2, "nomes": ["Cliente c_troca"]}'::jsonb,
-  'a gestão: conta todos os clientes que usam, mas só dá os nomes que ela vê');
+  '{"clientes": 1, "nomes": ["Cliente c_troca"]}'::jsonb,
+  'a gestão: conta e nomeia só os clientes da consultoria dela (o de B não entra nem no número)');
 select is(testes.chamar('central1', format('public.uso_do_modelo(%L)', testes.id('m_todas'))),
-  '{"clientes": 2, "nomes": ["Cliente c_b", "Cliente c_troca"]}'::jsonb, 'a Central vê todos os nomes');
-select is(testes.chamar('pessoa_a2', format('public.uso_do_modelo(%L)', testes.id('m_todas'))) -> 'nomes',
-  '["Cliente c_troca"]'::jsonb, 'o consultor: só os clientes dele');
-select is(testes.chamar('pessoa_a', format('public.uso_do_modelo(%L)', testes.id('m_todas'))) -> 'nomes',
-  '[]'::jsonb, 'quem não atende nenhum não vê nome');
+  '{"clientes": 2, "nomes": ["Cliente c_b", "Cliente c_troca"]}'::jsonb, 'a Central conta e vê todos');
+select is(testes.chamar('pessoa_a2', format('public.uso_do_modelo(%L)', testes.id('m_todas'))),
+  '{"clientes": 1, "nomes": ["Cliente c_troca"]}'::jsonb, 'o consultor: só os clientes dele');
+select is(testes.chamar('pessoa_a', format('public.uso_do_modelo(%L)', testes.id('m_todas'))),
+  '{"clientes": 0, "nomes": []}'::jsonb, 'quem não atende nenhum: zero, sem nomes');
 select is(testes.chamar('gestor_a', format('public.uso_do_modelo(%L)', testes.id('m_b'))), null::jsonb,
   'modelo que não vê: nulo');
 select is(testes.chamar('a_senha', format('public.uso_do_modelo(%L)', testes.id('m_todas'))) ->> 'erro',

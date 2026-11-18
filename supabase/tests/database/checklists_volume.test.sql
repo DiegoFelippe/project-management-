@@ -8,7 +8,7 @@
 -- cresce com o número de check-lists. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(22);
+select plan(23);
 
 create schema testes;
 grant usage on schema testes to authenticated;
@@ -259,6 +259,8 @@ select is(public.uso_do_modelo(testes.id('modelo')) -> 'nomes',
     join public.cliente_checklists cl on cl.cliente_id = c.id and cl.encerrado_em is null and cl.modelo_id = testes.id('modelo')
     where c.consultoria_id = testes.id('c1') order by c.nome, c.id limit 5) x),
   'a gestão: os 5 primeiros nomes da consultoria dela');
+select is((public.uso_do_modelo(testes.id('modelo')) ->> 'clientes')::int, 100,
+  'e conta só os 100 clientes da consultoria dela (a Central conta os 5.000)');
 select diag('gestor, lista: ' || testes.media_ms($$select public.modelos_da_lista('ativos', 'volume check-list')$$)
   || ' ms; números: ' || testes.media_ms('select public.indicadores_de_modelos()') || ' ms; uso: '
   || testes.media_ms(format('select public.uso_do_modelo(%L)', testes.id('modelo'))) || ' ms');

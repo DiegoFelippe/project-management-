@@ -1,18 +1,19 @@
 import { useAuth } from '@/auth/useAuth'
+import AndamentoDosClientes from '@/components/checkins/AndamentoDosClientes'
 import AbasDoCliente from '@/components/clientes/AbasDoCliente'
 import Cabecalho from '@/components/comum/Cabecalho'
 import ModelosDeCheckin from '@/components/modelos/ModelosDeCheckin'
 import { veTudo } from '@/lib/papeis'
 
-// O que cada papel faz com os modelos (Quem faz o quê, no desenho dos modelos de check-in).
+// O que cada papel acompanha no Andamento e faz com os modelos (Quem faz o quê, no desenho dos modelos de check-in).
 function subtitulo(perfil) {
   if (veTudo(perfil)) {
-    return 'Os check-lists que o consultor segue em cada cliente. Você cria modelos para todas as consultorias ou para uma só.'
+    return 'O andamento do check-list em cada cliente e os modelos que o consultor segue. Você cria modelos para todas as consultorias ou para uma só.'
   }
   if (['admin', 'gestor'].includes(perfil.papel)) {
-    return 'Os modelos da Central e os da sua consultoria. Você cria e edita os da consultoria; os da Central você duplica e adapta.'
+    return 'O andamento do check-list nos clientes da consultoria e os modelos: os da Central e os seus. Você cria e edita os da consultoria; os da Central você duplica e adapta.'
   }
-  return 'Os check-lists que a Central e a gestão preparam. Em cada cliente você segue o modelo que foi aplicado.'
+  return 'O que falta em cada cliente seu e os check-lists que a Central e a gestão preparam. Em cada cliente você segue o modelo que foi aplicado.'
 }
 
 // As seções da página: com uma só, o conteúdo vem direto (uma barra com uma aba só não diz nada — pedido do Diego,
@@ -22,14 +23,17 @@ export function SecoesDeCheckins({ secoes }) {
   return <AbasDoCliente rotulo="Seções de Check-ins" abas={secoes} />
 }
 
-// Item "Check-ins" do trilho, para todos os papéis. Por enquanto só Modelos; o Andamento dos clientes entra na frente
-// (e aí as abas aparecem). O cabeçalho não tem botões: a ação principal fica no fim da barra de filtros de cada seção.
+// Item "Check-ins" do trilho, para todos os papéis: Andamento (a primeira; o consultor vê os clientes dele) e Modelos. O
+// cabeçalho não tem botões: a ação principal fica no fim da barra de filtros de cada seção.
 export default function Checkins() {
   const { perfil } = useAuth()
   return (
     <>
       <Cabecalho titulo="Check-ins" descricao={subtitulo(perfil)} />
-      <SecoesDeCheckins secoes={[{ id: 'modelos', rotulo: 'Modelos', conteudo: <ModelosDeCheckin perfil={perfil} /> }]} />
+      <SecoesDeCheckins secoes={[
+        { id: 'andamento', rotulo: 'Andamento', conteudo: <AndamentoDosClientes perfil={perfil} /> },
+        { id: 'modelos', rotulo: 'Modelos', conteudo: <ModelosDeCheckin perfil={perfil} /> },
+      ]} />
     </>
   )
 }

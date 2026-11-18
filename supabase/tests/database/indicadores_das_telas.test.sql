@@ -439,8 +439,8 @@ select ok(has_function_privilege('authenticated', 'public.indicadores_de_consult
 select ok(has_function_privilege('authenticated', 'public.indicadores_de_integracoes(uuid)', 'execute'), 'logado conta integrações');
 select is((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname like 'indicadores\_de\_%'
-    and p.prosecdef and p.proconfig @> array['search_path=""']), 6::bigint,
-  'as 6 funções (com a dos modelos de check-in): security definer com search_path vazio');
+    and p.prosecdef and p.proconfig @> array['search_path=""']), 7::bigint,
+  'as 7 funções (com as dos modelos e do andamento dos check-ins): security definer com search_path vazio');
 
 select * from finish();
 rollback;

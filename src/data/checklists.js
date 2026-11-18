@@ -29,6 +29,26 @@ async function escrever(funcao, argumentos) {
 // o que foi marcado nele), ultimo_checkin }. null quando a pessoa não vê o cliente.
 export const lerChecklist = (clienteId) => ler('checklist_do_cliente', { p_cliente: clienteId })
 
+// Aba Andamento de Check-ins: uma página (15) dos clientes ativos que a pessoa vê, com o check-list ativo de cada um, do
+// mais atrasado ao mais em dia e os sem modelo no fim. situacao: 'todos' | 'com_atraso' | 'sem_modelo'; busca no cliente
+// e no nome do modelo (sem acento); consultoriaId só vale para a Central e consultorId para a Central e a gestão (o banco
+// ignora o resto). { itens: [{ cliente: { id, nome, cidade, uf }, consultor: { id, nome, foto, cor } | null, consultoria:
+// { id, nome } | null (só a Central), pode_aplicar, checklist: null | { id, modelo_nome, tarefas, feitas, pct, atrasadas,
+// proxima: { titulo, vence_em } | null } }], total }; página que deixou de existir volta com foraDaFaixa.
+export async function listarAndamento({ consultoriaId, consultorId, situacao = 'todos', busca, pagina = 1 } = {}) {
+  const data = await ler('andamento_dos_clientes', {
+    p_consultoria: consultoriaId || null,
+    p_consultor: consultorId || null,
+    p_situacao: situacao,
+    p_busca: busca?.trim() || null,
+    p_pagina: pagina,
+  })
+  const itens = data?.itens ?? []
+  const total = data?.total ?? 0
+  if (pagina > 1 && !itens.length) return { itens, total, foraDaFaixa: true }
+  return { itens, total }
+}
+
 // Os modelos que dá para aplicar no cliente (busca no banco; os do tipo do consultor do cliente primeiro, até 20):
 // { itens: [{ id, nome, tipo, da_central, etapas, tarefas, obrigatorias, maior_prazo, do_tipo_do_consultor }], total }.
 export async function modelosParaAplicar({ clienteId, busca } = {}) {
@@ -67,6 +87,7 @@ export async function marcarTarefa(tarefaId, estado) {
 // desatualizado, como em marcarTarefa).
 export const anotarTarefa = (tarefaId, nota) => escrever('anotar_tarefa', { p_tarefa: tarefaId, p_nota: nota ?? null })
 
-// Quantos clientes usam o modelo (todos) e até 5 nomes que a pessoa vê: { clientes, nomes }; null quando não vê o
-// modelo. Para a confirmação de apagar e arquivar.
+// Quantos clientes que a pessoa vê usam o modelo (a Central, todos; a gestão, os da consultoria; o consultor, os dele) e
+// até 5 nomes deles: { clientes, nomes }; null quando não vê o modelo. Para a confirmação de apagar e arquivar (apagar
+// modelo em uso é recusado pelo banco de qualquer jeito, mesmo que o uso seja de quem a pessoa não vê).
 export const usoDoModelo = (modeloId) => ler('uso_do_modelo', { p_modelo: modeloId })
