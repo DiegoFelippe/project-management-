@@ -171,35 +171,45 @@ async function objetosDoQuadro(pasta) {
   }
 }
 
-// Quadros dos clientes e das consultorias de teste. Os cartões seguram as colunas (restrict, e por elas o cliente) e
-// saem antes; checklist, comentários, responsáveis e anexos saem com o cartão, e as colunas com o quadro. Depois das
-// linhas, os objetos do balde "quadros" na pasta de cada cliente de teste (anexos, imagens e o que ficou sem linha).
+// Quadros dos clientes, das consultorias e das pessoas de teste. Os cartões seguram as colunas (restrict, e por elas o
+// cliente) e saem antes; checklist, comentários, responsáveis e anexos saem com o cartão, e as colunas com o quadro (os
+// quadros seguram o time e a pessoa: saem antes deles). Depois das linhas, os objetos do balde "quadros" na pasta de
+// cada cliente de teste e na de cada quadro pessoal ou de time de teste (quadro/<id>: anexos, imagens e o que ficou sem
+// linha).
 async function limparQuadros(clientes, consultorias) {
-  await limparQuadrosDoBanco(clientes, consultorias)
+  const pastas = await limparQuadrosDoBanco(clientes, consultorias)
   const caminhos = []
-  // Só a pasta de cada cliente de teste (nunca a raiz do balde, que tem as pastas de todos).
-  for (const cliente of clientes) if (cliente) caminhos.push(...await objetosDoQuadro(cliente))
+  // Só as pastas dos clientes e dos quadros de teste (nunca a raiz do balde nem a pasta "quadro", que têm as de todos).
+  for (const pasta of [...clientes.filter(Boolean), ...pastas]) caminhos.push(...await objetosDoQuadro(pasta))
   for (let inicio = 0; inicio < caminhos.length; inicio += 1000) {
     conferirLimpeza('apagar os objetos dos quadros de teste',
       await admin.storage.from('quadros').remove(caminhos.slice(inicio, inicio + 1000)))
   }
 }
 
+// Apaga os quadros de teste; devolve as pastas no balde dos que não são de cliente (quadro/<id>).
 async function limparQuadrosDoBanco(clientes, consultorias) {
-  const quadros = new Set()
+  const quadros = new Map()
+  const juntar = (acao, resposta) => {
+    conferirLimpeza(acao, resposta)
+    for (const linha of resposta.data ?? []) quadros.set(linha.id, linha.tipo)
+  }
   if (clientes.length) {
-    const resposta = await admin.from('quadros').select('id').in('cliente_id', clientes)
-    conferirLimpeza('ler os quadros dos clientes de teste', resposta)
-    for (const linha of resposta.data ?? []) quadros.add(linha.id)
+    juntar('ler os quadros dos clientes de teste', await admin.from('quadros').select('id, tipo').in('cliente_id', clientes))
   }
   if (consultorias.length) {
-    const resposta = await admin.from('quadros').select('id').in('consultoria_id', consultorias)
-    conferirLimpeza('ler os quadros das consultorias de teste', resposta)
-    for (const linha of resposta.data ?? []) quadros.add(linha.id)
+    juntar('ler os quadros das consultorias de teste',
+      await admin.from('quadros').select('id, tipo').in('consultoria_id', consultorias))
   }
-  if (!quadros.size) return
-  conferirLimpeza('apagar os cartões dos quadros de teste', await admin.from('cartoes').delete().in('quadro_id', [...quadros]))
-  conferirLimpeza('apagar os quadros de teste', await admin.from('quadros').delete().in('id', [...quadros]))
+  // Os quadros pessoais da central e do dono (de teste) não têm consultoria.
+  if (criados.usuarios.size) {
+    juntar('ler os quadros pessoais das pessoas de teste',
+      await admin.from('quadros').select('id, tipo').in('pessoa_id', [...criados.usuarios]))
+  }
+  if (!quadros.size) return []
+  conferirLimpeza('apagar os cartões dos quadros de teste', await admin.from('cartoes').delete().in('quadro_id', [...quadros.keys()]))
+  conferirLimpeza('apagar os quadros de teste', await admin.from('quadros').delete().in('id', [...quadros.keys()]))
+  return [...quadros].filter(([, tipo]) => tipo !== 'cliente').map(([id]) => `quadro/${id}`)
 }
 
 // Modelos de check-in das consultorias de teste (seguram a consultoria, restrict) e os que as pessoas de teste criaram
