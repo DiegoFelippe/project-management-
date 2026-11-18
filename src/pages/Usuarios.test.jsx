@@ -355,11 +355,11 @@ describe('Usuários', () => {
     const chamadas = vi.mocked(listarUsuarios).mock.calls.length
     await userEvent.clear(within(janela).getByLabelText('Nome'))
     await userEvent.type(within(janela).getByLabelText('Nome'), 'Eu Mesmo')
-    await userEvent.type(within(janela).getByLabelText('Telefone'), '1')
+    await userEvent.type(within(janela).getByLabelText('Telefone'), '{Backspace}1')
     await userEvent.click(within(janela).getByRole('button', { name: 'Salvar alterações' }))
     await waitFor(() => expect(gerenciarAcesso).toHaveBeenCalledWith('editar', 'a1', { nome: 'Eu Mesmo' }))
     expect(gerenciarAcesso).toHaveBeenCalledTimes(1)
-    expect(atualizarMeuContato).toHaveBeenCalledWith({ telefone: '(11) 90000-00001', cidade: '', uf: '' })
+    expect(atualizarMeuContato).toHaveBeenCalledWith({ telefone: '(11) 90000-0001', cidade: '', uf: '' })
     expect(definirCarga).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Meu perfil' })).not.toBeInTheDocument())
     await waitFor(() => expect(vi.mocked(listarUsuarios).mock.calls.length).toBeGreaterThan(chamadas))

@@ -1,7 +1,8 @@
-import { AtSign, CheckCircle2, KeyRound, MailCheck, Pencil, Power, RotateCcw, RotateCcwKey, Send, ShieldAlert, ShieldCheck, ShieldOff, Smartphone, UserPlus, UserRound, UserX, User } from 'lucide-react'
+import { AtSign, Check, CheckCircle2, KeyRound, MailCheck, Pencil, Power, RotateCcw, RotateCcwKey, Send, ShieldAlert, ShieldCheck, ShieldOff, Smartphone, UserPlus, UserRound, UserX, User, X } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import Caixa from '@/components/campos/Caixa'
+import Campo from '@/components/campos/Campo'
 import CampoData from '@/components/campos/CampoData'
 import CampoNumero from '@/components/campos/CampoNumero'
 import CampoSenha from '@/components/campos/CampoSenha'
@@ -14,12 +15,12 @@ import { lerHoras } from '@/components/clientes/rotulos'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import CampoImagem from '@/components/comum/CampoImagem'
 import CartoesDeOpcao from '@/components/comum/CartoesDeOpcao'
-import JanelaFormulario, { CartaoDaSecao, SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import JanelaFormulario, { BotaoCancelar, CartaoDaSecao, SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import { useAlterado } from '@/components/comum/useAlterado'
 import SeletorDeCor from '@/components/comum/SeletorDeCor'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import VerificacaoDoPerfil from '@/components/verificacao/VerificacaoDoPerfil'
 import { CORES_DO_AVATAR, corDe } from '@/lib/cores'
 import { formatarHoras } from '@/lib/horas'
@@ -32,16 +33,19 @@ import { ehPapelDeConsultoria, papeisQuePodeDar, rotuloDoPapel, veTudo } from '@
 import { situacao } from '@/lib/situacao'
 import { situacaoNaFicha } from '@/lib/verificacao'
 import { cn } from '@/lib/utils'
+import { erroDeEmail, erroDeTelefone } from '@/lib/validacao'
 
 const CARGA_PADRAO = 44
 const CAMPOS_DE_TEXTO = ['cargo', 'telefone', 'cidade', 'uf', 'data_entrada']
 const CAMPOS_DE_CONTATO = ['telefone', 'cidade', 'uf']
 
 // Em que aba aparece o erro de cada campo (ponto vermelho na aba) e qual campo recebe o foco ao pular para ela.
-const ABA_DO_ERRO = { nome: 'dados', email: 'dados', data_entrada: 'dados', consultoria: 'dados', carga: 'dados', senha: 'acesso', repetida: 'acesso' }
+const ABA_DO_ERRO = {
+  nome: 'dados', email: 'dados', telefone: 'dados', data_entrada: 'dados', consultoria: 'dados', carga: 'dados', senha: 'acesso', repetida: 'acesso',
+}
 const CAMPO_DO_ERRO = {
-  nome: 'ficha-nome', email: 'ficha-email', data_entrada: 'ficha-entrada', consultoria: 'ficha-consultoria', carga: 'ficha-carga',
-  senha: 'ficha-senha', repetida: 'ficha-senha-repetida',
+  nome: 'ficha-nome', email: 'ficha-email', telefone: 'ficha-telefone', data_entrada: 'ficha-entrada', consultoria: 'ficha-consultoria',
+  carga: 'ficha-carga', senha: 'ficha-senha', repetida: 'ficha-senha-repetida',
 }
 
 const OPCOES_DE_UF = UFS.map((uf) => ({ valor: uf, rotulo: uf }))
@@ -52,13 +56,18 @@ const comoTexto = (valor) => String(valor ?? '')
 
 const Bloco = SecaoFormulario
 
-function Campo({ id, rotulo, erro, children }) {
+// "Repita a senha nova" ao digitar (usabilidade, U10): diz se as senhas são iguais (✓) ou não. Enquanto o que foi
+// repetido é o começo da senha nova, não acusa nada (a pessoa ainda está digitando). A linha (role="status") fica
+// sempre na tela, vazia quando não há o que dizer, para o leitor de tela anunciar a mudança.
+// Com o erro do Salvar embaixo do campo (`calada`), ela fica vazia para não repetir o aviso.
+function SenhasIguais({ id, senha, repetida, calada = false }) {
+  const iguais = !calada && Boolean(repetida) && senha === repetida
+  const diferentes = !calada && Boolean(repetida) && !iguais && !senha.startsWith(repetida)
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{rotulo}</Label>
-      {children}
-      {erro && <p className="text-rotulo text-destructive">{erro}</p>}
-    </div>
+    <p id={id} role="status" className={cn('flex items-center gap-1.5 text-rotulo', iguais ? 'text-positive' : 'text-destructive')}>
+      {iguais && <><Check className="size-3.5 shrink-0" aria-hidden="true" />As senhas são iguais</>}
+      {diferentes && <><X className="size-3.5 shrink-0" aria-hidden="true" />As senhas não são iguais</>}
+    </p>
   )
 }
 
@@ -226,6 +235,10 @@ export default function FichaDoConsultor({
   const corGuardada = pessoa?.cor ?? null
   const corMarcada = corEscolhida === undefined ? corGuardada : corEscolhida
   const reservaCor = corMarcada ?? corDe(pessoa ? pessoa.id : 'nova-pessoa')
+  // Fechar com algo mudado pergunta antes (usabilidade, U4). O sucesso fecha direto, pelo `fechar`.
+  const alterado = useAlterado({ dados, marcados, tipos, foto, corEscolhida })
+  // O erro das senhas diferentes some quando elas ficam iguais (a linha de baixo passa a mostrar o ✓).
+  const erroDaRepetida = erros.repetida && dados.senha !== dados.repetida ? erros.repetida : undefined
 
   const mudar = (campo) => (evento) => setDados((d) => ({ ...d, [campo]: evento.target.value }))
   const definir = (campo) => (valor) => setDados((d) => ({ ...d, [campo]: valor }))
@@ -280,7 +293,8 @@ export default function FichaDoConsultor({
   function validar() {
     const achados = {}
     if (dados.nome.trim().length < 2) achados.nome = 'Use pelo menos 2 caracteres.'
-    if (novo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dados.email.trim())) achados.email = 'Digite um e-mail válido.'
+    if (novo && erroDeEmail(dados.email, { obrigatorio: true })) achados.email = erroDeEmail(dados.email, { obrigatorio: true })
+    if (erroDeTelefone(dados.telefone)) achados.telefone = erroDeTelefone(dados.telefone)
     if (novo && dados.forma === 'senha' && !avaliarSenha(dados.senha).forte) achados.senha = 'A senha provisória precisa ser forte: confira as regras abaixo do campo.'
     if (mostraCapacidade) {
       const horas = lerHoras(dados.carga)
@@ -450,7 +464,7 @@ export default function FichaDoConsultor({
   return (
     <JanelaFormulario aberto={aberto} aoFechar={fechar} titulo={titulo ?? (novo ? 'Nova pessoa' : propria ? 'Meu perfil' : `Ficha de ${pessoa.nome}`)}
       icone={novo ? UserPlus : propria ? UserRound : Pencil}
-      largura="5xl" alturaFixa enviando={enviando} acaoEsquerda={acaoEsquerda}
+      largura="5xl" alturaFixa enviando={enviando} acaoEsquerda={acaoEsquerda} alterado={alterado}
       abas={<AbasSegmentadas rotulo="Seções da ficha" comoAbas idBase={idBase} abas={abas} valor={aba} aoMudar={setAbaEscolhida} />}
       descricao={propria
         ? 'Sua foto, seu nome, seu contato, sua senha e a verificação em duas etapas. O que aparece apagado quem muda é a administração.'
@@ -461,7 +475,7 @@ export default function FichaDoConsultor({
             : 'Você passa a senha provisória para a pessoa. No primeiro acesso ela troca por uma senha só dela.'}
       rodape={(
         <>
-          <Button type="button" variant="outline" onClick={fechar} disabled={enviando}>Cancelar</Button>
+          <BotaoCancelar />
           {jaExiste ? (
             <Button type="button" className="min-w-[150px]" disabled={enviando || marcados.length === 0} onClick={colocarNosTimes}>
               {enviando ? 'Salvando…' : 'Colocar nos times marcados'}
@@ -484,8 +498,7 @@ export default function FichaDoConsultor({
               </div>
               <div className="grid min-w-0 flex-1 gap-3">
                 <Campo id="ficha-nome" rotulo="Nome" erro={erros.nome}>
-                  <Input id="ficha-nome" autoComplete="off" maxLength={120} className="h-10"
-                    aria-invalid={erros.nome ? true : undefined} value={dados.nome} onChange={mudar('nome')} />
+                  <Input id="ficha-nome" autoComplete="off" maxLength={120} className="h-10" value={dados.nome} onChange={mudar('nome')} />
                 </Campo>
                 <div className="flex flex-wrap gap-1.5">
                   {estado && estado !== 'Ativo' && <Badge variant={estado === 'Desativado' ? 'outline' : estado === 'Senha provisória' ? 'secondary' : 'notice'}>{estado}</Badge>}
@@ -497,8 +510,7 @@ export default function FichaDoConsultor({
             <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
               <Campo id="ficha-email" rotulo="E-mail" erro={erros.email}>
                 {novo
-                  ? <Input id="ficha-email" type="email" autoComplete="off" className="h-10"
-                    aria-invalid={erros.email ? true : undefined} value={dados.email} onChange={mudar('email')} />
+                  ? <Input id="ficha-email" type="email" autoComplete="off" className="h-10" value={dados.email} onChange={mudar('email')} />
                   : (
                     <>
                       <Input id="ficha-email" className="h-10" value={pessoa.email ?? ''} disabled readOnly />
@@ -508,8 +520,8 @@ export default function FichaDoConsultor({
                     </>
                   )}
               </Campo>
-              <Campo id="ficha-telefone" rotulo="Telefone">
-                <Input id="ficha-telefone" type="text" inputMode="tel" autoComplete="off" maxLength={30} className="h-10"
+              <Campo id="ficha-telefone" rotulo="Telefone" erro={erros.telefone}>
+                <Input id="ficha-telefone" type="text" inputMode="tel" autoComplete="off" maxLength={30} className="h-10" placeholder="(49) 99988-7766"
                   value={dados.telefone} onChange={mudar('telefone')} />
               </Campo>
               <Campo id="ficha-cidade" rotulo="Cidade">
@@ -611,7 +623,7 @@ export default function FichaDoConsultor({
               {dados.forma === 'senha' && (
                 <CartaoDaSecao className="p-3">
                   <Campo id="ficha-senha" rotulo="Senha provisória" erro={erros.senha}>
-                    <CampoSenha id="ficha-senha" valor={dados.senha} invalido={!!erros.senha}
+                    <CampoSenha id="ficha-senha" valor={dados.senha}
                       aoMudar={(senha) => setDados((d) => ({ ...d, senha }))}
                       dica={erros.senha ? undefined : 'Só senha forte é aceita. A pessoa troca no primeiro acesso.'} />
                   </Campo>
@@ -635,12 +647,13 @@ export default function FichaDoConsultor({
             <Bloco titulo="Trocar senha (opcional)">
               <CartaoDaSecao className="grid items-start gap-x-4 gap-y-3 p-3 sm:grid-cols-2">
                 <Campo id="ficha-senha" rotulo="Senha nova" erro={erros.senha}>
-                  <CampoSenha id="ficha-senha" valor={dados.senha} invalido={!!erros.senha} aoMudar={definir('senha')}
+                  <CampoSenha id="ficha-senha" valor={dados.senha} aoMudar={definir('senha')}
                     dica="Só senha forte é aceita. Deixe em branco para manter a atual; ela muda quando você salva." />
                 </Campo>
-                <Campo id="ficha-senha-repetida" rotulo="Repita a senha nova" erro={erros.repetida}>
+                <Campo id="ficha-senha-repetida" rotulo="Repita a senha nova" erro={erroDaRepetida}>
                   <Input id="ficha-senha-repetida" type="password" autoComplete="new-password" className="h-10"
-                    aria-invalid={erros.repetida ? true : undefined} value={dados.repetida} onChange={mudar('repetida')} />
+                    aria-describedby="ficha-senhas-iguais" value={dados.repetida} onChange={mudar('repetida')} />
+                  <SenhasIguais id="ficha-senhas-iguais" senha={dados.senha} repetida={dados.repetida} calada={Boolean(erroDaRepetida)} />
                 </Campo>
               </CartaoDaSecao>
             </Bloco>

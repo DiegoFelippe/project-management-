@@ -164,7 +164,8 @@ describe('FichaDoConsultor: Novo acesso', () => {
     expect(aoCriar).not.toHaveBeenCalled()
     expect(screen.getByRole('tab', { name: 'Dados pessoais, tem erro' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: 'Acesso, tem erro' })).toHaveAttribute('aria-selected', 'false')
-    expect(screen.getByText('Digite um e-mail válido.')).toBeInTheDocument()
+    // O erro fica embaixo do campo e o descreve (usabilidade, U2).
+    expect(screen.getByLabelText('E-mail')).toHaveAccessibleDescription(/Digite um e-mail válido/)
   })
 
   it('erro só na senha leva para a aba Acesso e foca a senha', async () => {
@@ -870,9 +871,10 @@ describe('FichaDoConsultor: modo próprio (Meu perfil)', () => {
     expect(aoSalvar.mock.calls[0][0].mudancas).toEqual({})
     expect(aoSalvar.mock.calls[0][0].contato).toBeUndefined()
     expect(aoSalvar.mock.calls[0][0].senha).toBeUndefined()
-    await userEvent.type(screen.getByLabelText('Telefone'), '9')
+    // Troca o último número: o telefone continua com 11 números (usabilidade, U2).
+    await userEvent.type(screen.getByLabelText('Telefone'), '{Backspace}9')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
-    expect(aoSalvar.mock.calls[1][0].contato).toEqual({ telefone: '(11) 97777-00009', cidade: 'Santos', uf: 'SP' })
+    expect(aoSalvar.mock.calls[1][0].contato).toEqual({ telefone: '(11) 97777-0009', cidade: 'Santos', uf: 'SP' })
   })
 
   it('a data de entrada não é da pessoa: mesmo no futuro (vinda do cadastro), não impede salvar', async () => {
