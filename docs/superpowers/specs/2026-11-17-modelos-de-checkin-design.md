@@ -324,3 +324,22 @@ de consultorias anteriores.
   Modelos e Andamento são tabelas.
 - **No celular o fluxograma começa "Em pé".**
 - **Sem tempo real nesta entrega.**
+
+## Acréscimo de 18/11: tarefa "Não se aplica"
+
+Pedido do Diego (18/11): o consultor importou o modelo, mas uma tarefa não foi necessária naquele cliente; ele marca
+isso para a auditoria saber. Proposta aprovada ("Pode fazer", 18/11 08:50):
+
+- **Terceiro jeito de fechar uma tarefa**, ao lado de "feita": **"Não se aplica"** (`estado = 'nao_se_aplica'`).
+- **Quem marca:** o consultor do cliente, como "feita", com ou sem check-in aberto; volta para "a fazer" pelo mesmo
+  caminho (o motivo sai junto).
+- **Motivo obrigatório** (1 a 500 letras, o que o auditor lê), guardado à parte da nota da tarefa; fica quem marcou e
+  quando, e o Histórico do cliente ganha uma linha (tarefa, motivo, quem).
+- **Vale também para tarefa obrigatória**, desde que tenha motivo (decisão do controlador; o Diego pode travar depois).
+- **Libera as que dependem dela**, como "feita".
+- **Progresso:** conta como resolvida, mas aparece separada ("4 de 5 resolvidas: 3 feitas, 1 não se aplica"). Não
+  entra em "atrasadas", "vencem em 7 dias" nem vira a "próxima"; a aba Andamento e os números seguem a mesma regra.
+- **No check-in:** marcada com o check-in aberto, entra no resumo da sessão e no texto do check-out como
+  "Não se aplica: <tarefa> (<motivo>)".
+- **Visual:** cinza, com ícone próprio (nunca o check verde), na lista, no fluxograma, na janela da tarefa e nas
+  legendas (inclusive a prévia do modelo). O modelo em si não muda: quem decide é o consultor, no cliente.

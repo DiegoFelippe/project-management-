@@ -359,3 +359,40 @@ de exemplo e usa as mesmas funções da tela; não toca nos dados reais).
   central; claro e escuro; 1440 e 390 px; criar, editar, duplicar, arquivar e apagar modelo; aplicar e trocar com
   check-in aberto; marcar com e sem check-in e conferir o check-out; fluxograma de um modelo de 500 tarefas rolando sem
   travar.
+
+### Task 8: Tarefa "Não se aplica" (acréscimo de 18/11)
+
+Desenho: seção "Acréscimo de 18/11" do design. Depois da T7 no `CLAUDE.md` (a seção do check-list que a T7 escreve
+ganha as regras novas).
+
+**Arquivos:** migração nova `tarefa_nao_se_aplica` (estado novo no check de `checklist_tarefas.estado`; coluna
+`motivo text check (char_length(btrim(motivo)) between 1 and 500)` com a regra "motivo só e sempre com
+`nao_se_aplica`"; `marcar_tarefa` recebe `p_motivo` (assinatura nova: `drop` + `create` com os grants de volta ou
+parâmetro com default, sem quebrar quem chama); liberação das dependentes, `private.recontar_checklist`, resumo de
+`checklist_do_cliente`, `andamento_dos_clientes`, `indicadores_de_checkins`, `indicadores_de_modelos`/`uso_do_modelo`
+se contarem feitas; `checkin_tarefas` guarda o estado e o motivo; tipo novo em `cliente_eventos` para o Histórico —
+`create or replace` a partir do corpo mais novo de cada função, com o comentário "Mesmo corpo de <migração>; muda só
+…"), `supabase/tests/database/checklists.test.sql` (+ volume se o plano mudar), `src/data/checklists.js` (+ teste),
+`src/components/checkins/{situacao,ListaDoChecklist,Fluxograma,JanelaDaTarefa,ChecklistDoCliente,PainelDaSessao,
+TarefasMarcadas,AndamentoDosClientes}*`, `src/components/modelos/*` (só a legenda), o texto do check-out
+(`src/components/clientes/JanelaCheckin*` ou onde ele é montado), `src/lib/erros.js` (`motivo_obrigatorio`),
+`tests/integracao/checklists.test.js`, `CLAUDE.md`.
+
+**Testes que provam (pgTAP, depois tela e integração):**
+- consultor marca `nao_se_aplica` com motivo → estado, motivo, quem e quando gravados; sem motivo ou só espaços →
+  `motivo_obrigatorio` (22023); gestão, central e outro consultor → `sem_permissao`; cliente arquivado → recusa.
+- dependente de uma tarefa `nao_se_aplica` fica liberada; voltar para `a_fazer` limpa o motivo e bloqueia de novo.
+- resumo: `resolvidas = feitas + nao_se_aplica`, `nao_se_aplica` à parte; atrasadas, vencem em 7 dias e próxima
+  ignoram as `nao_se_aplica`; Andamento e indicadores iguais.
+- com check-in aberto, entra em `checkin_tarefas` com o motivo; o texto do check-out traz "Não se aplica: <tarefa>
+  (<motivo>)"; o Histórico ganha a linha.
+- tela: a janela da tarefa oferece "Não se aplica" com o campo Motivo (obrigatório, contador até 500, erro no campo);
+  lista e fluxograma mostram o selo cinza com ícone próprio; legendas (cliente e prévia do modelo) com a cor nova;
+  progresso "4 de 5 resolvidas: 3 feitas, 1 não se aplica"; Andamento conta como resolvida.
+- volume: os tempos de `checklists_volume`/`andamento_volume` continuam dentro dos limites.
+
+- [ ] Passo 1: testes (ver FALHAR). Passo 2: migração (cópia antes) e código. Passo 3: `npm run test:db`,
+  `npm test`, `npm run test:integracao`, lint, build. Passo 4: conferência no navegador (consultor marca e desmarca numa
+  tarefa de um cliente da Consultoria Exemplo, com e sem check-in; gestor e central só veem). Passo 5: commit
+  `Check-list: tarefa "Não se aplica" com motivo`.
+
