@@ -328,6 +328,8 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     expect(campoCliente).toHaveTextContent('Provedor Alfa')
     expect(within(janela).getByText('Novo evento na agenda deste cliente. Para outro cliente, use o Calendário do menu.')).toBeInTheDocument()
     await user.type(within(janela).getByLabelText('Título'), 'Alinhamento')
+    // Sem horário, só com "Dia inteiro" ligado (usabilidade, U9).
+    await user.click(within(janela).getByRole('switch', { name: 'Dia inteiro' }))
     await user.click(within(janela).getByRole('button', { name: 'Criar evento' }))
     await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({ cliente_id: 'k1', titulo: 'Alinhamento' })))
   })
@@ -404,6 +406,49 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     tela(gestora)
     const aviso = await screen.findByText(/mais eventos neste período do que o calendário mostra/)
     expect(aviso).not.toHaveTextContent(/consultor|cliente/)
+  })
+})
+
+// Usabilidade, U9: a visão escolhida fica no endereço (?visao=): recarregar ou voltar reabre nela.
+describe('a visão no endereço', () => {
+  const botaoDaVisao = (nome) => within(screen.getByRole('group', { name: 'Visão do calendário' })).getByRole('button', { name: nome })
+
+  it('no cliente, trocar a visão escreve ?visao= sem perder a aba; Todos também', async () => {
+    const user = userEvent.setup()
+    tela(gestora)
+    await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    await user.click(botaoDaVisao('Semana'))
+    expect(screen.getByTestId('endereco')).toHaveTextContent('/clientes/k1?aba=agenda&visao=semana')
+    await user.click(botaoDaVisao('Todos'))
+    expect(screen.getByTestId('endereco')).toHaveTextContent('/clientes/k1?aba=agenda&visao=todos')
+  })
+
+  it('o endereço com ?visao=todos abre direto na tabela do cliente; ?visao= desconhecida cai no Mês', async () => {
+    const { unmount } = tela(gestora, { endereco: '/clientes/k1?aba=agenda&visao=todos' })
+    expect(await screen.findByRole('table', { name: 'Eventos do cliente' })).toBeInTheDocument()
+    expect(botaoDaVisao('Todos')).toHaveAttribute('aria-pressed', 'true')
+    unmount()
+    tela(gestora, { endereco: '/clientes/k1?aba=agenda&visao=ano' })
+    expect(await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })).toBeInTheDocument()
+    expect(botaoDaVisao('Mês')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('no menu, ?visao=semana abre na Semana; Todos não vale fora do cliente', async () => {
+    const { unmount } = tela(gestora, { cliente: null, endereco: '/calendario?visao=semana' })
+    await screen.findByRole('group', { name: 'Visão do calendário' })
+    expect(botaoDaVisao('Semana')).toHaveAttribute('aria-pressed', 'true')
+    unmount()
+    tela(gestora, { cliente: null, endereco: '/calendario?visao=todos' })
+    await screen.findByRole('group', { name: 'Visão do calendário' })
+    expect(botaoDaVisao('Mês')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('no menu, trocar para Agenda escreve ?visao=agenda', async () => {
+    const user = userEvent.setup()
+    tela(gestora, { cliente: null, endereco: '/calendario' })
+    await screen.findByRole('group', { name: 'Visão do calendário' })
+    await user.click(botaoDaVisao('Agenda'))
+    expect(screen.getByTestId('endereco')).toHaveTextContent('/calendario?visao=agenda')
   })
 })
 

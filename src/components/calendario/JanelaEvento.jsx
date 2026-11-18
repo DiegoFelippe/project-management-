@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { CalendarDays, Check, CheckCircle2, Info, Mail, Plus, Send, Trash2, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import Campo from '@/components/campos/Campo'
 import CampoData from '@/components/campos/CampoData'
 import CampoHora from '@/components/campos/CampoHora'
 import Chave from '@/components/campos/Chave'
@@ -10,10 +11,11 @@ import Avatar from '@/components/comum/Avatar'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import SeletorDeCor from '@/components/comum/SeletorDeCor'
+import { useAlterado } from '@/components/comum/useAlterado'
+import { useEnvio } from '@/components/comum/useEnvio'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { apagarEvento, novoIdDeEvento, pessoasParaConvidar, responderConvite, salvarEvento } from '@/data/agenda'
 import { consultoresPorOcupacao } from '@/data/capacidade'
@@ -162,23 +164,41 @@ function atalhosDeData() {
 }
 
 function camposIniciais(evento, diaInicial) {
-  if (!evento) return { titulo: '', descricao: '', data: diaInicial, horaInicio: '', horaFim: '', dataFim: '', cor: 0 }
+  if (!evento) return { titulo: '', descricao: '', data: diaInicial, horaInicio: '', horaFim: '', dataFim: '', diaInteiro: false, cor: 0 }
   const data = diaEmSP(evento.inicio)
   const base = { titulo: evento.titulo, descricao: evento.descricao ?? '', data, cor: evento.cor ?? 0 }
   if (evento.dia_inteiro) {
     const ultimo = diaEmSP(Date.parse(evento.fim) - 1)
-    return { ...base, horaInicio: '', horaFim: '', dataFim: ultimo > data ? ultimo : '' }
+    return { ...base, horaInicio: '', horaFim: '', dataFim: ultimo > data ? ultimo : '', diaInteiro: true }
   }
   const diaDoFim = diaEmSP(evento.fim)
-  return { ...base, horaInicio: horaEmSP(evento.inicio), horaFim: horaEmSP(evento.fim), dataFim: diaDoFim !== data ? diaDoFim : '' }
+  return { ...base, horaInicio: horaEmSP(evento.inicio), horaFim: horaEmSP(evento.fim), dataFim: diaDoFim !== data ? diaDoFim : '', diaInteiro: false }
 }
 
-// Prévia do "Quando": "Sex, 20 de nov. · 14:00–15:00", "… até 22/11 · dia inteiro".
-function quandoDaPrevia({ data, horaInicio, horaFim, dataFim }) {
+// Prévia do "Quando": "Sex, 20 de nov. · 14:00–15:00", "… até 22/11 · dia inteiro", "… · escolha o horário".
+function quandoDaPrevia({ data, horaInicio, horaFim, dataFim, diaInteiro }) {
   if (!data) return 'Escolha a data'
   const ate = dataFim && dataFim !== data ? ` até ${diaCurtoComSemana(dataFim)}` : ''
-  const horario = horaInicio ? `${horaInicio}${horaFim ? `–${horaFim}` : ''}` : 'dia inteiro'
+  const horario = diaInteiro ? 'dia inteiro' : horaInicio ? `${horaInicio}${horaFim ? `–${horaFim}` : ''}` : 'escolha o horário'
   return `${diaCurtoComSemana(data)}${ate} · ${horario}`
+}
+
+// Os erros do evento, todos de uma vez ({ campo: mensagem }; usabilidade, U2). O horário vem do montarHorario (com
+// "Dia inteiro" ligado, sem hora); sem hora e com a chave desligada, o erro aponta o Das (U9).
+const CAMPO_DO_HORARIO = { data: 'data', dataFim: 'dataFim', horaInicio: 'horaInicio', horaFim: 'horaFim' }
+function errosDoEvento({ titulo, consultor, horario, diaInteiro, horaInicio }) {
+  const erros = {}
+  if (!titulo.trim()) erros.titulo = 'Escreva o título do evento.'
+  if (!consultor) erros.consultor = 'Escolha o consultor: o evento fica na agenda dele.'
+  if (!diaInteiro && !horaInicio) erros.horaInicio = 'Escolha o horário de início ou ligue "Dia inteiro".'
+  else if (horario.erro) erros[CAMPO_DO_HORARIO[horario.campo] ?? 'data'] = horario.erro
+  return erros
+}
+
+// Quem organiza é quem conecta o Google: o aviso "Fica só no app" do meu evento leva ao "Conectar Google" (U9).
+function acaoDoAviso(aviso, { souOrganizador, aoConectarGoogle }) {
+  if (!souOrganizador || !aoConectarGoogle || !aviso.startsWith('Fica só no app') || /desativad/.test(aviso)) return null
+  return { action: { label: /reconectar/.test(aviso) ? 'Reconectar Google' : 'Conectar Google', onClick: aoConectarGoogle }, duration: 10000 }
 }
 
 // O "Quando" de um evento gravado, para a leitura.
@@ -207,6 +227,7 @@ function FormularioDoEvento({
   const [data, setData] = useState(iniciais.data)
   const [horaInicio, setHoraInicio] = useState(iniciais.horaInicio)
   const [horaFim, setHoraFim] = useState(iniciais.horaFim)
+  const [diaInteiro, setDiaInteiro] = useState(iniciais.diaInteiro)
   const [outroDia, setOutroDia] = useState(Boolean(iniciais.dataFim))
   const [dataFim, setDataFim] = useState(iniciais.dataFim)
   const [cor, setCor] = useState(iniciais.cor)
@@ -227,15 +248,17 @@ function FormularioDoEvento({
   const [comMeet, setComMeet] = useState(() => evento?.com_meet ?? (clienteTravado && !semGoogleProprio))
   const [gravar, setGravar] = useState(() => evento?.gravar ?? (clienteTravado && !semGoogleProprio))
   const [meetTocado, setMeetTocado] = useState(false)
-  const [erro, setErro] = useState(null)
-  const [erroDoQuando, setErroDoQuando] = useState(null) // { erro, campo } do horário, mostrado junto dos campos
-  const [enviando, setEnviando] = useState(false)
   const [apagando, setApagando] = useState(false)
-  const gravando = useRef(false)
+  const { erro, erros, conferir, enviando, enviar } = useEnvio()
+  const alterado = useAlterado({
+    titulo, descricao, data, horaInicio, horaFim, diaInteiro, outroDia, dataFim, cor, consultor: consultor?.id ?? null, cliente: cliente?.id ?? null,
+    participantes: participantes.map((p) => p.perfil_id), convidados: convidados.map((c) => c.email), novoConvidado, comMeet, gravar,
+  })
 
-  // O erro do horário some quando a pessoa mexe em algum campo do Quando.
-  const chaveDoQuando = [data, horaInicio, horaFim, outroDia ? dataFim : ''].join('|')
-  const erroDoHorario = erroDoQuando?.chave === chaveDoQuando ? erroDoQuando : null
+  // Os erros do horário somem quando a pessoa mexe em algum campo do Quando (os outros ficam até o próximo Salvar).
+  const chaveDoQuando = [data, horaInicio, horaFim, diaInteiro, outroDia ? dataFim : ''].join('|')
+  const [chaveDosErros, setChaveDosErros] = useState(null)
+  const erroDoQuando = (campo) => (chaveDosErros === chaveDoQuando ? erros[campo] : undefined)
   const meetFixo = !novo && Boolean(evento.com_meet)
   // A pasta da reunião já foi criada nos Arquivos do cliente: o cliente não muda mais.
   const clienteFixo = !novo && Boolean(evento.pasta_id)
@@ -306,12 +329,11 @@ function FormularioDoEvento({
 
   async function salvar(e) {
     e.preventDefault()
-    if (gravando.current) return
-    if (!titulo.trim()) return setErro('Escreva o título do evento.')
-    if (!consultor) return setErro('Escolha o consultor: o evento fica na agenda dele.')
-    const horario = montarHorario({ data, horaInicio, horaFim, dataFim: outroDia ? dataFim : '' })
-    setErroDoQuando(horario.erro ? { ...horario, chave: chaveDoQuando } : null)
-    if (horario.erro) return setErro(null)
+    if (enviando) return
+    const semHora = diaInteiro || !horaInicio
+    const horario = montarHorario({ data, horaInicio: semHora ? '' : horaInicio, horaFim: semHora ? '' : horaFim, dataFim: outroDia ? dataFim : '' })
+    setChaveDosErros(chaveDoQuando)
+    if (!conferir(errosDoEvento({ titulo, consultor, horario, diaInteiro, horaInicio }))) return
     const dados = {
       id,
       ...(novo ? { novo: true, consultor_id: consultor.id } : {}),
@@ -325,21 +347,16 @@ function FormularioDoEvento({
       participantes: participantes.map((p) => p.perfil_id),
       convidados: convidados.map((c) => c.email),
     }
-    gravando.current = true
-    setEnviando(true)
-    setErro(null)
-    let resposta
-    try {
-      resposta = await salvarEvento(dados)
-    } catch {
-      resposta = { erro: 'Não foi possível salvar agora. Tente de novo.' }
-    }
-    gravando.current = false
-    setEnviando(false)
-    if (resposta.erro) return setErro(resposta.erro)
-    if (resposta.aviso) toast.warning(resposta.aviso)
-    else toast.success(novo ? 'Evento criado.' : 'Alterações salvas.')
-    aoSalvo?.(resposta.evento)
+    await enviar(async () => {
+      const resposta = await salvarEvento(dados)
+      if (resposta.erro) return resposta
+      const acao = resposta.aviso && acaoDoAviso(resposta.aviso, { souOrganizador, aoConectarGoogle })
+      if (acao) toast.warning(resposta.aviso, acao)
+      else if (resposta.aviso) toast.warning(resposta.aviso)
+      else toast.success(novo ? 'Evento criado.' : 'Alterações salvas.')
+      aoSalvo?.(resposta.evento)
+      return { erro: null }
+    })
   }
 
   async function apagar() {
@@ -381,6 +398,7 @@ function FormularioDoEvento({
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={novo ? 'Novo evento' : 'Editar evento'} icone={CalendarDays} largura="5xl" enviando={enviando}
+      erros={erros} alterado={alterado}
       descricao={novo ? 'Marque a reunião ou o compromisso e convide quem vai.' : 'Mude o que precisar: o Google e os convidados são avisados.'}
       acaoEsquerda={!novo && (
         <Button type="button" variant="ghost" disabled={enviando} onClick={() => setApagando(true)}
@@ -392,13 +410,11 @@ function FormularioDoEvento({
       <form id="form-evento" noValidate onSubmit={salvar} className="grid gap-6 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-6">
           <SecaoFormulario titulo="O evento">
-            <div className="grid gap-2">
-              <Label htmlFor="evento-titulo">Título</Label>
+            <Campo id="evento-titulo" rotulo="Título" erro={erros.titulo}>
               <Input id="evento-titulo" className="h-10" maxLength={200} value={titulo} placeholder="Ex.: Reunião de kickoff"
                 onChange={(e) => setTitulo(e.target.value)} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="evento-cliente">Cliente</Label>
+            </Campo>
+            <Campo id="evento-cliente" rotulo="Cliente">
               <Seletor id="evento-cliente" valor={cliente?.id ?? ''} buscar={buscarOsClientes} rotuloTodos="Sem cliente"
                 desabilitado={!consultoriaDoEvento || clienteFixo || clienteTravado} placeholder={consultoriaDoEvento ? 'Sem cliente' : 'Escolha o consultor primeiro'}
                 opcoes={cliente ? [{ valor: cliente.id, rotulo: cliente.nome }] : []} aoMudar={escolherCliente} />
@@ -406,21 +422,19 @@ function FormularioDoEvento({
               {clienteTravado && (
                 <p className="text-legenda text-muted-foreground">Novo evento na agenda deste cliente. Para outro cliente, use o Calendário do menu.</p>
               )}
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="evento-descricao">Descrição</Label>
+            </Campo>
+            <Campo id="evento-descricao" rotulo="Descrição">
               <Textarea id="evento-descricao" rows={2} maxLength={5000} value={descricao} placeholder="Pauta, o que levar…" onChange={(e) => setDescricao(e.target.value)} className="resize-none" />
-            </div>
+            </Campo>
             {(central || gestao) && (
-              <div className="grid gap-2">
-                <Label htmlFor="evento-consultor">Consultor</Label>
+              <Campo id="evento-consultor" rotulo="Consultor" erro={erros.consultor}>
                 <Seletor id="evento-consultor" valor={consultor?.id ?? ''} buscar={buscarConsultores} desabilitado={!novo} placeholder="Escolha o consultor"
                   opcoes={consultor ? [{ valor: consultor.id, rotulo: consultor.nome }] : []} aoMudar={escolherConsultor} />
                 <p className="text-legenda text-muted-foreground">
                   {novo ? 'De quem é a agenda: o evento vai para o Google dele.'
                     : 'O consultor não muda: para levar o evento à agenda de outra pessoa, apague e crie de novo.'}
                 </p>
-              </div>
+              </Campo>
             )}
           </SecaoFormulario>
 
@@ -435,52 +449,50 @@ function FormularioDoEvento({
                 </button>
               ))}
             </div>
-            <div role="group" aria-label="Quando" aria-describedby={erroDoHorario ? 'evento-quando-erro' : undefined} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="col-span-2 grid gap-2 sm:col-span-1">
-                  <Label htmlFor="evento-data">{outroDia ? 'Começa em' : 'Data'}</Label>
+            <div role="group" aria-label="Quando" className="space-y-3">
+              <div className={cn('grid grid-cols-2 items-start gap-3', !diaInteiro && 'sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]')}>
+                <Campo id="evento-data" rotulo={outroDia ? 'Começa em' : 'Data'} erro={erroDoQuando('data')} className={cn('col-span-2', !diaInteiro && 'sm:col-span-1')}>
                   <CampoData id="evento-data" valor={data} obrigatorio aoMudar={(v) => { setData(v); if (dataFim && dataFim < v) setDataFim('') }} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="evento-das">Das</Label>
-                  <CampoHora id="evento-das" valor={horaInicio} aoMudar={setHoraInicio} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="evento-ate">Até</Label>
-                  <CampoHora id="evento-ate" valor={horaFim} aoMudar={setHoraFim} />
-                </div>
+                </Campo>
+                {!diaInteiro && (
+                  <>
+                    <Campo id="evento-das" rotulo="Das" erro={erroDoQuando('horaInicio')}>
+                      <CampoHora id="evento-das" valor={horaInicio} aoMudar={setHoraInicio} />
+                    </Campo>
+                    <Campo id="evento-ate" rotulo="Até" erro={erroDoQuando('horaFim')}>
+                      <CampoHora id="evento-ate" valor={horaFim} aoMudar={setHoraFim} />
+                    </Campo>
+                  </>
+                )}
               </div>
-              {outroDia ? (
+              {outroDia && (
                 <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,2fr)]">
-                  <div className="col-span-2 grid gap-2 sm:col-span-1">
-                    <Label htmlFor="evento-termina">Termina em</Label>
+                  <Campo id="evento-termina" rotulo="Termina em" erro={erroDoQuando('dataFim')} className="col-span-2 sm:col-span-1">
                     <CampoData id="evento-termina" valor={dataFim} min={data} aoMudar={setDataFim} />
-                  </div>
+                  </Campo>
                   <Button type="button" variant="link" size="sm" className="justify-self-start" onClick={() => { setOutroDia(false); setDataFim('') }}>
                     Termina no mesmo dia
                   </Button>
                 </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              )}
+              {/* "Dia inteiro" explícito, desligado por padrão (usabilidade, U9): sem hora e desligado, o erro aponta o Das. */}
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+                <Chave id="evento-dia-inteiro" rotulo="Dia inteiro" ligada={diaInteiro} aoMudar={setDiaInteiro} />
+                {!outroDia && (
                   <Button type="button" variant="link" size="sm" className="px-0" onClick={() => setOutroDia(true)}><Plus /> Termina em outro dia</Button>
-                  <span className="text-legenda text-muted-foreground">Sem horário, o evento fica como dia inteiro.</span>
-                </div>
-              )}
-              {erroDoHorario && (
-                <p id="evento-quando-erro" role="alert" data-campo={erroDoHorario.campo} className="text-rotulo text-destructive">{erroDoHorario.erro}</p>
-              )}
+                )}
+              </div>
             </div>
           </SecaoFormulario>
 
           <SecaoFormulario titulo="Participantes">
             {participantes.length > 0 && !novo && <p className="text-legenda text-muted-foreground">{resumoDasRespostas(participantes)}</p>}
-            <div className="grid gap-2">
-              <Label htmlFor="evento-participante">Convidar consultor</Label>
+            <Campo id="evento-participante" rotulo="Convidar consultor">
               <Seletor id="evento-participante" valor="" buscar={buscarColegas} desabilitado={!consultoriaDoEvento}
                 placeholder={consultoriaDoEvento ? 'Buscar pessoa da consultoria' : 'Escolha o consultor primeiro'}
                 aoMudar={(valor, opcao) => valor && setParticipantes((lista) => (lista.some((p) => p.perfil_id === valor) ? lista
                   : [...lista, { perfil_id: valor, nome: opcao.rotulo, resposta: 'novo' }]))} />
-            </div>
+            </Campo>
             {participantes.length > 0 ? (
               <ListaDaCasa participantes={participantes} aoTirar={(perfilId) => setParticipantes((lista) => lista.filter((p) => p.perfil_id !== perfilId))} />
             ) : (
@@ -532,7 +544,7 @@ function FormularioDoEvento({
               {/* O chip do calendário: o tipo (reunião com cliente ou compromisso) e a cor escolhida na bolinha. */}
               <ChipDoEvento tamanho="rotulo" className="w-fit max-w-full"
                 item={{ tipo: 'evento', id: 'previa', evento: { titulo: titulo.trim() || 'Título do evento', cor, cliente_id: cliente?.id ?? null, com_meet: comMeet } }} />
-              <p className="text-rotulo text-foreground/80">{quandoDaPrevia({ data, horaInicio, horaFim, dataFim: outroDia ? dataFim : '' })}</p>
+              <p className="text-rotulo text-foreground/80">{quandoDaPrevia({ data, horaInicio, horaFim, dataFim: outroDia ? dataFim : '', diaInteiro })}</p>
               {(participantes.length > 0 || convidados.length > 0) && (
                 <p className="text-legenda text-muted-foreground">
                   {[participantes.length && `${participantes.length} do time`, convidados.length && `${convidados.length} de fora`].filter(Boolean).join(' · ')}

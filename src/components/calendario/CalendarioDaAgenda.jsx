@@ -100,7 +100,8 @@ function useItensDoPeriodo({ de, ate, filtros, mostrar, versao, ligado = true })
 // dias (auditoria de 17/11): no Mês, a partir de 1280 px, o mês ocupa dois terços e os dois ficam à direita, o detalhe em
 // cima (M3); nas telas menores e na Semana ficam embaixo, e clicar num dia rola a página até o detalhe; na visão Agenda,
 // que já lista tudo, eles não aparecem (R5). Cada pessoa vê o que o banco deixa (consultor: a própria agenda e os
-// convites; gestão: a da consultoria; central: todas). Só o período visível é lido. ?evento=<id> no endereço abre o evento.
+// convites; gestão: a da consultoria; central: todas). Só o período visível é lido. ?evento=<id> no endereço abre o evento;
+// ?visao= guarda a visão escolhida (usabilidade, U9).
 // - Sem `cliente`: o menu Calendário. Aqui também termina a conexão do Google da pessoa (o Google volta para
 //   /calendario?code=…&state=…).
 // - Com `cliente` ({ id, nome, consultoria_id, arquivado, contato_nome, contato_email }, a aba Agenda do cliente): só os
@@ -118,7 +119,11 @@ export default function CalendarioDaAgenda({ cliente = null }) {
   const podeCriar = !cliente || Boolean(cliente.consultoria_id && !cliente.arquivado)
   const [parametros, setParametros] = useSearchParams()
   const [hoje] = useState(hojeEmSP)
-  const [visao, setVisao] = useState(() => (ehCelular() ? 'agenda' : 'mes'))
+  // A visão fica no endereço, ?visao=mes|semana|agenda (e todos, no cliente): recarregar ou voltar reabre nela
+  // (usabilidade, U9). Sem ela (ou com uma que não vale aqui), a de sempre: Agenda no celular, Mês no resto.
+  const [visaoPadrao] = useState(() => (ehCelular() ? 'agenda' : 'mes'))
+  const visaoPedida = parametros.get('visao')
+  const visao = (cliente ? VISOES_DO_CLIENTE : VISOES).some((v) => v.valor === visaoPedida) ? visaoPedida : visaoPadrao
   const [diaDaVisao, setDiaDaVisao] = useState(hoje)
   const [selecionado, setSelecionado] = useState(hoje)
   const [mostrar, setMostrar] = useState(mostrarTudo)
@@ -259,7 +264,11 @@ export default function CalendarioDaAgenda({ cliente = null }) {
   }
 
   function mudarVisao(nova) {
-    setVisao(nova)
+    setParametros((anteriores) => {
+      const novos = new URLSearchParams(anteriores)
+      novos.set('visao', nova)
+      return novos
+    }, { replace: true })
     if (nova !== 'agenda' && nova !== 'todos') setDiaDaVisao(diaDoDetalhe)
   }
 

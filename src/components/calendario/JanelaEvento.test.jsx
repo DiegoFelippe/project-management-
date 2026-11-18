@@ -134,16 +134,101 @@ describe('JanelaEvento: editar', () => {
     expect(screen.queryByText('A pasta da reunião já está neste cliente.')).not.toBeInTheDocument()
   })
 
-  it('aviso de "fica só no app" vira aviso na tela', async () => {
+  it('aviso de "fica só no app" vira aviso na tela (o Google é de outra pessoa: sem botão)', async () => {
     const user = userEvent.setup()
     vi.mocked(salvarEvento).mockResolvedValue({ erro: null, evento: EVENTO, aviso: 'Fica só no app: Ana Souza não conectou o Google.' })
     janela()
     await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
     await waitFor(() => expect(toast.warning).toHaveBeenCalledWith('Fica só no app: Ana Souza não conectou o Google.'))
   })
+
+  // Usabilidade, U9: quem organiza é quem conecta o Google; o aviso leva ao "Conectar Google" de sempre.
+  it('"Fica só no app" do meu evento traz "Conectar Google" no aviso, pelo mesmo caminho do Calendário', async () => {
+    const user = userEvent.setup()
+    vi.mocked(salvarEvento).mockResolvedValue({ erro: null, evento: EVENTO, aviso: 'Fica só no app: Ana Souza não conectou o Google.' })
+    const { aoConectarGoogle } = janela({ perfil: consultora, google: { conectado: false, email: null, erro: null } })
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledWith('Fica só no app: Ana Souza não conectou o Google.', expect.objectContaining({
+      action: expect.objectContaining({ label: 'Conectar Google' }),
+    })))
+    vi.mocked(toast.warning).mock.calls[0][1].action.onClick()
+    expect(aoConectarGoogle).toHaveBeenCalledTimes(1)
+  })
+
+  it('"pede para reconectar" traz "Reconectar Google"; acesso desativado não traz botão', async () => {
+    const user = userEvent.setup()
+    vi.mocked(salvarEvento).mockResolvedValueOnce({ erro: null, evento: EVENTO, aviso: 'Fica só no app: o Google de Ana Souza pede para reconectar.' })
+    janela({ perfil: consultora })
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(toast.warning).mock.calls[0][1].action.label).toBe('Reconectar Google')
+    cleanup()
+    vi.mocked(salvarEvento).mockResolvedValueOnce({ erro: null, evento: EVENTO, aviso: 'Fica só no app: o acesso de Ana Souza está desativado.' })
+    janela({ perfil: consultora })
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(toast.warning).mock.calls[1]).toEqual(['Fica só no app: o acesso de Ana Souza está desativado.'])
+  })
+
+  it('um evento de dia inteiro abre com a chave "Dia inteiro" ligada e sem Das e Até', () => {
+    janela({ evento: { ...EVENTO, dia_inteiro: true, inicio: '2026-11-20T00:00:00-03:00', fim: '2026-11-21T00:00:00-03:00' } })
+    expect(screen.getByRole('switch', { name: 'Dia inteiro' })).toBeChecked()
+    expect(screen.queryByLabelText('Das')).toBeNull()
+    expect(screen.queryByLabelText('Até')).toBeNull()
+  })
+
+  it('fechar com algo mudado pergunta antes de descartar (usabilidade, U4)', async () => {
+    const user = userEvent.setup()
+    const { aoFechar } = janela()
+    await user.type(screen.getByLabelText('Título'), ' 2')
+    await user.keyboard('{Escape}')
+    expect(aoFechar).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })).getByRole('button', { name: 'Descartar' }))
+    expect(aoFechar).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('JanelaEvento: novo', () => {
+  // Usabilidade, U9: a chave "Dia inteiro" é explícita e começa desligada; sem horário, o erro aponta a hora.
+  it('"Dia inteiro" começa desligada; sem título e sem horário, os dois erros aparecem juntos, cada um no seu campo', async () => {
+    const user = userEvent.setup()
+    janela({ perfil: consultora, evento: null })
+    expect(screen.getByRole('switch', { name: 'Dia inteiro' })).not.toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'Criar evento' }))
+    expect(salvarEvento).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Título')).toHaveAccessibleDescription('Escreva o título do evento.')
+    expect(screen.getByLabelText('Das')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Das')).toHaveAccessibleDescription(/Escolha o horário de início ou ligue "Dia inteiro"\./)
+    expect(screen.getByLabelText('Título')).toHaveFocus()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('ligar "Dia inteiro" tira Das e Até, a prévia diz "dia inteiro" e o evento vai como dia inteiro', async () => {
+    const user = userEvent.setup()
+    janela({ perfil: consultora, evento: null })
+    expect(screen.getByText(/· escolha o horário$/)).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Título'), 'Imersão')
+    await user.click(screen.getByRole('switch', { name: 'Dia inteiro' }))
+    expect(screen.queryByLabelText('Das')).toBeNull()
+    expect(screen.queryByLabelText('Até')).toBeNull()
+    expect(screen.getByText(/· dia inteiro$/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Criar evento' }))
+    await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({
+      inicio: '2026-11-20T00:00:00-03:00', fim: '2026-11-21T00:00:00-03:00', dia_inteiro: true,
+    })))
+  })
+
+  it('com horário, a chave fica desligada e o evento vai com a hora', async () => {
+    const user = userEvent.setup()
+    janela({ perfil: consultora, evento: null })
+    await user.type(screen.getByLabelText('Título'), 'Reunião')
+    await escolherHora(user, 'Das', '14:00')
+    await user.click(screen.getByRole('button', { name: 'Criar evento' }))
+    await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({
+      inicio: '2026-11-20T14:00:00-03:00', fim: '2026-11-20T15:00:00-03:00', dia_inteiro: false,
+    })))
+  })
+
   it('o id nasce uma vez por janela; o botão trava enquanto grava e tentar de novo usa o mesmo id', async () => {
     const user = userEvent.setup()
     let responder
@@ -151,6 +236,8 @@ describe('JanelaEvento: novo', () => {
     janela({ perfil: consultora, evento: null })
     expect(screen.getByRole('dialog', { name: 'Novo evento' })).toBeInTheDocument()
     await user.type(screen.getByLabelText('Título'), 'Alinhamento')
+    // Sem horário, só com a chave "Dia inteiro" ligada (usabilidade, U9).
+    await user.click(screen.getByRole('switch', { name: 'Dia inteiro' }))
     await user.click(screen.getByRole('button', { name: 'Criar evento' }))
     const gravando = screen.getByRole('button', { name: 'Criando…' })
     expect(gravando).toBeDisabled()
@@ -179,11 +266,15 @@ describe('JanelaEvento: novo', () => {
     await escolherData(user, 'Termina em', '2026-11-22')
     expect(screen.getByText(/até Dom, 22 de nov\. · 14:00$/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Criar evento' }))
-    const quando = screen.getByRole('group', { name: 'Quando' })
-    expect(within(quando).getByRole('alert')).toHaveTextContent('Escolha o horário em que termina.')
+    // O erro fica embaixo do campo Até (usabilidade, U2), que recebe o foco.
+    expect(screen.getByLabelText('Até')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Até')).toHaveAccessibleDescription(/Escolha o horário em que termina\./)
+    expect(screen.getByLabelText('Até')).toHaveFocus()
     expect(salvarEvento).not.toHaveBeenCalled()
     await escolherHora(user, 'Até', '10:00')
-    expect(within(quando).queryByRole('alert')).not.toBeInTheDocument()
+    // Mexeu no Quando: o erro do horário some.
+    expect(screen.getByLabelText('Até')).not.toHaveAttribute('aria-invalid')
+    expect(screen.queryByText('Escolha o horário em que termina.')).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Criar evento' }))
     await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({
       inicio: '2026-11-20T14:00:00-03:00', fim: '2026-11-22T10:00:00-03:00', dia_inteiro: false,
@@ -278,6 +369,7 @@ describe('JanelaEvento: novo', () => {
     await waitFor(() => expect(opcoes()).toEqual(['Caio Melo']))
     await user.keyboard('{Escape}')
     await user.type(screen.getByLabelText('Título'), 'Alinhamento do time')
+    await user.click(screen.getByRole('switch', { name: 'Dia inteiro' }))
     await user.click(screen.getByRole('button', { name: 'Criar evento' }))
     await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({ participantes: ['p2'] })))
   })
@@ -292,6 +384,7 @@ describe('JanelaEvento: novo', () => {
     expect(consultoresPorOcupacao).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1' }))
     expect(pessoasParaConvidar).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1', termo: '' }))
     await user.type(screen.getByLabelText('Título'), 'Revisão')
+    await user.click(screen.getByRole('switch', { name: 'Dia inteiro' }))
     await user.click(screen.getByRole('button', { name: 'Criar evento' }))
     await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({ consultor_id: 'p1', participantes: ['p3'] })))
   })
@@ -312,6 +405,7 @@ describe('JanelaEvento: novo na agenda do cliente', () => {
     expect(screen.getByRole('switch', { name: 'Gravar e transcrever' })).toBeChecked()
     expect(screen.getByRole('group', { name: 'Sugestão de convidado' })).toHaveTextContent('carla@alfa.com.br')
     await user.type(screen.getByLabelText('Título'), 'Kickoff')
+    await user.click(screen.getByRole('switch', { name: 'Dia inteiro' }))
     await user.click(screen.getByRole('button', { name: 'Criar evento' }))
     await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({
       novo: true, consultor_id: 'p1', cliente_id: 'k1', com_meet: true, gravar: true,
@@ -334,6 +428,7 @@ describe('JanelaEvento: novo na agenda do cliente', () => {
     expect(screen.getByLabelText('Cliente')).toHaveTextContent('Provedor Alfa')
     expect(screen.getByLabelText('Cliente')).toBeDisabled()
     await user.type(screen.getByLabelText('Título'), 'Revisão')
+    await user.click(screen.getByRole('switch', { name: 'Dia inteiro' }))
     await user.click(screen.getByRole('button', { name: 'Criar evento' }))
     await waitFor(() => expect(salvarEvento).toHaveBeenCalledWith(expect.objectContaining({ consultor_id: 'p2', cliente_id: 'k1' })))
   })
