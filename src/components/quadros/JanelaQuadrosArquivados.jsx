@@ -12,6 +12,7 @@ import { FUSO } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
 import JanelaApagarQuadro from './JanelaApagarQuadro'
+import { OQuadro } from './nomeDoQuadro'
 
 const QUANDO = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, dateStyle: 'short', timeStyle: 'short' })
 const ABAS = [{ valor: '', rotulo: 'Todos' }, { valor: 'pessoa', rotulo: 'Pessoais' }, { valor: 'time', rotulo: 'Dos times' }]
@@ -54,7 +55,7 @@ export default function JanelaQuadrosArquivados({ perfil, aoFechar, aoAbrir, aoM
     setRestaurando(null)
     setVersao((v) => v + 1)
     if (resposta.erro) return toast.error(resposta.erro)
-    toast.success(`Quadro ${quadro.nome} restaurado.`)
+    toast.success(`${OQuadro(quadro.nome)} restaurado.`)
     aoMudou(quadro.id, 'restaurado')
   }
 

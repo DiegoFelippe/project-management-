@@ -157,13 +157,39 @@ describe('Quadros: qual quadro abre', () => {
     await waitFor(() => expect(lerMemoria(ANA.id)).toEqual({ ultimo: FAVORITO_ID, recentes: [FAVORITO_ID] }))
   })
 
-  it('o último arquivado (ou de cliente) também não abre: cai no primeiro de Meus e sai da memória', async () => {
+  it('o último arquivado também não abre: cai no primeiro de Dos times e sai da memória', async () => {
     quadros[PESSOAL_ID] = ARQUIVADO
     lembrarQuadro(ANA.id, PESSOAL_ID)
     vi.mocked(quadrosParaEscolher).mockResolvedValue({ favoritos: vazio, meus: vazio, dosTimes: { itens: [itemDaLista(DO_TIME)], total: 1 } })
     montar('/quadros')
     await waitFor(() => expect(endereco()).toBe(`/quadros/${DO_TIME_ID}`))
     await waitFor(() => expect(lerMemoria(ANA.id).recentes).toEqual([DO_TIME_ID]))
+  })
+
+  it('o último sendo de cliente também não abre: cai no primeiro de Meus e sai da memória', async () => {
+    lembrarQuadro(ANA.id, DO_CLIENTE_ID)
+    montar('/quadros')
+    await waitFor(() => expect(endereco()).toBe(`/quadros/${PESSOAL_ID}`))
+    expect(quadroPorId).toHaveBeenCalledWith(DO_CLIENTE_ID)
+    expect(screen.queryByText(/de um cliente/)).not.toBeInTheDocument()
+    await waitFor(() => expect(lerMemoria(ANA.id).recentes).toEqual([PESSOAL_ID]))
+  })
+
+  it('restaurar a partir do vazio abre o quadro restaurado', async () => {
+    const user = userEvent.setup()
+    vi.mocked(quadrosParaEscolher).mockResolvedValue({ favoritos: vazio, meus: vazio, dosTimes: vazio })
+    vi.mocked(quadrosArquivados).mockResolvedValue({
+      itens: [{ ...itemDaLista(PESSOAL), arquivado_em: '2026-11-17T12:00:00Z', pode_administrar: true }], total: 1,
+    })
+    montar('/quadros')
+    await screen.findByText('Você ainda não tem quadros.')
+    await user.click(screen.getByRole('button', { name: 'Quadros arquivados' }))
+    const tabela = await screen.findByRole('table', { name: 'Quadros arquivados' })
+    await user.click(within(tabela).getByRole('button', { name: 'Restaurar' }))
+    expect(restaurarQuadro).toHaveBeenCalledWith(PESSOAL_ID)
+    await waitFor(() => expect(endereco()).toBe(`/quadros/${PESSOAL_ID}`))
+    expect(await coluna('A fazer')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Quadros arquivados' })).not.toBeInTheDocument()
   })
 
   it('sem quadros: ListaVazia com Novo quadro (que abre a janela)', async () => {
@@ -194,6 +220,14 @@ describe('Quadros: qual quadro abre', () => {
     await waitFor(() => expect(lerMemoria(ANA.id).recentes).toEqual([]))
     await user.click(screen.getByRole('link', { name: 'Ir para os meus quadros' }))
     await waitFor(() => expect(endereco()).toBe(`/quadros/${PESSOAL_ID}`))
+  })
+
+  it('/quadros/<não é um id>: "não existe", sem ir ao banco (nada de erro com Tentar de novo)', async () => {
+    montar('/quadros/abc')
+    expect(await screen.findByText('Este quadro não existe ou você não tem acesso a ele.')).toBeInTheDocument()
+    expect(quadroPorId).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ir para os meus quadros' })).toHaveAttribute('href', '/quadros')
   })
 
   it('quadro de cliente manda para o cliente: mensagem com o link da página do cliente', async () => {
@@ -404,14 +438,47 @@ describe('Quadros: o CRUD do quadro no cabeçalho', () => {
     expect(lerMemoria(ANA.id).recentes).not.toContain(PESSOAL_ID)
   })
 
-  it('a estrela marca o favorito e o quadro é relido', async () => {
+  it('a estrela marca o favorito e relê só o quadro (os cartões das colunas ficam)', async () => {
     const user = userEvent.setup()
     montar(`/quadros/${PESSOAL_ID}`)
     await coluna('A fazer')
+    await screen.findByRole('button', { name: 'Cartão Mapear boletos' })
     quadros[PESSOAL_ID] = { ...PESSOAL, favorito: true }
+    const leiturasDoQuadro = vi.mocked(quadroPorId).mock.calls.length
+    const leiturasDeCartoes = vi.mocked(cartoesDoQuadro).mock.calls.length
     await user.click(screen.getByRole('button', { name: 'Favorito' }))
     expect(marcarFavorito).toHaveBeenCalledWith(PESSOAL_ID, true)
+    await waitFor(() => expect(vi.mocked(quadroPorId).mock.calls.length).toBeGreaterThan(leiturasDoQuadro))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Favorito' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(vi.mocked(cartoesDoQuadro).mock.calls.length).toBe(leiturasDeCartoes)
+  })
+
+  it('voltar (navegador) ao quadro em que uma janela do cabeçalho estava aberta não a reabre', async () => {
+    const user = userEvent.setup()
+    montar(`/quadros/${PESSOAL_ID}`)
+    await coluna('A fazer')
+    await abrirMenu(user)
+    await user.click(screen.getByRole('menuitem', { name: 'Renomear' }))
+    expect(await screen.findByRole('dialog', { name: 'Renomear quadro' })).toBeInTheDocument()
+    await act(async () => navegar(`/quadros/${DO_TIME_ID}`))
+    await coluna('Ideias')
+    expect(screen.queryByRole('dialog', { name: 'Renomear quadro' })).not.toBeInTheDocument()
+    await act(async () => navegar(-1))
+    await waitFor(() => expect(endereco()).toBe(`/quadros/${PESSOAL_ID}`))
+    await coluna('A fazer')
+    expect(screen.queryByRole('dialog', { name: 'Renomear quadro' })).not.toBeInTheDocument()
+  })
+
+  it('nome que já começa com "Quadro": os avisos não repetem a palavra', async () => {
+    const user = userEvent.setup()
+    quadros[PESSOAL_ID] = { ...PESSOAL, nome: 'Quadro de metas' }
+    montar(`/quadros/${PESSOAL_ID}`)
+    await coluna('A fazer')
+    await abrirMenu(user)
+    await user.click(screen.getByRole('menuitem', { name: 'Arquivar' }))
+    const confirmar = await screen.findByRole('alertdialog', { name: 'Arquivar o Quadro de metas?' })
+    await user.click(within(confirmar).getByRole('button', { name: 'Arquivar quadro' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Quadro de metas arquivado.'))
   })
 
   it('Quadros arquivados → Abrir abre o arquivado, só para ler', async () => {

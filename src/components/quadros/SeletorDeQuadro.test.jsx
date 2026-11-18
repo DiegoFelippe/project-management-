@@ -61,6 +61,9 @@ describe('SeletorDeQuadro', () => {
     expect(nomes).toEqual(['Favoritos', 'Recentes', 'Meus', 'Dos times'])
     const favoritos = within(listbox).getByRole('group', { name: 'Favoritos' })
     expect(within(favoritos).getByRole('option', { name: /Prioridades/ })).toHaveTextContent('1 cartão')
+    // A estrela do item é só desenho; o leitor de tela ouve "favorito" no nome.
+    expect(within(favoritos).getByRole('option', { name: /Prioridades.*favorito/ })).toBeInTheDocument()
+    expect(within(listbox).getByRole('group', { name: 'Meus' })).not.toHaveTextContent('favorito')
     const dosTimes = within(listbox).getByRole('group', { name: 'Dos times' })
     const sprint = within(dosTimes).getByRole('option', { name: /Sprint/ })
     expect(sprint).toHaveTextContent('Comercial')
@@ -122,8 +125,9 @@ describe('SeletorDeQuadro', () => {
     expect(screen.queryByRole('group', { name: 'Recentes' })).not.toBeInTheDocument()
   })
 
-  it('central (e dono): sem o grupo Dos times', async () => {
-    responder({ escolher: grupos({ dos_times: { itens: [], total: 0 } }) })
+  it('central (e dono): sem o grupo Dos times (mesmo que viesse algo)', async () => {
+    // A guarda é da tela: com Dos times na resposta, o grupo continua fora.
+    responder({ escolher: grupos() })
     const { gatilho } = tela({ perfil: CENTRAL })
     await userEvent.click(gatilho)
     const listbox = await lista()

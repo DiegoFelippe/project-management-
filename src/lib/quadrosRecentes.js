@@ -6,7 +6,8 @@
 export const RECENTES_GUARDADOS = 8
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const ehUuid = (valor) => typeof valor === 'string' && UUID.test(valor)
+// Também para a tela: id que não é uuid nem vai ao banco (o quadro_por_id recusaria com 22P02).
+export const ehUuid = (valor) => typeof valor === 'string' && UUID.test(valor)
 const chave = (perfilId) => `ixc.quadros.${perfilId}`
 const vazia = () => ({ ultimo: null, recentes: [] })
 

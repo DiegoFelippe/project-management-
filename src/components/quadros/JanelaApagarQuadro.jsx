@@ -7,6 +7,7 @@ import { useEnvio } from '@/components/comum/useEnvio'
 import { Button } from '@/components/ui/button'
 import { quadroPorId } from '@/data/quadro'
 import { apagarQuadro } from '@/data/quadros'
+import { oQuadro, OQuadro } from './nomeDoQuadro'
 
 const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
 
@@ -42,8 +43,8 @@ export default function JanelaApagarQuadro({ quadro, aoFechar, aoApagado, aoArqu
   const apagar = () => fazer('apagar', async () => {
     const resposta = await apagarQuadro(quadro.id)
     if (resposta.erro) return resposta
-    if (resposta.aviso) toast.warning(`Quadro ${quadro.nome} apagado, mas: ${resposta.aviso}`)
-    else toast.success(`Quadro ${quadro.nome} apagado.`)
+    if (resposta.aviso) toast.warning(`${OQuadro(quadro.nome)} apagado, mas: ${resposta.aviso}`)
+    else toast.success(`${OQuadro(quadro.nome)} apagado.`)
     aoApagado()
     return resposta
   })
@@ -57,7 +58,7 @@ export default function JanelaApagarQuadro({ quadro, aoFechar, aoApagado, aoArqu
       : 'Contando o que some junto…'
 
   return (
-    <JanelaFormulario aberto aoFechar={aoFechar} titulo={`Apagar o quadro ${quadro.nome}?`} icone={Trash2} enviando={enviando}
+    <JanelaFormulario aberto aoFechar={aoFechar} titulo={`Apagar o ${oQuadro(quadro.nome)}?`} icone={Trash2} enviando={enviando}
       rodape={(
         <>
           <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>

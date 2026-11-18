@@ -96,6 +96,15 @@ describe('JanelaApagarQuadro', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Apagando…' })).not.toBeInTheDocument())
   })
 
+  it('nome que já começa com "Quadro": título e aviso sem repetir a palavra', async () => {
+    const aoApagado = vi.fn()
+    render(<JanelaApagarQuadro quadro={{ ...DO_TIME, nome: 'Quadro de metas' }} aoFechar={vi.fn()} aoApagado={aoApagado} />)
+    const janela = screen.getByRole('dialog', { name: 'Apagar o Quadro de metas?' })
+    await within(janela).findByText(/3 colunas/)
+    await userEvent.click(screen.getByRole('button', { name: 'Apagar quadro' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Quadro de metas apagado.'))
+  })
+
   it('quadro pessoal: uma coluna e um cartão no singular', async () => {
     vi.mocked(quadroPorId).mockResolvedValue({ ...DO_TIME, tipo: 'pessoa', time: null, colunas: [{ id: 'c1', cartoes: 1, arquivados: 0 }] })
     const { janela } = tela({ quadro: { ...DO_TIME, tipo: 'pessoa', time: null } })

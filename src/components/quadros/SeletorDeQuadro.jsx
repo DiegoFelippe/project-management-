@@ -143,7 +143,9 @@ function ListaDeQuadros({ perfil, quadroId, ancora, aoFechar, aoEscolher }) {
                   className={cn('flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 pointer-coarse:min-h-11', marcado && 'bg-primary/10', i === atual && 'bg-accent')}>
                   <Star className={cn('size-3.5 shrink-0', q.favorito ? 'fill-current text-notice' : 'text-muted-foreground/50')} aria-hidden="true" />
                   <span className="min-w-0 flex-1">
-                    <span className={cn('block truncate text-rotulo', marcado ? 'text-primary-texto font-medium' : 'text-foreground')}>{q.nome}</span>
+                    <span className={cn('block truncate text-rotulo', marcado ? 'text-primary-texto font-medium' : 'text-foreground')}>
+                      {q.nome}{q.favorito && <span className="sr-only"> (favorito)</span>}
+                    </span>
                     {q.time && <span className="text-muted-foreground block truncate text-legenda">{q.time.nome}</span>}
                   </span>
                   <span className="text-muted-foreground shrink-0 text-legenda tabular-nums">{cartoes(q.cartoes ?? 0)}</span>

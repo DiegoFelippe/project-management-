@@ -15,12 +15,13 @@ import JanelaNovoQuadro from '@/components/quadros/JanelaNovoQuadro'
 import JanelaQuadrosArquivados from '@/components/quadros/JanelaQuadrosArquivados'
 import JanelaRenomearQuadro from '@/components/quadros/JanelaRenomearQuadro'
 import MenuDoQuadro from '@/components/quadros/MenuDoQuadro'
+import { oQuadro, OQuadro } from '@/components/quadros/nomeDoQuadro'
 import SeletorDeQuadro from '@/components/quadros/SeletorDeQuadro'
 import { Button } from '@/components/ui/button'
 import { quadroPorId } from '@/data/quadro'
 import { arquivarQuadro, quadrosParaEscolher, restaurarQuadro } from '@/data/quadros'
 import { veTudo } from '@/lib/papeis'
-import { esquecerQuadro, lembrarQuadro, lerMemoria } from '@/lib/quadrosRecentes'
+import { ehUuid, esquecerQuadro, lembrarQuadro, lerMemoria } from '@/lib/quadrosRecentes'
 import { useAtraso } from '@/lib/useAtraso'
 
 // Quem vê o quadro aberto (o subtítulo do cabeçalho).
@@ -46,12 +47,17 @@ export default function Quadros() {
   const naTela = useRef(null)
   // O que o quadro aberto (filho com key) mostrou por último: { id, quadro, semAcesso }.
   const [visto, setVisto] = useState(null)
-  // A janela do cabeçalho vale só para o quadro em que foi aberta: trocar de quadro (endereço) a fecha.
-  const [janela, setJanela] = useState(null) // { tipo, id }
-  const aberta = janela && janela.id === id ? janela.tipo : null
+  // A janela do cabeçalho vale só para o quadro em que foi aberta: trocar de quadro (endereço, inclusive voltar e
+  // avançar do navegador) a fecha de vez.
+  const [janela, setJanela] = useState(null) // 'novo' | 'arquivados' | 'renomear' | 'arquivar' | 'apagar'
+  const [idDaJanela, setIdDaJanela] = useState(id)
+  if (idDaJanela !== id) {
+    setIdDaJanela(id)
+    setJanela(null)
+  }
   const quadro = id && visto?.id === id && !visto.semAcesso ? visto.quadro ?? null : null
 
-  const abrir = (tipo) => setJanela({ tipo, id })
+  const abrir = (tipo) => setJanela(tipo)
   const fechar = () => setJanela(null)
   const reler = () => naTela.current?.reler()
   const irPara = (quadroId) => navigate(`/quadros/${quadroId}`)
@@ -63,7 +69,7 @@ export default function Quadros() {
   async function arquivar() {
     const resposta = await arquivarQuadro(quadro.id)
     if (!resposta.erro) {
-      toast.success(`Quadro ${quadro.nome} arquivado.`)
+      toast.success(`${OQuadro(quadro.nome)} arquivado.`)
       fechar()
       reler()
     }
@@ -73,7 +79,7 @@ export default function Quadros() {
   async function restaurar() {
     const resposta = await restaurarQuadro(quadro.id)
     if (resposta.erro) return toast.error(resposta.erro)
-    toast.success(`Quadro ${quadro.nome} restaurado.`)
+    toast.success(`${OQuadro(quadro.nome)} restaurado.`)
     reler()
   }
 
@@ -90,36 +96,42 @@ export default function Quadros() {
         ? <QuadroAberto key={id} ref={naTela} quadroId={id} perfil={perfil} aoVer={setVisto} />
         : <EscolherQuadro perfil={perfil} aoNovo={() => abrir('novo')} aoArquivados={() => abrir('arquivados')} />}
 
-      {aberta === 'novo' && (
+      {janela === 'novo' && (
         <JanelaNovoQuadro perfil={perfil} aoFechar={fechar} aoCriado={(novo, nome) => {
-          toast.success(`Quadro ${nome} criado.`)
+          toast.success(`${OQuadro(nome)} criado.`)
           fechar()
           irPara(novo)
         }} />
       )}
-      {aberta === 'arquivados' && (
+      {janela === 'arquivados' && (
         <JanelaQuadrosArquivados perfil={perfil} aoFechar={fechar} aoAbrir={(arquivado) => {
           fechar()
           irPara(arquivado)
         }} aoMudou={(quadroId, mudanca) => {
+          // Restaurou a partir da lista vazia (sem quadro aberto): abre o restaurado.
+          if (!id && mudanca === 'restaurado') {
+            fechar()
+            irPara(quadroId)
+            return
+          }
           if (quadroId !== id) return
           if (mudanca === 'apagado') sairDoQuadro(quadroId)
           else reler()
         }} />
       )}
-      {aberta === 'renomear' && quadro && (
+      {janela === 'renomear' && quadro && (
         <JanelaRenomearQuadro quadro={quadro} aoFechar={fechar} aoSalvo={() => {
           toast.success('Quadro renomeado.')
           fechar()
           reler()
         }} />
       )}
-      {aberta === 'arquivar' && quadro && (
-        <ConfirmarAcao aberto aoFechar={fechar} perigo={false} titulo={`Arquivar o quadro ${quadro.nome}?`}
+      {janela === 'arquivar' && quadro && (
+        <ConfirmarAcao aberto aoFechar={fechar} perigo={false} titulo={`Arquivar o ${oQuadro(quadro.nome)}?`}
           descricao="O quadro sai da lista e fica em Quadros arquivados, só para ler. Dá para restaurar."
           rotuloConfirmar="Arquivar quadro" aoConfirmar={arquivar} />
       )}
-      {aberta === 'apagar' && quadro && (
+      {janela === 'apagar' && quadro && (
         <JanelaApagarQuadro quadro={quadro} aoFechar={fechar} aoApagado={() => sairDoQuadro(quadro.id)}
           aoArquivar={quadro.arquivado_em ? undefined : arquivar} />
       )}
@@ -203,6 +215,8 @@ function QuadroAberto({ quadroId, perfil, aoVer, ref }) {
   const lembrado = useRef(false)
 
   const ler = useCallback(async () => {
+    // Endereço com algo que não é um id: não existe (sem ir ao banco, que recusaria com 22P02).
+    if (!ehUuid(quadroId)) return { quadro: null }
     const q = await quadroPorId(quadroId)
     if (!q || q.cliente_id) {
       esquecerQuadro(perfil.id, quadroId)
@@ -217,8 +231,10 @@ function QuadroAberto({ quadroId, perfil, aoVer, ref }) {
   }, [quadroId, perfil.id])
 
   const estado = useQuadro({ ler, chave: quadroId, filtros: { ...filtros, busca: buscaAtrasada } })
-  const { quadro, semAcesso, lerTudo } = estado
-  useImperativeHandle(ref, () => ({ reler: lerTudo }), [lerTudo])
+  const { quadro, semAcesso, relerQuadro } = estado
+  // Depois das ações do cabeçalho (estrela, renomear, arquivar, restaurar) basta reler o quadro: os cartões não mudam (e o
+  // canal já relê tudo quando o quadro muda de nome ou é arquivado).
+  useImperativeHandle(ref, () => ({ reler: () => relerQuadro() }), [relerQuadro])
   // Antes de pintar: o cabeçalho (nome, estrela, quem vê) muda junto com o quadro, sem um quadro de atraso.
   useLayoutEffect(() => {
     aoVer({ id: quadroId, quadro, semAcesso })
