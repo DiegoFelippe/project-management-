@@ -43,7 +43,7 @@ export function limitesDoMesEmSP(mes) {
   return [meiaNoiteEmSP(mes.slice(0, 10)), meiaNoiteEmSP(deslocarMes(mes, 1))]
 }
 
-const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+export const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 
 // "2026-03-01" -> "mar/26" (rótulo dos gráficos de horas por mês).
 export const rotuloCurto = (mes) => `${MESES_CURTOS[Number(mes.slice(5, 7)) - 1]}/${mes.slice(2, 4)}`

@@ -1,7 +1,7 @@
 // Período do painel do Início (pedido do Diego, 17/11): o Mês (padrão) ou um intervalo de dias de São Paulo.
 // Os atalhos contam a partir de hoje; Personalizado traz as datas escolhidas. O banco recebe o mês ou { de, ate }
 // e confere os mesmos limites (painel_do_inicio). Datas sempre como texto "AAAA-MM-DD", sem passar por fuso.
-import { formatarDia, rotuloCurto } from '@/lib/mes'
+import { MESES_CURTOS, formatarDia, rotuloCurto } from '@/lib/mes'
 
 export const TIPOS_DE_PERIODO = [
   { valor: 'mes', rotulo: 'Mês' },
@@ -99,7 +99,6 @@ export const descreverPeriodo = (de, ate) => (de === ate ? formatarDia(de) : `${
 // Último dia que o Até pode ter: o fim do mês atual.
 export const ultimoDiaPermitido = (hoje) => fimDoMes(primeiroDoMes(hoje))
 
-const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 const diaMes = (dia) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`
 
 // Rótulo do período anterior na linha de variação dos cartões ("▲ 12% vs set/26"). O banco calcula o anterior

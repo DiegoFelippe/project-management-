@@ -237,8 +237,8 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
 - **SVG na largura real** (`useLargura`, sem `viewBox` que estica) e texto do SVG só com `fontSize={TAMANHO.legenda}`
   (11 px) ou maior; rótulos do eixo X com 44 px entre eles (sempre o último); a 360 px nada rola para o lado.
 - **Todo gráfico tem visão em tabela** ("Ver em tabela", com os mesmos números) e **dica no mouse, no toque e no
-  teclado** (marca focável com `aria-label`; na linha, um alvo só e as setas ← →; Esc fecha). Texto da dica é texto
-  do React, nunca HTML montado.
+  teclado** (o SVG é `role="group"` com o nome do gráfico; marca focável com `aria-label`; na linha, um alvo só e as
+  setas ← →; Esc fecha). Texto da dica é texto do React, nunca HTML montado.
 - **A leitura (frase do gráfico) usa só números do banco** ou a lista inteira que o gráfico mostra, nunca uma amostra:
   as regras ficam em `src/lib/frasesDosGraficos.js`, com teste. A variação dos cartões ("▲ 12% vs out.") é
   `src/lib/variacao.js` + `rotuloDaComparacao` (`src/lib/periodo.js`), com o período anterior vindo do banco.

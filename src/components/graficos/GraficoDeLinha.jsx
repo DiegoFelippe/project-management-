@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { TAMANHO } from '@/lib/tipografia'
 import Dica from './Dica'
 import EixoY from './EixoY'
-import { escalaBonita, formatarValor, passoDosRotulos } from './escala'
+import { escalaBonita, formatarEixo, formatarValor, margemDoEixo, passoDosRotulos } from './escala'
 import { useDica } from './useDica'
 import { useLargura } from './useLargura'
 
@@ -21,18 +21,21 @@ export default function GraficoDeLinha({
   const contem = useRef(null)
   const svg = useRef(null)
   const largura = useLargura(contem)
-  const { dica, mostrar, esconder } = useDica()
+  const { dica, mostrar, esconder } = useDica(contem)
   const [indice, setIndice] = useState(null)
   const [anuncio, setAnuncio] = useState('')
   const ultimoVisto = useRef(null)
 
   const n = rotulos.length
-  const m = { l: unidade ? 46 : 34, r: 16, t: 22, b: 26 }
-  const larguraUtil = Math.max(20, largura - m.l - m.r)
-  const alturaUtil = altura - m.t - m.b
   const horizontal = referenciaHorizontal?.valor > 0 ? referenciaHorizontal : null
   const valores = series.flatMap((s) => s.pontos.filter((v) => v != null))
   const { topo, marcas: marcasDoEixo } = escalaBonita(Math.max(1, horizontal?.valor ?? 0, ...valores) * 1.08, 4, !unidade)
+  // A margem da esquerda cabe o maior rótulo do eixo Y.
+  const m = { l: margemDoEixo(marcasDoEixo.map((v) => formatarEixo(v, unidade))), r: 16, t: 22, b: 26 }
+  const larguraUtil = Math.max(20, largura - m.l - m.r)
+  const alturaUtil = altura - m.t - m.b
+  // A cruz só aparece com a dica aberta: Esc, rolar ou tocar fora fecham as duas (o foco fica no alvo).
+  const cruz = dica ? indice : null
   const x = (i) => (n === 1 ? m.l + larguraUtil / 2 : m.l + (i * larguraUtil) / (n - 1))
   const y = (v) => m.t + alturaUtil - (v / topo) * alturaUtil
 
@@ -136,10 +139,10 @@ export default function GraficoDeLinha({
             textAnchor={n > 1 && i === 0 ? 'start' : n > 1 && i === n - 1 ? 'end' : 'middle'}
             className="pointer-events-none fill-muted-foreground tabular-nums">{rotulo}</text>
         ) : null))}
-        <line data-cruz="" x1={indice == null ? 0 : x(indice)} x2={indice == null ? 0 : x(indice)} y1={m.t} y2={m.t + alturaUtil}
-          strokeWidth="1" shapeRendering="crispEdges" visibility={indice == null ? 'hidden' : 'visible'} className="pointer-events-none stroke-grafico-ref" />
-        <circle cx={indice == null ? 0 : x(indice)} cy={indice == null ? 0 : yDoPonto(indice)} r="4" strokeWidth="2"
-          visibility={indice == null ? 'hidden' : 'visible'} className="pointer-events-none fill-grafico-serie stroke-card" />
+        <line data-cruz="" x1={cruz == null ? 0 : x(cruz)} x2={cruz == null ? 0 : x(cruz)} y1={m.t} y2={m.t + alturaUtil}
+          strokeWidth="1" shapeRendering="crispEdges" visibility={cruz == null ? 'hidden' : 'visible'} className="pointer-events-none stroke-grafico-ref" />
+        <circle cx={cruz == null ? 0 : x(cruz)} cy={cruz == null ? 0 : yDoPonto(cruz)} r="4" strokeWidth="2"
+          visibility={cruz == null ? 'hidden' : 'visible'} className="pointer-events-none fill-grafico-serie stroke-card" />
         <rect role="img" tabIndex={0} aria-label={`${rotuloAria}. Use as setas ← → para percorrer os pontos.`} data-alvo-da-dica=""
           x={m.l - 6} y={m.t} width={larguraUtil + 12} height={alturaUtil}
           className="cursor-crosshair fill-transparent outline-none focus-visible:stroke-ring focus-visible:stroke-2"

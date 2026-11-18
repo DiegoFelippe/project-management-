@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 
 // Dica (tooltip) de um gráfico: { titulo, linhas: [{ valor, rotulo?, cor?, tracejado? }] } mais a posição na tela.
 // Uma por gráfico; aparece no mouse, no toque e no foco do teclado, e some com Esc, ao rolar a página ou ao tocar fora
-// de um alvo (os alvos têm data-alvo-da-dica).
-export function useDica() {
+// dos alvos (data-alvo-da-dica) do próprio gráfico: `contem` é o contêiner dele, então tocar numa marca de outro
+// gráfico fecha esta dica (lá abre a dele).
+export function useDica(contem) {
   const [dica, setDica] = useState(null)
   const mostrar = useCallback((conteudo, x, y) => {
     if (conteudo) setDica({ ...conteudo, x, y })
@@ -17,7 +18,8 @@ export function useDica() {
       if (e.key === 'Escape') setDica(null)
     }
     const toque = (e) => {
-      if (!e.target.closest?.('[data-alvo-da-dica]')) setDica(null)
+      const alvo = e.target.closest?.('[data-alvo-da-dica]')
+      if (!alvo || (contem?.current && !contem.current.contains(alvo))) setDica(null)
     }
     document.addEventListener('keydown', tecla)
     document.addEventListener('pointerdown', toque)
@@ -27,7 +29,7 @@ export function useDica() {
       document.removeEventListener('pointerdown', toque)
       window.removeEventListener('scroll', esconder, { capture: true })
     }
-  }, [aberta, esconder])
+  }, [aberta, esconder, contem])
 
   return { dica, mostrar, esconder }
 }

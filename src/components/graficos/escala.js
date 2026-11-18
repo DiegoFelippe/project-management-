@@ -4,13 +4,13 @@ const NUMERO = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 })
 const limpo = (n) => Math.round(n * 1e9) / 1e9
 
 // Topo e marcas redondas (passos de 1, 2, 2,5, 5 ou 10 × 10ⁿ) cobrindo `maximo` em cerca de `partes` faixas.
-// `inteiro`: contagens (check-ins), passo de no mínimo 1.
+// `inteiro`: contagens (check-ins), passo inteiro e bonito (no mínimo 1; o 2,5 vira 2, nunca 0/3/6/9).
 export function escalaBonita(maximo, partes = 4, inteiro = false) {
   const bruto = Math.max(maximo, 1e-9) / partes
   const ordem = 10 ** Math.floor(Math.log10(bruto))
   const n = bruto / ordem
   let passo = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * ordem
-  if (inteiro) passo = Math.max(1, Math.round(passo))
+  if (inteiro && !Number.isInteger(limpo(passo))) passo = passo < 1 ? 1 : limpo(2 * ordem)
   const topo = limpo(Math.ceil(maximo / passo - 1e-9) * passo) || passo
   const marcas = []
   for (let i = 0; limpo(i * passo) <= topo; i++) marcas.push(limpo(i * passo))
@@ -32,4 +32,16 @@ export function formatarEixo(valor, unidade = '') {
 // Valor de um ponto na dica e no leitor de tela, com a unidade do gráfico (o número inteiro, sem "mil").
 export function formatarValor(valor, unidade = '') {
   return unidade ? `${NUMERO.format(valor)} ${unidade}` : NUMERO.format(valor)
+}
+
+// Largura estimada de um rótulo de gráfico a 11 px (TAMANHO.legenda, Inter, números tabulares), por caractere, para
+// a margem do eixo: o SVG não mede texto antes de desenhar. A estimativa fica um pouco acima da real.
+const LARGURA_DO_CARACTERE = { ' ': 3.1, '.': 3.1, ',': 3.1, i: 2.8, l: 2.8, m: 9.6, h: 6.4, '%': 9 }
+export function larguraDoTexto(texto) {
+  return [...String(texto)].reduce((soma, c) => soma + (LARGURA_DO_CARACTERE[c] ?? 6.8), 0)
+}
+
+// Margem da esquerda do gráfico: o maior rótulo do eixo Y, os 8 px até a grade e 2 px de folga na borda.
+export function margemDoEixo(rotulos) {
+  return Math.ceil(Math.max(0, ...rotulos.map(larguraDoTexto))) + 10
 }

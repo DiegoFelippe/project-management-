@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { escalaBonita, formatarEixo, passoDosRotulos } from './escala'
+import { escalaBonita, formatarEixo, larguraDoTexto, margemDoEixo, passoDosRotulos } from './escala'
 
 describe('escala dos gráficos', () => {
   it('marcas redondas (0/500/1.000…), com o topo cobrindo o máximo', () => {
@@ -12,6 +12,26 @@ describe('escala dos gráficos', () => {
     expect(escalaBonita(3, 4, true)).toEqual({ topo: 3, marcas: [0, 1, 2, 3] })
     // Tudo zero: uma marca acima do zero.
     expect(escalaBonita(0, 4, true).topo).toBeGreaterThan(0)
+  })
+
+  it('contagem: passo inteiro bonito (1, 2, 5, 10…), nunca 0/3/6/9', () => {
+    expect(escalaBonita(9, 4, true)).toEqual({ topo: 10, marcas: [0, 2, 4, 6, 8, 10] })
+    expect(escalaBonita(9.72, 4, true).marcas).toEqual([0, 2, 4, 6, 8, 10])
+    expect(escalaBonita(90, 4, true).marcas).toEqual([0, 25, 50, 75, 100])
+    for (const maximo of [1, 3, 7, 9, 11, 19, 23, 37, 48, 99, 130]) {
+      const { marcas } = escalaBonita(maximo, 4, true)
+      const passo = marcas[1]
+      expect([1, 2, 5].some((base) => [1, 10, 100].some((ordem) => passo === base * ordem)) || passo === 25, `${maximo}: passo ${passo}`).toBe(true)
+    }
+  })
+
+  it('margem do eixo Y pela largura do maior rótulo (estimada por caractere a 11 px)', () => {
+    expect(larguraDoTexto('12 mil h')).toBeGreaterThan(larguraDoTexto('40 h'))
+    expect(larguraDoTexto('1.500 h')).toBeGreaterThan(larguraDoTexto('1.500'))
+    expect(margemDoEixo(['0 h', '12 mil h'])).toBeGreaterThanOrEqual(Math.ceil(larguraDoTexto('12 mil h')) + 8)
+    expect(margemDoEixo(['0', '10', '20'])).toBeLessThan(margemDoEixo(['0 h', '12 mil h']))
+    // "12 mil h" a 11 px tem uns 40 px; a estimativa não fica abaixo disso.
+    expect(larguraDoTexto('12 mil h')).toBeGreaterThanOrEqual(40)
   })
 
   it('passo dos rótulos deixa 44 px entre eles (sempre cabe pelo menos um)', () => {

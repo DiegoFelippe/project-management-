@@ -47,8 +47,26 @@ describe('variacao (a linha "▲ 12% vs out." dos cartões)', () => {
     expect(variacao(3, 4, { tipo: 'quantidade' }).paraLeitor).toBe('caiu 1')
   })
 
-  it('sem um dos números, não há variação (nulo)', () => {
-    expect(variacao(null, 10, { tipo: 'percentual' })).toBeNull()
-    expect(variacao(10, undefined, { tipo: 'quantidade' })).toBeNull()
+  // Nulo, no CartoesDeNumeros, é "a comparação ainda carrega" ("—" para sempre); sem número (ex.: ocupação nula com
+  // capacidade 0) o cartão fica sem a linha: undefined.
+  it('sem um dos números, não há variação (undefined: o cartão fica sem a linha)', () => {
+    expect(variacao(null, 10, { tipo: 'percentual' })).toBeUndefined()
+    expect(variacao(10, undefined, { tipo: 'quantidade' })).toBeUndefined()
+    expect(variacao(0.7, null, { tipo: 'pontos', limiteDoBom: 1 })).toBeUndefined()
+    expect(variacao(Number.NaN, 3, { tipo: 'quantidade' })).toBeUndefined()
+  })
+
+  it('arredonda o meio para longe do zero nos dois sentidos (Math.round(-1,5) daria -1)', () => {
+    // (0,1 − 0,115) × 100 = −1,5 exatos no ponto flutuante.
+    expect(variacao(0.1, 0.115, { tipo: 'pontos' })).toMatchObject({ texto: '▼ 2 p.p.', paraLeitor: 'caiu 2 pontos percentuais' })
+    expect(variacao(0.115, 0.1, { tipo: 'pontos' })).toMatchObject({ texto: '▲ 2 p.p.' })
+    // 39 contra 40: −2,5% → 3%.
+    expect(variacao(39, 40, { tipo: 'percentual' })).toMatchObject({ texto: '▼ 3%' })
+    expect(variacao(41, 40, { tipo: 'percentual' })).toMatchObject({ texto: '▲ 3%' })
+  })
+
+  it('quantidade: sem o "· 0%" quando o percentual arredonda para 0', () => {
+    expect(variacao(1001, 1000, { tipo: 'quantidade' })).toEqual({ texto: '▲ 1', tom: 'bom', paraLeitor: 'subiu 1' })
+    expect(variacao(999, 1000, { tipo: 'quantidade', subirEhBom: false })).toEqual({ texto: '▼ 1', tom: 'bom', paraLeitor: 'caiu 1' })
   })
 })

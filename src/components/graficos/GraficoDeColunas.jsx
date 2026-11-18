@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { TAMANHO } from '@/lib/tipografia'
 import Dica from './Dica'
 import EixoY from './EixoY'
-import { escalaBonita, passoDosRotulos } from './escala'
+import { escalaBonita, formatarEixo, margemDoEixo, passoDosRotulos } from './escala'
 import { pontoDoFoco, useDica } from './useDica'
 import { useLargura } from './useLargura'
 
@@ -25,14 +25,15 @@ export default function GraficoDeColunas({
 }) {
   const contem = useRef(null)
   const largura = useLargura(contem)
-  const { dica, mostrar, esconder } = useDica()
+  const { dica, mostrar, esconder } = useDica(contem)
 
-  const m = { l: unidade ? 52 : 34, r: 12, t: 22, b: 26 }
-  const larguraUtil = Math.max(20, largura - m.l - m.r)
-  const alturaUtil = altura - m.t - m.b
   const horizontal = referenciaHorizontal?.valor > 0 ? referenciaHorizontal : null
   const maior = Math.max(1, horizontal?.valor ?? 0, ...itens.map((i) => Math.max(i.valor ?? 0, linhaDeReferencia ? i.referencia ?? 0 : 0)))
   const { topo, marcas } = escalaBonita(maior * 1.08, 4, !unidade)
+  // A margem da esquerda cabe o maior rótulo do eixo Y ("15 mil h" pede mais que "40 h").
+  const m = { l: margemDoEixo(marcas.map((v) => formatarEixo(v, unidade))), r: 12, t: 22, b: 26 }
+  const larguraUtil = Math.max(20, largura - m.l - m.r)
+  const alturaUtil = altura - m.t - m.b
   const y = (v) => m.t + alturaUtil - (v / topo) * alturaUtil
   const banda = larguraUtil / Math.max(1, itens.length)
   const larguraDaColuna = Math.min(24, Math.max(4, banda * 0.56))

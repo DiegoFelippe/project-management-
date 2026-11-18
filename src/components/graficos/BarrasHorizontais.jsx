@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { ArrowDown, TriangleAlert } from 'lucide-react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/utils'
@@ -19,7 +20,8 @@ const ICONES = {
 
 const arredondar = (n) => Math.round(n * 1000) / 1000
 
-function Barra({ item, posicao, limite, marca100 }) {
+// posicao(v): '%' na trilha (preso entre 0 e 100); porcento(v): o mesmo, em número.
+function Barra({ item, posicao, porcento, limite, marca100 }) {
   if (item.partes) {
     const partes = ORDEM_DAS_PARTES.flatMap((tom) => item.partes.filter((p) => p.tom === tom && p.valor > 0))
     return (
@@ -30,14 +32,19 @@ function Barra({ item, posicao, limite, marca100 }) {
   }
   const cor = COR_DO_TOM[item.tom] ?? COR_DO_TOM.serie
   const acima = limite != null && item.valor > limite
+  // O trecho vermelho vai do limite (+ 2 px de vão) até o valor, sem passar do fim da trilha (escalaMax menor que o
+  // valor): no máximo o que sobra depois do limite. Limite fora da escala: a barra enche a trilha, sem trecho.
+  const sobra = acima ? arredondar(100 - porcento(limite)) : 0
   return (
     <>
-      {acima ? (
+      {acima && sobra > 0 ? (
         <>
           <span data-trecho="base" className={cn('absolute top-[5px] left-0 h-3 rounded-none', cor)} style={{ width: posicao(limite) }} />
           <span data-trecho="acima" className="absolute top-[5px] h-3 rounded-r-[4px] bg-grafico-acima"
-            style={{ left: `calc(${posicao(limite)} + 2px)`, width: `max(2px, ${posicao(item.valor - limite)} - 2px)` }} />
+            style={{ left: `calc(${posicao(limite)} + 2px)`, width: `min(max(2px, ${posicao(item.valor - limite)} - 2px), ${sobra}% - 2px)` }} />
         </>
+      ) : acima ? (
+        <span data-trecho="base" className={cn('absolute top-[5px] left-0 h-3 rounded-r-[4px]', cor)} style={{ width: '100%' }} />
       ) : (
         item.valor > 0 && <span data-trecho="base" className={cn('absolute top-[5px] left-0 h-3 rounded-r-[4px]', cor)} style={{ width: posicao(item.valor) }} />
       )}
@@ -54,13 +61,19 @@ function Barra({ item, posicao, limite, marca100 }) {
 // meio" depois dos `depoisDe` primeiros. Cada barra é focável (aria-label) e mostra a dica no mouse, no toque e no foco.
 // itens: [{ chave, nome, href?, sub?, valor, limite?, marca?, tom?, partes?, valorTexto, icone?, aria, dica, acao? }].
 export default function BarrasHorizontais({ itens, rotulo, escalaMax, marca100 = null, separador = null, rodape }) {
-  const { dica, mostrar, esconder } = useDica()
+  const contem = useRef(null)
+  const { dica, mostrar, esconder } = useDica(contem)
   const maximo = escalaMax ?? Math.max(1e-9, ...itens.flatMap((i) => [i.valor ?? 0, i.limite ?? 0, i.marca ?? 0]), marca100?.valor ?? 0) * 1.04
-  const posicao = (v) => `${arredondar(Math.max(0, Math.min(100, (v / maximo) * 100)))}%`
+  const porcento = (v) => arredondar(Math.max(0, Math.min(100, (v / maximo) * 100)))
+  const posicao = (v) => `${porcento(v)}%`
   const comAcao = itens.some((i) => i.acao)
   const colunas = comAcao ? COLUNAS.com : COLUNAS.sem
   const sair = (e) => {
     if (e.pointerType !== 'touch') esconder()
+  }
+  // No toque, o link do nome e o botão da ação são deles: tocar neles não abre a dica.
+  const tocar = (item, e) => {
+    if (!e.target.closest?.('a, button')) mostrar(item.dica, e.clientX, e.clientY)
   }
 
   const linhas = itens.map((item) => {
@@ -69,7 +82,7 @@ export default function BarrasHorizontais({ itens, rotulo, escalaMax, marca100 =
     const icone = item.icone ?? (acima ? 'alerta' : item.tom === 'folga' ? 'folga' : null)
     return (
       <li key={item.chave} data-alvo-da-dica="" className={cn('group/linha -mx-1.5 grid min-h-[30px] items-center gap-2.5 rounded-lg px-1.5 py-0.5 transition-colors hover:bg-muted/70 max-sm:gap-2', colunas)}
-        onPointerMove={(e) => mostrar(item.dica, e.clientX, e.clientY)} onPointerDown={(e) => mostrar(item.dica, e.clientX, e.clientY)} onPointerLeave={sair}>
+        onPointerMove={(e) => mostrar(item.dica, e.clientX, e.clientY)} onPointerDown={(e) => tocar(item, e)} onPointerLeave={sair}>
         <span className="flex min-w-0 flex-col">
           {item.href
             ? <Link to={item.href} title={item.nome} className="block truncate text-rotulo font-medium hover:text-primary hover:underline pointer-coarse:py-3">{item.nome}</Link>
@@ -79,7 +92,7 @@ export default function BarrasHorizontais({ itens, rotulo, escalaMax, marca100 =
         <span role="img" aria-label={item.aria} tabIndex={0}
           className="relative h-[22px] rounded-sm outline-none group-hover/linha:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
           onFocus={(e) => mostrar(item.dica, ...pontoDoFoco(e.currentTarget))} onBlur={esconder}>
-          <Barra item={item} posicao={posicao} limite={limite} marca100={marca100} />
+          <Barra item={item} posicao={posicao} porcento={porcento} limite={limite} marca100={marca100} />
         </span>
         <span className="flex items-center justify-end gap-1 text-rotulo whitespace-nowrap tabular-nums">
           {icone && ICONES[icone]}
@@ -96,7 +109,7 @@ export default function BarrasHorizontais({ itens, rotulo, escalaMax, marca100 =
   }
 
   return (
-    <div className="min-w-0">
+    <div ref={contem} className="min-w-0">
       {marca100 && (
         <div aria-hidden="true" className={cn('grid gap-2.5 text-legenda text-muted-foreground max-sm:gap-2', colunas)}>
           <span />

@@ -424,8 +424,9 @@ tela, e os rótulos podem ficar dentro do gráfico (no fim da linha, no pico).
 - Colunas, barras e linhas de risco são focáveis (Tab) com `aria-label` "nov/26: 1.020 h de 1.480 h"; a linha (semanas,
   burn-up) é um alvo só, e as setas ← → andam de ponto em ponto. Os pontos da fila não são focáveis (seriam até 40
   paradas): a faixa tem um nome que resume ("Aguardando consultor: 5 clientes, de 1 a 9 dias") e a tabela lista todos.
-- O SVG tem `role="img"` e um nome que resume o gráfico; alvo do mouse maior que a marca (a coluna inteira, a linha
-  inteira, 24 px nos pontos).
+- O SVG tem `role="group"` (não `img`, que esconderia as marcas focáveis) e um nome que resume o gráfico; cada marca
+  focável é `role="img"` com `aria-label`. Alvo do mouse maior que a marca (a coluna inteira, a linha inteira, 24 px
+  nos pontos).
 - Cor nunca sozinha: ícone, legenda e número. Com "reduzir movimento", nada anima (os gráficos não animam de qualquer
   forma; só o clarear da marca sob o mouse).
 

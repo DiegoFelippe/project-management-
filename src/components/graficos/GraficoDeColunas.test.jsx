@@ -1,8 +1,9 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { simularResizeObserver } from '@/test/resizeObserver'
 import GraficoDeColunas from './GraficoDeColunas'
+import { larguraDoTexto, margemDoEixo } from './escala'
 
 const MESES = ['jun/26', 'jul/26', 'ago/26', 'set/26', 'out/26', 'nov/26']
 const itens = (n = 6, extra = () => ({})) => Array.from({ length: n }, (_, i) => ({
@@ -113,5 +114,40 @@ describe('GraficoDeColunas', () => {
     for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(44)
     // Os valores continuam em cada coluna (aria-label e dica), mesmo sem o rótulo.
     expect(within(grafico()).getAllByRole('img')).toHaveLength(24)
+  })
+
+  it('toque: tocar numa coluna de outro gráfico fecha a dica deste (cada gráfico só guarda os próprios alvos)', () => {
+    render(
+      <>
+        <GraficoDeColunas itens={itens()} rotuloAria="Gráfico A" />
+        <GraficoDeColunas itens={itens(3, (i) => ({ dica: { titulo: `B${i}`, linhas: [] } }))} rotuloAria="Gráfico B" />
+      </>,
+    )
+    const a = screen.getByRole('group', { name: 'Gráfico A' })
+    const b = screen.getByRole('group', { name: 'Gráfico B' })
+    fireEvent.pointerDown(within(a).getAllByRole('img')[0], { pointerType: 'touch' })
+    expect(within(screen.getByRole('tooltip')).getByText('Mês 1')).toBeInTheDocument()
+    // Tocar em outra coluna do mesmo gráfico troca a dica (continua uma só).
+    fireEvent.pointerDown(within(a).getAllByRole('img')[1], { pointerType: 'touch' })
+    expect(screen.getAllByRole('tooltip')).toHaveLength(1)
+    expect(within(screen.getByRole('tooltip')).getByText('Mês 2')).toBeInTheDocument()
+    fireEvent.pointerDown(within(b).getAllByRole('img')[2], { pointerType: 'touch' })
+    expect(screen.getAllByRole('tooltip')).toHaveLength(1)
+    expect(within(screen.getByRole('tooltip')).getByText('B2')).toBeInTheDocument()
+    // Tocar fora de qualquer alvo fecha.
+    fireEvent.pointerDown(document.body, { pointerType: 'touch' })
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('margem do eixo Y pela largura do maior rótulo: "15 mil h" ganha mais espaço que "400 h", e nenhum rótulo sai do SVG', () => {
+    const { rerender } = render(<GraficoDeColunas itens={itens()} rotuloAria="Realizado e capacidade por mês" />)
+    const margem = () => Number(grafico().querySelector('line').getAttribute('x1'))
+    const pequena = margem()
+    const rotulosDoEixo = () => [...grafico().querySelectorAll('text[text-anchor="end"]')].filter((t) => !t.hasAttribute('data-rotulo-x'))
+    expect(pequena).toBe(margemDoEixo(rotulosDoEixo().map((t) => t.textContent)))
+    rerender(<GraficoDeColunas itens={itens(6, (i) => ({ valor: 11000 + i, referencia: 0 }))} rotuloAria="Realizado e capacidade por mês" />)
+    expect(rotulosDoEixo().map((t) => t.textContent)).toContain('15 mil h')
+    expect(margem()).toBeGreaterThan(pequena)
+    for (const t of rotulosDoEixo()) expect(Number(t.getAttribute('x')) - larguraDoTexto(t.textContent)).toBeGreaterThanOrEqual(0)
   })
 })

@@ -119,9 +119,10 @@ describe('CartoesDeNumeros', () => {
     expect(within(variacaoDe('Clientes')).getByText('= igual')).toHaveClass('text-muted-foreground')
   })
 
-  it('variação nula mostra "—" (a comparação ainda carrega); sem a chave, sem a linha', () => {
-    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_VARIACAO} />)
+  it('variação nula mostra "—" (a comparação ainda carrega); sem a chave ou undefined, sem a linha', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={[...COM_VARIACAO, { chave: 'sem-numero', rotulo: 'Sem número', valor: '—', variacao: undefined }]} />)
     expect(variacaoDe('Ocupação')).toHaveTextContent('—')
     expect(variacaoDe('Sem comparação')).toBeNull()
+    expect(variacaoDe('Sem número')).toBeNull()
   })
 })

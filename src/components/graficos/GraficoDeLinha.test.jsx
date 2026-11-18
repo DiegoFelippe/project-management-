@@ -7,8 +7,10 @@ const ROTULOS = ['06/10', '13/10', '20/10', '27/10', '03/11']
 const grafico = () => screen.getByRole('group', { name: 'Check-ins por semana' })
 const alvo = () => within(grafico()).getByRole('img', { name: /Use as setas/ })
 const cruz = () => grafico().querySelector('[data-cruz]')
-// Largura padrão (640, sem ResizeObserver), margens de 46 px (com unidade) e 16 px: x(i) = 46 + i × 578 / 4.
-const x = (i) => 46 + (i * 578) / 4
+// Largura padrão (640, sem ResizeObserver); a margem da esquerda segue o maior rótulo do eixo Y (a linha da grade
+// começa nela) e a da direita é 16 px: x(i) = margem + i × (640 − margem − 16) / 4.
+const margem = () => Number(grafico().querySelector('line').getAttribute('x1'))
+const x = (i) => margem() + (i * (640 - margem() - 16)) / 4
 const pontosDe = (el) => el.getAttribute('points').trim().split(/\s+/).map((p) => p.split(',').map(Number))
 
 describe('GraficoDeLinha', () => {
@@ -42,8 +44,14 @@ describe('GraficoDeLinha', () => {
     await userEvent.keyboard('{Home}')
     expect(Number(cruz().getAttribute('x1'))).toBeCloseTo(x(0))
 
+    // Esc fecha a dica e tira a cruz (o foco fica); a seta traz as duas de volta.
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByRole('tooltip')).toBeNull()
+    expect(cruz()).toHaveAttribute('visibility', 'hidden')
+    expect(alvo()).toHaveFocus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(cruz()).toHaveAttribute('visibility', 'visible')
+    expect(Number(cruz().getAttribute('x1'))).toBeCloseTo(x(1))
     await userEvent.tab()
     expect(cruz()).toHaveAttribute('visibility', 'hidden')
   })
@@ -80,9 +88,9 @@ describe('GraficoDeLinha', () => {
 
   it('faixa de fundo nas posições dadas (meio passo para cada lado, sem passar das margens)', () => {
     render(<GraficoDeLinha rotulos={ROTULOS} rotuloAria="Check-ins por semana" faixa={[2, 4]} series={[{ pontos: [1, 2, 3, 4, 5] }]} />)
-    // Sem unidade: margem esquerda 34; passo = 590 / 4 = 147,5.
+    const meioPasso = (640 - margem() - 16) / 4 / 2
     const faixa = grafico().querySelector('[data-faixa]')
-    expect(Number(faixa.getAttribute('x'))).toBeCloseTo(34 + 2 * 147.5 - 73.75)
+    expect(Number(faixa.getAttribute('x'))).toBeCloseTo(x(2) - meioPasso)
     expect(Number(faixa.getAttribute('x')) + Number(faixa.getAttribute('width'))).toBeCloseTo(640 - 16)
     expect(faixa).toHaveClass('fill-muted')
   })

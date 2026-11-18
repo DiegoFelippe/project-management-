@@ -35,14 +35,18 @@ describe('CartaoDeGrafico', () => {
     render(<Cartao />)
     const botao = screen.getByRole('button', { name: 'Ver em tabela' })
     expect(botao).toHaveAttribute('aria-pressed', 'false')
+    expect(botao).toHaveAttribute('title', 'Ver em tabela')
     await userEvent.click(botao)
     expect(screen.queryByRole('group', { name: 'Gráfico de teste' })).toBeNull()
     const tabela = screen.getByRole('table', { name: 'Realizado e capacidade por mês' })
     expect(within(tabela).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Mês', 'Realizado', 'Capacidade'])
     expect(within(tabela).getByRole('cell', { name: '1.020 h' })).toHaveClass('tabular-nums')
-    const deVolta = screen.getByRole('button', { name: 'Ver gráfico' })
+    // O nome fica fixo (o estado é o aria-pressed); só o ícone e o title trocam.
+    const deVolta = screen.getByRole('button', { name: 'Ver em tabela' })
     expect(deVolta).toBe(botao)
     expect(deVolta).toHaveAttribute('aria-pressed', 'true')
+    expect(deVolta).toHaveAttribute('title', 'Ver gráfico')
+    expect(screen.queryByRole('button', { name: 'Ver gráfico' })).toBeNull()
     expect(deVolta).toHaveFocus()
     // Na tabela a legenda some (os nomes estão nas colunas).
     expect(screen.queryByText('Capacidade', { selector: 'li *, li' })).toBeNull()
@@ -59,6 +63,22 @@ describe('CartaoDeGrafico', () => {
     expect(screen.queryByText('1.020 h')).toBeNull()
     expect(screen.queryByText('Realizado')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Ver em tabela' })).toBeNull()
+  })
+
+  it('carregando: a linha da leitura e a da legenda ficam reservadas (com a altura delas), para nada pular quando o gráfico chega', () => {
+    const { container, rerender } = render(<Cartao estado="carregando" />)
+    const leitura = container.querySelector('[data-reserva="leitura"]')
+    const legenda = container.querySelector('[data-reserva="legenda"]')
+    expect(leitura).toHaveAttribute('aria-hidden', 'true')
+    expect(leitura).toHaveClass('mt-0.5', 'h-[18px]') // a linha do text-rotulo da leitura
+    expect(legenda).toHaveAttribute('aria-hidden', 'true')
+    expect(legenda).toHaveClass('h-4') // a linha do text-legenda
+    // Pronto: a leitura e a legenda de verdade, no lugar das reservas.
+    rerender(<Cartao />)
+    expect(container.querySelector('[data-reserva]')).toBeNull()
+    // Sem legenda (ou com 1 item só) e com leitura={null}: nada reservado.
+    rerender(<Cartao estado="carregando" leitura={null} legenda={[{ forma: 'quadrado', cor: 'serie', texto: 'Realizado' }]} />)
+    expect(container.querySelector('[data-reserva]')).toBeNull()
   })
 
   it('erro com "Tentar de novo" chamando aoTentarDeNovo', async () => {

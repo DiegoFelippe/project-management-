@@ -22,7 +22,8 @@ const texto = (valor) => {
 }
 
 // "▲ 12% vs out." (variação contra o período anterior; src/lib/variacao.js e rotuloDaComparacao). A seta e as cores são
-// só para os olhos; o leitor de tela ouve "subiu 12% vs out.". Nulo = a comparação ainda carrega ("—").
+// só para os olhos; o leitor de tela ouve "subiu 12% vs out.". Só recebe objeto ou nulo: nulo = a comparação ainda
+// carrega ("—"); undefined não chega aqui (o cartão fica sem a linha).
 function Variacao({ variacao }) {
   if (variacao === null) {
     return (
@@ -48,8 +49,9 @@ function Variacao({ variacao }) {
 // 17/11): o cartão sobe 1px com sombra e o ícone dá o pulinho dos botões (.cartao-animado em src/index.css; "reduzir
 // movimento" para). Não são clicáveis nem focáveis, então não há animação de foco. `cartoes`: [{ chave, rotulo, valor (número, texto pronto, ou nulo = "—"
 // enquanto carrega), icone, tom (cor do ícone, azul se não disser), destaque ('atencao' | 'perigo', cor do número),
-// detalhe (linha pequena embaixo), variacao ({ texto, tom, paraLeitor, comparado }; nulo = "—" enquanto a comparação
-// carrega; sem a chave, sem a linha) }].
+// detalhe (linha pequena embaixo), variacao: { texto, tom, paraLeitor, comparado } = a linha "▲ 12% vs out.";
+// null = a comparação ainda carrega ("—"); ausente ou undefined = sem a linha (é o que variacao() devolve quando falta
+// um dos números, ex.: ocupação nula com capacidade 0; também quando a comparação falhou) }].
 export default function CartoesDeNumeros({ rotulo, cartoes, className }) {
   return (
     <section aria-label={rotulo} className={cn('mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4', className)}>
