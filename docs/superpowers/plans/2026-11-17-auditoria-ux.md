@@ -70,6 +70,11 @@ U3 ("Desfazer" e "Ver cliente" nos avisos de check-in, Mandar para consultoria, 
 modelo sem tarefa marcada apaga; migração, teste pgTAP e de integração), U11 ("Fazendo check-in…" e o aviso de tempo
 esgotado com "Tentar de novo"), U12 (a caixa da sessão relê depois do check-out). **Depois** da T6/T7 dos check-ins.
 
+### Divisão do lote C (18/11, controlador)
+- **C1 — moldura e celular (agora):** G7, G6, R12, R4, G3 e U5 (cartões que levam ao filtro; a T4 dos gráficos já
+  entrou no `CartoesDeNumeros`).
+- **C2 — check-in (depois da T8 dos check-ins e do lote F):** G2, U3, U6, U11, U12.
+
 ### Lote F — formulários (novo, depois do lote E)
 U2 (erros embaixo de cada campo, todos de uma vez, borda vermelha, `aria-describedby`, foco no primeiro; e-mail e
 telefone conferidos — na `JanelaFormulario`, nos campos de `src/components/campos/` e no `useEnvio`), U4 (a
