@@ -368,7 +368,7 @@ describe('Calendário: detalhe do dia ao lado e visão Agenda (auditoria, M3 e R
     expect(rolar).not.toHaveBeenCalled()
   })
 
-  it('abaixo de 1280 px, com o detalhe já à vista, clicar não rola; pelo teclado (setas e Enter) também não', async () => {
+  it('abaixo de 1280 px, com o detalhe já à vista, clicar no dia não rola', async () => {
     largura(1024)
     const rolar = vi.fn()
     Element.prototype.scrollIntoView = rolar
@@ -378,12 +378,73 @@ describe('Calendário: detalhe do dia ao lado e visão Agenda (auditoria, M3 e R
     const detalhe = screen.getByRole('region', { name: 'Detalhe do dia' })
     detalhe.getBoundingClientRect = () => ({ top: 200, bottom: 500, left: 0, right: 600, width: 600, height: 300 })
     await user.click(within(grade).getByRole('gridcell', { name: /^20 de novembro/ }))
-    foraDaVista(detalhe)
-    await user.keyboard('{ArrowRight}{Enter}')
-    expect(within(grade).getByRole('gridcell', { name: /^21 de novembro/ })).toHaveFocus()
-    expect(within(detalhe).getByText('21 de novembro')).toBeInTheDocument()
+    expect(within(detalhe).getByText('20 de novembro')).toBeInTheDocument()
     await esperar(450)
     expect(rolar).not.toHaveBeenCalled()
+  })
+
+  it('abaixo de 1280 px, escolher o dia pelo teclado (setas e Enter) não rola: o foco fica na célula', async () => {
+    largura(1024)
+    const rolar = vi.fn()
+    Element.prototype.scrollIntoView = rolar
+    const user = userEvent.setup()
+    tela(consultor)
+    const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    const detalhe = screen.getByRole('region', { name: 'Detalhe do dia' })
+    foraDaVista(detalhe)
+    within(grade).getByRole('gridcell', { name: /^17 de novembro/ }).focus()
+    await user.keyboard('{ArrowRight}{Enter}')
+    expect(within(grade).getByRole('gridcell', { name: /^18 de novembro/ })).toHaveFocus()
+    expect(within(detalhe).getByText('18 de novembro')).toBeInTheDocument()
+    await esperar(450)
+    expect(rolar).not.toHaveBeenCalled()
+  })
+
+  it('a rolagem que espera o duplo clique é cancelada ao trocar de visão, de mês ou ao abrir um evento', async () => {
+    largura(1024)
+    const rolar = vi.fn()
+    Element.prototype.scrollIntoView = rolar
+    const user = userEvent.setup()
+    tela(consultor)
+    let grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    foraDaVista(screen.getByRole('region', { name: 'Detalhe do dia' }))
+    // Trocar para a Semana antes dos 300 ms.
+    await user.click(within(grade).getByRole('gridcell', { name: /^20 de novembro/ }))
+    await user.click(screen.getByRole('button', { name: 'Semana' }))
+    await esperar(450)
+    expect(rolar).not.toHaveBeenCalled()
+    // Voltar ao Mês e andar um mês.
+    await user.click(screen.getByRole('button', { name: 'Mês' }))
+    grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    foraDaVista(screen.getByRole('region', { name: 'Detalhe do dia' }))
+    await user.click(within(grade).getByRole('gridcell', { name: /^20 de novembro/ }))
+    await user.click(screen.getByRole('button', { name: 'Próximo período' }))
+    await esperar(450)
+    expect(rolar).not.toHaveBeenCalled()
+    // Abrir um evento (o chip) logo depois do clique no dia.
+    await user.click(screen.getByRole('button', { name: 'Hoje' }))
+    grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    foraDaVista(screen.getByRole('region', { name: 'Detalhe do dia' }))
+    await user.click(within(grade).getByRole('gridcell', { name: /^20 de novembro/ }))
+    await user.click(within(grade).getByRole('button', { name: /Kickoff Alfa/ }))
+    expect(await screen.findByRole('dialog', { name: 'Editar evento' })).toBeInTheDocument()
+    await esperar(450)
+    expect(rolar).not.toHaveBeenCalled()
+  })
+
+  it('no chip do mês, Enter e espaço abrem o evento (a célula não engole a tecla)', async () => {
+    const user = userEvent.setup()
+    tela(consultor)
+    const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    const chip = await within(grade).findByRole('button', { name: /Kickoff Alfa/ })
+    chip.focus()
+    await user.keyboard('{Enter}')
+    expect(await screen.findByRole('dialog', { name: 'Editar evento' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    within(grade).getByRole('button', { name: /Kickoff Alfa/ }).focus()
+    await user.keyboard(' ')
+    expect(await screen.findByRole('dialog', { name: 'Editar evento' })).toBeInTheDocument()
   })
 
   it('de 1280 px para cima, o detalhe já está ao lado: clicar no dia não rola a página', async () => {

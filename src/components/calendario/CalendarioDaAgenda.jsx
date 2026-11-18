@@ -270,7 +270,7 @@ export default function CalendarioDaAgenda({ cliente = null }) {
     setClienteDoFiltro(SEM_FILTRO)
   }
 
-  const abrir = (evento) => setJanela({ evento })
+  const abrir = (evento) => { clearTimeout(rolagem.current); setJanela({ evento }) }
   const criar = podeCriar ? (dia) => { clearTimeout(rolagem.current); setJanela({ dia }) } : undefined
   const fecharJanela = () => setJanela(null)
   const gravou = () => {
@@ -279,8 +279,9 @@ export default function CalendarioDaAgenda({ cliente = null }) {
   }
 
   // Escolher um dia com o mouse ou o toque (escolheu): quando o detalhe fica embaixo e fora da vista, a página rola até
-  // ele, para o clique não parecer sem efeito (M3) — depois do tempo do duplo clique, que cancela. Pelo teclado (setas,
-  // Enter) não rola: o foco fica na célula, à vista.
+  // ele, para o clique não parecer sem efeito (M3) — depois do tempo do duplo clique. Cancelam a rolagem: o duplo
+  // clique (criar), abrir um evento, trocar de visão ou de período. Pelo teclado (setas, Enter) não rola: o foco fica na
+  // célula, à vista.
   function selecionar(dia, { escolheu = false } = {}) {
     setSelecionado(dia)
     clearTimeout(rolagem.current)
@@ -290,7 +291,8 @@ export default function CalendarioDaAgenda({ cliente = null }) {
       if (el && !aVista(el)) el.scrollIntoView?.({ behavior: semMovimento() ? 'auto' : 'smooth', block: 'start' })
     }, ESPERA_DO_DUPLO_CLIQUE)
   }
-  useEffect(() => () => clearTimeout(rolagem.current), [])
+  // Trocar de visão ou de período (e sair da tela) cancela a rolagem que esperava o duplo clique.
+  useEffect(() => () => clearTimeout(rolagem.current), [visao, diaDaVisao])
 
   const rotulo = rotuloDoPeriodo(visaoDoPeriodo, diaDaVisao)
   const propsDaVisao = {

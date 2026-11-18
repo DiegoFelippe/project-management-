@@ -22,6 +22,8 @@ export default function VisaoMes({
 
   function teclar(e, dia) {
     if (e.key === 'Enter' || e.key === ' ') {
+      // Enter e espaço num chip de dentro da célula são do chip (abrem o evento), não da célula.
+      if (e.target !== e.currentTarget) return
       e.preventDefault()
       aoSelecionar(dia)
       return

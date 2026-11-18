@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Palette, Pencil, Trash2 } from 'lucide-react'
 import { describe, expect, it, vi } from 'vitest'
@@ -75,6 +75,25 @@ describe('MenuDeAcoes', () => {
     await userEvent.click(botao)
     await userEvent.click(screen.getByRole('button', { name: 'Depois' }))
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('perto do pé da tela, a altura do menu conta 44 px por item no toque (abre para cima) e 36 no computador (cabe embaixo)', async () => {
+    const abrirCom = async (toque) => {
+      vi.stubGlobal('matchMedia', vi.fn((consulta) => ({ matches: toque && consulta.includes('coarse'), media: consulta, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
+      const { botao } = tela()
+      // 130 px livres embaixo (a tela do jsdom tem 768): 3 × 36 + 12 = 120 cabe; 3 × 44 + 12 = 144 não.
+      botao.getBoundingClientRect = () => ({ top: 598, bottom: 630, left: 100, right: 132, width: 32, height: 32 })
+      await userEvent.click(botao)
+      const estilo = menu().style
+      cleanup()
+      vi.unstubAllGlobals()
+      return estilo
+    }
+    const noComputador = await abrirCom(false)
+    expect(noComputador.top).toBe('634px')
+    const noToque = await abrirCom(true)
+    expect(noToque.top).toBe('')
+    expect(noToque.bottom).toBe('174px')
   })
 
   it('o item de perigo fica vermelho; os itens animam e têm 44 px no toque', async () => {
