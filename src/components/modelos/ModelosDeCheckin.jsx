@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Archive, ArchiveRestore, Building2, Copy, Eye, Globe, ListChecks, Pencil, Plus, RadioTower, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import Seletor from '@/components/campos/Seletor'
@@ -8,7 +8,7 @@ import { GraficoCarregando } from '@/components/comum/Carregando'
 import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
-import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -20,26 +20,17 @@ import { veTudo } from '@/lib/papeis'
 import { OPCOES_DE_TIPO, TIPOS_DE_CONSULTORIA } from '@/lib/tiposDeConsultoria'
 import { useAtraso } from '@/lib/useAtraso'
 import { useLeitura } from '@/lib/useLeitura'
+import { useListaPaginada } from '@/lib/useListaPaginada'
 import ApagarModelo from './ApagarModelo'
 import JanelaModelo from './JanelaModelo'
 import JanelaVerModelo from './JanelaVerModelo'
 
 const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'arquivados', rotulo: 'Arquivados' }]
-const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
 const rotuloDoTipo = (tipo) => TIPOS_DE_CONSULTORIA.find((t) => t.valor === tipo)?.rotulo
 
 // Números dos cartões (contados no banco, no recorte de quem vê): seguem a consultoria do filtro da Central; a aba, a
 // busca e o tipo não mudam os cartões.
 const lerNumeros = ({ consultoriaId }) => indicadoresDeModelos({ consultoriaId })
-
-// Ação da linha (ghost sm): no celular só o ícone aparece; o nome continua para o leitor de tela.
-function Acao({ rotulo, icone: Icone, perigo, ...props }) {
-  return (
-    <Button variant="ghost" size="sm" title={rotulo} className={perigo ? BOTAO_PERIGO : undefined} {...props}>
-      <Icone /><span className="max-sm:sr-only">{rotulo}</span>
-    </Button>
-  )
-}
 
 // A aba Modelos de Check-ins (molde de tela nova): barra de filtros (Ativos/Arquivados, busca, tipo, consultoria para a
 // Central e "Novo modelo" no fim) → cartões de números → tabela "Modelos de check-in" (15 por página, do banco) →
@@ -55,32 +46,17 @@ export default function ModelosDeCheckin({ perfil }) {
   const buscaAtrasada = useAtraso(busca.trim(), 300)
   const [tipo, setTipo] = useState('')
   const [consultoriaId, setConsultoriaId] = useState('')
-  const [pagina, setPagina] = useState(1)
-  const [resultado, setResultado] = useState(null)
-  const [erro, setErro] = useState(null)
   const [versao, setVersao] = useState(0)
   const [janela, setJanela] = useState(null)
   const recarregar = () => setVersao((v) => v + 1)
   const filtroDaCentral = central && consultoriaId ? consultoriaId : undefined
   const numeros = useLeitura(lerNumeros, { consultoriaId: filtroDaCentral, versao }).dados
 
-  // Uma página por vez, filtrada e contada no banco (regra "Escala" do CLAUDE.md).
-  useEffect(() => {
-    let ativo = true
-    listarModelos({ aba, busca: buscaAtrasada || undefined, tipo: tipo || undefined, consultoriaId: filtroDaCentral, pagina })
-      .then((r) => {
-        if (!ativo) return
-        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
-        setResultado(r)
-        setErro(null)
-      })
-      .catch(() => ativo && setErro('Não foi possível carregar os modelos.'))
-    return () => {
-      ativo = false
-    }
-  }, [aba, buscaAtrasada, tipo, filtroDaCentral, pagina, versao])
-
-  const filtrar = (mudar) => (valor) => { mudar(valor); setPagina(1) }
+  // Uma página por vez, filtrada e contada no banco (regra "Escala" do CLAUDE.md); trocar de aba mostra o carregando.
+  const { itens: modelos, erro: falhou, paginacao } = useListaPaginada(listarModelos,
+    { aba, busca: buscaAtrasada || undefined, tipo: tipo || undefined, consultoriaId: filtroDaCentral },
+    { versao, limparAoMudar: ['aba'] })
+  const erro = falhou ? 'Não foi possível carregar os modelos.' : null
 
   // Editar e duplicar abrem a janela com o modelo inteiro, lido na hora (a linha só tem os contadores).
   async function abrirComModelo(linha, tipoDaJanela) {
@@ -104,11 +80,7 @@ export default function ModelosDeCheckin({ perfil }) {
       ? `"${nome}" criado. Ele já aparece em "Aplicar modelo" nos clientes.`
       : `"${nome}" salvo. Quem já usa este modelo continua com o check-list que recebeu.`)
     setJanela(null)
-    if (novo && aba !== 'ativos') {
-      setAba('ativos')
-      setPagina(1)
-      setResultado(null)
-    }
+    if (novo && aba !== 'ativos') setAba('ativos')
     recarregar()
   }
 
@@ -137,36 +109,27 @@ export default function ModelosDeCheckin({ perfil }) {
     recarregar()
   }
 
+  // Posições fixas (auditoria, G1): Editar (ou Ver, para quem não edita) · Duplicar · Arquivar (ou Reativar) · Apagar; a
+  // que não vale para a linha deixa o espaço. O consultor, que não cria modelos, só tem o Ver.
   function acoesDaLinha(m) {
-    if (m.arquivado_em) {
-      if (!m.pode_editar) return <Acao rotulo="Ver" icone={Eye} onClick={() => setJanela({ tipo: 'ver', linha: m })} />
-      return (
-        <>
-          <Acao rotulo="Reativar" icone={ArchiveRestore} onClick={() => reativar(m)} />
-          <Acao rotulo="Apagar" icone={Trash2} perigo onClick={() => setJanela({ tipo: 'apagar', linha: m })} />
-        </>
-      )
-    }
-    if (!m.pode_editar) {
-      return (
-        <>
-          <Acao rotulo="Ver" icone={Eye} onClick={() => setJanela({ tipo: 'ver', linha: m })} />
-          {m.pode_duplicar && <Acao rotulo="Duplicar" icone={Copy} onClick={() => abrirComModelo(m, 'duplicar')} />}
-        </>
-      )
-    }
+    const arquivado = Boolean(m.arquivado_em)
+    const ver = () => setJanela({ tipo: 'ver', linha: m })
+    const primeira = m.pode_editar
+      ? <AcaoDaLinha nome="Editar" icone={Pencil} visivel={!arquivado} onClick={() => abrirComModelo(m, 'editar')} />
+      : <AcaoDaLinha nome="Ver" icone={Eye} onClick={ver} />
+    if (!criaModelo) return primeira
     return (
       <>
-        <Acao rotulo="Editar" icone={Pencil} onClick={() => abrirComModelo(m, 'editar')} />
-        <Acao rotulo="Duplicar" icone={Copy} onClick={() => abrirComModelo(m, 'duplicar')} />
-        <Acao rotulo="Arquivar" icone={Archive} onClick={() => setJanela({ tipo: 'arquivar', linha: m })} />
-        <Acao rotulo="Apagar" icone={Trash2} perigo onClick={() => setJanela({ tipo: 'apagar', linha: m })} />
+        {primeira}
+        <AcaoDaLinha nome="Duplicar" icone={Copy} visivel={!arquivado && (m.pode_editar || m.pode_duplicar)}
+          onClick={() => abrirComModelo(m, 'duplicar')} />
+        <AcaoDaLinha nome={arquivado ? 'Reativar' : 'Arquivar'} icone={arquivado ? ArchiveRestore : Archive} visivel={m.pode_editar}
+          onClick={() => (arquivado ? reativar(m) : setJanela({ tipo: 'arquivar', linha: m }))} />
+        <AcaoDaLinha nome="Apagar" icone={Trash2} perigo visivel={m.pode_editar} onClick={() => setJanela({ tipo: 'apagar', linha: m })} />
       </>
     )
   }
 
-  const modelos = resultado?.itens ?? null
-  const total = resultado?.total ?? 0
   const filtrando = Boolean(buscaAtrasada || tipo || filtroDaCentral)
   const colunaUsando = central ? 'Clientes usando' : gestao ? 'Clientes da consultoria usando' : 'Seus clientes usando'
   const usando = janela?.linha?.clientes_usando ?? 0
@@ -175,15 +138,15 @@ export default function ModelosDeCheckin({ perfil }) {
     <>
       <BarraDeFiltros>
         <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={aba}
-          aoMudar={(valor) => { setAba(valor); setPagina(1); setResultado(null) }} />
-        <CampoBusca rotulo="Buscar modelos" placeholder="Buscar por nome ou descrição" valor={busca} aoMudar={filtrar(setBusca)} />
+          aoMudar={setAba} />
+        <CampoBusca rotulo="Buscar modelos" placeholder="Buscar por nome ou descrição" valor={busca} aoMudar={setBusca} />
         <div className="flex items-center gap-2">
           <Label htmlFor="filtro-tipo-do-modelo" className="text-muted-foreground shrink-0">Tipo</Label>
           <div className="w-48">
-            <Seletor id="filtro-tipo-do-modelo" tamanho="sm" valor={tipo} aoMudar={filtrar(setTipo)} opcoes={OPCOES_DE_TIPO} rotuloTodos="Todos" />
+            <Seletor id="filtro-tipo-do-modelo" tamanho="sm" valor={tipo} aoMudar={setTipo} opcoes={OPCOES_DE_TIPO} rotuloTodos="Todos" />
           </div>
         </div>
-        {central && <FiltroConsultoria valor={consultoriaId} aoMudar={filtrar(setConsultoriaId)} />}
+        {central && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
         {criaModelo && (
           <AcaoPrincipal>
             <Button onClick={() => setJanela({ tipo: 'novo' })}>
@@ -209,7 +172,7 @@ export default function ModelosDeCheckin({ perfil }) {
         </ListaVazia>
       )}
       {!erro && modelos?.length > 0 && (
-        <Tabela rotulo="Modelos de check-in" larguraMinima={980} paginacao={{ pagina, total, aoMudar: setPagina }}
+        <Tabela rotulo="Modelos de check-in" larguraMinima={980} paginacao={paginacao}
           colunas={['Modelo', 'Tipo', 'Para', 'Criado por', 'Etapas', 'Tarefas', colunaUsando]}>
           {modelos.map((m) => (
             <Linha key={m.id}>

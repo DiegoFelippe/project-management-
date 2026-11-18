@@ -1,5 +1,5 @@
 import { Archive, ArchiveRestore, Building2, Gauge, Pencil, Plus, RadioTower, UserPlus, Users } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
@@ -9,7 +9,7 @@ import Cabecalho from '@/components/comum/Cabecalho'
 import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
-import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import { frase, juntar, useClientesAtivos } from '@/components/clientes/useClientesAtivos'
 import NovaConsultoria from '@/components/consultorias/NovaConsultoria'
 import EditarConsultoria from '@/components/consultorias/EditarConsultoria'
@@ -26,6 +26,7 @@ import { mesAtual, rotuloCurto } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
 import { useLeitura } from '@/lib/useLeitura'
+import { useListaPaginada } from '@/lib/useListaPaginada'
 import { urlPublica } from '@/lib/imagem'
 import { criarAcesso } from '@/data/usuarios'
 
@@ -35,6 +36,12 @@ const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um :
 
 // Cartões da plataforma (só quem vê todas; contados no banco): seguem o mês da aba Ocupação; as abas e a busca, não.
 const lerNumeros = ({ mes }) => indicadoresDeConsultorias({ mes })
+// A lista de cada aba, uma página por vez, filtrada no banco (regra "Escala" no CLAUDE.md). "Ocupação do mês": uma página
+// do resumo por consultoria, calculado no banco.
+const lerConsultorias = ({ filtro, mes, busca, pagina }) => (filtro === 'ocupacao'
+  ? consultoriasPorOcupacao({ limite: POR_PAGINA, deslocamento: (pagina - 1) * POR_PAGINA, mes, busca })
+    .then((r) => ({ ...r, foraDaFaixa: r.itens.length === 0 }))
+  : listarConsultorias({ arquivadas: filtro === 'arquivadas', pagina }))
 const cartoesDoMes = (n, passado, mes) => [
   { chave: 'ativas', rotulo: 'Consultorias ativas', icone: Building2, valor: n?.consultorias_ativas },
   { chave: 'clientes', rotulo: 'Clientes ativos', icone: RadioTower, tom: 'positivo', valor: n?.clientes_ativos },
@@ -54,9 +61,6 @@ export default function Consultorias() {
   })
   const [busca, setBusca] = useState('')
   const buscaAtrasada = useAtraso(busca.trim(), 300)
-  const [resultado, setResultado] = useState(null)
-  const [pagina, setPagina] = useState(1)
-  const [erro, setErro] = useState(null)
   const [nova, setNova] = useState(false)
   const [novoAdminEm, setNovoAdminEm] = useState(null)
   // ?aba=ocupacao abre direto a aba do mês (só quem vê todas as consultorias; os outros caem em Ativas).
@@ -65,8 +69,15 @@ export default function Consultorias() {
   const [confirmando, setConfirmando] = useState(null)
   const emOcupacao = filtro === 'ocupacao'
   const passado = mes < mesAtual()
+  const [versao, setVersao] = useState(0)
+  const recarregar = () => setVersao((v) => v + 1)
+  const numeros = useLeitura(lerNumeros, veTudo(perfil) ? { mes, versao } : null).dados
+  // Trocar de aba ou de mês mostra o carregando (as colunas e os números mudam); a busca mantém a lista até chegar a nova.
+  const { resultado, total, erro: falhou, paginacao } = useListaPaginada(lerConsultorias,
+    { filtro, mes: emOcupacao ? mes : undefined, busca: emOcupacao ? buscaAtrasada || undefined : undefined },
+    { versao, limparAoMudar: ['filtro', 'mes'] })
+  const erro = falhou ? (emOcupacao ? 'Não foi possível carregar a capacidade.' : 'Não foi possível carregar as consultorias.') : null
   const lista = resultado?.itens ?? []
-  const total = resultado?.total ?? 0
   // Arquivar: os clientes ativos dela voltam para a central (o banco conta quantos).
   const clientesAtivos = useClientesAtivos(confirmando?.acao === 'arquivar' ? { consultoriaId: confirmando.c.id } : null)
   const sobreOsClientes = frase(clientesAtivos, {
@@ -97,31 +108,6 @@ export default function Consultorias() {
     recarregar()
     return { erro: null }
   }
-  const [versao, setVersao] = useState(0)
-  const recarregar = () => setVersao((v) => v + 1)
-  const numeros = useLeitura(lerNumeros, veTudo(perfil) ? { mes, versao } : null).dados
-
-  // Uma página por vez, ativas ou arquivadas, filtrada no banco (regra "Escala" no CLAUDE.md).
-  useEffect(() => {
-    let ativo = true
-    // "Ocupação do mês": uma página do resumo por consultoria, calculado no banco.
-    const pedido = emOcupacao
-      ? consultoriasPorOcupacao({ limite: POR_PAGINA, deslocamento: (pagina - 1) * POR_PAGINA, mes, busca: buscaAtrasada || undefined })
-        .then((r) => ({ ...r, foraDaFaixa: r.itens.length === 0 }))
-      : listarConsultorias({ arquivadas: filtro === 'arquivadas', pagina })
-    pedido
-      .then((r) => {
-        if (!ativo) return
-        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
-        setResultado(r)
-        setErro(null)
-      })
-      .catch(() => ativo && setErro(emOcupacao ? 'Não foi possível carregar a capacidade.' : 'Não foi possível carregar as consultorias.'))
-    return () => {
-      ativo = false
-    }
-  }, [filtro, emOcupacao, mes, buscaAtrasada, pagina, versao])
-
   async function criar(dados) {
     const resposta = await criarConsultoria(dados)
     if (resposta.consultoriaId) {
@@ -153,11 +139,11 @@ export default function Consultorias() {
           ? (filtro === 'ativas' ? plural(total, 'consultoria ativa', 'consultorias ativas') : plural(total, 'consultoria arquivada', 'consultorias arquivadas'))
           : null} />
       <BarraDeFiltros>
-        <AbasSegmentadas rotulo="Mostrar" abas={abas} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1); setResultado(null) }} />
-        {emOcupacao && <NavegacaoDoMes mes={mes} aoMudar={(m) => { setMes(m); setPagina(1); setResultado(null) }} />}
+        <AbasSegmentadas rotulo="Mostrar" abas={abas} valor={filtro} aoMudar={setFiltro} />
+        {emOcupacao && <NavegacaoDoMes mes={mes} aoMudar={setMes} />}
         {emOcupacao && (
           <CampoBusca rotulo="Buscar consultorias" placeholder="Buscar consultoria" valor={busca}
-            aoMudar={(texto) => { setBusca(texto); setPagina(1) }} />
+            aoMudar={setBusca} />
         )}
         {!emOcupacao && (
           <AcaoPrincipal>
@@ -176,9 +162,9 @@ export default function Consultorias() {
         </ListaVazia>
       )}
       {lista.length > 0 && emOcupacao && (
-        <Tabela rotulo="Ocupação do mês" larguraMinima={880}
+        <Tabela rotulo="Ocupação do mês" larguraMinima={880} semAcoes
           colunas={['Consultoria', 'Consultores', ...colunasDoMes(passado), 'Clientes', 'Aguardando']}
-          paginacao={{ pagina, total, aoMudar: setPagina }}>
+          paginacao={paginacao}>
           {lista.map((c) => (
             <Linha key={c.id}>
               <Celula className="font-semibold">{c.nome}</Celula>
@@ -189,14 +175,13 @@ export default function Consultorias() {
               <Celula className="tabular-nums font-semibold">{formatarOcupacao(c.ocupacao)}</Celula>
               <Celula className="tabular-nums">{c.clientes}</Celula>
               <Celula className="tabular-nums">{c.aguardando}</Celula>
-              <CelulaAcoes />
             </Linha>
           ))}
         </Tabela>
       )}
       {lista.length > 0 && !emOcupacao && (
         <Tabela rotulo="Consultorias" colunas={['Consultoria', 'Administração', 'Pessoas', 'Times']} larguraMinima={880}
-          paginacao={{ pagina, total, aoMudar: setPagina }}>
+          paginacao={paginacao}>
           {lista.map((c) => (
             <Linha key={c.id}>
               <Celula>
@@ -223,20 +208,10 @@ export default function Consultorias() {
               <Celula className="text-muted-foreground tabular-nums">{c.pessoas.toLocaleString('pt-BR')}</Celula>
               <Celula className="text-muted-foreground tabular-nums">{c.times.toLocaleString('pt-BR')}</Celula>
               <CelulaAcoes>
-                {!c.arquivada && (
-                  <>
-                    <Button variant="ghost" size="sm" onClick={() => setNovoAdminEm(c.id)}>
-                      <UserPlus /> Novo administrador
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEditando(c)}>
-                      <Pencil /> Editar
-                    </Button>
-                  </>
-                )}
-                <Button variant="ghost" size="sm" onClick={() => setConfirmando({ c, acao: c.arquivada ? 'reativar' : 'arquivar' })}
-                  className={c.arquivada ? '' : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'}>
-                  {c.arquivada ? <><ArchiveRestore /> Reativar</> : <><Archive /> Arquivar</>}
-                </Button>
+                <AcaoDaLinha nome="Editar" icone={Pencil} visivel={!c.arquivada} onClick={() => setEditando(c)} />
+                <AcaoDaLinha nome="Novo administrador" icone={UserPlus} visivel={!c.arquivada} onClick={() => setNovoAdminEm(c.id)} />
+                <AcaoDaLinha nome={c.arquivada ? 'Reativar' : 'Arquivar'} icone={c.arquivada ? ArchiveRestore : Archive} perigo={!c.arquivada}
+                  onClick={() => setConfirmando({ c, acao: c.arquivada ? 'reativar' : 'arquivar' })} />
               </CelulaAcoes>
             </Linha>
           ))}

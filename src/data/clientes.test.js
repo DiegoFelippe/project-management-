@@ -38,6 +38,14 @@ describe('listarClientes: abas', () => {
     expect(banco.chamou('not', 'consultoria_id', 'is', null)).toBe(true)
     expect(banco.chamou('is', 'consultor_id', null)).toBe(true)
   })
+
+  it('qualquer (a busca da central, usabilidade U1): todas as situações, com os arquivados, e o termo no banco', async () => {
+    await listarClientes({ aba: 'qualquer', busca: 'usabilidade' })
+    expect(banco.chamadas.some((c) => c[0] === 'eq' && c[1] === 'arquivado')).toBe(false)
+    expect(banco.chamadas.some((c) => ['is', 'not'].includes(c[0]))).toBe(false)
+    expect(banco.chamou('ilike', 'busca', '%usabilidade%')).toBe(true)
+    expect(banco.chamou('range', 0, 14)).toBe(true)
+  })
 })
 
 describe('contarClientesAtivos', () => {

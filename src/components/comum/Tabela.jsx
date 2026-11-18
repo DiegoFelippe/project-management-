@@ -3,6 +3,7 @@
 // registros, a paginação (feita no banco) aparece embaixo da tabela.
 import { useLayoutEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { POR_PAGINA } from '@/data/paginar'
 import { cn } from '@/lib/utils'
@@ -55,7 +56,8 @@ function useRolaParaOLado(ativo) {
 
 // semAcoes: tabela só de leitura, sem a coluna de ações; quando ela rola para o lado (no celular), a rolagem recebe o
 // foco do teclado e tem nome, porque na tabela não há nada que receba o foco (auditoria, R13); cabendo na tela, nada de
-// parada a mais no Tab. No celular (abaixo de sm) a coluna de ações não fica fixa, para o nome não sumir em 360 px.
+// parada a mais no Tab. No celular (abaixo de sm) a coluna de ações não fica fixa e a primeira coluna tem 160 px no
+// mínimo, para o nome não sumir nem quebrar letra a letra em 360 px (auditoria, G1).
 // titulo: cabeçalho dentro do cartão.
 // semCartao: a tabela entra rente no cartão de quem a usa (ex.: a visão Todos da agenda do cliente, dentro do cartão do calendário).
 export function Tabela({ rotulo, titulo, colunas, larguraMinima = 720, paginacao, semAcoes = false, semCartao = false, children }) {
@@ -68,8 +70,8 @@ export function Tabela({ rotulo, titulo, colunas, larguraMinima = 720, paginacao
         <table aria-label={rotulo} className="w-full text-left text-corpo" style={{ minWidth: larguraMinima }}>
           <thead className="border-b bg-muted/50 text-rotulo text-muted-foreground">
             <tr>
-              {colunas.map((coluna) => (
-                <th key={coluna} className="px-4 py-2.5 font-medium">{coluna}</th>
+              {colunas.map((coluna, i) => (
+                <th key={coluna} className={cn('px-4 py-2.5 font-medium', i === 0 && 'max-sm:min-w-40')}>{coluna}</th>
               ))}
               {!semAcoes && <th className="sticky right-0 max-sm:static border-l bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] px-4 py-2.5"><span className="sr-only">Ações</span></th>}
             </tr>
@@ -93,6 +95,21 @@ export function Celula({ className, children }) {
 // No toque (pointer-coarse), 8 px entre uma ação e outra (cada botão de ícone já tem 44 px lá).
 export function CelulaAcoes({ children }) {
   return <td className="bg-card group-hover:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))] sticky right-0 max-sm:static border-l px-4 py-3 text-right whitespace-nowrap pointer-coarse:[&>*+*]:ml-2">{children}</td>
+}
+
+const PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
+
+// Ação da linha (auditoria de 17/11, G1; Padrão Hub): só o ícone, com o nome no aria-label e no title. Posições fixas:
+// cada tabela põe as ações sempre na mesma ordem e, na linha em que uma delas não vale, `visivel={false}` deixa o
+// espaço vazio (do tamanho do botão), para o lápis nunca mudar de lugar. `perigo`: apagar, desativar, desconectar...
+// Exceção (fora daqui): a linha com uma única ação principal (ex.: "Conectar") pode ter texto, num Button ghost sm.
+// `para`: a ação é um link (abre outra página). `classeDoIcone`: ex.: animate-spin enquanto testa.
+export function AcaoDaLinha({ nome, icone: Icone, perigo = false, visivel = true, para, classeDoIcone, className, ...props }) {
+  if (!visivel) return <span aria-hidden="true" className="inline-block size-8 align-middle pointer-coarse:min-h-11 pointer-coarse:min-w-11" />
+  const icone = <Icone aria-hidden="true" className={classeDoIcone} />
+  const comum = { variant: 'ghost', size: 'icon', 'aria-label': nome, title: nome, className: cn(perigo && PERIGO, className) }
+  if (para) return <Button asChild {...comum}><Link to={para} {...props}>{icone}</Link></Button>
+  return <Button type="button" {...comum} {...props}>{icone}</Button>
 }
 
 export function ListaVazia({ children }) {

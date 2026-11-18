@@ -1,10 +1,11 @@
 import { AtSign, CheckCircle2, KeyRound, MailCheck, Pencil, Power, RotateCcw, RotateCcwKey, Send, ShieldAlert, ShieldCheck, ShieldOff, Smartphone, UserPlus, UserRound, UserX, User } from 'lucide-react'
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import Caixa from '@/components/campos/Caixa'
 import CampoData from '@/components/campos/CampoData'
 import CampoNumero from '@/components/campos/CampoNumero'
 import CampoSenha from '@/components/campos/CampoSenha'
+import { buscarConsultoriasComoOpcoes } from '@/components/campos/opcoesDeConsultoria'
 import CartaoChave from '@/components/campos/CartaoChave'
 import { avaliarSenha } from '@/lib/senha'
 import Seletor from '@/components/campos/Seletor'
@@ -228,10 +229,7 @@ export default function FichaDoConsultor({
 
   const mudar = (campo) => (evento) => setDados((d) => ({ ...d, [campo]: evento.target.value }))
   const definir = (campo) => (valor) => setDados((d) => ({ ...d, [campo]: valor }))
-  const buscarOpcoesDeConsultoria = useCallback(async (termo) => {
-    const { itens, total } = await buscarConsultorias(termo)
-    return { itens: itens.map((c) => ({ valor: c.id, rotulo: c.nome })), total }
-  }, [buscarConsultorias])
+  const buscarOpcoesDeConsultoria = useMemo(() => buscarConsultoriasComoOpcoes(buscarConsultorias), [buscarConsultorias])
   // Sempre na ordem do pedido (a mesma da lista e do filtro), qualquer que seja a ordem dos cliques.
   const alternarTipo = (valor) => setTipos((atuais) => TIPOS_DE_CONSULTORIA.map((t) => t.valor)
     .filter((v) => (v === valor ? !atuais.includes(v) : atuais.includes(v))))

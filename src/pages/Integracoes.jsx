@@ -16,7 +16,7 @@ import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
-import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import FormularioIa from '@/components/integracoes/FormularioIa'
 import FormularioSlack from '@/components/integracoes/FormularioSlack'
 import FormularioSmtp from '@/components/integracoes/FormularioSmtp'
@@ -189,7 +189,7 @@ export default function Integracoes() {
       {consultoriaId && !erro && integracoes === null && <GraficoCarregando texto="Carregando as integrações…" className="py-12" />}
       {consultoriaId && integracoes && visiveis.length === 0 && <ListaVazia>Nenhuma integração neste filtro.</ListaVazia>}
       {consultoriaId && integracoes && visiveis.length > 0 && (
-        <Tabela rotulo="Integrações" colunas={['Integração', 'Situação', 'Conexão', 'Último teste']} larguraMinima={760}>
+        <Tabela rotulo="Integrações" colunas={['Integração', 'Situação', 'Conexão', 'Último teste']} larguraMinima={760} semAcoes={ehDono}>
           {visiveis.map((item) => {
             const integracao = integracoes[item.tipo]
             const situacao = integracao ? SITUACAO[integracao.situacao] : { rotulo: 'Não conectada', variante: 'outline' }
@@ -213,27 +213,24 @@ export default function Integracoes() {
                 </Celula>
                 <Celula className="text-muted-foreground">{detalhes(item.tipo, integracao?.config)}</Celula>
                 <Celula className="text-muted-foreground tabular-nums">{quando(integracao?.ultimo_teste_em)}</Celula>
-                <CelulaAcoes>
-                  {!ehDono && !integracao && (
-                    <Button variant="outline" size="sm" disabled={ocupado === item.tipo} onClick={() => abrir(item)}>
-                      <PlugZap /> Conectar
-                    </Button>
-                  )}
-                  {!ehDono && integracao && (
-                    <>
-                      <Button variant="ghost" size="sm" onClick={() => abrir(item)}>
-                        <Pencil /> {item.tipo === 'google' ? 'Reconectar' : 'Editar'}
+                {/* Não conectada: uma ação só, a principal, com texto (a exceção do G1); conectada: os ícones, sempre na mesma
+                    ordem. O dono só olha: a tabela fica sem a coluna de ações. */}
+                {!ehDono && (
+                  <CelulaAcoes>
+                    {!integracao ? (
+                      <Button variant="ghost" size="sm" disabled={ocupado === item.tipo} onClick={() => abrir(item)}>
+                        <PlugZap /> Conectar
                       </Button>
-                      <Button variant="ghost" size="sm" disabled={ocupado === integracao.id} onClick={() => testar(integracao)}>
-                        <RefreshCw className={ocupado === integracao.id ? 'animate-spin' : ''} /> Testar
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setDesconectando({ item, integracao })}
-                        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-                        <Unplug /> Desconectar
-                      </Button>
-                    </>
-                  )}
-                </CelulaAcoes>
+                    ) : (
+                      <>
+                        <AcaoDaLinha nome={item.tipo === 'google' ? 'Reconectar' : 'Editar'} icone={Pencil} onClick={() => abrir(item)} />
+                        <AcaoDaLinha nome="Testar" icone={RefreshCw} disabled={ocupado === integracao.id} onClick={() => testar(integracao)}
+                          classeDoIcone={ocupado === integracao.id ? 'animate-spin' : undefined} />
+                        <AcaoDaLinha nome="Desconectar" icone={Unplug} perigo onClick={() => setDesconectando({ item, integracao })} />
+                      </>
+                    )}
+                  </CelulaAcoes>
+                )}
               </Linha>
             )
           })}

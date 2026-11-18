@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { CalendarClock, ExternalLink, Gauge, ListChecks, TriangleAlert } from 'lucide-react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -9,8 +9,7 @@ import BarraDeFiltros, { CampoBusca } from '@/components/comum/BarraDeFiltros'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
-import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
-import { Button } from '@/components/ui/button'
+import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import { listarAndamento } from '@/data/checklists'
 import { indicadoresDeCheckins } from '@/data/indicadores'
 import { hoje } from '@/lib/mes'
@@ -18,6 +17,7 @@ import { plural } from '@/lib/nomes'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
 import { useLeitura } from '@/lib/useLeitura'
+import { useListaPaginada } from '@/lib/useListaPaginada'
 import { cn } from '@/lib/utils'
 import { BarraDeProgresso } from './CartaoDoModelo'
 import JanelaAplicarModelo from './JanelaAplicarModelo'
@@ -49,15 +49,6 @@ function cartoes(n) {
       destaque: n?.atrasadas > 0 ? 'perigo' : null },
     { chave: 'vencem', rotulo: 'Vencem em 7 dias', icone: CalendarClock, tom: 'aviso', valor: n?.vencem_7_dias },
   ]
-}
-
-// Ação da linha (ghost sm): no celular só o ícone aparece; o nome continua para o leitor de tela.
-function Acao({ rotulo, icone: Icone, ...props }) {
-  return (
-    <Button variant="ghost" size="sm" title={rotulo} {...props}>
-      <Icone /><span className="max-sm:sr-only">{rotulo}</span>
-    </Button>
-  )
 }
 
 function Consultor({ linha, comConsultoria }) {
@@ -112,9 +103,6 @@ export default function AndamentoDosClientes({ perfil }) {
   const buscaAtrasada = useAtraso(busca.trim(), 300)
   const [consultoriaId, setConsultoriaId] = useState('')
   const [consultor, setConsultor] = useState({ valor: '', nome: null })
-  const [pagina, setPagina] = useState(1)
-  const [resultado, setResultado] = useState(null)
-  const [erro, setErro] = useState(null)
   const [versao, setVersao] = useState(0)
   const [aplicarEm, setAplicarEm] = useState(null)
   const diaDeHoje = hoje()
@@ -124,27 +112,9 @@ export default function AndamentoDosClientes({ perfil }) {
   const numeros = useLeitura(lerNumeros, { consultoriaId: filtroDaCentral, consultorId: filtroDoConsultor, versao }).dados
 
   // Uma página por vez, filtrada, ordenada e contada no banco (regra "Escala" do CLAUDE.md).
-  useEffect(() => {
-    let ativo = true
-    listarAndamento({
-      situacao, busca: buscaAtrasada || undefined, consultoriaId: filtroDaCentral, consultorId: filtroDoConsultor, pagina,
-    })
-      .then((r) => {
-        if (!ativo) return
-        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
-        setResultado(r)
-        setErro(null)
-      })
-      .catch(() => ativo && setErro('Não foi possível carregar o andamento.'))
-    return () => {
-      ativo = false
-    }
-  }, [situacao, buscaAtrasada, filtroDaCentral, filtroDoConsultor, pagina, versao])
-
-  const filtrar = (mudar) => (...valores) => { mudar(...valores); setPagina(1) }
-
-  const linhas = resultado?.itens ?? null
-  const total = resultado?.total ?? 0
+  const { itens: linhas, erro: falhou, paginacao } = useListaPaginada(listarAndamento,
+    { situacao, busca: buscaAtrasada || undefined, consultoriaId: filtroDaCentral, consultorId: filtroDoConsultor }, { versao })
+  const erro = falhou ? 'Não foi possível carregar o andamento.' : null
   const filtrando = Boolean(buscaAtrasada || filtroDaCentral || filtroDoConsultor)
   const vazio = filtrando ? 'Nenhum cliente encontrado.'
     : VAZIO[situacao] ?? (doConsultor ? 'Você ainda não tem clientes.' : 'Nenhum cliente em atendimento ainda.')
@@ -152,17 +122,17 @@ export default function AndamentoDosClientes({ perfil }) {
   return (
     <>
       <BarraDeFiltros>
-        <AbasSegmentadas rotulo="Situação" abas={SITUACOES} valor={situacao} aoMudar={filtrar(setSituacao)} />
+        <AbasSegmentadas rotulo="Situação" abas={SITUACOES} valor={situacao} aoMudar={setSituacao} />
         <CampoBusca rotulo="Buscar clientes ou modelos" placeholder="Buscar cliente ou modelo" valor={busca}
-          aoMudar={filtrar(setBusca)} />
+          aoMudar={setBusca} />
         {central && (
           <FiltroConsultoria valor={consultoriaId}
-            aoMudar={filtrar((id) => { setConsultoriaId(id); setConsultor({ valor: '', nome: null }) })} />
+            aoMudar={(id) => { setConsultoriaId(id); setConsultor({ valor: '', nome: null }) }} />
         )}
         {!doConsultor && (
           <FiltroConsultor valor={consultor.valor} nome={consultor.nome} comSemConsultor={false}
             consultoriaId={central ? (consultoriaId || null) : perfil.consultoria_id}
-            aoMudar={filtrar((valor, nome) => setConsultor({ valor, nome }))} />
+            aoMudar={(valor, nome) => setConsultor({ valor, nome })} />
         )}
       </BarraDeFiltros>
       <CartoesDeNumeros rotulo="Indicadores do andamento" cartoes={cartoes(numeros)} />
@@ -170,7 +140,7 @@ export default function AndamentoDosClientes({ perfil }) {
       {!erro && linhas === null && <GraficoCarregando texto="Carregando o andamento…" className="py-12" />}
       {!erro && linhas?.length === 0 && <ListaVazia>{vazio}</ListaVazia>}
       {!erro && linhas?.length > 0 && (
-        <Tabela rotulo="Andamento dos clientes" larguraMinima={1040} paginacao={{ pagina, total, aoMudar: setPagina }}
+        <Tabela rotulo="Andamento dos clientes" larguraMinima={1040} paginacao={paginacao}
           colunas={['Cliente', 'Consultor', 'Modelo', 'Progresso', 'Atrasadas', 'Próxima tarefa']}>
           {linhas.map((l) => {
             const { cliente, checklist } = l
@@ -195,13 +165,13 @@ export default function AndamentoDosClientes({ perfil }) {
                       : <span className="text-muted-foreground">0</span>}
                 </Celula>
                 <Celula>{checklist ? <ProximaTarefa proxima={checklist.proxima} diaDeHoje={diaDeHoje} /> : '—'}</Celula>
+                {/* Posições fixas (auditoria, G1): Aplicar modelo (só nos sem modelo, para quem aplica) · Abrir. */}
                 <CelulaAcoes>
-                  <Button asChild variant="ghost" size="sm" title="Abrir">
-                    <Link to={daAbaCheckins(cliente)}><ExternalLink /><span className="max-sm:sr-only">Abrir</span></Link>
-                  </Button>
-                  {!checklist && l.pode_aplicar && (
-                    <Acao rotulo="Aplicar modelo" icone={ListChecks} onClick={() => setAplicarEm(l)} />
+                  {!doConsultor && (
+                    <AcaoDaLinha nome="Aplicar modelo" icone={ListChecks} visivel={!checklist && Boolean(l.pode_aplicar)}
+                      onClick={() => setAplicarEm(l)} />
                   )}
+                  <AcaoDaLinha nome="Abrir" icone={ExternalLink} para={daAbaCheckins(cliente)} />
                 </CelulaAcoes>
               </Linha>
             )

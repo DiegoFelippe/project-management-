@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
-import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { useEnvio } from '@/components/comum/useEnvio'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
@@ -19,10 +19,10 @@ import { ARQUIVO_GRANDE_DEMAIS } from '@/lib/erros'
 import { formatarTamanho, TAMANHO_MAXIMO_ARQUIVO } from '@/lib/arquivos'
 import { FUSO } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
+import { useListaPaginada } from '@/lib/useListaPaginada'
 import { cn } from '@/lib/utils'
 
 const QUANDO = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, dateStyle: 'short', timeStyle: 'short' })
-const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
 const LIMITE_EM_MB = TAMANHO_MAXIMO_ARQUIVO / 1048576
 
 // Quem manda arquivo, como private.posso_enviar_arquivo (o banco confere): a central, mesmo com o cliente
@@ -45,6 +45,9 @@ function podeMudarPasta(perfil, pasta) {
   if (veTudo(perfil) || pasta.criada_por === perfil.id) return true
   return (perfil.papel === 'admin' || perfil.papel === 'gestor') && !!pasta.consultoria_id && pasta.consultoria_id === perfil.consultoria_id
 }
+
+const lerPastas = ({ clienteId, pagina }) => listarPastas(clienteId, { pagina })
+const lerArquivos = ({ clienteId, pastaId, pagina }) => listarArquivos(clienteId, { pastaId: pastaId ?? null, pagina })
 
 const quantosArquivos = (n) => (n === 1 ? 'O 1 arquivo dela some de vez.' : `Os ${n} arquivos dela somem de vez.`)
 
@@ -82,15 +85,9 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
   const [parametros, setParametros] = useSearchParams()
   const pastaDoEndereco = parametros.get('pasta')
   const [pasta, setPasta] = useState(null) // pasta aberta ({ id, nome }) ou null: a raiz
-  const [paginaPastas, setPaginaPastas] = useState(1)
-  const [pastas, setPastas] = useState(null)
-  const [erroPastas, setErroPastas] = useState(null)
   const [formulario, setFormulario] = useState(null) // 'nova' | pasta que está sendo renomeada
   const [apagandoPasta, setApagandoPasta] = useState(null)
-  const [pagina, setPagina] = useState(1)
   const [versao, setVersao] = useState(0)
-  const [resultado, setResultado] = useState(null)
-  const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(null) // nome do arquivo em envio
   const [problemas, setProblemas] = useState([])
   const [arrastando, setArrastando] = useState(false)
@@ -121,36 +118,14 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
     }
   }, [pastaDoEndereco, cliente.id, setParametros])
 
-  useEffect(() => {
-    if (pastaId) return undefined
-    let ativo = true
-    listarPastas(cliente.id, { pagina: paginaPastas })
-      .then((r) => {
-        if (!ativo) return
-        if (r.foraDaFaixa && paginaPastas > 1) return setPaginaPastas(1)
-        setPastas(r)
-        setErroPastas(null)
-      })
-      .catch(() => ativo && setErroPastas('Não foi possível carregar as pastas.'))
-    return () => {
-      ativo = false
-    }
-  }, [cliente.id, pastaId, paginaPastas, versao])
-
-  useEffect(() => {
-    let ativo = true
-    listarArquivos(cliente.id, { pastaId, pagina })
-      .then((r) => {
-        if (!ativo) return
-        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
-        setResultado(r)
-        setErro(null)
-      })
-      .catch(() => ativo && setErro('Não foi possível carregar os arquivos.'))
-    return () => {
-      ativo = false
-    }
-  }, [cliente.id, pastaId, pagina, versao])
+  // Pastas (só na raiz) e arquivos (da raiz ou da pasta aberta): uma página por vez, do banco. Abrir ou sair de uma pasta
+  // mostra o carregando no lugar dos arquivos de antes.
+  const listaDePastas = useListaPaginada(lerPastas, pastaId ? null : { clienteId: cliente.id }, { versao })
+  const pastas = listaDePastas.resultado
+  const erroPastas = listaDePastas.erro ? 'Não foi possível carregar as pastas.' : null
+  const listaDeArquivos = useListaPaginada(lerArquivos, { clienteId: cliente.id, pastaId }, { versao, limparAoMudar: ['pastaId'] })
+  const resultado = listaDeArquivos.resultado
+  const erro = listaDeArquivos.erro ? 'Não foi possível carregar os arquivos.' : null
 
   async function enviar(lista) {
     if (enviando || lista.length === 0) return
@@ -167,7 +142,7 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
     }
     setEnviando(null)
     setProblemas(falhas)
-    setPagina(1)
+    listaDeArquivos.paginacao.aoMudar(1)
     recarregar()
   }
 
@@ -208,15 +183,11 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
 
   function abrirPasta(p) {
     setPasta({ id: p.id, nome: p.nome })
-    setResultado(null)
-    setPagina(1)
     setProblemas([])
   }
 
   function voltar() {
     setPasta(null)
-    setResultado(null)
-    setPagina(1)
     setProblemas([])
   }
 
@@ -224,7 +195,7 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
     const resposta = formulario === 'nova' ? await criarPasta(cliente.id, nome) : await renomearPasta(formulario.id, nome)
     if (resposta.erro) return resposta
     toast.success(formulario === 'nova' ? `Pasta ${nome} criada.` : 'Pasta renomeada.')
-    if (formulario === 'nova') setPaginaPastas(1)
+    if (formulario === 'nova') listaDePastas.paginacao.aoMudar(1)
     recarregar()
     return resposta
   }
@@ -281,20 +252,16 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
       {erroPastas && !pasta && <p role="alert" className="text-corpo text-destructive">{erroPastas}</p>}
       {!pasta && pastas?.itens.length > 0 && (
         <Tabela rotulo="Pastas" colunas={['Nome', 'Arquivos', 'Criada em']} larguraMinima={560}
-          paginacao={{ pagina: paginaPastas, total: pastas.total, aoMudar: setPaginaPastas }}>
+          paginacao={listaDePastas.paginacao}>
           {pastas.itens.map((p) => (
             <Linha key={p.id}>
               <Celula className="font-medium break-all"><span className="inline-flex items-center gap-2"><Folder className="size-4 shrink-0 text-primary" aria-hidden="true" />{p.nome}</span></Celula>
               <Celula className="tabular-nums text-muted-foreground">{p.arquivos}</Celula>
               <Celula className="tabular-nums text-muted-foreground">{QUANDO.format(new Date(p.criada_em))}</Celula>
               <CelulaAcoes>
-                <Button variant="ghost" size="sm" onClick={() => abrirPasta(p)}><FolderOpen /> Abrir</Button>
-                {podeMudarPasta(perfil, p) && (
-                  <>
-                    <Button variant="ghost" size="sm" onClick={() => setFormulario(p)}><Pencil /> Renomear</Button>
-                    <Button variant="ghost" size="sm" onClick={() => setApagandoPasta(p)} className={BOTAO_PERIGO}><Trash2 /> Apagar</Button>
-                  </>
-                )}
+                <AcaoDaLinha nome="Abrir" icone={FolderOpen} onClick={() => abrirPasta(p)} />
+                <AcaoDaLinha nome="Renomear" icone={Pencil} visivel={podeMudarPasta(perfil, p)} onClick={() => setFormulario(p)} />
+                <AcaoDaLinha nome="Apagar" icone={Trash2} perigo visivel={podeMudarPasta(perfil, p)} onClick={() => setApagandoPasta(p)} />
               </CelulaAcoes>
             </Linha>
           ))}
@@ -304,7 +271,7 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
       {itens?.length === 0 && !pasta && semPastas && <ListaVazia>Nenhum arquivo enviado ainda.</ListaVazia>}
       {itens?.length > 0 && (
         <Tabela rotulo="Arquivos" colunas={['Nome', 'Tamanho', 'Enviado por', 'Quando']} larguraMinima={640}
-          paginacao={{ pagina, total: resultado.total, aoMudar: setPagina }}>
+          paginacao={listaDeArquivos.paginacao}>
           {itens.map((a) => (
             <Linha key={a.id}>
               <Celula className="font-medium break-all">{a.nome}</Celula>
@@ -312,10 +279,8 @@ export default function ArquivosDoCliente({ cliente, perfil }) {
               <Celula className="text-muted-foreground">{a.autor ?? '—'}</Celula>
               <Celula className="tabular-nums text-muted-foreground">{QUANDO.format(new Date(a.enviado_em))}</Celula>
               <CelulaAcoes>
-                <Button variant="ghost" size="sm" onClick={() => baixar(a)}><Download /> Baixar</Button>
-                {podeApagar(perfil, a) && (
-                  <Button variant="ghost" size="sm" onClick={() => setApagando(a)} className={BOTAO_PERIGO}><Trash2 /> Apagar</Button>
-                )}
+                <AcaoDaLinha nome="Baixar" icone={Download} onClick={() => baixar(a)} />
+                <AcaoDaLinha nome="Apagar" icone={Trash2} perigo visivel={podeApagar(perfil, a)} onClick={() => setApagando(a)} />
               </CelulaAcoes>
             </Linha>
           ))}

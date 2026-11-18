@@ -286,8 +286,9 @@ describe('Cliente (página)', () => {
     })
     tela(central, '/clientes/k1?aba=checkins')
     const tabela = await screen.findByRole('table', { name: 'Check-ins' })
+    // A central só vê os check-ins: a tabela não tem a coluna de ações.
     expect(within(tabela).getAllByRole('columnheader').map((c) => c.textContent))
-      .toEqual(['Data', 'Consultor', 'Horas', 'Tarefas marcadas', 'O que foi feito', 'Ações'])
+      .toEqual(['Data', 'Consultor', 'Horas', 'Tarefas marcadas', 'O que foi feito'])
     const comTarefas = within(within(tabela).getByRole('row', { name: /Reunião/ }))
     expect(comTarefas.getAllByRole('listitem').map((i) => i.textContent)).toEqual(['Análise do DRE', 'Mapa de custos', 'Plano de ação', '+2'])
     expect(within(within(tabela).getByRole('row', { name: /Ajuste/ })).queryByRole('list')).not.toBeInTheDocument()

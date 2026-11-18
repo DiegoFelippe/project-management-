@@ -62,7 +62,8 @@ const botoesDoRodape = (janela) =>
   within(janela.querySelector('[data-slot="dialog-footer"]')).getAllByRole('button').map((b) => b.textContent.trim())
 const acoes = async (nome) => {
   const tr = await screen.findByRole('row', { name: new RegExp(nome) })
-  return within(tr.querySelector('td:last-child')).queryAllByRole('button').map((b) => b.textContent.trim())
+  // As ações da linha são só ícone, com o nome no aria-label (auditoria, G1); o espaço de uma que não vale não é botão.
+  return within(tr.querySelector('td:last-child')).queryAllByRole('button').map((b) => b.getAttribute('aria-label'))
 }
 
 beforeEach(() => {
@@ -184,12 +185,14 @@ describe('ModelosDeCheckin: a tela', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar os modelos.')
   })
 
-  it('a 360 px nada rola para o lado: a barra quebra linha, a tabela rola dentro do cartão e as ações viram só ícone', async () => {
+  it('a 360 px nada rola para o lado: a barra quebra linha, a tabela rola dentro do cartão e as ações são só ícone', async () => {
     const { container } = tela(gestor)
     await screen.findByRole('table', { name: 'Modelos de check-in' })
     expect(screen.getByText('Filtros').closest('.card')).toHaveClass('flex-wrap')
     expect(screen.getByRole('table').parentElement).toHaveClass('overflow-x-auto')
-    expect(within(within(linha('Implantação STI')).getByRole('button', { name: 'Editar' })).getByText('Editar')).toHaveClass('max-sm:sr-only')
+    const editar = within(linha('Implantação STI')).getByRole('button', { name: 'Editar' })
+    expect(editar).toHaveAttribute('title', 'Editar')
+    expect(editar).toHaveTextContent('')
     expect(container.innerHTML).not.toMatch(/max-w-(?:sm|md|lg|xl|\dxl|screen)[^"]*mx-auto|mx-auto[^"]*max-w-(?:sm|md|lg|xl|\dxl|screen)/)
   })
 })
@@ -206,6 +209,9 @@ describe('ModelosDeCheckin: quem faz o quê', () => {
     tela(gestor)
     expect(await acoes('Gestão financeira')).toEqual(['Ver', 'Duplicar'])
     expect(await acoes('Implantação STI')).toEqual(['Editar', 'Duplicar', 'Arquivar', 'Apagar'])
+    // Posições fixas (auditoria, G1): as duas que não valem para o da Central deixam o espaço, e Duplicar fica no 2º lugar.
+    const lugares = [...linha('Gestão financeira').querySelector('td:last-child').children]
+    expect(lugares.map((el) => el.getAttribute('aria-label') ?? (el.getAttribute('aria-hidden') && 'espaço'))).toEqual(['Ver', 'Duplicar', 'espaço', 'espaço'])
   })
 
   it('a Central faz tudo em todos', async () => {

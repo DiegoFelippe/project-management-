@@ -41,11 +41,12 @@ function paraColunas(dados) {
   }
 }
 
-// Uma página de clientes, filtrada e paginada no banco.
+// Uma página de clientes, filtrada e paginada no banco. `qualquer`: todas as situações, inclusive os arquivados (a busca
+// da central, que passa por cima da situação escolhida: usabilidade, U1).
 export async function listarClientes({ aba, consultoriaId, consultorId, busca, pagina = 1 } = {}) {
   let consulta = supabase.from('clientes').select(CAMPOS_DA_LISTA, { count: 'exact' }).order('nome').order('id')
-  // Só a aba Arquivados mostra arquivados; todas as outras ficam com os ativos.
-  consulta = consulta.eq('arquivado', aba === 'arquivados')
+  // Só a aba Arquivados mostra arquivados; todas as outras (menos `qualquer`) ficam com os ativos.
+  if (aba !== 'qualquer') consulta = consulta.eq('arquivado', aba === 'arquivados')
   if (aba === 'distribuir') consulta = consulta.is('consultoria_id', null)
   else if (aba === 'nas_consultorias') consulta = consulta.not('consultoria_id', 'is', null)
   else if (aba === 'aguardando') consulta = consulta.not('consultoria_id', 'is', null).is('consultor_id', null)

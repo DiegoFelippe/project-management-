@@ -1,4 +1,4 @@
-import { Archive, Building2, CalendarX, Hourglass, Plus, RadioTower, Timer, TrendingUp, Users } from 'lucide-react'
+import { Archive, Building2, CalendarX, Eye, Hourglass, Plus, RadioTower, Timer, TrendingUp, Users } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
@@ -24,6 +24,7 @@ import { formatarHoras } from '@/lib/horas'
 import { veTudo } from '@/lib/papeis'
 import { useAtraso } from '@/lib/useAtraso'
 import { useLeitura } from '@/lib/useLeitura'
+import { useListaPaginada } from '@/lib/useListaPaginada'
 
 // Situação (filtro) por papel. A central e o dono veem tudo e começam pelo que espera a central; admin e gestor
 // começam pelo que está em atendimento. A pessoa não tem filtro: só vê os clientes dela.
@@ -46,6 +47,37 @@ const VAZIO = {
   aguardando: 'Nenhum cliente aguardando consultor.',
   atendimento: 'Nenhum cliente em atendimento.',
   meus: 'Você ainda não tem clientes.',
+}
+
+// Com algo na busca, a situação de cada linha aparece numa coluna (a busca passa por cima da situação escolhida: U1).
+const SITUACAO_DA_LINHA = {
+  distribuir: { rotulo: 'Aguardando consultoria', variante: 'notice' },
+  aguardando: { rotulo: 'Aguardando consultor', variante: 'notice' },
+  atendimento: { rotulo: 'Em atendimento', variante: 'positive' },
+  arquivados: { rotulo: 'Arquivado', variante: 'secondary' },
+}
+
+const quantos = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
+
+// Lista vazia sem busca (auditoria, M1): o texto diz o próximo passo e `destino` é a situação que tem clientes (o "Ver"
+// troca para ela). Os números são os dos cartões (contados no banco, no mesmo recorte de consultoria e consultor).
+function vazioDaSituacao(aba, n, central) {
+  if (central && aba === 'distribuir') {
+    if (n?.aguardando_consultor > 0) {
+      return { texto: `Nada para mandar agora. ${quantos(n.aguardando_consultor, 'cliente aguarda', 'clientes aguardam')} consultor nas consultorias.`, destino: 'aguardando' }
+    }
+    if (n?.em_atendimento > 0) {
+      return { texto: `Nada para mandar agora. ${quantos(n.em_atendimento, 'cliente está', 'clientes estão')} em atendimento.`, destino: 'atendimento' }
+    }
+    return { texto: 'Nada para mandar agora.' }
+  }
+  if (!central && aba === 'atendimento' && n?.aguardando_consultor > 0) {
+    return { texto: `${VAZIO.atendimento} ${quantos(n.aguardando_consultor, 'cliente aguarda', 'clientes aguardam')} consultor.`, destino: 'aguardando' }
+  }
+  if (!central && aba === 'aguardando' && n?.em_atendimento > 0) {
+    return { texto: `${VAZIO.aguardando} ${quantos(n.em_atendimento, 'cliente está', 'clientes estão')} em atendimento.`, destino: 'atendimento' }
+  }
+  return { texto: VAZIO[aba] }
 }
 
 // Números dos cartões (contados no banco, no recorte de quem vê): seguem a consultoria e o consultor do filtro; a
@@ -100,9 +132,6 @@ export default function Clientes() {
   const buscaAtrasada = useAtraso(busca.trim(), 300)
   const [consultoriaId, setConsultoriaId] = useState('')
   const [consultor, setConsultor] = useState({ valor: '', nome: null }) // '' = todos, 'sem' ou o id
-  const [pagina, setPagina] = useState(1)
-  const [resultado, setResultado] = useState(null)
-  const [erro, setErro] = useState(null)
   const [versao, setVersao] = useState(0)
   const [aberto, setAberto] = useState(null) // meu check-in aberto
   const idDoAviso = useId()
@@ -118,27 +147,17 @@ export default function Clientes() {
     consultoriaId: consultoriaId || undefined, consultorId: consultorFiltrado || undefined, versao,
   }).dados
 
-  // Uma página por vez, filtrada e paginada no banco (regra "Escala" no CLAUDE.md).
-  useEffect(() => {
-    let ativo = true
-    listarClientes({
-      aba,
-      busca: buscaAtrasada || undefined,
-      consultoriaId: consultoriaId || undefined,
-      consultorId: aba === 'meus' ? perfil.id : consultorFiltrado || undefined,
-      pagina,
-    })
-      .then((r) => {
-        if (!ativo) return
-        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
-        setResultado(r)
-        setErro(null)
-      })
-      .catch(() => ativo && setErro('Não foi possível carregar os clientes.'))
-    return () => {
-      ativo = false
-    }
-  }, [aba, buscaAtrasada, consultoriaId, consultorFiltrado, pagina, versao, perfil.id])
+  // Com algo na busca, a lista procura em todas as situações (usabilidade, U1): a central em todas, até nos arquivados; a
+  // gestão em Todas (as da consultoria). O consultor não tem situação: a busca continua nos clientes dele.
+  const buscando = Boolean(buscaAtrasada) && !doConsultor
+  // Uma página por vez, filtrada e paginada no banco (regra "Escala" no CLAUDE.md); mudar um filtro volta para a página 1.
+  const { resultado, total, erro: falhou, paginacao } = useListaPaginada(listarClientes, {
+    aba: buscando ? (central ? 'qualquer' : 'todas') : aba,
+    busca: buscaAtrasada || undefined,
+    consultoriaId: consultoriaId || undefined,
+    consultorId: aba === 'meus' ? perfil.id : consultorFiltrado || undefined,
+  }, { versao })
+  const erro = falhou ? 'Não foi possível carregar os clientes.' : null
 
   // O check-in que ficou aberto (no máximo um); recarregado depois de cada check-in, check-out ou lançamento.
   useEffect(() => {
@@ -151,14 +170,6 @@ export default function Clientes() {
       ativo = false
     }
   }, [consultorQueAtende, perfil.id, versao])
-
-  // Qualquer mudança de filtro volta para a página 1.
-  const filtros = `${aba}|${buscaAtrasada}|${consultoriaId}|${consultorFiltrado}`
-  const [filtrosAnteriores, setFiltrosAnteriores] = useState(filtros)
-  if (filtros !== filtrosAnteriores) {
-    setFiltrosAnteriores(filtros)
-    setPagina(1)
-  }
 
   // As ações vêm da situação do próprio cliente (não do filtro). Quem atende ainda faz check-in e lança horas
   // nos clientes dele; a gestão também escolhe/troca consultor e ajusta a previsão.
@@ -174,7 +185,7 @@ export default function Clientes() {
   }
 
   const clientes = resultado?.itens ?? null
-  const total = resultado?.total ?? 0
+  const vazio = vazioDaSituacao(aba, numeros, central)
 
   return (
     <>
@@ -213,22 +224,39 @@ export default function Clientes() {
           {' '}Faça o check-out para começar outro.
         </p>
       )}
+      {buscando && <p role="status" className="mb-3 text-corpo text-muted-foreground">Buscando em todas as situações.</p>}
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && clientes === null && <GraficoCarregando texto="Carregando os clientes…" className="py-12" />}
-      {clientes?.length === 0 && <ListaVazia>{buscaAtrasada ? 'Nenhum cliente encontrado.' : VAZIO[aba]}</ListaVazia>}
+      {clientes?.length === 0 && buscaAtrasada && <ListaVazia>Nenhum cliente encontrado.</ListaVazia>}
+      {clientes?.length === 0 && !buscaAtrasada && (
+        <ListaVazia>
+          <p>{vazio.texto}</p>
+          {(vazio.destino || central) && (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              {vazio.destino && <Button onClick={() => setSituacao(vazio.destino)}><Eye /> Ver</Button>}
+              {central && <Button variant="outline" onClick={() => abrir('formulario')}><Plus /> Novo cliente</Button>}
+            </div>
+          )}
+        </ListaVazia>
+      )}
       {clientes?.length > 0 && (
-        <Tabela rotulo="Clientes" colunas={['Cliente', 'CNPJ', 'Cidade', 'Previsão', 'Consultoria', 'Consultor']}
-          paginacao={{ pagina, total, aoMudar: setPagina }}>
+        <Tabela rotulo="Clientes" paginacao={paginacao}
+          colunas={['Cliente', ...(buscando ? ['Situação'] : []), 'CNPJ', 'Cidade', 'Previsão', 'Consultoria', 'Consultor']}>
           {clientes.map((c) => (
             <Linha key={c.id}>
               <Celula>
                 <p className="flex items-center gap-2 font-semibold">
                   <Link to={`/clientes/${c.id}`} className="hover:underline">{c.nome}</Link>
-                  {!c.arquivado && c.consultoria_id && !c.consultor_id && <Badge variant="notice">Novo</Badge>}
+                  {!buscando && !c.arquivado && c.consultoria_id && !c.consultor_id && <Badge variant="notice">Novo</Badge>}
                 </p>
                 {c.razao_social && <p className="truncate text-rotulo text-muted-foreground">{c.razao_social}</p>}
               </Celula>
-              <Celula className="tabular-nums text-muted-foreground">{c.cnpj ? formatarCnpj(c.cnpj) : '—'}</Celula>
+              {buscando && (
+                <Celula>
+                  <Badge variant={SITUACAO_DA_LINHA[abaDoCliente(c, false)].variante}>{SITUACAO_DA_LINHA[abaDoCliente(c, false)].rotulo}</Badge>
+                </Celula>
+              )}
+              <Celula className="whitespace-nowrap tabular-nums text-muted-foreground">{c.cnpj ? formatarCnpj(c.cnpj) : '—'}</Celula>
               <Celula className="text-muted-foreground">{c.cidade ? `${c.cidade}${c.uf ? `/${c.uf}` : ''}` : '—'}</Celula>
               <Celula><Previsao cliente={c} comRealizado={doConsultor} /></Celula>
               <Celula className="text-muted-foreground">{c.consultoria?.nome ?? '—'}</Celula>

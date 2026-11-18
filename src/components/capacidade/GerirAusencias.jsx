@@ -3,14 +3,13 @@ import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import CampoData from '@/components/campos/CampoData'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
+import { AcaoDaLinha } from '@/components/comum/Tabela'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { apagarAusencia, criarAusencia, editarAusencia } from '@/data/capacidade'
 import { formatarDia } from '@/lib/mes'
 import AusenciasDaPessoa from './AusenciasDaPessoa'
-
-const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
 
 function Formulario({ ausencia, aoSalvar, aoCancelar }) {
   const [de, setDe] = useState(ausencia?.de ?? '')
@@ -82,8 +81,8 @@ export function GerirAusencias({ pessoa, aoMudar }) {
     <>
       <AusenciasDaPessoa perfilId={pessoa.id} versao={versao} acoes={(a) => (
         <>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setFormulario(a)}><Pencil /> Editar</Button>
-          <Button type="button" variant="ghost" size="sm" className={BOTAO_PERIGO} onClick={() => setApagando(a)}><Trash2 /> Apagar</Button>
+          <AcaoDaLinha nome="Editar" icone={Pencil} onClick={() => setFormulario(a)} />
+          <AcaoDaLinha nome="Apagar" icone={Trash2} perigo onClick={() => setApagando(a)} />
         </>
       )} />
       {formulario ? (

@@ -56,8 +56,9 @@ const consultor = { id: 'p1', papel: 'pessoa', consultoria_id: 'c1', consultoria
 const tela = (perfil) => renderizarTela(<AndamentoDosClientes perfil={perfil} />, { perfil, endereco: '/checkins' })
 const linha = (nome) => screen.getByRole('row', { name: new RegExp(nome) })
 const celulas = (nome) => within(linha(nome)).getAllByRole('cell').map((c) => c.textContent)
+// As ações da linha são só ícone, com o nome no aria-label (auditoria, G1).
 const acoes = (nome) => [...linha(nome).querySelector('td:last-child').querySelectorAll('a, button')]
-  .map((b) => b.textContent.trim())
+  .map((b) => b.getAttribute('aria-label'))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -122,7 +123,9 @@ describe('AndamentoDosClientes: a tela', () => {
     expect(within(linha('Padaria Pão Quente')).getByRole('link', { name: 'Padaria Pão Quente' }))
       .toHaveAttribute('href', '/clientes/k1?aba=checkins')
     expect(acoes('Padaria Pão Quente')).toEqual(['Abrir'])
-    expect(acoes('Farmácia Central')).toEqual(['Abrir', 'Aplicar modelo'])
+    expect(acoes('Farmácia Central')).toEqual(['Aplicar modelo', 'Abrir'])
+    // Posições fixas: onde Aplicar modelo não vale fica o espaço, e o Abrir não muda de lugar.
+    expect(linha('Padaria Pão Quente').querySelector('td:last-child').firstElementChild).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('Aplicar modelo abre a janela do cliente; aplicado, avisa e relê a lista e os cartões', async () => {
@@ -234,15 +237,13 @@ describe('AndamentoDosClientes: a tela', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar o andamento.')
   })
 
-  it('a 360 px nada rola para o lado: a barra quebra linha, a tabela rola dentro do cartão e as ações viram só ícone', async () => {
+  it('a 360 px nada rola para o lado: a barra quebra linha, a tabela rola dentro do cartão e as ações são só ícone', async () => {
     const { container } = tela(gestor)
     await screen.findByRole('table', { name: 'Andamento dos clientes' })
     expect(screen.getByText('Filtros').closest('.card')).toHaveClass('flex-wrap')
     expect(screen.getByRole('table').parentElement).toHaveClass('overflow-x-auto')
-    expect(within(within(linha('Farmácia Central')).getByRole('link', { name: 'Abrir' })).getByText('Abrir'))
-      .toHaveClass('max-sm:sr-only')
-    expect(within(within(linha('Farmácia Central')).getByRole('button', { name: 'Aplicar modelo' })).getByText('Aplicar modelo'))
-      .toHaveClass('max-sm:sr-only')
+    expect(within(linha('Farmácia Central')).getByRole('link', { name: 'Abrir' })).toHaveTextContent('')
+    expect(within(linha('Farmácia Central')).getByRole('button', { name: 'Aplicar modelo' })).toHaveAttribute('title', 'Aplicar modelo')
     expect(container.innerHTML).not.toMatch(/max-w-(?:sm|md|lg|xl|\dxl|screen)[^"]*mx-auto|mx-auto[^"]*max-w-(?:sm|md|lg|xl|\dxl|screen)/)
   })
 })

@@ -218,30 +218,46 @@ describe('Clientes: distribuir e escolher consultor', () => {
   const gestor = { id: 'g1', papel: 'gestor', consultoria_id: 's1' }
   const NA_CONSULTORIA = CLIENTES.map((c) => ({ ...c, consultoria_id: 's1', consultoria: { id: 's1', nome: 'STI' } }))
 
-  // Padrão Hub: nas linhas da tabela as ações continuam ghost sm (cheio e outline são só do cabeçalho da página).
+  // Padrão Hub: nas linhas da tabela as ações são ghost (cheio e outline são só do cabeçalho da página). A principal da
+  // situação tem texto (ghost sm); as outras são só o ícone, com o nome no aria-label e no title (auditoria, G1).
   const ehGhostSm = (botao) => {
     expect(botao).toHaveClass('text-muted-foreground', 'h-8')
     expect(botao).not.toHaveClass('bg-primary-cheio')
     expect(botao).not.toHaveClass('border')
   }
+  const ehSoIcone = (botao) => {
+    expect(botao).toHaveClass('text-muted-foreground', 'size-8')
+    expect(botao).toHaveAttribute('title', botao.getAttribute('aria-label'))
+    expect(botao).toHaveTextContent('')
+  }
 
-  it('as ações das linhas continuam ghost sm (central, gestor e consultor)', async () => {
+  it('nas linhas, a ação principal tem texto e as outras são só ícone (central, gestor e consultor)', async () => {
     const { unmount } = renderizarTela(<Clientes />, { perfil: central })
     const linha = await screen.findByRole('row', { name: /Provedor Alfa/ })
     ehGhostSm(within(linha).getByRole('button', { name: 'Mandar para consultoria' }))
-    ehGhostSm(within(linha).getByRole('button', { name: 'Editar' }))
+    for (const nome of ['Editar', 'Arquivar', 'Apagar']) ehSoIcone(within(linha).getByRole('button', { name: nome }))
     unmount()
     vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA.map((c) => ({ ...c, consultor_id: 'p9', consultor: { id: 'p9', nome: 'Zé', ativo: true } })), total: 2 })
     const gestao = renderizarTela(<Clientes />, { perfil: gestor })
     await screen.findByRole('table', { name: 'Clientes' })
     const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
-    ehGhostSm(within(alfa).getByRole('button', { name: 'Trocar consultor' }))
-    ehGhostSm(within(alfa).getByRole('button', { name: 'Ajustar previsão' }))
+    ehSoIcone(within(alfa).getByRole('button', { name: 'Trocar consultor' }))
+    ehSoIcone(within(alfa).getByRole('button', { name: 'Ajustar previsão' }))
     gestao.unmount()
     renderizarTela(<Clientes />, { perfil: { id: 'p9', papel: 'pessoa', consultoria_id: 's1' } })
     const minha = await screen.findByRole('row', { name: /Provedor Alfa/ })
     ehGhostSm(within(minha).getByRole('button', { name: 'Fazer check-in' }))
-    ehGhostSm(within(minha).getByRole('button', { name: 'Lançar horas' }))
+    ehSoIcone(within(minha).getByRole('button', { name: 'Lançar horas' }))
+  })
+
+  it('central: os ícones ficam nos mesmos lugares em toda linha (Editar, Arquivar, Apagar por último)', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: [CLIENTES[0], NA_CONSULTORIA[1]], total: 2 })
+    renderizarTela(<Clientes />, { perfil: central })
+    const nomes = (nome) => [...linha(nome).querySelector('td:last-child').querySelectorAll('button')]
+      .map((b) => b.getAttribute('aria-label') ?? b.textContent.trim()).slice(-3)
+    await screen.findByRole('row', { name: /Provedor Alfa/ })
+    expect(nomes('Provedor Alfa')).toEqual(['Editar', 'Arquivar', 'Apagar'])
+    expect(nomes('Provedor Beta')).toEqual(['Editar', 'Arquivar', 'Apagar'])
   })
 
   it('central: Mandar para consultoria abre a janela com a sugestão e confirma', async () => {
@@ -558,5 +574,117 @@ describe('Clientes: cartões de números abaixo dos filtros', () => {
     const cartoes = await cartoesAbaixoDaBarra('Indicadores dos clientes')
     expect(numeroDoCartao(cartoes, 'Em atendimento')).toBe('—')
     expect(await screen.findByRole('table', { name: 'Clientes' })).toBeInTheDocument()
+  })
+})
+
+describe('Clientes: a busca procura em todas as situações (usabilidade, U1)', () => {
+  const gestor = { id: 'g1', papel: 'gestor', consultoria_id: 's1' }
+  const DE_TODAS = [
+    { ...base, id: 'k1', nome: 'Usabilidade Net', horas_mes: 10 },
+    { ...base, id: 'k2', nome: 'Usabilidade Fibra', horas_mes: 10, consultoria_id: 's1', consultoria: { id: 's1', nome: 'STI' } },
+    { ...base, id: 'k3', nome: 'Usabilidade Rádio', horas_mes: 10, consultoria_id: 's1', consultor_id: 'p9', consultor: { id: 'p9', nome: 'Zé', ativo: true } },
+    { ...base, id: 'k4', nome: 'Usabilidade Antiga', horas_mes: 10, arquivado: true },
+  ]
+  const buscar = async (texto) => {
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar clientes' }), texto)
+  }
+
+  it('central: com algo na busca, pede todas as situações (com os arquivados) no banco, diz isso e mostra a situação de cada linha', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    await screen.findByRole('table', { name: 'Clientes' })
+    expect(screen.queryByText('Buscando em todas as situações.')).not.toBeInTheDocument()
+    vi.mocked(listarClientes).mockResolvedValue({ itens: DE_TODAS, total: 4 })
+    await buscar('usabilidade')
+    await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'qualquer', busca: 'usabilidade', pagina: 1 })))
+    expect(await screen.findByRole('status')).toHaveTextContent('Buscando em todas as situações.')
+    // A situação escolhida continua no filtro; a busca só passa por cima dela.
+    expect(screen.getByLabelText('Situação')).toHaveTextContent('Aguardando consultoria')
+    const tabela = screen.getByRole('table', { name: 'Clientes' })
+    expect(within(tabela).getAllByRole('columnheader').map((c) => c.textContent).slice(0, 2)).toEqual(['Cliente', 'Situação'])
+    expect(within(linha('Usabilidade Net')).getByText('Aguardando consultoria')).toBeInTheDocument()
+    expect(within(linha('Usabilidade Fibra')).getByText('Aguardando consultor')).toBeInTheDocument()
+    expect(within(linha('Usabilidade Rádio')).getByText('Em atendimento')).toBeInTheDocument()
+    expect(within(linha('Usabilidade Antiga')).getByText('Arquivado')).toBeInTheDocument()
+    // As ações de cada linha seguem a situação do próprio cliente.
+    expect(within(linha('Usabilidade Antiga')).getByRole('button', { name: 'Reativar' })).toBeInTheDocument()
+    expect(within(linha('Usabilidade Net')).getByRole('button', { name: 'Mandar para consultoria' })).toBeInTheDocument()
+  })
+
+  it('a busca vazia volta à situação escolhida, sem o aviso nem a coluna Situação', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    await screen.findByRole('table', { name: 'Clientes' })
+    await buscar('alfa')
+    await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'qualquer', busca: 'alfa' })))
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Buscar clientes' }))
+    await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'distribuir', pagina: 1 })))
+    expect(screen.queryByText('Buscando em todas as situações.')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('table', { name: 'Clientes' })).queryByRole('columnheader', { name: 'Situação' })).not.toBeInTheDocument()
+  })
+
+  it('administrador e gestor: a busca procura em Todas (as situações da consultoria, sem arquivados)', async () => {
+    renderizarTela(<Clientes />, { perfil: gestor })
+    await screen.findByRole('table', { name: 'Clientes' })
+    await buscar('fibra')
+    await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'todas', busca: 'fibra', pagina: 1 })))
+    expect(await screen.findByRole('status')).toHaveTextContent('Buscando em todas as situações.')
+  })
+
+  it('o consultor não tem situação: a busca continua nos clientes dele, sem o aviso', async () => {
+    renderizarTela(<Clientes />, { perfil: { id: 'p9', papel: 'pessoa', consultoria_id: 's1' } })
+    await screen.findByRole('table', { name: 'Clientes' })
+    await buscar('alfa')
+    await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'meus', consultorId: 'p9', busca: 'alfa' })))
+    expect(screen.queryByText('Buscando em todas as situações.')).not.toBeInTheDocument()
+  })
+
+  it('paginação da busca: 15 por página, Próxima pede a página 2 com todas as situações', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    await screen.findByRole('table', { name: 'Clientes' })
+    vi.mocked(listarClientes).mockResolvedValue({ itens: DE_TODAS, total: 16 })
+    await buscar('usabilidade')
+    expect(await screen.findByText('1–15 de 16')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Próxima/ }))
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'qualquer', busca: 'usabilidade', pagina: 2 }))
+  })
+})
+
+describe('Clientes: o vazio diz o próximo passo (auditoria, M1)', () => {
+  it('central em Aguardando consultoria vazia: diz quantos aguardam consultor, com Ver e Novo cliente', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: [], total: 0 })
+    vi.mocked(indicadoresDeClientes).mockResolvedValue({ recorte: 'tudo', aguardando_consultoria: 0, aguardando_consultor: 15, em_atendimento: 2, arquivados: 0 })
+    renderizarTela(<Clientes />, { perfil: central })
+    const vazio = await screen.findByText(/Nada para mandar agora\./)
+    expect(vazio).toHaveTextContent('Nada para mandar agora. 15 clientes aguardam consultor nas consultorias.')
+    const caixa = vazio.closest('div')
+    await userEvent.click(within(caixa).getByRole('button', { name: 'Ver' }))
+    expect(screen.getByLabelText('Situação')).toHaveTextContent('Aguardando consultor')
+    await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'aguardando', pagina: 1 })))
+  })
+
+  it('o Novo cliente do vazio abre o formulário', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: [], total: 0 })
+    vi.mocked(indicadoresDeClientes).mockResolvedValue({ recorte: 'tudo', aguardando_consultoria: 0, aguardando_consultor: 1, em_atendimento: 0, arquivados: 0 })
+    renderizarTela(<Clientes />, { perfil: central })
+    const caixa = (await screen.findByText(/1 cliente aguarda consultor nas consultorias\./)).closest('div')
+    await userEvent.click(within(caixa).getByRole('button', { name: 'Novo cliente' }))
+    expect(screen.getByRole('dialog', { name: 'Novo cliente' })).toBeInTheDocument()
+  })
+
+  it('sem clientes nas outras situações, o vazio fica só com o texto e o Novo cliente', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: [], total: 0 })
+    renderizarTela(<Clientes />, { perfil: central })
+    const caixa = (await screen.findByText(/Nada para mandar agora\./)).closest('div')
+    expect(within(caixa).queryByRole('button', { name: 'Ver' })).not.toBeInTheDocument()
+    expect(within(caixa).getByRole('button', { name: 'Novo cliente' })).toBeInTheDocument()
+  })
+
+  it('gestão em Em atendimento vazia: diz quantos aguardam consultor, com Ver', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: [], total: 0 })
+    vi.mocked(indicadoresDeClientes).mockResolvedValue({ recorte: 'consultoria', aguardando_consultor: 3, em_atendimento: 0, passaram_da_previsao: 0, sem_checkin_30_dias: 0 })
+    renderizarTela(<Clientes />, { perfil: { id: 'g1', papel: 'gestor', consultoria_id: 's1' } })
+    const vazio = await screen.findByText(/Nenhum cliente em atendimento\./)
+    expect(vazio).toHaveTextContent('Nenhum cliente em atendimento. 3 clientes aguardam consultor.')
+    await userEvent.click(within(vazio.closest('div')).getByRole('button', { name: 'Ver' }))
+    await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'aguardando', pagina: 1 })))
   })
 })

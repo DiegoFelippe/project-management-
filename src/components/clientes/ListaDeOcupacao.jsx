@@ -1,19 +1,9 @@
 import { Sparkles } from 'lucide-react'
+import BarraDeOcupacao from '@/components/comum/BarraDeOcupacao'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatarOcupacao } from '@/lib/horas'
 import { sugestaoDe } from './rotulos'
-
-function Barra({ ocupacao }) {
-  const n = Number(ocupacao)
-  const cheia = !Number.isNaN(n) && n > 1
-  const largura = ocupacao === null || ocupacao === undefined || Number.isNaN(n) ? 0 : Math.min(n, 1) * 100
-  return (
-    <div aria-hidden="true" className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-      <div className={`h-full rounded-full ${cheia ? 'bg-notice' : 'bg-primary'}`} style={{ width: `${largura}%` }} />
-    </div>
-  )
-}
 
 // Opções em rádio com barra de ocupação. itens: { id, nome, ocupacao, ... }; aoEscolher recebe o item inteiro.
 export default function ListaDeOcupacao({
@@ -39,7 +29,7 @@ export default function ListaDeOcupacao({
               {item.id === atualId && <Badge variant="secondary">Atual</Badge>}
               <span className="text-corpo tabular-nums text-muted-foreground">{rotulo(item)}</span>
             </span>
-            <Barra ocupacao={item.ocupacao} />
+            <BarraDeOcupacao ocupacao={item.ocupacao} />
           </label>
         ))}
       </div>

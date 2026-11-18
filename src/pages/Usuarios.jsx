@@ -6,6 +6,7 @@ import { useAuth } from '@/auth/useAuth'
 import Seletor from '@/components/campos/Seletor'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import Avatar from '@/components/comum/Avatar'
+import BarraDeOcupacao from '@/components/comum/BarraDeOcupacao'
 import BarraDeFiltros, { AcaoPrincipal } from '@/components/comum/BarraDeFiltros'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import Cabecalho from '@/components/comum/Cabecalho'
@@ -13,7 +14,7 @@ import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
-import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import { frase, juntar, useClientesAtivos } from '@/components/clientes/useClientesAtivos'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +35,7 @@ import { ehPapelDeConsultoria, veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
 import { OPCOES_DE_TIPO, rotulosDosTipos } from '@/lib/tiposDeConsultoria'
 import { useLeitura } from '@/lib/useLeitura'
+import { useListaPaginada } from '@/lib/useListaPaginada'
 
 const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'desativados', rotulo: 'Desativados' }]
 
@@ -55,10 +57,11 @@ const COR_DA_SITUACAO = {
   Desativado: 'outline',
 }
 
-// Largura mínima da tabela (soma das colunas): abaixo disso ela rola dentro do cartão, com as ações fixas.
+// Largura mínima da tabela (soma das colunas): abaixo disso ela rola dentro do cartão, com as ações fixas. Cabe na área
+// de conteúdo de uma tela de 1440 px (cerca de 1.317 px): mais larga, a coluna de ações fixa cobria a ocupação (R2).
 function larguraDaTabela({ comNumeros, ehDono }) {
-  const base = comNumeros ? 1340 : 1110
-  return ehDono ? base + 110 : base
+  const base = comNumeros ? 1180 : 980
+  return ehDono ? base + 100 : base
 }
 
 // Confirmação do Zerar: segue a chave "Exigir" como está na ficha (`exigida`), mesmo antes de salvar.
@@ -71,27 +74,16 @@ function textoDoZerar({ pessoa, exigida }) {
   return `${inicio} ${depois}${naoSalva}`
 }
 
-// Ação da linha: só o ícone (Padrão Hub), com o nome da ação em aria-label e title.
-function AcaoDaLinha({ nome, className, children, ...props }) {
-  return (
-    <Button variant="ghost" size="icon" aria-label={nome} title={nome} className={className} {...props}>
-      {children}
-    </Button>
-  )
-}
-
 function Ocupacao({ n, passado }) {
   if (!n) return <span className="text-muted-foreground">—</span>
   const apoio = passado
     ? `${formatarHoras(n.realizado)} de ${formatarHoras(n.capacidade)}`
     : `${formatarHoras(n.reservado)} de ${formatarHoras(n.capacidade)}`
-  const largura = Math.max(0, Math.min(100, Math.round((n.ocupacao ?? 0) * 100)))
+  // A coluna cresce com o texto ("32,5 h de 167,2 h" inteiro, sem cortar o "h": auditoria, R2); a barra vai junto.
   return (
-    <div className="w-32">
+    <div className="w-max min-w-28">
       <p className="font-semibold tabular-nums">{formatarOcupacao(n.ocupacao)}</p>
-      <div aria-hidden="true" className="my-1 h-1 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${largura}%` }} />
-      </div>
+      <BarraDeOcupacao ocupacao={n.ocupacao} className="my-1 h-1" />
       <p className="text-rotulo whitespace-nowrap tabular-nums text-muted-foreground">{apoio}</p>
     </div>
   )
@@ -102,9 +94,6 @@ export default function Usuarios() {
   const ehDono = veTudo(perfil)
   const ehAdminGeral = perfil.papel === 'dono'
   const [consultoriaId, setConsultoriaId] = useState(ehDono ? '' : perfil.consultoria_id)
-  const [resultado, setResultado] = useState(null)
-  const [pagina, setPagina] = useState(1)
-  const [erro, setErro] = useState(null)
   const [times, setTimes] = useState([])
   const [novo, setNovo] = useState(false)
   const [reenviando, setReenviando] = useState(null)
@@ -129,21 +118,12 @@ export default function Usuarios() {
   const recarregarNumeros = () => setVersaoNumeros((v) => v + 1)
   const cartoes = useLeitura(lerNumeros, { consultoriaId: consultoriaId || undefined, mes, versao, versaoNumeros }).dados
 
-  // Uma página por vez, filtrada no banco (regra "Escala" no CLAUDE.md).
-  useEffect(() => {
-    let ativo = true
-    listarUsuarios({ consultoriaId: consultoriaId || undefined, ativos: filtro === 'ativos', pagina, tipo: tipo || undefined })
-      .then((r) => {
-        if (!ativo) return
-        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
-        setResultado(r)
-        setErro(null)
-      })
-      .catch(() => ativo && setErro('Não foi possível carregar as pessoas.'))
-    return () => {
-      ativo = false
-    }
-  }, [consultoriaId, filtro, tipo, pagina, versao])
+  // Uma página por vez, filtrada no banco (regra "Escala" no CLAUDE.md). Ativos e desativados têm colunas diferentes:
+  // trocar de aba mostra o carregando.
+  const { resultado, erro: falhou, paginacao } = useListaPaginada(listarUsuarios,
+    { consultoriaId: consultoriaId || undefined, ativos: filtro === 'ativos', tipo: tipo || undefined },
+    { versao, limparAoMudar: ['ativos'] })
+  const erro = falhou ? 'Não foi possível carregar as pessoas.' : null
 
   // Capacidade do mês: uma chamada por (página, mês), com os ids das linhas da página (o banco calcula).
   // Mudar o mês não muda a página. Se falhar, a lista segue com "—" e um aviso.
@@ -207,6 +187,9 @@ export default function Usuarios() {
     (ehDono || (['admin', 'gestor'].includes(perfil.papel) && p.consultoria_id === perfil.consultoria_id))
   // Só o administrador geral move para a central (admin, gestor ou pessoa ativos).
   const podeMover = (p) => ehAdminGeral && p.id !== perfil.id && p.ativo !== false && ['admin', 'gestor', 'pessoa'].includes(p.papel)
+  // Que ações a tabela tem para quem vê (cada uma com o seu lugar em todas as linhas).
+  const comCapacidade = ehDono || ['admin', 'gestor'].includes(perfil.papel)
+  const comDesativar = ehDono || perfil.papel === 'admin'
 
   // Pessoa vinda do painel: carregada por id (o RLS decide se ela aparece) e aberta na ação que faz sentido.
   useEffect(() => {
@@ -337,16 +320,16 @@ export default function Usuarios() {
       <Cabecalho titulo="Usuários"
         descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'pessoa' : 'pessoas'}` : null} />
       <BarraDeFiltros>
-        <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={(valor) => { setFiltro(valor); setPagina(1); setResultado(null) }} />
+        <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={setFiltro} />
         {comNumeros && <NavegacaoDoMes mes={mes} aoMudar={setMes} />}
         <div className="flex items-center gap-2">
           <Label htmlFor="filtro-tipo" className="shrink-0 text-muted-foreground">Tipo</Label>
           <div className="w-48">
-            <Seletor id="filtro-tipo" tamanho="sm" valor={tipo} aoMudar={(valor) => { setTipo(valor); setPagina(1) }}
+            <Seletor id="filtro-tipo" tamanho="sm" valor={tipo} aoMudar={setTipo}
               opcoes={OPCOES_DE_TIPO} rotuloTodos="Todos" />
           </div>
         </div>
-        {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setPagina(1) }} />}
+        {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
         {(!ehDono || ehAdminGeral) && (
           <AcaoPrincipal>
             <Button onClick={() => setNovo(true)}>
@@ -369,7 +352,7 @@ export default function Usuarios() {
             'Nome', 'Cargo', 'Tipo de consultoria', 'Telefone', 'Papel', ...(ehDono ? ['Consultoria'] : []), 'Times',
             ...(comNumeros ? [passado ? 'Utilização' : 'Ocupação', 'Realizado'] : []),
           ]}
-          paginacao={{ pagina, total, aoMudar: setPagina }}>
+          paginacao={paginacao}>
           {lista.map((p) => {
             const s = situacao(p)
             // Só vale o que veio para o mês mostrado; quem o banco não devolveu (central, dono) fica com "—".
@@ -378,14 +361,16 @@ export default function Usuarios() {
             return (
               <Linha key={p.id}>
                 <Celula>
-                  <div className="flex items-center gap-3">
+                  {/* Nome e e-mail com teto de largura (o e-mail longo sai com reticências e inteiro no title): a tabela cabe
+                      em 1440 px sem a coluna de ações fixa cobrir a ocupação (auditoria, R2). */}
+                  <div className="flex max-w-48 items-center gap-3">
                     <Avatar pessoa={p} className="size-8 text-legenda" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-semibold">{p.nome}</p>
                         {s !== 'Ativo' && <Badge variant={COR_DA_SITUACAO[s]} className="shrink-0">{s}</Badge>}
                       </div>
-                      <p className="truncate text-rotulo text-muted-foreground">{p.email}</p>
+                      <p className="truncate text-rotulo text-muted-foreground" title={p.email}>{p.email}</p>
                     </div>
                   </div>
                 </Celula>
@@ -415,25 +400,23 @@ export default function Usuarios() {
                     <Celula className="tabular-nums">{formatarHoras(n?.realizado)}</Celula>
                   </>
                 )}
+                {/* Posições fixas (auditoria, G1): cada ação no seu lugar; a que não vale para a linha deixa o espaço. */}
+                {/* Reenviar convite (raro) vem antes, sem guardar lugar: com a célula alinhada à direita, ele não empurra os outros. */}
                 <CelulaAcoes>
-                  {(podeEditar(p) || p.id === perfil.id) && p.ativo !== false && (
-                    <AcaoDaLinha nome="Editar" onClick={() => setEditando(p)}><Pencil /></AcaoDaLinha>
-                  )}
-                  {podeCapacidade(p) && (
-                    <AcaoDaLinha nome="Capacidade" onClick={() => setCapacidade(p)}><Gauge /></AcaoDaLinha>
-                  )}
-                  {podeDesativar(p) && (
-                    <AcaoDaLinha nome={p.ativo === false ? 'Reativar' : 'Desativar'}
-                      onClick={() => setConfirmando({ pessoa: p, acao: p.ativo === false ? 'reativar' : 'desativar' })}
-                      className={p.ativo === false ? '' : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'}>
-                      {p.ativo === false ? <UserCheck /> : <UserX />}
-                    </AcaoDaLinha>
-                  )}
-                  {podeMover(p) && (
-                    <AcaoDaLinha nome="Mover para a central" onClick={() => setConfirmando({ pessoa: p, acao: 'mover' })}><Landmark /></AcaoDaLinha>
-                  )}
                   {p.convite_pendente && p.ativo !== false && (!ehDono || podeEditar(p)) && (
-                    <AcaoDaLinha nome="Reenviar convite" disabled={reenviando === p.id} onClick={() => reenviar(p)}><Send /></AcaoDaLinha>
+                    <AcaoDaLinha nome="Reenviar convite" icone={Send} disabled={reenviando === p.id} onClick={() => reenviar(p)} />
+                  )}
+                  <AcaoDaLinha nome="Editar" icone={Pencil} visivel={(podeEditar(p) || p.id === perfil.id) && p.ativo !== false}
+                    onClick={() => setEditando(p)} />
+                  {comCapacidade && <AcaoDaLinha nome="Capacidade" icone={Gauge} visivel={podeCapacidade(p)} onClick={() => setCapacidade(p)} />}
+                  {ehAdminGeral && (
+                    <AcaoDaLinha nome="Mover para a central" icone={Landmark} visivel={podeMover(p)}
+                      onClick={() => setConfirmando({ pessoa: p, acao: 'mover' })} />
+                  )}
+                  {comDesativar && (
+                    <AcaoDaLinha nome={p.ativo === false ? 'Reativar' : 'Desativar'} icone={p.ativo === false ? UserCheck : UserX}
+                      perigo={p.ativo !== false} visivel={podeDesativar(p)}
+                      onClick={() => setConfirmando({ pessoa: p, acao: p.ativo === false ? 'reativar' : 'desativar' })} />
                   )}
                 </CelulaAcoes>
               </Linha>

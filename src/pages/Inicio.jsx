@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
+import Cabecalho from '@/components/comum/Cabecalho'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import ClientesEsperando from '@/components/inicio/ClientesEsperando'
 import Extremos from '@/components/inicio/Extremos'
@@ -64,12 +65,7 @@ export default function Inicio() {
 
   return (
     <section className="grid grid-cols-[minmax(0,1fr)] gap-5">
-      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-titulo font-bold">Olá, {primeiroNome(perfil.nome)}.</h1>
-          <p className="text-subtitulo text-muted-foreground">{NOME_DO_PAPEL[perfil.papel]} {onde}.</p>
-        </div>
-      </div>
+      <Cabecalho className="mb-0" titulo={`Olá, ${primeiroNome(perfil.nome)}.`} descricao={`${NOME_DO_PAPEL[perfil.papel]} ${onde}.`} />
       <BarraDeFiltros className="mb-0">
         <FiltroDePeriodo periodo={periodo} hoje={hoje} erro={erroDoPeriodo}
           aoTrocarTipo={(novoTipo) => irPara(periodoAoTrocar(periodo, novoTipo, hoje))}

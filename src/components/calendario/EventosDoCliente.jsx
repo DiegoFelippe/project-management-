@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Eye, Folder, PlayCircle, Video } from 'lucide-react'
 import Avatar from '@/components/comum/Avatar'
 import { GraficoCarregando } from '@/components/comum/Carregando'
-import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { eventosDoCliente } from '@/data/agenda'
 import { diasDoEvento, horarioNoDia } from '@/lib/calendario'
 import { formatarDia } from '@/lib/mes'
+import { useListaPaginada } from '@/lib/useListaPaginada'
 import { cn } from '@/lib/utils'
 import { situacaoDaReuniao } from './situacaoDaReuniao'
 
@@ -50,30 +50,13 @@ function Situacao({ evento, agora }) {
 // da barra não filtra esta lista: Todos mostra todos os eventos do cliente, de propósito (ele vale para as visões do
 // calendário).
 export default function EventosDoCliente({ clienteId, hoje, versao = 0, aoAbrir }) {
-  const [pagina, setPagina] = useState(1)
-  const [resultado, setResultado] = useState(null)
-  const [erro, setErro] = useState(false)
   const [agora] = useState(() => Date.now())
-
-  useEffect(() => {
-    let ativo = true
-    eventosDoCliente({ clienteId, pagina })
-      .then((r) => {
-        if (!ativo) return
-        if (r.foraDaFaixa) return setPagina(1)
-        setResultado(r)
-        setErro(false)
-      })
-      .catch(() => ativo && setErro(true))
-    return () => {
-      ativo = false
-    }
-  }, [clienteId, pagina, versao])
+  const { resultado, erro, paginacao } = useListaPaginada(eventosDoCliente, { clienteId }, { versao })
 
   if (!erro && resultado?.itens.length) {
     return (
       <Tabela rotulo={ROTULO} semCartao colunas={COLUNAS} larguraMinima={760}
-        paginacao={{ pagina, total: resultado.total, aoMudar: setPagina }}>
+        paginacao={paginacao}>
         {resultado.itens.map((evento) => {
           const dias = diasDoEvento(evento)
           const [dia, ultimo] = [dias[0], dias.at(-1)]
@@ -104,9 +87,7 @@ export default function EventosDoCliente({ clienteId, hoje, versao = 0, aoAbrir 
               </Celula>
               <Celula><Situacao evento={evento} agora={agora} /></Celula>
               <CelulaAcoes>
-                <Button type="button" variant="ghost" size="sm" aria-label={`Abrir ${evento.titulo}`} onClick={() => aoAbrir(evento)}>
-                  <Eye /> Abrir
-                </Button>
+                <AcaoDaLinha nome={`Abrir ${evento.titulo}`} icone={Eye} onClick={() => aoAbrir(evento)} />
               </CelulaAcoes>
             </Linha>
           )

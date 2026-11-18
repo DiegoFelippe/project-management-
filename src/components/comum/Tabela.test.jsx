@@ -1,7 +1,8 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { Pencil, Trash2 } from 'lucide-react'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { Celula, CelulaAcoes, Linha, ListaVazia, Paginacao, Tabela } from './Tabela'
+import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Paginacao, Tabela } from './Tabela'
 
 // O jsdom não mede: scrollWidth e clientWidth de mentira para dizer se a tabela rola para o lado.
 function rolagemDe(conteudo, visivel) {
@@ -84,6 +85,57 @@ describe('Tabela (padrão das listas)', () => {
     const tabela = screen.getByRole('table', { name: 'Times' })
     expect(within(tabela).getAllByRole('columnheader')[1]).toHaveClass('max-sm:static')
     expect(within(tabela).getByRole('button', { name: 'Editar' }).closest('td')).toHaveClass('max-sm:static')
+  })
+
+  it('no celular a primeira coluna tem largura mínima: o nome não vira "Pr / Te / Na" (auditoria, G1)', () => {
+    render(
+      <Tabela rotulo="Clientes" colunas={['Cliente', 'CNPJ']}>
+        <Linha><Celula>Provedor Teste Nacional</Celula><Celula>—</Celula><CelulaAcoes /></Linha>
+      </Tabela>,
+    )
+    const [primeira, segunda] = within(screen.getByRole('table', { name: 'Clientes' })).getAllByRole('columnheader')
+    expect(primeira).toHaveClass('max-sm:min-w-40')
+    expect(segunda).not.toHaveClass('max-sm:min-w-40')
+  })
+
+  it('AcaoDaLinha: só o ícone, com o nome no aria-label e no title; perigo ganha o realce vermelho (auditoria, G1)', async () => {
+    const aoApagar = vi.fn()
+    render(
+      <>
+        <AcaoDaLinha nome="Editar" icone={Pencil} onClick={vi.fn()} />
+        <AcaoDaLinha nome="Apagar" icone={Trash2} perigo onClick={aoApagar} />
+      </>,
+    )
+    const editar = screen.getByRole('button', { name: 'Editar' })
+    expect(editar).toHaveAttribute('title', 'Editar')
+    expect(editar).toHaveTextContent('')
+    expect(editar.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    const apagar = screen.getByRole('button', { name: 'Apagar' })
+    expect(apagar).toHaveClass('hover:text-destructive')
+    await userEvent.click(apagar)
+    expect(aoApagar).toHaveBeenCalled()
+  })
+
+  it('AcaoDaLinha que não vale para a linha deixa o espaço vazio: as outras não mudam de lugar (auditoria, G1)', () => {
+    render(
+      <Tabela rotulo="Pessoas" colunas={['Nome']}>
+        <Linha><Celula>Ana</Celula><CelulaAcoes>
+          <AcaoDaLinha nome="Editar" icone={Pencil} onClick={vi.fn()} />
+          <AcaoDaLinha nome="Apagar" icone={Trash2} onClick={vi.fn()} />
+        </CelulaAcoes></Linha>
+        <Linha><Celula>Bia</Celula><CelulaAcoes>
+          <AcaoDaLinha nome="Editar" icone={Pencil} visivel={false} onClick={vi.fn()} />
+          <AcaoDaLinha nome="Apagar" icone={Trash2} onClick={vi.fn()} />
+        </CelulaAcoes></Linha>
+      </Tabela>,
+    )
+    const bia = screen.getByRole('row', { name: /Bia/ })
+    expect(within(bia).queryByRole('button', { name: 'Editar' })).toBeNull()
+    const [espaco, apagar] = bia.querySelector('td:last-child').children
+    expect(espaco).toHaveAttribute('aria-hidden', 'true')
+    // Do tamanho do botão de ícone: 32 px no computador e 44 px no toque.
+    expect(espaco).toHaveClass('size-8', 'pointer-coarse:min-w-11', 'pointer-coarse:min-h-11')
+    expect(apagar).toHaveAccessibleName('Apagar')
   })
 
   it('lista vazia mostra o aviso', () => {

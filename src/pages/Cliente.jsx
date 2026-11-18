@@ -1,9 +1,8 @@
-import { ArrowLeft } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { GraficoCarregando } from '@/components/comum/Carregando'
-import Cabecalho from '@/components/comum/Cabecalho'
+import Cabecalho, { Voltar } from '@/components/comum/Cabecalho'
 import CalendarioDaAgenda from '@/components/calendario/CalendarioDaAgenda'
 import ChecklistDoCliente from '@/components/checkins/ChecklistDoCliente'
 import AbasDoCliente from '@/components/clientes/AbasDoCliente'
@@ -89,11 +88,7 @@ export default function Cliente() {
     }
   }, [central, perfil.id, versao])
 
-  const voltar = (
-    <Link to="/clientes" className="mb-3 inline-flex items-center gap-1 text-corpo text-muted-foreground hover:text-foreground">
-      <ArrowLeft className="size-4" /> Clientes
-    </Link>
-  )
+  const voltar = <Voltar para="/clientes">Clientes</Voltar>
   if (erro) return <>{voltar}<p role="alert" className="text-corpo text-destructive">{erro}</p></>
   if (cliente === undefined) return <>{voltar}<GraficoCarregando texto="Carregando o cliente…" className="py-12" /></>
   if (cliente === null) return <>{voltar}<p className="text-corpo text-muted-foreground">Cliente não encontrado.</p></>
@@ -170,8 +165,7 @@ export default function Cliente() {
 
   return (
     <>
-      {voltar}
-      <Cabecalho titulo={cliente.nome} descricao={cliente.razao_social} />
+      <Cabecalho voltarPara={{ caminho: '/clientes', rotulo: 'Clientes' }} titulo={cliente.nome} descricao={cliente.razao_social} />
       {aberto && souConsultor && aberto.cliente_id !== cliente.id && (
         <p id={idDoAviso} className="mb-3 text-corpo text-muted-foreground">
           Você está com check-in aberto em {aberto.cliente?.nome ?? 'outro cliente'} desde {HORA.format(new Date(aberto.inicio))}.

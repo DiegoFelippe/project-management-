@@ -1,12 +1,10 @@
+import { buscarConsultoriasComoOpcoes } from '@/components/campos/opcoesDeConsultoria'
 import Seletor from '@/components/campos/Seletor'
 import { Label } from '@/components/ui/label'
 import { buscarConsultorias } from '@/data/consultorias'
 
 // A lista vem do banco, pelo nome, nunca inteira (milhares de consultorias).
-const buscar = async (termo) => {
-  const { itens, total } = await buscarConsultorias(termo)
-  return { itens: itens.map((c) => ({ valor: c.id, rotulo: c.nome })), total }
-}
+const buscar = buscarConsultoriasComoOpcoes(buscarConsultorias)
 
 // Só quem vê tudo (administrador geral e central): escolhe de qual consultoria olhar ("" = todas).
 export default function FiltroConsultoria({ valor, aoMudar }) {

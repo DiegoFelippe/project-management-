@@ -1,19 +1,21 @@
 import { Pencil, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import TarefasMarcadas from '@/components/checkins/TarefasMarcadas'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
-import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { apagarCheckin, editarCheckin, listarCheckins } from '@/data/checkins'
 import { formatarHoras, horasEntre } from '@/lib/horas'
+import { veTudo } from '@/lib/papeis'
+import { useListaPaginada } from '@/lib/useListaPaginada'
 import JanelaCheckin from './JanelaCheckin'
 
 const DATA = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' })
 const HORA = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' })
-const BOTAO_PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
+
+const lerCheckins = ({ clienteId, pagina }) => listarCheckins({ clienteId, pagina })
 
 // Edita e apaga: o próprio consultor ou admin/gestor, sempre na consultoria do check-in (quem saiu dela só
 // vê). A central só vê.
@@ -26,26 +28,12 @@ function podeMexer(perfil, checkin) {
 // cada check-in (até 3, as primeiras, e "+N", contado no banco).
 // aoMudar() avisa a página depois de editar ou apagar, para recarregar o realizado.
 export default function CheckinsDoCliente({ cliente, perfil, versao, aoMudar }) {
-  const [pagina, setPagina] = useState(1)
-  const [resultado, setResultado] = useState(null)
-  const [erro, setErro] = useState(null)
   const [editando, setEditando] = useState(null)
   const [apagando, setApagando] = useState(null)
-
-  useEffect(() => {
-    let ativo = true
-    listarCheckins({ clienteId: cliente.id, pagina })
-      .then((r) => {
-        if (!ativo) return
-        if (r.foraDaFaixa && pagina > 1) return setPagina(1)
-        setResultado(r)
-        setErro(null)
-      })
-      .catch(() => ativo && setErro('Não foi possível carregar os check-ins.'))
-    return () => {
-      ativo = false
-    }
-  }, [cliente.id, pagina, versao])
+  const { itens, erro: falhou, paginacao } = useListaPaginada(lerCheckins, { clienteId: cliente.id }, { versao })
+  const erro = falhou ? 'Não foi possível carregar os check-ins.' : null
+  // A central só vê: a tabela fica sem a coluna de ações.
+  const soVe = veTudo(perfil)
 
   async function salvar(checkin, dados) {
     const resposta = await editarCheckin(checkin.id, dados)
@@ -65,7 +53,6 @@ export default function CheckinsDoCliente({ cliente, perfil, versao, aoMudar }) 
     return resposta
   }
 
-  const itens = resultado?.itens ?? null
   return (
     <section aria-labelledby="titulo-checkins" className="grid grid-cols-1 gap-2">
       <h2 id="titulo-checkins" className="text-janela font-bold">Check-ins</h2>
@@ -74,7 +61,7 @@ export default function CheckinsDoCliente({ cliente, perfil, versao, aoMudar }) 
       {itens?.length === 0 && <ListaVazia>Nenhum check-in neste cliente ainda.</ListaVazia>}
       {itens?.length > 0 && (
         <Tabela rotulo="Check-ins" colunas={['Data', 'Consultor', 'Horas', 'Tarefas marcadas', 'O que foi feito']} larguraMinima={880}
-          paginacao={{ pagina, total: resultado.total, aoMudar: setPagina }}>
+          semAcoes={soVe} paginacao={paginacao}>
           {itens.map((c) => {
             const inicio = new Date(c.inicio)
             const fim = c.fim ? new Date(c.fim) : null
@@ -94,10 +81,12 @@ export default function CheckinsDoCliente({ cliente, perfil, versao, aoMudar }) 
                     : <span className="text-muted-foreground">—</span>}
                 </Celula>
                 <Celula className="max-w-md truncate text-muted-foreground">{c.descricao || '—'}</Celula>
-                <CelulaAcoes>
-                  {mexe && <Button variant="ghost" size="sm" onClick={() => setEditando(c)}><Pencil /> Editar</Button>}
-                  {mexe && <Button variant="ghost" size="sm" onClick={() => setApagando(c)} className={BOTAO_PERIGO}><Trash2 /> Apagar</Button>}
-                </CelulaAcoes>
+                {!soVe && (
+                  <CelulaAcoes>
+                    <AcaoDaLinha nome="Editar" icone={Pencil} visivel={mexe} onClick={() => setEditando(c)} />
+                    <AcaoDaLinha nome="Apagar" icone={Trash2} perigo visivel={mexe} onClick={() => setApagando(c)} />
+                  </CelulaAcoes>
+                )}
               </Linha>
             )
           })}

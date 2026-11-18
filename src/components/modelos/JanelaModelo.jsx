@@ -1,6 +1,7 @@
 import { useCallback, useId, useMemo, useRef, useState } from 'react'
 import { Building2, Globe, ListChecks, ListOrdered, TriangleAlert, Workflow } from 'lucide-react'
 import { useAuth } from '@/auth/useAuth'
+import { buscarConsultoriasComoOpcoes } from '@/components/campos/opcoesDeConsultoria'
 import Seletor from '@/components/campos/Seletor'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import CartoesDeOpcao from '@/components/comum/CartoesDeOpcao'
@@ -21,10 +22,7 @@ import { LIMITES, paraSalvar, rascunhoDe, rascunhoNovo, resumoDoRascunho, tarefa
 import PreviaDoFluxo from './PreviaDoFluxo'
 
 // Consultorias ativas (as arquivadas não recebem modelo), buscadas no banco pelo nome.
-const buscarConsultoria = async (termo) => {
-  const { itens, total } = await buscarConsultoriasAtivas(termo)
-  return { itens: itens.map((c) => ({ valor: c.id, rotulo: c.nome })), total }
-}
+const buscarConsultoria = buscarConsultoriasComoOpcoes(buscarConsultoriasAtivas)
 
 // "Para quem" da Central: todas ou uma (cartões de opção, como "Como a pessoa entra" na ficha).
 const OPCOES_DE_PARA = [
