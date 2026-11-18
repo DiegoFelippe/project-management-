@@ -106,7 +106,14 @@ const ERROS_MENSAGEM_BANCO = {
   modelo_indisponivel: 'Esse modelo não está mais disponível para este cliente. Escolha outro.',
   inicio_invalido: 'O início dos prazos precisa estar entre 2 anos atrás e 1 ano à frente.',
   tarefa_bloqueada: 'Esta tarefa depende de outras que ainda não foram feitas.',
+  // Quadros do menu (pessoais e de time)
+  time_invalido: 'Esse time não está mais disponível para você. Escolha outro time.',
+  quadro_arquivado: 'Este quadro está arquivado: restaure antes de renomear.',
 }
+
+// O quadro segura o time (on delete restrict): time com quadros, abertos ou arquivados, não se apaga.
+const QUADROS_SEGURAM_O_TIME =
+  'Este time tem quadros (abertos ou arquivados). Apague os quadros dele em Quadros antes de apagar o time.'
 
 // Códigos que só valem no check-list (o mesmo código tem outro sentido em outras telas).
 const ERROS_DO_CHECKLIST = {
@@ -132,9 +139,10 @@ function traduzirErroDoStorage(erro) {
   return null
 }
 
-// `sobre`: 'time' (padrão) | 'cliente' | 'checkin' | 'arquivo' | 'modelo' | 'checklist' — muda o texto de alguns
-// códigos.
-export function traduzirErroBanco(erro, { sobre = 'time' } = {}) {
+// `sobre`: 'time' (o padrão quando não vem) | 'cliente' | 'checkin' | 'arquivo' | 'modelo' | 'checklist' | 'quadro' —
+// muda o texto de alguns códigos. O 23503 do time com quadros vale com `sobre: 'time'` dito ou quando a recusa é a da
+// regra quadros_time_id_fkey (apagarTime não diz o `sobre`, e outro 23503 sem contexto continua no texto padrão).
+export function traduzirErroBanco(erro, { sobre } = {}) {
   const doChecklist = sobre === 'checklist' ? ERROS_DO_CHECKLIST[erro?.message] : null
   if (doChecklist) return doChecklist
   const mensagem = ERROS_MENSAGEM_BANCO[erro?.message]
@@ -144,16 +152,22 @@ export function traduzirErroBanco(erro, { sobre = 'time' } = {}) {
     if (doStorage) return doStorage
   }
   if (erro?.code === '23505') {
-    return sobre === 'cliente'
-      ? 'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).'
-      : 'Já existe um time com esse nome.'
+    if (sobre === 'cliente') return 'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).'
+    // O nome do quadro não se repete entre os abertos do mesmo dono (criar, renomear e restaurar).
+    if (sobre === 'quadro') return 'Já existe um quadro aberto com esse nome.'
+    return 'Já existe um time com esse nome.'
   }
   // Check-ins, arquivos, cartões do quadro e check-lists de modelo seguram o cliente (on delete restrict).
   if (erro?.code === '23503' && sobre === 'cliente') {
     return 'Este cliente tem horas, arquivos, cartões ou modelo de check-in registrados. Arquive em vez de apagar.'
   }
+  if (erro?.code === '23503' && (sobre === 'time' || /quadros_time_id_fkey/.test(erro.message ?? ''))) {
+    return QUADROS_SEGURAM_O_TIME
+  }
   if (erro?.code === '23514') {
     if (sobre === 'checkin') return CHECKIN_DE_MAIS_DE_24H
+    // No quadro, o que a pessoa digita é só o nome.
+    if (sobre === 'quadro') return 'O nome do quadro precisa ter de 1 a 80 letras.'
     // No check-list, o que a pessoa digita é só a nota da tarefa.
     if (sobre === 'checklist') return 'A nota vai até 500 letras.'
     // Só as regras de tamanho dos textos (nome, descrição, título); as outras (ex.: tipo) ficam no texto de sempre.

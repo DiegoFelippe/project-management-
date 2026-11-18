@@ -1,7 +1,8 @@
 // Quadros pessoais e de time contra o Supabase local de verdade (banco, Storage e Realtime): o que um mock esconde —
 // a regra do balde "quadros" na pasta quadro/<quadro>/<cartão>/ (subir, link assinado, lista), a recusa do servidor do
-// Realtime no canal privado "quadro:<id>" e o aviso de acesso quando alguém sai do time. Os quadros nascem pela chave de
-// serviço (criar_quadro chega na Task 2 do plano docs/superpowers/plans/2026-11-17-quadros-pessoais-e-de-time.md).
+// Realtime no canal privado "quadro:<id>" e o aviso de acesso quando alguém sai do time. Os quadros das primeiras provas
+// nascem pela chave de serviço; a última cria, renomeia, arquiva, restaura e apaga pelas funções do app (src/data/quadros.js,
+// Task 2 do plano docs/superpowers/plans/2026-11-17-quadros-pessoais-e-de-time.md).
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
@@ -25,6 +26,7 @@ vi.mock('@/lib/supabase', () => ({
 }))
 
 const { ouvirQuadro } = await import('../../src/data/quadroAoVivo.js')
+const quadros = await import('../../src/data/quadros.js')
 
 const admin = clienteAdmin()
 const BALDE = 'quadros'
@@ -247,3 +249,84 @@ describe('quadros pessoais e de time contra o Supabase local', () => {
     expect(releitura.data).toBeNull()
   })
 })
+
+describe('o que se faz com o quadro, pela API real (src/data/quadros.js)', () => {
+  // As funções do app rodam como quem está "logado" no teste.
+  const como = (quem) => {
+    atual.cliente = sessoes[quem]
+    return quadros
+  }
+
+  it('criar, renomear, arquivar, restaurar e apagar pela API real; apagar tira os objetos do balde', async () => {
+    // Criar: o pessoal e um do time (pelo membro), com as três colunas.
+    const pessoalNovo = await como('pessoa').criarQuadro({ nome: '  Integração: meu quadro ' })
+    expect(pessoalNovo.erro).toBeNull()
+    const novo = await como('pessoa').criarQuadro({ nome: 'Integração: do time', timeId: time })
+    expect(novo.erro).toBeNull()
+    const aberto = (await sessoes.pessoa.rpc('quadro_por_id', { p_quadro: novo.id })).data
+    expect(aberto).toMatchObject({ tipo: 'time', nome: 'Integração: do time', pode_mexer: true, pode_administrar: false })
+    expect(aberto.colunas.map((c) => c.nome)).toEqual(['A fazer', 'Em andamento', 'Concluído'])
+    expect((await como('pessoa').criarQuadro({ nome: 'integração: DO time', timeId: time })).erro)
+      .toBe('Já existe um quadro aberto com esse nome.')
+    expect((await como('central').criarQuadro({ nome: 'Da central', timeId: time })).erro)
+      .toBe('Você não tem permissão para isso.')
+
+    // O seletor da pessoa traz os dois; a estrela vira favorito.
+    expect((await como('pessoa').marcarFavorito(novo.id, true)).erro).toBeNull()
+    const seletor = await como('pessoa').quadrosParaEscolher({ termo: 'integracao' })
+    expect(seletor.meus.itens.map((q) => q.nome)).toEqual(['Integração: meu quadro', 'Pessoal integração'])
+    expect(seletor.dosTimes.itens.map((q) => q.nome)).toContain('Integração: do time')
+    expect(seletor.favoritos.itens.map((q) => q.id)).toEqual([novo.id])
+    expect(await como('pessoa').quadrosPorIds([novo.id, pessoal.id, doTime.id])).toHaveLength(3)
+
+    // Renomear: o membro não; o gestor do time sim.
+    expect((await como('pessoa').renomearQuadro(novo.id, 'Tomado')).erro).toBe('Você não tem permissão para isso.')
+    expect((await como('gestor').renomearQuadro(novo.id, ' Integração: renomeado ')).erro).toBeNull()
+
+    // Arquivar: sai do seletor e vai para os arquivados (só para ler; não se renomeia); restaurar volta.
+    expect((await como('gestor').arquivarQuadro(novo.id)).erro).toBeNull()
+    expect((await como('pessoa').quadrosParaEscolher({ termo: 'renomeado' })).dosTimes.total).toBe(0)
+    const arquivados = await como('gestor').quadrosArquivados({ busca: 'renomeado', tipo: 'time' })
+    expect(arquivados.itens).toEqual([expect.objectContaining({ id: novo.id, pode_administrar: true })])
+    expect((await como('gestor').renomearQuadro(novo.id, 'Outro')).erro)
+      .toBe('Este quadro está arquivado: restaure antes de renomear.')
+    expect((await como('gestor').restaurarQuadro(novo.id)).erro).toBeNull()
+    expect((await como('pessoa').quadrosParaEscolher({ termo: 'renomeado' })).favoritos.total).toBe(1)
+
+    // Um cartão com anexo e imagem, e uma sobra (objeto sem linha) na pasta do quadro.
+    const coluna = aberto.colunas[0].id
+    const cartao = await novoCartao('pessoa', coluna, 'Cartão do quadro que vai sair')
+    const pasta = `quadro/${novo.id}/${cartao}`
+    const anexo = `${pasta}/${randomUUID()}-ata.txt`
+    const imagem = `${pasta}/imagens/${randomUUID()}.png`
+    const sobra = `${pasta}/${randomUUID()}-sobra.txt`
+    const balde = sessoes.pessoa.storage.from(BALDE)
+    expect((await balde.upload(anexo, new File(['ata'], 'ata.txt', { type: 'text/plain' }))).error).toBeNull()
+    expect((await sessoes.pessoa.from('cartao_anexos')
+      .insert({ cartao_id: cartao, caminho: anexo, nome: 'ata.txt', tamanho: 3, tipo: 'text/plain' })).error).toBeNull()
+    expect((await balde.upload(imagem, new File([PNG], 'p.png', { type: 'image/png' }), { contentType: 'image/png' })).error)
+      .toBeNull()
+    expect((await balde.upload(sobra, new File(['x'], 'sobra.txt', { type: 'text/plain' }))).error).toBeNull()
+    // O quadro que fica (doTime) com um objeto que não pode sair junto.
+    const cartaoQueFica = await novoCartao('pessoa', doTime.coluna, 'Cartão do quadro que fica')
+    const deOutro = `quadro/${doTime.id}/${cartaoQueFica}/${randomUUID()}-fica.txt`
+    expect((await balde.upload(deOutro, new File(['fica'], 'fica.txt', { type: 'text/plain' }))).error).toBeNull()
+
+    // Apagar: o membro não; o gestor sim, e os objetos da pasta saem do balde (os de outro quadro ficam).
+    expect((await como('pessoa').apagarQuadro(novo.id)).erro).toBe('Você não tem permissão para isso.')
+    expect(await como('gestor').apagarQuadro(novo.id)).toEqual({ erro: null })
+    expect(await existe(anexo)).toBe(false)
+    expect(await existe(imagem)).toBe(false)
+    expect(await existe(sobra)).toBe(false)
+    expect(await existe(deOutro)).toBe(true)
+    expect((await admin.from('quadros').select('id').eq('id', novo.id)).data).toEqual([])
+    expect((await admin.from('cartoes').select('id').eq('id', cartao)).data).toEqual([])
+    expect((await admin.from('quadro_favoritos').select('quadro_id').eq('quadro_id', novo.id)).data).toEqual([])
+    expect(await como('pessoa').quadrosPorIds([novo.id])).toEqual([])
+
+    // O pessoal: a própria pessoa apaga; o administrador não vê nem apaga.
+    expect((await como('admin').apagarQuadro(pessoalNovo.id)).erro).toBe('Você não tem permissão para isso.')
+    expect(await como('pessoa').apagarQuadro(pessoalNovo.id)).toEqual({ erro: null })
+  })
+})
+

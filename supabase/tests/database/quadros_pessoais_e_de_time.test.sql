@@ -447,8 +447,8 @@ select is(testes.regras('qP'), 'vê,mexe,gere,administra', 'a pessoa vê, mexe, 
 select is(public.quadro_por_id(testes.id('qP')) - 'colunas' - 'criado_em',
   jsonb_build_object('id', testes.id('qP'), 'cliente_id', null, 'consultoria_id', testes.id('A'), 'pode_mexer', true,
     'pode_gerir', true, 'tipo', 'pessoa', 'nome', 'Minhas tarefas', 'time', null, 'arquivado_em', null,
-    'pode_administrar', true),
-  'quadro_por_id traz as chaves de hoje e mais tipo, nome, time, arquivado_em e pode_administrar');
+    'pode_administrar', true, 'favorito', false),
+  'quadro_por_id traz as chaves de hoje e mais tipo, nome, time, arquivado_em, pode_administrar e favorito (Task 2)');
 select is(jsonb_array_length(public.quadro_por_id(testes.id('qP')) -> 'colunas'), 2, 'com as colunas');
 select lives_ok($$select testes.nova_coluna('p_col', 'qP', 'Hoje')$$, 'a pessoa cria coluna');
 select lives_ok($$select testes.novo_cartao('kP', 'qP_afazer')$$, 'cria cartão');
@@ -612,7 +612,7 @@ select is(public.quadro_por_id(testes.id('qT')) -> 'time',
   jsonb_build_object('id', testes.id('T1'), 'nome', 'Time T1'), 'quadro_por_id traz o time');
 select is(public.quadro_por_id(testes.id('qT')) - 'colunas' - 'criado_em' - 'time' - 'id' - 'consultoria_id',
   jsonb_build_object('cliente_id', null, 'pode_mexer', true, 'pode_gerir', false, 'tipo', 'time', 'nome', 'Sprint',
-    'arquivado_em', null, 'pode_administrar', false),
+    'arquivado_em', null, 'pode_administrar', false, 'favorito', false),
   'e o que o membro pode');
 select testes.novo_cartao('kT1', 'qT_afazer');
 reset role;

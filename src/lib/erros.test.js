@@ -222,3 +222,42 @@ describe('traduzirErroBanco com contexto', () => {
   })
 })
 
+
+describe('traduzirErroBanco nos quadros do menu', () => {
+  it('nome de quadro em uso entre os abertos (criar, renomear ou restaurar)', () => {
+    expect(traduzirErroBanco({ code: '23505' }, { sobre: 'quadro' })).toBe('Já existe um quadro aberto com esse nome.')
+    // Fora de "quadro", o 23505 continua o de antes.
+    expect(traduzirErroBanco({ code: '23505' })).toBe('Já existe um time com esse nome.')
+  })
+
+  it('nome do quadro em branco ou comprido demais', () => {
+    expect(traduzirErroBanco({ code: '23514' }, { sobre: 'quadro' })).toBe('O nome do quadro precisa ter de 1 a 80 letras.')
+  })
+
+  it('time com quadros não se apaga (23503): diz para apagar os quadros antes', () => {
+    const texto =
+      'Este time tem quadros (abertos ou arquivados). Apague os quadros dele em Quadros antes de apagar o time.'
+    expect(traduzirErroBanco({ code: '23503' }, { sobre: 'time' })).toBe(texto)
+    // A forma real do PostgREST ao apagar o time (apagarTime não passa "sobre"): reconhece pela regra do quadro.
+    expect(traduzirErroBanco({
+      code: '23503',
+      message: 'update or delete on table "times" violates foreign key constraint "quadros_time_id_fkey" on table "quadros"',
+    })).toBe(texto)
+    // Outro 23503 sem contexto continua o texto padrão; o do cliente, o dele.
+    expect(traduzirErroBanco({ code: '23503', message: 'violates foreign key constraint "cartao_comentarios_cartao_id_fkey"' }))
+      .toBe('Algo deu errado. Tente de novo.')
+    expect(traduzirErroBanco({ code: '23503' }, { sobre: 'cliente' })).toBe(
+      'Este cliente tem horas, arquivos, cartões ou modelo de check-in registrados. Arquive em vez de apagar.',
+    )
+  })
+
+  it('time que a pessoa não pode usar e quadro arquivado', () => {
+    expect(traduzirErroBanco({ code: 'P0001', message: 'time_invalido' }, { sobre: 'quadro' })).toBe(
+      'Esse time não está mais disponível para você. Escolha outro time.',
+    )
+    expect(traduzirErroBanco({ code: 'P0001', message: 'quadro_arquivado' }, { sobre: 'quadro' })).toBe(
+      'Este quadro está arquivado: restaure antes de renomear.',
+    )
+    expect(traduzirErroBanco({ code: '42501' }, { sobre: 'quadro' })).toBe('Você não tem permissão para isso.')
+  })
+})
