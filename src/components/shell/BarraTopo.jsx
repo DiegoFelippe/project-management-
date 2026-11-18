@@ -4,11 +4,13 @@ import { useAuth } from '@/auth/useAuth'
 import { Button } from '@/components/ui/button'
 import { salvarTema } from '@/data/preferencias'
 import { urlPublica } from '@/lib/imagem'
+import { cn } from '@/lib/utils'
 import { useInstalar } from '@/pwa/useInstalar'
 import BotaoTema from '@/tema/BotaoTema'
 import { NOME_DO_PAPEL, tituloDaRota } from './menu'
 
-// Barra fina de cima: onde a pessoa está (logo e nome da consultoria › Times), o tema e o papel dela.
+// Barra fina de cima: onde a pessoa está (logo e nome da consultoria › Times), o tema e o papel dela. No celular, o ☰ abre
+// o resto do menu, o perfil, o tema e o Sair (o tema sai daqui: auditoria, G7).
 export default function BarraTopo({ aoAbrirMenu }) {
   const { perfil } = useAuth()
   const { pathname } = useLocation()
@@ -33,8 +35,8 @@ export default function BarraTopo({ aoAbrirMenu }) {
           <Download /> <span className="hidden sm:inline">Instalar app</span>
         </Button>
       )}
-      <BotaoTema aoTrocar={guardarNoPerfil} className={podeInstalar ? 'shrink-0' : 'ml-auto shrink-0'} />
-      <span className="shrink-0 rounded-full border px-3 py-1 text-rotulo font-medium text-muted-foreground">
+      <BotaoTema aoTrocar={guardarNoPerfil} className={podeInstalar ? 'shrink-0 max-md:hidden' : 'ml-auto shrink-0 max-md:hidden'} />
+      <span className={cn('shrink-0 rounded-full border px-3 py-1 text-rotulo font-medium text-muted-foreground', !podeInstalar && 'max-md:ml-auto')}>
         {NOME_DO_PAPEL[perfil.papel]}
       </span>
     </header>

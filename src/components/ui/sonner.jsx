@@ -15,6 +15,8 @@ function Toaster(props) {
     <Sonner
       theme={escuro ? 'dark' : 'light'}
       position="bottom-center"
+      // no celular, acima da barra de baixo do menu (e da área segura do iPhone)
+      mobileOffset={{ bottom: 'calc(4.75rem + env(safe-area-inset-bottom))' }}
       className="toaster group"
       style={{
         '--normal-bg': 'var(--popover)',

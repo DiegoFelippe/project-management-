@@ -21,7 +21,8 @@ const rotulo = (aceso) =>
     aceso ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground',
   )
 
-function Quadro({ icone: Icone, animacao, aceso, perigo }) {
+// O ícone num quadrado arredondado, com a animação do item (o mesmo no trilho, na barra de baixo e no ☰ do celular).
+export function Quadro({ icone: Icone, animacao, aceso, perigo }) {
   return (
     <span
       className={cn(
@@ -36,9 +37,9 @@ function Quadro({ icone: Icone, animacao, aceso, perigo }) {
   )
 }
 
-function Item({ item, aoNavegar }) {
+function Item({ item }) {
   return (
-    <NavLink to={item.rota} end={item.rota === '/'} title={item.rotulo} onClick={aoNavegar} data-item-trilho=""
+    <NavLink to={item.rota} end={item.rota === '/'} title={item.rotulo} data-item-trilho=""
       className="group flex w-16 flex-col items-center gap-1 py-0.5 outline-none focus-visible:[&>span:first-child]:ring-2 focus-visible:[&>span:first-child]:ring-ring">
       {({ isActive }) => (
         <>
@@ -50,32 +51,40 @@ function Item({ item, aoNavegar }) {
   )
 }
 
-export default function Trilho({ aoNavegar }) {
+// A bolinha de quem está usando: a foto ou as iniciais na cor da pessoa, com a animação pulsar (trilho e ☰ do celular).
+export function Bolinha({ perfil }) {
+  const foto = urlPublica('fotos', perfil.foto)
+  const cor = corDaPessoa(perfil)
+  return (
+    <span style={foto ? undefined : { backgroundColor: cor, color: corDoTextoSobre(cor) }}
+      className={cn('anim-pulsar grid size-8 shrink-0 place-items-center overflow-hidden rounded-full text-rotulo font-bold ring-1 ring-primary/25 transition-shadow group-hover:ring-2 group-hover:ring-primary/50', foto && 'bg-primary/10 text-primary-texto')}>
+      {foto ? <img src={foto} alt="" className="size-full object-cover" /> : iniciais(perfil.nome)}
+    </span>
+  )
+}
+
+// Só no computador (md em diante); no celular, a BarraDeBaixo e o ☰ (MenuDoCelular) fazem o papel dele.
+export default function Trilho() {
   const { perfil, sair } = useAuth()
   const navigate = useNavigate()
   const [perfilAberto, setPerfilAberto] = useState(false)
-  const foto = urlPublica('fotos', perfil.foto)
-  const cor = corDaPessoa(perfil)
 
   return (
     <div className="trilho flex h-full w-[72px] flex-none flex-col bg-moldura">
       <div className="grid h-[56px] flex-none place-items-center">
-        <NavLink to="/" onClick={aoNavegar} title="IXC Consult: início" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <NavLink to="/" title="IXC Consult: início" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Logo />
         </NavLink>
       </div>
       <nav aria-label="Seções" className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto py-1.5 [scrollbar-width:none]">
-        {itensDoMenu(perfil.papel).map((item) => <Item key={item.id} item={item} aoNavegar={aoNavegar} />)}
+        {itensDoMenu(perfil.papel).map((item) => <Item key={item.id} item={item} />)}
       </nav>
       <div className="flex flex-none flex-col items-center gap-1.5 pt-2 pb-3">
         <span aria-hidden="true" className="mb-0.5 h-px w-8 bg-border" />
         <button type="button" title={`Meu perfil: ${perfil.nome} (${perfil.email})`} aria-label={`Meu perfil (${perfil.nome})`}
           data-item-trilho="" onClick={() => setPerfilAberto(true)}
           className="group flex w-16 flex-col items-center gap-1 py-0.5 outline-none focus-visible:[&>span:first-child]:ring-2 focus-visible:[&>span:first-child]:ring-ring">
-          <span style={foto ? undefined : { backgroundColor: cor, color: corDoTextoSobre(cor) }}
-            className={cn('anim-pulsar grid size-8 place-items-center overflow-hidden rounded-full text-rotulo font-bold ring-1 ring-primary/25 transition-shadow group-hover:ring-2 group-hover:ring-primary/50', foto && 'bg-primary/10 text-primary-texto')}>
-            {foto ? <img src={foto} alt="" className="size-full object-cover" /> : iniciais(perfil.nome)}
-          </span>
+          <Bolinha perfil={perfil} />
           <span className={rotulo(false)}>{primeiroNome(perfil.nome)}</span>
         </button>
         <button type="button" title="Sair da conta" data-item-trilho=""
