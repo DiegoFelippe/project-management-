@@ -1,16 +1,17 @@
 import { Search, SlidersHorizontal } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import BarraDaPagina from './BarraDaPagina'
 
-// Cartão que reúne, nesta ordem, o rótulo "Filtros" (ícone + texto, sempre, como no Calendário), as abas, a busca, os filtros pequenos e a ação principal (no fim, à direita).
+// Cartão (BarraDaPagina) que reúne, nesta ordem, o rótulo "Filtros" (ícone + texto, sempre, como no Calendário), as abas, a busca, os filtros pequenos e a ação principal (no fim, à direita).
 export default function BarraDeFiltros({ children, className }) {
   return (
-    <div className={cn('card mb-4 flex flex-wrap items-center gap-3 p-3', className)}>
+    <BarraDaPagina className={className}>
       <span className="inline-flex items-center gap-1.5 text-rotulo font-semibold text-foreground/80">
         <SlidersHorizontal className="size-3.5" aria-hidden="true" /> Filtros
       </span>
       {children}
-    </div>
+    </BarraDaPagina>
   )
 }
 
@@ -26,6 +27,6 @@ export function CampoBusca({ rotulo, placeholder, valor, aoMudar }) {
 }
 
 // Ação principal da barra (botão azul): vai para o fim da linha.
-export function AcaoPrincipal({ children }) {
-  return <div className="ml-auto flex items-center gap-2">{children}</div>
+export function AcaoPrincipal({ children, className }) {
+  return <div className={cn('ml-auto flex items-center gap-2', className)}>{children}</div>
 }

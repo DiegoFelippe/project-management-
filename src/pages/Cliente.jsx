@@ -159,17 +159,20 @@ export default function Cliente() {
   return (
     <>
       {voltar}
-      <Cabecalho titulo={cliente.nome} descricao={cliente.razao_social}>
-        {souConsultor && <AcoesDaLinha {...acoes} aba="meus" noCabecalho />}
-        {(central || (gestao && !cliente.arquivado)) && <AcoesDaLinha {...acoes} aba={aba} noCabecalho />}
-      </Cabecalho>
+      <Cabecalho titulo={cliente.nome} descricao={cliente.razao_social} />
       {aberto && souConsultor && aberto.cliente_id !== cliente.id && (
         <p id={idDoAviso} className="mb-3 text-corpo text-muted-foreground">
           Você está com check-in aberto em {aberto.cliente?.nome ?? 'outro cliente'} desde {HORA.format(new Date(aberto.inicio))}.
           {' '}Faça o check-out para começar outro.
         </p>
       )}
-      <AbasDoCliente abas={abas} />
+      {/* O título fica sozinho; abas e ações ficam numa barra no estilo da de filtros (pedido do Diego, 17/11). */}
+      <AbasDoCliente abas={abas} barra="Abas e ações do cliente" acoes={(
+        <>
+          {souConsultor && <AcoesDaLinha {...acoes} aba="meus" noCabecalho />}
+          {(central || (gestao && !cliente.arquivado)) && <AcoesDaLinha {...acoes} aba={aba} noCabecalho />}
+        </>
+      )} />
       {janelas}
     </>
   )

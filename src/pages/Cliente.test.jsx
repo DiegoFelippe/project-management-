@@ -235,26 +235,55 @@ describe('Cliente (página)', () => {
     expect(apagarCheckin).toHaveBeenCalledWith('c1')
   })
 
+  it('o título fica sozinho no topo; abas e ações ficam numa barra no estilo da de filtros (pedido do Diego, 17/11)', async () => {
+    tela()
+    const titulo = await screen.findByRole('heading', { name: 'Provedor Alfa' })
+    const cabecalho = titulo.parentElement.parentElement
+    expect(cabecalho).toHaveTextContent('Alfa Telecom Ltda')
+    expect(within(cabecalho).queryAllByRole('button')).toHaveLength(0)
+    const regiao = screen.getByRole('region', { name: 'Abas e ações do cliente' })
+    expect(regiao).toHaveClass('card', 'flex', 'flex-wrap')
+    expect(regiao).not.toHaveTextContent('Filtros')
+    const abas = within(regiao).getByRole('tablist', { name: 'Seções do cliente' })
+    const botoes = within(regiao).getAllByRole('button')
+    expect(botoes.map((b) => b.textContent.trim())).toEqual(['Mover', 'Editar', 'Arquivar', 'Apagar'])
+    // Abas à esquerda, botões depois delas, no fim da barra (à direita).
+    expect(abas.compareDocumentPosition(botoes[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(botoes[0].parentElement).toHaveClass('ml-auto', 'flex-wrap')
+    // O conteúdo da aba vem abaixo da barra, fora dela.
+    expect(regiao).not.toContainElement(screen.getByRole('tabpanel'))
+  })
+
+  it('no celular as ações secundárias ficam só com o ícone, mantendo o nome; a principal mantém o texto', async () => {
+    tela(consultor)
+    const regiao = within(await screen.findByRole('region', { name: 'Abas e ações do cliente' }))
+    const principal = await regiao.findByRole('button', { name: 'Fazer check-in' })
+    expect(principal.querySelector('[class*="sr-only"]')).toBeNull()
+    expect(within(regiao.getByRole('button', { name: 'Lançar horas' })).getByText('Lançar horas')).toHaveClass('max-sm:sr-only')
+  })
+
   it('as ações da lista seguem o papel: a central edita e arquiva', async () => {
     tela()
     await screen.findByRole('heading', { name: 'Provedor Alfa' })
-    expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Arquivar' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Mover' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Editar' })).toHaveClass('border')
-    expect(screen.getByRole('button', { name: 'Apagar' })).toHaveClass('border')
-    expect(screen.getByRole('button', { name: 'Apagar' })).not.toHaveClass('bg-primary')
+    const barra = within(screen.getByRole('region', { name: 'Abas e ações do cliente' }))
+    expect(barra.getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+    expect(barra.getByRole('button', { name: 'Arquivar' })).toBeInTheDocument()
+    expect(barra.getByRole('button', { name: 'Mover' })).toBeInTheDocument()
+    expect(barra.getByRole('button', { name: 'Editar' })).toHaveClass('border')
+    expect(barra.getByRole('button', { name: 'Apagar' })).toHaveClass('border')
+    expect(barra.getByRole('button', { name: 'Apagar' })).not.toHaveClass('bg-primary')
+    expect(barra.getByRole('button', { name: 'Apagar' })).toHaveClass('hover:text-destructive')
   })
 
   it('o administrador troca o consultor e ajusta a previsão', async () => {
     tela(adminDaSti, '/clientes/k1?aba=checkins')
     await screen.findByRole('heading', { name: 'Provedor Alfa' })
-    expect(screen.getByRole('button', { name: 'Trocar consultor' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Ajustar previsão' })).toBeInTheDocument()
+    const barra = within(screen.getByRole('region', { name: 'Abas e ações do cliente' }))
+    expect(barra.getAllByRole('button').map((b) => b.textContent.trim())).toEqual(['Trocar consultor', 'Ajustar previsão'])
     expect(screen.queryByRole('button', { name: 'Arquivar' })).not.toBeInTheDocument()
-    // Padrão Hub: no cabeçalho da página, sem a principal do contexto, tudo é outline (nada de link solto).
+    // Padrão Hub: na barra da página, sem a principal do contexto, tudo é outline (nada de link solto).
     for (const nome of ['Trocar consultor', 'Ajustar previsão']) {
-      const botao = screen.getByRole('button', { name: nome })
+      const botao = barra.getByRole('button', { name: nome })
       expect(botao).toHaveClass('border')
       expect(botao).not.toHaveClass('bg-primary')
       expect(botao.className).not.toMatch(/text-muted-foreground/)
@@ -263,16 +292,20 @@ describe('Cliente (página)', () => {
 
   it('o consultor do cliente faz check-in e lança horas; outra pessoa não tem ações', async () => {
     const { unmount } = tela(consultor)
-    expect(await screen.findByRole('button', { name: 'Fazer check-in' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Lançar horas' })).toBeInTheDocument()
+    const barra = within(await screen.findByRole('region', { name: 'Abas e ações do cliente' }))
+    expect(await barra.findByRole('button', { name: 'Fazer check-in' })).toBeInTheDocument()
+    expect(barra.getAllByRole('button').map((b) => b.textContent.trim())).toEqual(['Fazer check-in', 'Lançar horas'])
     // Padrão Hub: a principal do contexto cheia, as demais outline.
-    expect(screen.getByRole('button', { name: 'Fazer check-in' })).toHaveClass('bg-primary')
-    expect(screen.getByRole('button', { name: 'Lançar horas' })).toHaveClass('border')
-    expect(screen.getByRole('button', { name: 'Lançar horas' })).not.toHaveClass('bg-primary')
+    expect(barra.getByRole('button', { name: 'Fazer check-in' })).toHaveClass('bg-primary')
+    expect(barra.getByRole('button', { name: 'Lançar horas' })).toHaveClass('border')
+    expect(barra.getByRole('button', { name: 'Lançar horas' })).not.toHaveClass('bg-primary')
     unmount()
     tela(outraPessoa)
     await screen.findByRole('heading', { name: 'Provedor Alfa' })
-    expect(screen.queryByRole('button', { name: 'Fazer check-in' })).not.toBeInTheDocument()
+    // A barra continua (com as abas), só sem botões.
+    const semAcoes = within(screen.getByRole('region', { name: 'Abas e ações do cliente' }))
+    expect(semAcoes.getByRole('tablist', { name: 'Seções do cliente' })).toBeInTheDocument()
+    expect(semAcoes.queryAllByRole('button')).toHaveLength(0)
   })
 
   it('mostra as abas na ordem e abre Geral com os dados e as ações', async () => {

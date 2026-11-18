@@ -149,6 +149,8 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   demais são `outline`, tamanho padrão, com ícone. Apagar no cabeçalho é `outline` com o realce de perigo no hover.
   `ghost sm` só dentro de linhas de tabela e listas. Ações que servem aos dois lugares (`AcoesDaLinha`,
   `BotaoCheckin`) recebem `noCabecalho` e usam `estiloDaAcao` (`src/components/clientes/estiloDaAcao.js`).
+- **Página do cliente:** o título fica sozinho no topo; abas e ações ficam numa barra no estilo da `BarraDeFiltros`
+  (abas à esquerda, botões à direita) — pedido do Diego, 17/11.
 - **Mês sempre pela `NavegacaoDoMes`** (`maximo` trava o Próximo); nunca montar Anterior/Próximo de mês à mão.
   `src/components/comum/navegacaoDoMesVarredura.test.js` falha se `deslocarMes` aparecer fora dela.
   **Exceção: o Calendário.** O "Hoje ‹ ›" dele anda por semana ou por mês, como o Hub, conforme a visão, e por isso

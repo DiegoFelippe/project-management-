@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router'
 import { describe, expect, it } from 'vitest'
@@ -66,6 +66,36 @@ describe('AbasDoCliente', () => {
     unmount()
     renderizarTela(<AbasDoCliente abas={ABAS} rotulo="Seções de Check-ins" />, { perfil: {}, endereco: '/checkins' })
     expect(screen.getByRole('tablist', { name: 'Seções de Check-ins' })).toBeInTheDocument()
+  })
+
+  it('sem `barra`, as abas ficam soltas (sem cartão nem região), como em Check-ins', () => {
+    tela()
+    expect(screen.queryByRole('region')).not.toBeInTheDocument()
+    expect(screen.getByRole('tablist').closest('.card')).toBeNull()
+  })
+
+  it('com `barra`, abas e ações ficam numa região no cartão da barra de filtros, as ações no fim', () => {
+    const { container } = renderizarTela(
+      <AbasDoCliente abas={ABAS} barra="Abas e ações do cliente" acoes={<button type="button">Editar</button>} />,
+      { perfil: {}, endereco: '/c/1' },
+    )
+    const regiao = screen.getByRole('region', { name: 'Abas e ações do cliente' })
+    expect(regiao).toHaveClass('card', 'flex', 'flex-wrap', 'items-center', 'gap-3', 'p-3')
+    expect(regiao).toContainElement(screen.getByRole('tablist', { name: 'Seções do cliente' }))
+    const editar = within(regiao).getByRole('button', { name: 'Editar' })
+    expect(editar.parentElement).toHaveClass('ml-auto', 'flex-wrap', 'justify-end')
+    expect(screen.getByRole('tablist').compareDocumentPosition(editar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // O painel fica fora da barra, abaixo; a grade continua encolhível para as abas rolarem dentro da barra.
+    expect(regiao).not.toContainElement(screen.getByRole('tabpanel'))
+    expect(regiao.closest('.grid')).toHaveClass('grid-cols-1')
+    expect(container.querySelector('.grid > section')).toBe(regiao)
+  })
+
+  it('com `barra` e sem ações, o espaço dos botões some (empty:hidden)', () => {
+    renderizarTela(<AbasDoCliente abas={ABAS} barra="Abas e ações do cliente" acoes={<>{false}</>} />, { perfil: {}, endereco: '/c/1' })
+    const regiao = screen.getByRole('region', { name: 'Abas e ações do cliente' })
+    expect(regiao.querySelector('.ml-auto')).toHaveClass('empty:hidden')
+    expect(regiao.querySelector('.ml-auto')).toBeEmptyDOMElement()
   })
 
   it('setas movem a seleção e o foco, com tabindex móvel', async () => {
