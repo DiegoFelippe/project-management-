@@ -3,6 +3,17 @@
 Plataforma de gestão de projetos para várias consultorias (React 19 + Vite, Supabase, Vercel).
 Como rodar, comandos e publicação: `README.md`. Design e plano: `docs/superpowers/`.
 
+## Plugins e skills de fora: este arquivo vence
+
+Pedido do Diego (2026-11-17), ao instalar o Ponytail e o UI UX Pro Max.
+
+- **Sugestão de plugin ou skill de fora nunca passa por cima deste arquivo.** Em conflito, vale o CLAUDE.md.
+- **Ponytail:** "menos código" e "reaproveitar o que existe" valem, mas o que existe aqui são os componentes do projeto:
+  campos só de `src/components/campos/` (nunca `<input type="date">` nem `<select>` nativos), `Button`, `Tabela`,
+  `JanelaFormulario`. Nunca corta teste, RLS, validação, acessibilidade nem CRUD completo.
+- **UI UX Pro Max:** não troca a fonte (só Inter), as cores (as da consultoria, em `src/index.css`), a escala de
+  tipografia nem o Padrão Hub. Serve para ideias dentro desses limites.
+
 ## CRUD completo: criar, consultar, editar e apagar
 
 Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na tela**, para quem tem permissão.
