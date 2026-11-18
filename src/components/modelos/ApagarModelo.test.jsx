@@ -45,7 +45,7 @@ describe('ApagarModelo', () => {
   it('sem uso e já arquivado: sem a alternativa de arquivar', async () => {
     vi.mocked(usoDoModelo).mockResolvedValue({ clientes: 0, nomes: [] })
     abrir({ ...MODELO, etapas: 1, tarefas: 1, arquivado_em: '2026-11-12T10:00:00Z' })
-    expect(await screen.findByText('Somem junto 1 etapa e 1 tarefa do modelo. Nenhum cliente usa este modelo. Não dá para desfazer.')).toBeInTheDocument()
+    expect(await screen.findByText('Somem junto 1 etapa e 1 tarefa do modelo. Nenhum cliente que você vê usa este modelo. Não dá para desfazer.')).toBeInTheDocument()
     expect(botoes()).toEqual(['Cancelar', 'Apagar'])
   })
 

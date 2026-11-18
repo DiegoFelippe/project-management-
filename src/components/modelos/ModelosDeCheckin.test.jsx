@@ -309,7 +309,7 @@ describe('ModelosDeCheckin: arquivar e apagar', () => {
     await userEvent.click(within(await screen.findByRole('row', { name: /Implantação STI/ })).getByRole('button', { name: 'Apagar' }))
     const confirmar = await screen.findByRole('alertdialog', { name: 'Apagar "Implantação STI"?' })
     expect(usoDoModelo).toHaveBeenCalledWith('m2')
-    await within(confirmar).findByText(/Somem junto 1 etapa e 2 tarefas do modelo\. Nenhum cliente usa este modelo\. Não dá para desfazer\. Se quiser só tirar da lista, arquive\./)
+    await within(confirmar).findByText(/Somem junto 1 etapa e 2 tarefas do modelo\. Nenhum cliente que você vê usa este modelo\. Não dá para desfazer\. Se quiser só tirar da lista, arquive\./)
     expect(botoesDoRodape(confirmar)).toEqual(['Cancelar', 'Arquivar', 'Apagar'])
     await userEvent.click(within(confirmar).getByRole('button', { name: 'Apagar' }))
     expect(apagarModelo).toHaveBeenCalledWith('m2')

@@ -62,7 +62,7 @@ export default function ApagarModelo({ modelo, aoFechar, aoApagar, aoArquivar })
     texto = `${quem} este modelo${nomes.length ? `: ${nomesDosClientes(nomes, clientes)}` : ''}. Por isso ele não pode ser apagado. ${arquivado
       ? 'Ele já está arquivado: os clientes continuam com o check-list.'
       : `Arquive: ele sai da lista de modelos para aplicar e ${clientes === 1 ? 'o cliente continua' : 'os clientes continuam'} com o check-list.`}`
-  } else texto = `${oQueSome} Nenhum cliente usa este modelo. Não dá para desfazer.${arquiveNoLugar}`
+  } else texto = `${oQueSome} Nenhum cliente que você vê usa este modelo. Não dá para desfazer.${arquiveNoLugar}`
 
   const decidido = !uso.carregando && !sumiu
   const podeArquivar = decidido && !arquivado
