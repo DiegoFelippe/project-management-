@@ -5,7 +5,7 @@ import CampoData from '@/components/campos/CampoData'
 import CampoHora from '@/components/campos/CampoHora'
 import TarefasMarcadas from '@/components/checkins/TarefasMarcadas'
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
-import { Button } from '@/components/ui/button'
+import { useEnvio } from '@/components/comum/useEnvio'
 import { Label } from '@/components/ui/label'
 import { tarefasDoCheckin } from '@/data/checkins'
 import { CHECKIN_DE_MAIS_DE_24H } from '@/lib/erros'
@@ -58,8 +58,7 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
   const [dataFim, setDataFim] = useState(iniciais.dataFim)
   const [fim, setFim] = useState(iniciais.fim)
   const [descricao, setDescricao] = useState(checkin?.descricao ?? '')
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  const { erro, setErro, enviando, enviar } = useEnvio(aoFechar)
   const checkout = modo === 'checkout'
   const fechando = Boolean(checkin?.inicio && !checkin?.fim)
   // Data do fim: sempre no check-out; nos outros, quando o check-in atravessa a meia-noite.
@@ -105,12 +104,7 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
     const dados = { descricao: descricao.trim() }
     if (mudouInicio) dados.inicio = de.toISOString()
     if (mudouFim || fechando) dados.fim = ate.toISOString()
-    setErro(null)
-    setEnviando(true)
-    const resposta = await aoSalvar(dados)
-    setEnviando(false)
-    if (resposta?.erro) return setErro(resposta.erro)
-    aoFechar()
+    await enviar(() => aoSalvar(dados))
   }
 
   const campoDataDoFim = (
@@ -129,12 +123,7 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={`${textos.titulo} ${nomeDoCliente}`} icone={Clock} largura="lg" enviando={enviando}
       descricao={modo === 'editar' && fechando ? 'Informe o fim e o que foi feito para fechar o check-in.' : textos.descricao}
-      rodape={(
-        <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
-          <Button type="submit" form="form-checkin" disabled={enviando}>{enviando ? 'Salvando…' : textos.botao}</Button>
-        </>
-      )}>
+      form="form-checkin" rotuloEnviar={textos.botao}>
       <form id="form-checkin" noValidate onSubmit={salvar} className="space-y-5">
         {checkout ? (
           <div className="grid grid-cols-2 gap-3">

@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Loader2, XIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
@@ -17,9 +18,17 @@ const FOCAVEL = 'input:not([disabled]):not([type="hidden"]), textarea:not([disab
 // Opcionais (fichas grandes, como a da pessoa): `abas` (um controle de abas, numa faixa abaixo do título),
 // `alturaFixa` (no desktop a janela tem altura fixa e só o corpo rola, então trocar de aba não muda o tamanho)
 // e `acaoEsquerda` (botão à esquerda do rodapé, ex.: Desativar).
-// Convenção de envio: enquanto `enviando`, Esc e X não fecham, e o botão principal que quem chama põe no
-// `rodape` mostra "Salvando…" (e fica desabilitado). O componente só mostra o spinner e marca aria-busy.
-export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, icone: Icone, largura = 'md', rodape, abas, alturaFixa = false, acaoEsquerda, enviando = false, children }) {
+// Rodapé padrão (auditoria, C3): com `rotuloEnviar`, a janela monta Cancelar (outline, chama aoFechar) + o botão
+// principal, que mostra `rotuloEnviando` ("Salvando…" se não vier) enquanto `enviando`. O principal envia o <form> do
+// corpo pelo id (`form`, como type="submit", então o Enter nos campos também envia) ou, sem `form`, é um botão comum
+// que chama `aoEnviar`; `envioDesabilitado` o desliga (ex.: nada escolhido ainda). `rodape` fica para os rodapés
+// diferentes (Fechar, Testar, a mensagem do modelo...) e vence o padrão.
+// Convenção de envio: enquanto `enviando`, Esc e X não fecham e os botões do rodapé ficam desabilitados. O componente
+// mostra o spinner e marca aria-busy.
+export default function JanelaFormulario({
+  aberto, aoFechar, titulo, descricao, icone: Icone, largura = 'md', rodape, abas, alturaFixa = false, acaoEsquerda, enviando = false,
+  rotuloEnviar, rotuloEnviando = 'Salvando…', form, aoEnviar, envioDesabilitado = false, children,
+}) {
   const corpo = useRef(null)
   // Ao abrir, o foco vai para o primeiro campo do corpo (e não para o X do cabeçalho, onde um Enter fecharia a janela).
   function focarPrimeiroCampo(e) {
@@ -28,6 +37,14 @@ export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, 
     e.preventDefault()
     campo.focus()
   }
+  const botoes = rodape ?? (rotuloEnviar && (
+    <>
+      <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
+      <Button type={form ? 'submit' : 'button'} form={form} onClick={form ? undefined : aoEnviar} disabled={enviando || envioDesabilitado}>
+        {enviando ? rotuloEnviando : rotuloEnviar}
+      </Button>
+    </>
+  ))
   return (
     <DialogPrimitive.Root open={aberto} onOpenChange={(abrir) => !abrir && !enviando && aoFechar()}>
       <DialogPortal>
@@ -65,11 +82,11 @@ export default function JanelaFormulario({ aberto, aoFechar, titulo, descricao, 
           </header>
           {abas && <div data-slot="janela-abas" className="border-b px-6 pb-3">{abas}</div>}
           <div ref={corpo} data-slot="janela-corpo" className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">{children}</div>
-          {(rodape || acaoEsquerda) && (
+          {(botoes || acaoEsquerda) && (
             <footer data-slot="janela-rodape" className="bg-muted/40 flex items-center justify-end gap-2 rounded-b-2xl border-t px-6 py-3.5">
               {acaoEsquerda && <div className="mr-auto">{acaoEsquerda}</div>}
               {enviando && <Loader2 className="text-muted-foreground size-4 animate-spin" aria-hidden="true" />}
-              {rodape}
+              {botoes}
             </footer>
           )}
         </DialogPrimitive.Content>

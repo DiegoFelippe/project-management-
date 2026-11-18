@@ -9,11 +9,19 @@ describe('AnimacaoGestao', () => {
     expect(raiz).toHaveAttribute('aria-hidden', 'true')
   })
 
-  it('mostra a rede da consultoria e os quatro cartões de gestão', () => {
+  it('mostra a rede da consultoria e os quatro cartões com o que o app faz', () => {
     const { container } = render(<AnimacaoGestao />)
     expect(container.querySelectorAll('[data-no]')).toHaveLength(5)
     expect(container.querySelectorAll('[data-cartao]')).toHaveLength(4)
-    expect(container).toHaveTextContent('Projetos no prazo')
-    expect(container).toHaveTextContent('Crescimento')
+    for (const texto of ['Clientes', 'Times', 'Check-ins', 'Agenda', 'Clientes em atendimento', 'Check-ins da semana', 'Ocupação do time', 'Agenda de hoje']) {
+      expect(container).toHaveTextContent(texto)
+    }
+  })
+
+  it('não promete o que o app não tem (auditoria, R10)', () => {
+    const { container } = render(<AnimacaoGestao />)
+    for (const texto of ['Projetos', 'Sprint', 'Metas', 'Empresas', 'Crescimento']) {
+      expect(container.textContent).not.toContain(texto)
+    }
   })
 })

@@ -52,6 +52,11 @@ describe('Integrações', () => {
     expect(listarIntegracoes).toHaveBeenCalledWith({ consultoriaId: 'c1' })
   })
 
+  it('o subtítulo diz que a conexão é da consultoria (auditoria, R9)', async () => {
+    renderizarTela(<Integracoes />, { perfil: admin })
+    expect(await screen.findByText('Conexões que o sistema usa. Cada consultoria conecta as suas; todos da consultoria usam a mesma conexão.')).toBeInTheDocument()
+  })
+
   it('a barra começa com Filtros e o filtro Conectadas/Não conectadas recorta a tabela', async () => {
     renderizarTela(<Integracoes />, { perfil: admin })
     expect(await screen.findByText('Filtros')).toBeInTheDocument()

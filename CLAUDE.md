@@ -119,8 +119,11 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
 - **Todo formulário é uma `JanelaFormulario`** (`src/components/comum/JanelaFormulario.jsx`), com o corpo em
   `SecaoFormulario`. Rodapé: **Cancelar** (outline) + botão principal, que mostra a ação em andamento enquanto
   grava ("Salvando…", "Criando…", "Testando…"). O botão de enviar fica no rodapé e liga ao formulário por
-  `form="<id>"`. **Exceções:** `FichaDoConsultor` não é um `<form>` (o botão chama `enviar` e o Enter nos campos de
-  texto salva, porque as ausências têm o formulário delas) e o formulário em linha de `GerirAusencias` tem o
+  `form="<id>"`. **A janela monta esse rodapé** (auditoria, 17/11): `rotuloEnviar` (+ `rotuloEnviando`, que por padrão é
+  "Salvando…") com `form="<id>"`, ou `aoEnviar` quando não há `<form>`; `rodape` só para rodapé diferente (Fechar,
+  Testar, mensagem no rodapé). O envio comum (erro, "…ando", fechar ao dar certo) é o `useEnvio(aoConcluir)`
+  (`src/components/comum/useEnvio.js`); cartões de opção em rádio são o `CartoesDeOpcao`. **Exceções:**
+  `FichaDoConsultor` não é um `<form>` (o botão chama `enviar` e o Enter nos campos de texto salva, porque as ausências têm o formulário delas) e o formulário em linha de `GerirAusencias` tem o
   próprio botão dentro dele. `VerificacaoDoPerfil` e `CadastroDoAutenticador` (`src/components/verificacao/`, na
   aba Acesso da `FichaDoConsultor` no modo próprio) têm formulário em linha com o próprio botão, como `GerirAusencias`.
 - **Exceção registrada: `JanelaDoCartao`** (Quadro) grava campo a campo, com o estado "Salvando… / Salvo / Erro ao

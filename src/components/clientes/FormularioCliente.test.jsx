@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import FormularioCliente from './FormularioCliente'
@@ -11,8 +11,8 @@ const CLIENTE = {
 function abrir(props = {}) {
   const aoSalvar = vi.fn().mockResolvedValue({ erro: null })
   const aoFechar = vi.fn()
-  render(<FormularioCliente aberto aoFechar={aoFechar} aoSalvar={aoSalvar} {...props} />)
-  return { aoSalvar, aoFechar }
+  const { unmount } = render(<FormularioCliente aberto aoFechar={aoFechar} aoSalvar={aoSalvar} {...props} />)
+  return { aoSalvar, aoFechar, unmount }
 }
 
 describe('FormularioCliente', () => {
@@ -21,11 +21,36 @@ describe('FormularioCliente', () => {
     expect(screen.getByRole('dialog', { name: 'Novo cliente' })).toBeInTheDocument()
   })
 
+  it('Novo cliente: o botão é "Criar cliente" e mostra "Criando…" enquanto grava; Editar fica com "Salvar"/"Salvando…"', async () => {
+    let terminar
+    const { aoFechar, unmount } = abrir({ aoSalvar: vi.fn(() => new Promise((resolver) => { terminar = resolver })) })
+    expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull()
+    await userEvent.type(screen.getByLabelText('Nome'), 'Gama Net')
+    await userEvent.type(screen.getByLabelText('Previsão de horas por mês'), '30')
+    await userEvent.click(screen.getByRole('button', { name: 'Criar cliente' }))
+    expect(screen.getByRole('button', { name: 'Criando…' })).toBeDisabled()
+    await act(async () => terminar({ erro: null }))
+    expect(aoFechar).toHaveBeenCalled()
+    unmount()
+    abrir({ cliente: CLIENTE, aoSalvar: vi.fn(() => new Promise(() => {})) })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(screen.getByRole('button', { name: 'Salvando…' })).toBeDisabled()
+  })
+
+  it('"(opcional)" só nos campos que o banco não exige; nome e previsão não têm', () => {
+    abrir()
+    for (const rotulo of ['Razão social', 'CNPJ', 'Contato', 'Telefone do contato', 'E-mail do contato', 'Observações']) {
+      expect(screen.getByLabelText(`${rotulo} (opcional)`)).toBeInTheDocument()
+    }
+    expect(screen.getByLabelText('Nome')).toBeInTheDocument()
+    expect(screen.getByLabelText('Previsão de horas por mês')).toBeInTheDocument()
+  })
+
   it('preenche com o cliente, formata o CNPJ e salva em camelCase', async () => {
     const { aoSalvar, aoFechar } = abrir({ cliente: CLIENTE })
     expect(screen.getByRole('dialog', { name: 'Editar cliente' })).toBeInTheDocument()
     expect(screen.getByLabelText('Nome')).toHaveValue('Provedor Alfa')
-    expect(screen.getByLabelText('CNPJ')).toHaveValue('11.222.333/0001-81')
+    expect(screen.getByLabelText('CNPJ (opcional)')).toHaveValue('11.222.333/0001-81')
     expect(screen.getByLabelText('Previsão de horas por mês')).toHaveValue('40')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(aoSalvar).toHaveBeenCalledWith(expect.objectContaining({
@@ -65,7 +90,7 @@ describe('FormularioCliente', () => {
   it('previsão vazia', async () => {
     const { aoSalvar } = abrir()
     await userEvent.type(screen.getByLabelText('Nome'), 'Novo Provedor')
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Criar cliente' }))
     expect(screen.getByText('Informe a previsão de horas por mês.')).toBeInTheDocument()
     expect(aoSalvar).not.toHaveBeenCalled()
   })

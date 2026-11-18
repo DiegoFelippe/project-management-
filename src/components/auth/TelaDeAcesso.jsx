@@ -21,7 +21,7 @@ export default function TelaDeAcesso({ children }) {
         </div>
         <div>
           <h2 className="text-janela md:text-titulo leading-tight font-bold text-balance">
-            Projetos, times e pessoas no mesmo lugar.
+            Clientes, times e agenda no mesmo lugar.
           </h2>
           <p className="mt-3 hidden text-muted-foreground md:block">
             Cada gestor acompanha o próprio time. O administrador vê a consultoria inteira.

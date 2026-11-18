@@ -2,7 +2,7 @@ import { Search, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
-import { Button } from '@/components/ui/button'
+import { useEnvio } from '@/components/comum/useEnvio'
 import { Input } from '@/components/ui/input'
 import { formatarOcupacao } from '@/lib/horas'
 import ListaDeOcupacao from './ListaDeOcupacao'
@@ -16,8 +16,7 @@ export default function EscolhaDeOcupacao({
 }) {
   const { busca, setBusca, itens, total, erro: erroDaLista, carregandoMais, mostrarMais } = useOpcoes(carregar)
   const [manual, setManual] = useState(null)
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  const { erro, enviando, enviar } = useEnvio(aoFechar)
 
   // Começa com a sugestão; vale a escolha da pessoa enquanto o item ainda estiver na lista.
   const sugestao = sugestaoDe(itens, atualId)
@@ -27,23 +26,12 @@ export default function EscolhaDeOcupacao({
 
   async function confirmar() {
     if (!escolhido || enviando) return
-    setEnviando(true)
-    const resposta = await aoConfirmar(escolhido.id, escolhido)
-    setEnviando(false)
-    if (resposta?.erro) return setErro(resposta.erro)
-    aoFechar()
+    await enviar(() => aoConfirmar(escolhido.id, escolhido))
   }
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={titulo} descricao={descricao} icone={Users} largura="lg" enviando={enviando}
-      rodape={(
-        <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
-          <Button type="button" disabled={!escolhido || enviando} onClick={confirmar}>
-            {enviando ? 'Salvando…' : escolhido ? rotuloDoBotao(escolhido) : 'Escolher'}
-          </Button>
-        </>
-      )}>
+      rotuloEnviar={escolhido ? rotuloDoBotao(escolhido) : 'Escolher'} aoEnviar={confirmar} envioDesabilitado={!escolhido}>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input type="search" aria-label={rotuloDaBusca} placeholder={rotuloDaBusca} className="h-10 pl-9"

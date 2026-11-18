@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import CampoImagem from '@/components/comum/CampoImagem'
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
-import { Button } from '@/components/ui/button'
+import { useEnvio } from '@/components/comum/useEnvio'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { urlPublica } from '@/lib/imagem'
@@ -12,29 +12,17 @@ import { urlPublica } from '@/lib/imagem'
 export default function EditarConsultoria({ aberto, aoFechar, consultoria, aoSalvar }) {
   const [nome, setNome] = useState(consultoria?.nome ?? '')
   const [logo, setLogo] = useState(null)
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  const { erro, setErro, enviando, enviar } = useEnvio(aoFechar)
 
   async function salvar(evento) {
     evento.preventDefault()
     if (nome.trim().length < 2) return setErro('Use pelo menos 2 caracteres.')
-    setErro(null)
-    setEnviando(true)
-    const resposta = await aoSalvar({ nome: nome.trim(), logo })
-    setEnviando(false)
-    if (resposta?.erro) return setErro(resposta.erro)
-    aoFechar()
+    await enviar(() => aoSalvar({ nome: nome.trim(), logo }))
   }
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo="Editar consultoria" icone={Building2} enviando={enviando}
-      descricao="A logo e o nome aparecem para todos da consultoria."
-      rodape={(
-        <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
-          <Button type="submit" form="form-editar-consultoria" disabled={enviando}>{enviando ? 'Salvando…' : 'Salvar'}</Button>
-        </>
-      )}>
+      descricao="A logo e o nome aparecem para todos da consultoria." form="form-editar-consultoria" rotuloEnviar="Salvar">
       <form id="form-editar-consultoria" noValidate onSubmit={salvar} className="space-y-5">
         <CampoImagem rotulo="logo" redondo={false} atual={urlPublica('logos', consultoria?.logo)}
           reserva={<Building2 className="size-6" />} valor={logo} aoMudar={setLogo} />

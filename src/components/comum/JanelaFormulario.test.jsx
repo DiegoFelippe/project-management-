@@ -132,6 +132,74 @@ describe('JanelaFormulario', () => {
     expect(document.querySelector('[data-slot="janela-rodape"]')).not.toBeNull()
   })
 
+  it('rodapé padrão (rotuloEnviar + form): Cancelar outline e o principal ligado ao <form> do corpo', async () => {
+    const aoFechar = vi.fn()
+    render(
+      <JanelaFormulario aberto aoFechar={aoFechar} titulo="Novo time" form="form-time" rotuloEnviar="Criar time" rotuloEnviando="Criando…">
+        <form id="form-time"><input aria-label="Nome" /></form>
+      </JanelaFormulario>,
+    )
+    const rodape = document.querySelector('[data-slot="janela-rodape"]')
+    const cancelar = screen.getByRole('button', { name: 'Cancelar' })
+    const criar = screen.getByRole('button', { name: 'Criar time' })
+    expect(rodape).toContainElement(cancelar)
+    expect(rodape).toContainElement(criar)
+    expect(cancelar).toHaveAttribute('type', 'button')
+    expect(cancelar).toHaveClass('border', 'bg-card') // outline
+    expect(criar).toHaveAttribute('type', 'submit')
+    expect(criar).toHaveClass('bg-primary-cheio') // o principal, cheio
+    expect(criar.form).toBe(screen.getByLabelText('Nome').form)
+    expect(cancelar.compareDocumentPosition(criar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await userEvent.click(cancelar)
+    expect(aoFechar).toHaveBeenCalledTimes(1)
+  })
+
+  it('rodapé padrão enquanto envia: o principal mostra a ação em andamento e os dois ficam desabilitados', () => {
+    const { unmount } = render(
+      <JanelaFormulario aberto aoFechar={() => {}} titulo="A" form="f" rotuloEnviar="Criar time" rotuloEnviando="Criando…" enviando>
+        <form id="f" />
+      </JanelaFormulario>,
+    )
+    expect(screen.getByRole('button', { name: 'Criando…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Criar time' })).toBeNull()
+    unmount()
+    // Sem rotuloEnviando, a ação em andamento é "Salvando…".
+    render(<JanelaFormulario aberto aoFechar={() => {}} titulo="B" form="f" rotuloEnviar="Salvar" enviando><form id="f" /></JanelaFormulario>)
+    expect(screen.getByRole('button', { name: 'Salvando…' })).toBeDisabled()
+  })
+
+  it('rodapé padrão sem form: o principal é um botão comum que chama aoEnviar', async () => {
+    const aoEnviar = vi.fn()
+    render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A" rotuloEnviar="Salvar" aoEnviar={aoEnviar}><p>x</p></JanelaFormulario>)
+    const salvar = screen.getByRole('button', { name: 'Salvar' })
+    expect(salvar).toHaveAttribute('type', 'button')
+    expect(salvar).not.toHaveAttribute('form')
+    await userEvent.click(salvar)
+    expect(aoEnviar).toHaveBeenCalledTimes(1)
+  })
+
+  it('rodapé padrão com envioDesabilitado: só o principal fica desabilitado', () => {
+    render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A" rotuloEnviar="Escolher" aoEnviar={() => {}} envioDesabilitado><p>x</p></JanelaFormulario>)
+    expect(screen.getByRole('button', { name: 'Escolher' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeEnabled()
+  })
+
+  it('rodape (o rodapé diferente) vence o padrão', () => {
+    render(
+      <JanelaFormulario aberto aoFechar={() => {}} titulo="A" rotuloEnviar="Salvar" aoEnviar={() => {}}
+        rodape={<button type="button">Fechar e voltar</button>}><p>x</p></JanelaFormulario>,
+    )
+    expect(screen.getByRole('button', { name: 'Fechar e voltar' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).toBeNull()
+  })
+
+  it('sem rodape, rotuloEnviar e acaoEsquerda, a janela não tem rodapé', () => {
+    render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A"><p>x</p></JanelaFormulario>)
+    expect(document.querySelector('[data-slot="janela-rodape"]')).toBeNull()
+  })
+
   it('o foco inicial não cai no input de arquivo', () => {
     render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A"><input type="file" aria-label="Arquivo" /><input aria-label="Nome" /></JanelaFormulario>)
     expect(screen.getByLabelText('Nome')).toHaveFocus()

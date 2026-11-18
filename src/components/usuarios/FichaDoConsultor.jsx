@@ -12,6 +12,7 @@ import { GerirAusencias } from '@/components/capacidade/GerirAusencias'
 import { lerHoras } from '@/components/clientes/rotulos'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import CampoImagem from '@/components/comum/CampoImagem'
+import CartoesDeOpcao from '@/components/comum/CartoesDeOpcao'
 import JanelaFormulario, { CartaoDaSecao, SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import SeletorDeCor from '@/components/comum/SeletorDeCor'
 import { Badge } from '@/components/ui/badge'
@@ -93,39 +94,6 @@ const OPCOES_DE_ACESSO = [
   { valor: 'convite', icone: MailCheck, titulo: 'Enviar convite por e-mail', dica: 'A pessoa recebe um link para criar a própria senha.' },
   { valor: 'senha', icone: KeyRound, titulo: 'Definir senha provisória', dica: 'Você passa a senha; a pessoa troca no primeiro acesso.' },
 ]
-
-// Cartões de opção (role="radio"), um de cada vez: o escolhido ganha a borda e o anel da cor principal.
-function EscolhaDeAcesso({ valor, aoMudar }) {
-  function teclar(evento, indice) {
-    const passo = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[evento.key]
-    if (!passo) return
-    evento.preventDefault()
-    const proxima = OPCOES_DE_ACESSO[(indice + passo + OPCOES_DE_ACESSO.length) % OPCOES_DE_ACESSO.length]
-    aoMudar(proxima.valor)
-    document.getElementById(`ficha-acesso-${proxima.valor}`)?.focus()
-  }
-  return (
-    <div role="radiogroup" aria-label="Como a pessoa entra" className="grid gap-2 sm:grid-cols-2">
-      {OPCOES_DE_ACESSO.map((o, i) => {
-        const escolhida = valor === o.valor
-        return (
-          <button key={o.valor} id={`ficha-acesso-${o.valor}`} type="button" role="radio" aria-checked={escolhida}
-            tabIndex={escolhida ? 0 : -1} onClick={() => aoMudar(o.valor)} onKeyDown={(e) => teclar(e, i)}
-            className={cn('botao-animado flex items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow,translate,scale] outline-none hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50',
-              escolhida ? 'border-primary bg-primary/5 ring-primary/15 ring-2' : 'bg-card hover:border-primary/40')}>
-            <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', escolhida ? 'bg-primary-cheio text-primary-foreground' : 'bg-muted text-muted-foreground')}>
-              <o.icone className="size-4" aria-hidden="true" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-rotulo font-semibold">{o.titulo}</span>
-              <span className="text-muted-foreground block text-legenda">{o.dica}</span>
-            </span>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
 
 // Cartão com o estado do acesso de quem já existe (Ativo, Convite pendente, Senha provisória, Desativado).
 const ESTADOS_DO_ACESSO = {
@@ -640,7 +608,8 @@ export default function FichaDoConsultor({
         {painel('acesso', novo ? (
           <>
             <Bloco titulo="Como a pessoa entra">
-              <EscolhaDeAcesso valor={dados.forma} aoMudar={(forma) => setDados((d) => ({ ...d, forma }))} />
+              <CartoesDeOpcao rotulo="Como a pessoa entra" opcoes={OPCOES_DE_ACESSO} className="sm:grid-cols-2"
+                valor={dados.forma} aoMudar={(forma) => setDados((d) => ({ ...d, forma }))} />
               {dados.forma === 'senha' && (
                 <CartaoDaSecao className="p-3">
                   <Campo id="ficha-senha" rotulo="Senha provisória" erro={erros.senha}>

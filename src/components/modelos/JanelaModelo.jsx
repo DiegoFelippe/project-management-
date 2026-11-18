@@ -3,6 +3,7 @@ import { Building2, Globe, ListChecks, ListOrdered, TriangleAlert, Workflow } fr
 import { useAuth } from '@/auth/useAuth'
 import Seletor from '@/components/campos/Seletor'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
+import CartoesDeOpcao from '@/components/comum/CartoesDeOpcao'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
@@ -25,43 +26,11 @@ const buscarConsultoria = async (termo) => {
   return { itens: itens.map((c) => ({ valor: c.id, rotulo: c.nome })), total }
 }
 
+// "Para quem" da Central: todas ou uma (cartões de opção, como "Como a pessoa entra" na ficha).
 const OPCOES_DE_PARA = [
   { valor: 'todas', titulo: 'Todas as consultorias', dica: 'Inclusive as que entrarem depois.', icone: Globe },
   { valor: 'uma', titulo: 'Uma consultoria', dica: 'Só ela vê e aplica nos clientes dela.', icone: Building2 },
 ]
-
-// "Para quem" da Central: todas ou uma (cartões de opção, como "Como a pessoa entra" na ficha).
-function EscolhaDoPara({ valor, aoMudar }) {
-  function teclar(evento, indice) {
-    const passo = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[evento.key]
-    if (!passo) return
-    evento.preventDefault()
-    const proxima = OPCOES_DE_PARA[(indice + passo + OPCOES_DE_PARA.length) % OPCOES_DE_PARA.length]
-    aoMudar(proxima.valor)
-    evento.currentTarget.parentElement.querySelector(`[data-para="${proxima.valor}"]`)?.focus()
-  }
-  return (
-    <div role="radiogroup" aria-label="Para quem" className="grid gap-2">
-      {OPCOES_DE_PARA.map((o, i) => {
-        const escolhida = valor === o.valor
-        return (
-          <button key={o.valor} type="button" role="radio" aria-checked={escolhida} data-para={o.valor} tabIndex={escolhida ? 0 : -1}
-            onClick={() => aoMudar(o.valor)} onKeyDown={(e) => teclar(e, i)}
-            className={cn('botao-animado flex items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow,translate,scale] outline-none hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50',
-              escolhida ? 'border-primary bg-primary/5 ring-primary/15 ring-2' : 'bg-card hover:border-primary/40')}>
-            <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', escolhida ? 'bg-primary-cheio text-primary-foreground' : 'bg-muted text-muted-foreground')}>
-              <o.icone className="size-4" aria-hidden="true" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-rotulo font-semibold">{o.titulo}</span>
-              <span className="text-muted-foreground block text-legenda">{o.dica}</span>
-            </span>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
 
 // "Para quem" que não muda: a gestão cria só para a própria consultoria; um modelo da gestão de uma consultoria continua dela.
 function ParaFixo({ nome, dica }) {
@@ -205,7 +174,7 @@ export default function JanelaModelo({ modelo, origem, clientesUsando = 0, aoFec
             <SecaoFormulario titulo="Para quem">
               {paraFixo ? <ParaFixo nome={paraFixo.nome} dica={paraFixo.dica} /> : (
                 <>
-                  <EscolhaDoPara valor={umaConsultoria ? 'uma' : 'todas'}
+                  <CartoesDeOpcao rotulo="Para quem" opcoes={OPCOES_DE_PARA} valor={umaConsultoria ? 'uma' : 'todas'}
                     aoMudar={(valor) => mudar((r) => ({ ...r, para: valor === 'todas' ? 'todas' : (r.para === 'todas' ? (fonte?.consultoria?.id ?? '') : r.para) }))} />
                   {umaConsultoria && (
                     <div className="grid gap-2">

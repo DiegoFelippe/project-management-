@@ -4,7 +4,7 @@ import { Aviso } from '@/components/auth/TelaDeAcesso'
 import { buscarComoOpcoes, comoOpcaoDePessoa } from '@/components/campos/opcoesDePessoa'
 import Seletor from '@/components/campos/Seletor'
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
-import { Button } from '@/components/ui/button'
+import { useEnvio } from '@/components/comum/useEnvio'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -18,32 +18,21 @@ export default function EditarTime({ aberto, aoFechar, time, papelDeQuemEdita, b
   const [nome, setNome] = useState(time?.nome ?? '')
   const [descricao, setDescricao] = useState(time?.descricao ?? '')
   const [gestorId, setGestorId] = useState(time?.gestor_id ?? '')
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  const { erro, setErro, enviando, enviar } = useEnvio(aoFechar)
   const trocaGestor = papelDeQuemEdita === 'admin'
 
   async function salvar(evento) {
     evento.preventDefault()
     if (nome.trim().length < 2) return setErro('Use pelo menos 2 caracteres no nome.')
-    setErro(null)
-    setEnviando(true)
     const dados = { nome: nome.trim(), descricao: descricao.trim() }
     if (trocaGestor) dados.gestorId = gestorId
-    const resposta = await aoSalvar(dados)
-    setEnviando(false)
-    if (resposta?.erro) return setErro(resposta.erro)
-    aoFechar()
+    await enviar(() => aoSalvar(dados))
   }
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo="Editar time" icone={UsersRound} enviando={enviando}
       descricao={trocaGestor ? 'Nome, descrição e gestor do time.' : 'Nome e descrição do time.'}
-      rodape={(
-        <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
-          <Button type="submit" form="form-editar-time" disabled={enviando}>{enviando ? 'Salvando…' : 'Salvar'}</Button>
-        </>
-      )}>
+      form="form-editar-time" rotuloEnviar="Salvar">
       <form id="form-editar-time" noValidate onSubmit={salvar} className="space-y-5">
         <div className="grid gap-2">
           <Label htmlFor="editar-time-nome">Nome do time</Label>

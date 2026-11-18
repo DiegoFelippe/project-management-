@@ -177,7 +177,7 @@ export default function Integracoes() {
   return (
     <>
       <Cabecalho titulo="Integrações"
-        descricao="Conexões que o sistema usa. Cada consultoria conecta as suas, e todo o sistema usa a mesma conexão." />
+        descricao="Conexões que o sistema usa. Cada consultoria conecta as suas; todos da consultoria usam a mesma conexão." />
       <BarraDeFiltros>
         <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={situacaoFiltro} aoMudar={setSituacaoFiltro} />
         {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setIntegracoes(null) }} />}

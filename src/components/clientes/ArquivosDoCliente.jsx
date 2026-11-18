@@ -6,6 +6,7 @@ import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
+import { useEnvio } from '@/components/comum/useEnvio'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -50,33 +51,20 @@ const quantosArquivos = (n) => (n === 1 ? 'O 1 arquivo dela some de vez.' : `Os 
 // Nova pasta e Renomear: a mesma janela; com `pasta`, vem preenchida com o nome dela.
 function FormularioDePasta({ pasta, aoFechar, aoSalvar }) {
   const [nome, setNome] = useState(pasta?.nome ?? '')
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  const { erro, setErro, enviando, enviar } = useEnvio(aoFechar)
   const novo = !pasta
 
-  async function enviar(evento) {
+  async function salvar(evento) {
     evento.preventDefault()
     if (!nome.trim()) return setErro('Dê um nome à pasta.')
-    setErro(null)
-    setEnviando(true)
-    const resposta = await aoSalvar(nome.trim())
-    setEnviando(false)
-    if (resposta?.erro) return setErro(resposta.erro)
-    aoFechar()
+    await enviar(() => aoSalvar(nome.trim()))
   }
 
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo={novo ? 'Nova pasta' : 'Renomear pasta'} icone={novo ? FolderPlus : Pencil}
       descricao={novo ? 'Agrupa arquivos deste cliente.' : 'O nome é único entre as pastas do cliente.'} enviando={enviando}
-      rodape={(
-        <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
-          <Button type="submit" form="form-pasta" disabled={enviando}>
-            {enviando ? (novo ? 'Criando…' : 'Salvando…') : (novo ? 'Criar pasta' : 'Salvar')}
-          </Button>
-        </>
-      )}>
-      <form id="form-pasta" noValidate onSubmit={enviar} className="space-y-5">
+      form="form-pasta" rotuloEnviar={novo ? 'Criar pasta' : 'Salvar'} rotuloEnviando={novo ? 'Criando…' : 'Salvando…'}>
+      <form id="form-pasta" noValidate onSubmit={salvar} className="space-y-5">
         <div className="grid gap-2">
           <Label htmlFor="nome-da-pasta">Nome da pasta</Label>
           <Input id="nome-da-pasta" className="h-10" maxLength={120} value={nome} onChange={(e) => setNome(e.target.value)} />

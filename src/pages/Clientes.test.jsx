@@ -88,7 +88,7 @@ describe('Clientes (central)', () => {
     await userEvent.click(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByRole('button', { name: 'Editar' }))
     const janela = screen.getByRole('dialog', { name: 'Editar cliente' })
     expect(within(janela).getByLabelText('Nome')).toHaveValue('Provedor Alfa')
-    expect(within(janela).getByLabelText('CNPJ')).toHaveValue('11.222.333/0001-81')
+    expect(within(janela).getByLabelText('CNPJ (opcional)')).toHaveValue('11.222.333/0001-81')
     expect(within(janela).getByLabelText('Previsão de horas por mês')).toHaveValue('40')
     await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
     expect(editarCliente).toHaveBeenCalledWith('k1', expect.objectContaining({ nome: 'Provedor Alfa', horasMes: 40 }))
@@ -100,7 +100,7 @@ describe('Clientes (central)', () => {
     const janela = screen.getByRole('dialog', { name: 'Novo cliente' })
     await userEvent.type(within(janela).getByLabelText('Nome'), 'Gama Net')
     await userEvent.type(within(janela).getByLabelText('Previsão de horas por mês'), '30')
-    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
+    await userEvent.click(within(janela).getByRole('button', { name: 'Criar cliente' }))
     expect(criarCliente).toHaveBeenCalledWith(expect.objectContaining({ nome: 'Gama Net', horasMes: 30 }))
   })
 

@@ -4,7 +4,7 @@ import { Aviso } from '@/components/auth/TelaDeAcesso'
 import { buscarComoOpcoes } from '@/components/campos/opcoesDePessoa'
 import Seletor from '@/components/campos/Seletor'
 import JanelaFormulario from '@/components/comum/JanelaFormulario'
-import { Button } from '@/components/ui/button'
+import { useEnvio } from '@/components/comum/useEnvio'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -17,8 +17,8 @@ export default function NovoTime({ aberto, aoFechar, papelDeQuemCria, buscarGest
   const [descricao, setDescricao] = useState('')
   const [gestorId, setGestorId] = useState('')
   const [erroNome, setErroNome] = useState(null)
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  // Deu certo: limpa para o próximo (quem chama fecha a janela).
+  const { erro, setErro, enviando, enviar } = useEnvio(limpar)
   const escolheGestor = papelDeQuemCria === 'admin'
 
   function limpar() {
@@ -29,19 +29,14 @@ export default function NovoTime({ aberto, aoFechar, papelDeQuemCria, buscarGest
     setErro(null)
   }
 
-  async function enviar(evento) {
+  async function criar(evento) {
     evento.preventDefault()
     if (nome.trim().length < 2) return setErroNome('Use pelo menos 2 caracteres.')
     setErroNome(null)
     if (escolheGestor && !gestorId) return setErro('Escolha o gestor do time.')
-    setErro(null)
-    setEnviando(true)
     const dados = { nome: nome.trim(), descricao: descricao.trim() }
     if (escolheGestor) dados.gestorId = gestorId
-    const resposta = await aoCriar(dados)
-    setEnviando(false)
-    if (resposta?.erro) return setErro(resposta.erro)
-    limpar()
+    await enviar(() => aoCriar(dados))
   }
 
   function cancelar() {
@@ -52,13 +47,8 @@ export default function NovoTime({ aberto, aoFechar, papelDeQuemCria, buscarGest
   return (
     <JanelaFormulario aberto={aberto} aoFechar={cancelar} titulo="Novo time" icone={UsersRound} enviando={enviando}
       descricao={escolheGestor ? 'Dê um nome ao time e escolha quem é o gestor.' : 'Você será o gestor deste time.'}
-      rodape={(
-        <>
-          <Button type="button" variant="outline" onClick={cancelar} disabled={enviando}>Cancelar</Button>
-          <Button type="submit" form="form-novo-time" disabled={enviando}>{enviando ? 'Criando…' : 'Criar time'}</Button>
-        </>
-      )}>
-      <form id="form-novo-time" noValidate onSubmit={enviar} className="space-y-5">
+      form="form-novo-time" rotuloEnviar="Criar time" rotuloEnviando="Criando…">
+      <form id="form-novo-time" noValidate onSubmit={criar} className="space-y-5">
         <div className="grid gap-2">
           <Label htmlFor="nome-time">Nome do time</Label>
           <Input id="nome-time" maxLength={80} aria-invalid={erroNome ? true : undefined} className="h-10"

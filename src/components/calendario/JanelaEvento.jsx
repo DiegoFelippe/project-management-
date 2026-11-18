@@ -388,14 +388,7 @@ function FormularioDoEvento({
           <Trash2 /> Apagar
         </Button>
       )}
-      rodape={(
-        <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
-          <Button type="submit" form="form-evento" disabled={enviando}>
-            {enviando ? (novo ? 'Criando…' : 'Salvando…') : (novo ? 'Criar evento' : 'Salvar alterações')}
-          </Button>
-        </>
-      )}>
+      form="form-evento" rotuloEnviar={novo ? 'Criar evento' : 'Salvar alterações'} rotuloEnviando={novo ? 'Criando…' : 'Salvando…'}>
       <form id="form-evento" noValidate onSubmit={salvar} className="grid gap-6 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-6">
           <SecaoFormulario titulo="O evento">

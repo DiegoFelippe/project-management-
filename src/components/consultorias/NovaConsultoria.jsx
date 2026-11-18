@@ -3,8 +3,8 @@ import { useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import EscolhaForma from '@/components/comum/EscolhaForma'
 import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import { useEnvio } from '@/components/comum/useEnvio'
 import CampoSenha from '@/components/campos/CampoSenha'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { avaliarSenha } from '@/lib/senha'
@@ -15,8 +15,7 @@ const VAZIO = { nome: '', forma: 'convite', adminNome: '', adminEmail: '', senha
 export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
   const [dados, setDados] = useState(VAZIO)
   const [erros, setErros] = useState({})
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  const { erro, setErro, enviando, enviar } = useEnvio(fechar)
   const mudar = (campo) => (evento) => setDados((d) => ({ ...d, [campo]: evento.target.value }))
 
   function fechar() {
@@ -36,17 +35,12 @@ export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
     return Object.keys(achados).length === 0
   }
 
-  async function enviar(evento) {
+  async function criar(evento) {
     evento.preventDefault()
     if (enviando || !validar()) return
-    setErro(null)
-    setEnviando(true)
     const admin = { forma: dados.forma, nome: dados.adminNome.trim(), email: dados.adminEmail.trim() }
     if (dados.forma === 'senha') admin.senha = dados.senha
-    const resposta = await aoCriar({ nome: dados.nome.trim(), admin })
-    setEnviando(false)
-    if (resposta?.erro) return setErro(resposta.erro)
-    fechar()
+    await enviar(() => aoCriar({ nome: dados.nome.trim(), admin }))
   }
 
   const campo = (id, rotulo, chave, extra = {}) => (
@@ -61,13 +55,8 @@ export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
   return (
     <JanelaFormulario aberto={aberto} aoFechar={fechar} titulo="Nova consultoria" icone={Building2} largura="lg" enviando={enviando}
       descricao="A consultoria que contratou a plataforma e quem vai administrá-la."
-      rodape={(
-        <>
-          <Button type="button" variant="outline" onClick={fechar} disabled={enviando}>Cancelar</Button>
-          <Button type="submit" form="form-nova-consultoria" disabled={enviando}>{enviando ? 'Criando…' : 'Criar consultoria'}</Button>
-        </>
-      )}>
-      <form id="form-nova-consultoria" noValidate onSubmit={enviar} className="space-y-5">
+      form="form-nova-consultoria" rotuloEnviar="Criar consultoria" rotuloEnviando="Criando…">
+      <form id="form-nova-consultoria" noValidate onSubmit={criar} className="space-y-5">
         <SecaoFormulario titulo="Consultoria">
           {campo('consultoria-nome', 'Nome da consultoria', 'nome', { maxLength: 120 })}
         </SecaoFormulario>

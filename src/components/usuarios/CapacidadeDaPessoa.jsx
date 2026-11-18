@@ -4,7 +4,7 @@ import CampoNumero from '@/components/campos/CampoNumero'
 import { GerirAusencias } from '@/components/capacidade/GerirAusencias'
 import { lerHoras } from '@/components/clientes/rotulos'
 import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
-import { Button } from '@/components/ui/button'
+import { useEnvio } from '@/components/comum/useEnvio'
 import { Label } from '@/components/ui/label'
 
 // Janela "Capacidade de <nome>": carga semanal e ausências, sem abrir a ficha inteira. Quem pode é decidido
@@ -12,30 +12,20 @@ import { Label } from '@/components/ui/label'
 // a página para buscar os números do mês de novo.
 export default function CapacidadeDaPessoa({ pessoa, aoFechar, aoSalvar, aoMudarAusencias }) {
   const [carga, setCarga] = useState(String(Number(pessoa.carga_semanal ?? 44)).replace('.', ','))
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  const { erro, setErro, enviando, enviar } = useEnvio(aoFechar)
 
+  // Sem <form>: as ausências têm o formulário delas, então o Salvar do rodapé chama esta função.
   async function salvar() {
     if (enviando) return
     const horas = lerHoras(carga)
     if (horas === null || horas > 60) return setErro('Use de 0 a 60 horas.')
-    setErro(null)
-    setEnviando(true)
-    const resposta = await aoSalvar(horas)
-    setEnviando(false)
-    if (resposta?.erro) return setErro(resposta.erro)
-    aoFechar()
+    await enviar(() => aoSalvar(horas))
   }
 
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo={`Capacidade de ${pessoa.nome}`} icone={Gauge} largura="xl" enviando={enviando}
       descricao="A carga semanal e as ausências (férias, licenças) definem a capacidade do mês."
-      rodape={(
-        <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
-          <Button type="button" onClick={salvar} disabled={enviando}>{enviando ? 'Salvando…' : 'Salvar'}</Button>
-        </>
-      )}>
+      rotuloEnviar="Salvar" aoEnviar={salvar}>
       <SecaoFormulario titulo="Carga semanal">
         <div className="grid max-w-xs gap-2">
           <Label htmlFor="capacidade-carga">Carga semanal (horas)</Label>
