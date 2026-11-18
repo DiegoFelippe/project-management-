@@ -53,6 +53,21 @@
   --evento-ausencia-texto: #92400e;
   --evento-feriado: #ffe4e6;
   --evento-feriado-texto: #9f1239;
+  /* Gráficos (design 2026-11-17-graficos-do-inicio-e-do-cliente; validados no dataviz, claro e escuro): série (o azul
+     da consultoria), acima do limite (vermelho), folga (âmbar), referência (capacidade, previsão), grade, trilha das
+     barras, "a fazer" e a rampa da fila (do claro ao escuro). Série, acima, folga e referência seguram 4,5:1 sobre o
+     cartão (src/lib/contraste.test.js); vermelho e âmbar sempre vêm com ícone. Texto nunca na cor da série. */
+  --grafico-serie: #2563eb;
+  --grafico-lavado: rgb(37 99 235 / 0.1);
+  --grafico-acima: #dc2626;
+  --grafico-folga: #b45309;
+  --grafico-ref: #64748b;
+  --grafico-grade: #e2e8f0;
+  --grafico-trilha: #dbeafe;
+  --grafico-neutro: #cbd5e1;
+  --grafico-fila-1: #60a5fa;
+  --grafico-fila-2: #2563eb;
+  --grafico-fila-3: #1e3a8a;
   color-scheme: light;
 }
 
@@ -98,6 +113,17 @@
   --evento-ausencia-texto: #fde68a;
   --evento-feriado: #442237;
   --evento-feriado-texto: #fecdd3;
+  --grafico-serie: #3b82f6;
+  --grafico-lavado: rgb(59 130 246 / 0.14);
+  --grafico-acima: #f05252;
+  --grafico-folga: #d97706;
+  --grafico-ref: #94a0b8;
+  --grafico-grade: #222c42;
+  --grafico-trilha: #1c2a4a;
+  --grafico-neutro: #34405a;
+  --grafico-fila-1: #2563eb;
+  --grafico-fila-2: #60a5fa;
+  --grafico-fila-3: #bfdbfe;
   color-scheme: dark;
 }
 
@@ -145,6 +171,17 @@
   --color-evento-ausencia-texto: var(--evento-ausencia-texto);
   --color-evento-feriado: var(--evento-feriado);
   --color-evento-feriado-texto: var(--evento-feriado-texto);
+  --color-grafico-serie: var(--grafico-serie);
+  --color-grafico-lavado: var(--grafico-lavado);
+  --color-grafico-acima: var(--grafico-acima);
+  --color-grafico-folga: var(--grafico-folga);
+  --color-grafico-ref: var(--grafico-ref);
+  --color-grafico-grade: var(--grafico-grade);
+  --color-grafico-trilha: var(--grafico-trilha);
+  --color-grafico-neutro: var(--grafico-neutro);
+  --color-grafico-fila-1: var(--grafico-fila-1);
+  --color-grafico-fila-2: var(--grafico-fila-2);
+  --color-grafico-fila-3: var(--grafico-fila-3);
   --animate-page-enter: page-enter 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   --animate-barra: barra 1.1s ease-in-out infinite;
 }

@@ -84,7 +84,44 @@ describe('CartoesDeNumeros', () => {
   it('no celular o ícone fica em cima do número (o número ganha a largura toda do cartão)', () => {
     render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={CARTOES} />)
     for (const cartao of screen.getByRole('region').querySelectorAll('[data-cartao]')) {
-      expect(cartao).toHaveClass('flex', 'items-center', 'max-sm:flex-col', 'max-sm:items-start')
+      expect(cartao).toHaveClass('flex', 'max-sm:flex-col', 'max-sm:items-start')
     }
+  })
+
+  // R6 da auditoria: cartão sem detalhe (ou sem variação) não deixa o número mais baixo que o dos vizinhos.
+  it('conteúdo alinhado pelo topo (os números ficam na mesma altura com e sem a linha de baixo)', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={CARTOES} />)
+    for (const cartao of screen.getByRole('region').querySelectorAll('[data-cartao]')) {
+      expect(cartao).toHaveClass('items-start')
+      expect(cartao).not.toHaveClass('items-center')
+    }
+  })
+
+  const COM_VARIACAO = [
+    { chave: 'realizado', rotulo: 'Realizado', valor: '1.020 h', variacao: { texto: '▲ 12%', tom: 'bom', paraLeitor: 'subiu 12%', comparado: 'vs out/26' } },
+    { chave: 'aguardando', rotulo: 'Aguardando', valor: 4, variacao: { texto: '▲ 2', tom: 'ruim', paraLeitor: 'subiu 2', comparado: 'vs out/26' } },
+    { chave: 'clientes', rotulo: 'Clientes', valor: 30, variacao: { texto: '= igual', tom: 'neutro', paraLeitor: 'igual', comparado: 'vs out/26' } },
+    { chave: 'ocupacao', rotulo: 'Ocupação', valor: '72%', variacao: null },
+    { chave: 'sem', rotulo: 'Sem comparação', valor: 1 },
+  ]
+  const variacaoDe = (rotulo) => within(screen.getByRole('region')).getByText(rotulo).closest('[data-cartao]').querySelector('[data-variacao]')
+
+  it('linha de variação com a seta e o tom (só para os olhos) e o texto para o leitor de tela', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_VARIACAO} />)
+    const realizado = variacaoDe('Realizado')
+    expect(realizado).toHaveClass('text-legenda')
+    const seta = within(realizado).getByText('▲ 12%')
+    expect(seta).toHaveClass('text-positive', 'font-semibold', 'tabular-nums')
+    expect(seta).toHaveAttribute('aria-hidden', 'true')
+    expect(within(realizado).getByText('vs out/26', { selector: '[aria-hidden]' })).toHaveClass('text-muted-foreground')
+    expect(within(realizado).getByText('subiu 12% vs out/26')).toHaveClass('sr-only')
+    expect(within(variacaoDe('Aguardando')).getByText('▲ 2')).toHaveClass('text-destructive')
+    expect(within(variacaoDe('Clientes')).getByText('= igual')).toHaveClass('text-muted-foreground')
+  })
+
+  it('variação nula mostra "—" (a comparação ainda carrega); sem a chave, sem a linha', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_VARIACAO} />)
+    expect(variacaoDe('Ocupação')).toHaveTextContent('—')
+    expect(variacaoDe('Sem comparação')).toBeNull()
   })
 })

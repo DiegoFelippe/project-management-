@@ -1,7 +1,7 @@
 // Período do painel do Início (pedido do Diego, 17/11): o Mês (padrão) ou um intervalo de dias de São Paulo.
 // Os atalhos contam a partir de hoje; Personalizado traz as datas escolhidas. O banco recebe o mês ou { de, ate }
 // e confere os mesmos limites (painel_do_inicio). Datas sempre como texto "AAAA-MM-DD", sem passar por fuso.
-import { formatarDia } from '@/lib/mes'
+import { formatarDia, rotuloCurto } from '@/lib/mes'
 
 export const TIPOS_DE_PERIODO = [
   { valor: 'mes', rotulo: 'Mês' },
@@ -98,3 +98,20 @@ export const descreverPeriodo = (de, ate) => (de === ate ? formatarDia(de) : `${
 
 // Último dia que o Até pode ter: o fim do mês atual.
 export const ultimoDiaPermitido = (hoje) => fimDoMes(primeiroDoMes(hoje))
+
+const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+const diaMes = (dia) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`
+
+// Rótulo do período anterior na linha de variação dos cartões ("▲ 12% vs set/26"). O banco calcula o anterior
+// (private.periodo_anterior) e manda { de, ate, forma }; aqui só o texto: mês inteiro "vs set/26", mês até um dia
+// "vs 1–17 de out.", ano "vs mesmo período de 2025" e os N dias antes "vs 18/09 a 17/10" (com o ano quando muda).
+export function rotuloDaComparacao({ de, ate, forma }) {
+  if (forma === 'mes') return `vs ${rotuloCurto(de)}`
+  if (forma === 'mes_parcial') {
+    const [inicio, fim] = [Number(de.slice(8, 10)), Number(ate.slice(8, 10))]
+    return `vs ${inicio === fim ? inicio : `${inicio}–${fim}`} de ${MESES_CURTOS[Number(de.slice(5, 7)) - 1]}.`
+  }
+  if (forma === 'ano_anterior') return `vs mesmo período de ${de.slice(0, 4)}`
+  if (de === ate) return `vs ${diaMes(de)}`
+  return de.slice(0, 4) === ate.slice(0, 4) ? `vs ${diaMes(de)} a ${diaMes(ate)}` : `vs ${formatarDia(de)} a ${formatarDia(ate)}`
+}

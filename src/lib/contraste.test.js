@@ -81,6 +81,36 @@ describe('contraste dos tokens de src/index.css', () => {
     expect(fracos).toEqual([])
   })
 
+  // Gráficos (design 2026-11-17-graficos-do-inicio-e-do-cliente): cores só por --grafico-*, com valor próprio no escuro.
+  // Série, acima, folga e referência são marcas finas (linhas de 2 px, barras de 12 px) ao lado de número e ícone:
+  // seguram 4,5:1 sobre o cartão. Trilha, grade, "a fazer" e a rampa da fila são fundo e têm nome e número ao lado.
+  const MARCAS = ['grafico-serie', 'grafico-acima', 'grafico-folga', 'grafico-ref']
+  const TOKENS_DOS_GRAFICOS = [...MARCAS, 'grafico-grade', 'grafico-trilha', 'grafico-neutro', 'grafico-fila-1', 'grafico-fila-2', 'grafico-fila-3']
+
+  it('os tokens dos gráficos existem no claro e no escuro (o escuro redefine cada um)', () => {
+    const escuro = tokens(CSS, '.dark')
+    for (const nome of TOKENS_DOS_GRAFICOS) {
+      expect(TEMAS.claro[nome], nome).toMatch(/^#/)
+      expect(escuro[nome], `${nome} no .dark`).toMatch(/^#/)
+    }
+    expect(CSS).toMatch(/--grafico-lavado:\s*rgb\(/)
+    expect(CSS).toMatch(/\.dark \{[^}]*--grafico-lavado:\s*rgb\(/)
+  })
+
+  it.each(Object.keys(TEMAS))('no %s, as marcas dos gráficos (série, acima, folga, referência) seguram 4,5:1 sobre o cartão', (tema) => {
+    const t = TEMAS[tema]
+    const fracas = MARCAS.map((nome) => ({ nome, contraste: arredondar(contraste(t[nome], t.card)) }))
+      .filter((m) => !(m.contraste >= CONTRASTE_MINIMO))
+    expect(fracas).toEqual([])
+  })
+
+  it.each(Object.keys(TEMAS))('no %s, positivo e destrutivo como texto da variação dos cartões seguram 4,5:1 sobre o cartão', (tema) => {
+    const t = TEMAS[tema]
+    const fracas = ['positive', 'destructive', 'muted-foreground'].map((nome) => ({ nome, contraste: arredondar(contraste(t[nome], t.card)) }))
+      .filter((m) => !(m.contraste >= CONTRASTE_MINIMO))
+    expect(fracas).toEqual([])
+  })
+
   it('no claro o azul cheio é o próprio --primary; no escuro, um azul que segura o branco (o --primary de lá não segura)', () => {
     expect(CLARO['primary-cheio']).toBe('var(--primary)')
     expect(contraste('#ffffff', TEMAS.escuro.primary)).toBeLessThan(CONTRASTE_MINIMO)

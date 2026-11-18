@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { descreverPeriodo, fimDoMes, lerPeriodo, paraEndereco, periodoAoTrocar, somarDias, validarPeriodo } from './periodo'
+import { descreverPeriodo, fimDoMes, lerPeriodo, paraEndereco, periodoAoTrocar, rotuloDaComparacao, somarDias, validarPeriodo } from './periodo'
 
 const HOJE = '2026-11-17'
 const ler = (busca) => lerPeriodo(new URLSearchParams(busca), HOJE)
@@ -65,5 +65,18 @@ describe('periodo', () => {
   it('descreve o período em dias', () => {
     expect(descreverPeriodo('2026-10-19', '2026-11-17')).toBe('19/10/2026 a 17/11/2026')
     expect(descreverPeriodo('2026-10-19', '2026-10-19')).toBe('19/10/2026')
+  })
+
+  it('rotuloDaComparacao: as quatro formas do período anterior (o banco manda de, até e a forma), inclusive dezembro do ano anterior', () => {
+    expect(rotuloDaComparacao({ de: '2026-09-01', ate: '2026-09-30', forma: 'mes' })).toBe('vs set/26')
+    expect(rotuloDaComparacao({ de: '2025-12-01', ate: '2025-12-31', forma: 'mes' })).toBe('vs dez/25')
+    expect(rotuloDaComparacao({ de: '2026-10-01', ate: '2026-10-17', forma: 'mes_parcial' })).toBe('vs 1–17 de out.')
+    expect(rotuloDaComparacao({ de: '2025-12-01', ate: '2025-12-17', forma: 'mes_parcial' })).toBe('vs 1–17 de dez.')
+    expect(rotuloDaComparacao({ de: '2026-10-01', ate: '2026-10-01', forma: 'mes_parcial' })).toBe('vs 1 de out.')
+    expect(rotuloDaComparacao({ de: '2025-01-01', ate: '2025-11-17', forma: 'ano_anterior' })).toBe('vs mesmo período de 2025')
+    expect(rotuloDaComparacao({ de: '2026-09-18', ate: '2026-10-17', forma: 'dias_antes' })).toBe('vs 18/09 a 17/10')
+    expect(rotuloDaComparacao({ de: '2026-11-16', ate: '2026-11-16', forma: 'dias_antes' })).toBe('vs 16/11')
+    // Anos diferentes: com o ano, para não ficar ambíguo.
+    expect(rotuloDaComparacao({ de: '2025-12-18', ate: '2026-01-16', forma: 'dias_antes' })).toBe('vs 18/12/2025 a 16/01/2026')
   })
 })
