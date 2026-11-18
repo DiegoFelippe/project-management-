@@ -74,6 +74,15 @@ function celular(sim) {
   })))
 }
 
+// Tela de `px` de largura: cada (min-width: N px) vale quando N <= px.
+function largura(px) {
+  vi.stubGlobal('matchMedia', vi.fn((consulta) => ({
+    matches: px >= Number(consulta.match(/min-width:\s*(\d+)px/)?.[1] ?? 0), media: consulta,
+    addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  })))
+}
+const bolinha = (chip) => chip.querySelector('[data-bolinha]')
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -100,11 +109,15 @@ afterEach(() => {
 })
 
 describe('Calendário: consultor (visão privada)', () => {
-  it('lê só o mês visível, sem filtro de consultor nem de consultoria, e o chip tem a cor do evento', async () => {
+  it('lê só o mês visível, sem filtro de consultor nem de consultoria; o chip é do tipo, com a cor do evento na bolinha', async () => {
     tela(consultor)
     const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
     const chip = await within(grade).findByRole('button', { name: /Kickoff Alfa/ })
-    expect(chip).toHaveStyle({ backgroundColor: '#047857' })
+    // O tipo manda no chip (reunião com cliente, compromisso) e a cor escolhida vira a bolinha (auditoria, M2).
+    expect(chip).toHaveClass('bg-evento-reuniao')
+    expect(chip).not.toHaveStyle({ backgroundColor: '#047857' })
+    expect(bolinha(chip)).toHaveStyle({ backgroundColor: '#047857' })
+    expect(within(grade).getByRole('button', { name: /Planejamento interno/ })).toHaveClass('bg-evento-compromisso')
     expect(chip).toHaveAccessibleName(/com Meet/)
     expect(screen.queryByLabelText('Consultor')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Consultoria')).not.toBeInTheDocument()
@@ -144,6 +157,11 @@ describe('Calendário: consultor (visão privada)', () => {
     expect(within(detalhe).getByText('Consciência Negra')).toBeInTheDocument()
     expect(within(detalhe).getByText('Planejamento interno')).toBeInTheDocument()
     expect(within(detalhe).getByText('14:00 – 15:00')).toBeInTheDocument()
+    const reuniao = within(detalhe).getByRole('button', { name: /Kickoff Alfa/ })
+    expect(reuniao).toHaveClass('bg-evento-reuniao')
+    expect(bolinha(reuniao)).toHaveStyle({ backgroundColor: '#047857' })
+    expect(within(detalhe).getByRole('button', { name: /Planejamento interno/ })).toHaveClass('bg-evento-compromisso')
+    expect(within(detalhe).getByText('Consciência Negra')).toHaveClass('bg-evento-feriado')
     const proximos = screen.getByRole('region', { name: 'Próximos 7 dias' })
     expect(within(proximos).getByRole('button', { name: /Kickoff Alfa/ })).toBeInTheDocument()
     expect(eventosDoPeriodo).toHaveBeenCalledTimes(1)
@@ -252,19 +270,131 @@ describe('Calendário: visões e períodos', () => {
   })
 })
 
+describe('Calendário: chips pelo tipo e alvos (auditoria, M2)', () => {
+  it('a legenda tem a amostra de cada tipo, a mesma dos chips', async () => {
+    tela(consultor)
+    await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    const legenda = screen.getByRole('list', { name: 'Legenda' })
+    const amostras = within(legenda).getAllByRole('listitem').map((item) => [item.textContent, item.querySelector('[data-amostra]')?.className])
+    expect(amostras.map(([texto]) => texto)).toEqual(['Reuniões com cliente', 'Compromissos', 'Ausências', 'Feriados'])
+    expect(amostras[0][1]).toContain('bg-evento-reuniao')
+    expect(amostras[1][1]).toContain('bg-evento-compromisso')
+    expect(amostras[2][1]).toContain('listras-de-ausencia')
+    expect(amostras[3][1]).toContain('bg-evento-feriado')
+  })
+
+  it('o chip do mês tem 24 px no computador; no toque e no celular o alvo é o dia (o chip não é um alvo pequeno)', async () => {
+    tela(consultor)
+    const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    const chip = await within(grade).findByRole('button', { name: /Kickoff Alfa/ })
+    expect(chip).toHaveClass('min-h-6', 'pointer-coarse:hidden', 'max-sm:hidden')
+    // Na semana e nos próximos 7 dias o chip é o alvo: 44 px no toque.
+    expect(within(screen.getByRole('region', { name: 'Próximos 7 dias' })).getByRole('button', { name: /Kickoff Alfa/ }).className)
+      .toContain('pointer-coarse:min-h-11')
+  })
+
+  it('o texto do chip não fica esmaecido (contraste de 4,5:1 vale para a hora também)', async () => {
+    tela(consultor)
+    const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    await within(grade).findByRole('button', { name: /Kickoff Alfa/ })
+    for (const regiao of ['Próximos 7 dias', 'Detalhe do dia']) {
+      for (const el of screen.getByRole('region', { name: regiao }).querySelectorAll('*')) {
+        expect(el.getAttribute('class') ?? '', regiao).not.toMatch(/(?:^|\s)opacity-(?:[1-9]\d)(?:\s|$)/)
+      }
+    }
+  })
+})
+
+describe('Calendário: detalhe do dia ao lado e visão Agenda (auditoria, M3 e R5)', () => {
+  afterEach(() => {
+    delete Element.prototype.scrollIntoView
+  })
+
+  it('no Mês, a partir de 1280 px: o mês em dois terços e, à direita, o detalhe do dia em cima e os próximos 7 dias embaixo', async () => {
+    tela(consultor)
+    const calendario = await screen.findByRole('region', { name: 'Calendário' })
+    const detalhe = screen.getByRole('region', { name: 'Detalhe do dia' })
+    const proximos = screen.getByRole('region', { name: 'Próximos 7 dias' })
+    const lado = detalhe.parentElement
+    expect(calendario).toHaveClass('xl:col-span-2')
+    expect(lado).toBe(proximos.parentElement)
+    expect(lado).toHaveClass('xl:grid-cols-1')
+    expect(lado.parentElement).toBe(calendario.parentElement)
+    expect(lado.parentElement).toHaveClass('xl:grid-cols-3')
+    expect(detalhe.compareDocumentPosition(proximos) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('na Semana o detalhe fica embaixo, em toda a largura (a semana precisa das 7 colunas)', async () => {
+    const user = userEvent.setup()
+    tela(consultor)
+    await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    await user.click(screen.getByRole('button', { name: 'Semana' }))
+    expect(await screen.findByText('15 a 21 de novembro de 2026')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Calendário' })).not.toHaveClass('xl:col-span-2')
+    expect(screen.getByRole('region', { name: 'Detalhe do dia' }).parentElement).not.toHaveClass('xl:grid-cols-1')
+  })
+
+  it('abaixo de 1280 px, clicar num dia rola até o detalhe; andar pelas setas não rola a página', async () => {
+    largura(1024)
+    const rolar = vi.fn()
+    Element.prototype.scrollIntoView = rolar
+    const user = userEvent.setup()
+    tela(consultor)
+    const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    await user.click(within(grade).getByRole('gridcell', { name: /^20 de novembro/ }))
+    expect(rolar).toHaveBeenCalledTimes(1)
+    expect(rolar.mock.contexts[0]).toBe(screen.getByRole('region', { name: 'Detalhe do dia' }))
+    await user.keyboard('{ArrowRight}')
+    expect(within(grade).getByRole('gridcell', { name: /^21 de novembro/ })).toHaveFocus()
+    expect(rolar).toHaveBeenCalledTimes(1)
+  })
+
+  it('de 1280 px para cima, o detalhe já está ao lado: clicar no dia não rola a página', async () => {
+    largura(1440)
+    const rolar = vi.fn()
+    Element.prototype.scrollIntoView = rolar
+    const user = userEvent.setup()
+    tela(consultor)
+    const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    await user.click(within(grade).getByRole('gridcell', { name: /^20 de novembro/ }))
+    expect(within(screen.getByRole('region', { name: 'Detalhe do dia' })).getByText('20 de novembro')).toBeInTheDocument()
+    expect(rolar).not.toHaveBeenCalled()
+  })
+
+  it('a dica do mês não diz mais "abaixo" (a partir de 1280 px o detalhe fica ao lado)', async () => {
+    tela(consultor)
+    await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    expect(screen.getByText('Clique num dia para ver os detalhes · dois cliques criam um evento')).toBeInTheDocument()
+  })
+
+  it('na visão Agenda, que já lista tudo, não repete os eventos: sem o detalhe do dia nem os próximos 7 dias', async () => {
+    celular(true)
+    const user = userEvent.setup()
+    tela(consultor)
+    const agenda = await screen.findByRole('region', { name: 'Agenda dos próximos 60 dias' })
+    expect(await within(agenda).findByRole('button', { name: /Kickoff Alfa/ })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Detalhe do dia' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Próximos 7 dias' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Mês' }))
+    expect(await screen.findByRole('region', { name: 'Detalhe do dia' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Próximos 7 dias' })).toBeInTheDocument()
+  })
+})
+
 describe('Calendário: gestão e central', () => {
   it('a gestora filtra por consultor e o pedido ao banco leva o filtro; sem filtro, o chip tem a cor do consultor', async () => {
     const user = userEvent.setup()
     tela(gestora)
     const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
-    expect(await within(grade).findByRole('button', { name: /Kickoff Alfa/ })).toHaveStyle({ backgroundColor: '#16a34a' })
+    expect(bolinha(await within(grade).findByRole('button', { name: /Kickoff Alfa/ }))).toHaveStyle({ backgroundColor: '#16a34a' })
     expect(screen.queryByLabelText('Consultoria')).not.toBeInTheDocument()
     await escolherNoSeletor(user, 'Consultor', 'Beto Lima')
     await waitFor(() => expect(eventosDoPeriodo).toHaveBeenLastCalledWith({ ...MES, consultorId: 'p2', consultoriaId: undefined, clienteId: undefined }))
     expect(ausenciasDoPeriodo).toHaveBeenLastCalledWith(expect.objectContaining({ consultorId: 'p2' }))
     expect(consultoresPorOcupacao).toHaveBeenCalledWith(expect.objectContaining({ consultoriaId: 's1' }))
-    // Com um consultor só, é a agenda dele: a cor volta a ser a do evento.
-    expect(await within(grade).findByRole('button', { name: /Kickoff Alfa/ })).toHaveStyle({ backgroundColor: '#047857' })
+    // Com um consultor só, é a agenda dele: a bolinha volta a ser a cor do evento; o chip continua o da reunião.
+    await waitFor(() => expect(bolinha(within(grade).getByRole('button', { name: /Kickoff Alfa/ }))).toHaveStyle({ backgroundColor: '#047857' }))
+    expect(within(grade).getByRole('button', { name: /Kickoff Alfa/ })).toHaveClass('bg-evento-reuniao')
   })
 
   it('o filtro de cliente vai ao banco', async () => {

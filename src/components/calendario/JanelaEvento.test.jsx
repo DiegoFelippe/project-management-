@@ -206,6 +206,33 @@ describe('JanelaEvento: novo', () => {
     expect(screen.queryByRole('group', { name: 'Sugestão de convidado' })).not.toBeInTheDocument()
   })
 
+  it('a prévia é o chip do calendário: o tipo (compromisso sem cliente, reunião com cliente) e a cor na bolinha (auditoria, M2)', async () => {
+    const user = userEvent.setup()
+    janela({ perfil: consultora, evento: null })
+    const previa = screen.getByText('Como aparece no calendário').parentElement
+    const bolinha = () => previa.querySelector('[data-bolinha]')
+    expect(bolinha().parentElement).toHaveClass('bg-evento-compromisso')
+    expect(bolinha().parentElement).toHaveTextContent('Título do evento')
+    expect(bolinha()).toHaveStyle({ backgroundColor: '#2563eb' })
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Cor do evento' })).getByRole('radio', { name: 'Verde' }))
+    expect(bolinha()).toHaveStyle({ backgroundColor: '#047857' })
+    await escolherNoSeletor(user, 'Cliente', 'Provedor Alfa')
+    expect(bolinha().parentElement).toHaveClass('bg-evento-reuniao')
+    expect(within(previa).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('atalhos do Quando (Hoje, Amanhã, Semana que vem): 44 px e 8 px entre eles no toque; texto azul firme (auditoria, G5)', () => {
+    janela({ perfil: consultora, evento: null })
+    const atalhos = screen.getByRole('group', { name: 'Atalhos da data' })
+    expect(atalhos.className).toContain('pointer-coarse:gap-2')
+    const botoes = within(atalhos).getAllByRole('button')
+    expect(botoes.map((b) => b.textContent)).toEqual(['Hoje', 'Amanhã', 'Semana que vem'])
+    for (const b of botoes) expect(b.className).toContain('pointer-coarse:min-h-11')
+    const solto = botoes.find((b) => b.getAttribute('aria-pressed') === 'false')
+    expect(solto).toHaveClass('text-primary-texto')
+    expect(solto).not.toHaveClass('text-primary')
+  })
+
   it('o meu Google pede para reconectar: sem Meet e com o botão Reconectar Google', async () => {
     const user = userEvent.setup()
     const { aoConectarGoogle } = janela({

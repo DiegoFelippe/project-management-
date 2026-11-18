@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import VerificacaoDoPerfil from '@/components/verificacao/VerificacaoDoPerfil'
-import { corDe } from '@/lib/cores'
+import { CORES_DO_AVATAR, corDe } from '@/lib/cores'
 import { formatarHoras } from '@/lib/horas'
 import { urlPublica } from '@/lib/imagem'
 import { hoje } from '@/lib/mes'
@@ -43,6 +43,9 @@ const CAMPO_DO_ERRO = {
 }
 
 const OPCOES_DE_UF = UFS.map((uf) => ({ valor: uf, rotulo: uf }))
+// Cor do avatar: as 8 da paleta (o banco guarda o #hex) e a automática (null: a que o app calcula pela pessoa).
+const CORES_DA_FICHA = CORES_DO_AVATAR.map((c) => ({ valor: c.valor, nome: c.nome, fundo: c.valor }))
+const COR_AUTOMATICA = { rotulo: 'Automática', titulo: 'Cor automática: a que o sistema escolhe para a pessoa' }
 const comoTexto = (valor) => String(valor ?? '')
 
 const Bloco = SecaoFormulario
@@ -522,7 +525,7 @@ export default function FichaDoConsultor({
                   {estado && estado !== 'Ativo' && <Badge variant={estado === 'Desativado' ? 'outline' : estado === 'Senha provisória' ? 'secondary' : 'notice'}>{estado}</Badge>}
                   {dados.papel && <Badge variant="outline">{rotuloDoPapel(dados.papel)}</Badge>}
                 </div>
-                {semFoto && <SeletorDeCor valor={corMarcada} aoMudar={setCorEscolhida} />}
+                {semFoto && <SeletorDeCor rotulo="Cor do avatar" cores={CORES_DA_FICHA} automatica={COR_AUTOMATICA} valor={corMarcada} aoMudar={setCorEscolhida} />}
               </div>
             </div>
             <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">

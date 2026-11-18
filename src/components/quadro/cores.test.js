@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { corDoTextoSobre } from '@/lib/cores'
+import { CONTRASTE_MINIMO, contraste } from '@/lib/contraste'
 import { atalhosDoPrazo, corDaColuna, CORES_DAS_COLUNAS, OPCOES_DE_PRIORIDADE, PRIORIDADES, seloDoPrazo } from './cores'
 
 describe('cores das colunas', () => {
@@ -6,6 +8,17 @@ describe('cores das colunas', () => {
     expect(CORES_DAS_COLUNAS.map((c) => c.nome)).toEqual([
       'Cinza', 'Índigo', 'Azul', 'Turquesa', 'Verde', 'Amarelo', 'Laranja', 'Vermelho', 'Rosa', 'Roxo',
     ])
+  })
+
+  it('o contador da coluna com cor escolhida segura 4,5:1: texto pelo corDoTextoSobre sobre a cor (auditoria de 17/11)', () => {
+    const fracas = CORES_DAS_COLUNAS
+      .map((c) => ({ nome: c.nome, contraste: contraste(corDoTextoSobre(c.solido), c.solido) }))
+      .filter((c) => !(c.contraste >= CONTRASTE_MINIMO))
+    expect(fracas).toEqual([])
+  })
+
+  it('o contador da cor automática tem o texto no tom 700 no claro (o 600 ficava abaixo de 4,5:1 sobre o tom 50)', () => {
+    for (const c of CORES_DAS_COLUNAS) expect(c.tom, c.nome).toMatch(/(?:^| )text-[a-z]+-700(?: |$)/)
   })
 
   it('a cor escolhida vale; sem cor, a automática pela posição', () => {

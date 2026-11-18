@@ -1,54 +1,66 @@
-// Cor do avatar (fundo das iniciais): 8 amostras e a opção "Automática" num radiogroup, como no Hub. A escolhida ganha
-// o check branco e o anel na própria cor. `valor` é a cor (#hex) ou null = automática (a que o app calcula pela pessoa);
-// aoMudar recebe o #hex ou null. Setas e Home/End mudam a escolha; só a escolhida entra na ordem do Tab.
+// Seletor de cor, um só para o app (auditoria de 17/11, C6): a cor do avatar (FichaDoConsultor), a do evento (JanelaEvento)
+// e a da coluna do quadro. As amostras de `cores` num radiogroup, como no Hub: a escolhida ganha o check e o anel.
+// - cores: [{ valor, nome, fundo?: '#hex' (pinta pelo style; o check segue o corDoTextoSobre), classe?: 'bg-…' }].
+// - automatica ({ rotulo, titulo?, classe? }): a opção sem cor (valor null) no fim, com a bolinha da cor que valeria.
+// - mostrarRotulo={false}: o rótulo fica só para o leitor de tela (a seção em volta já diz "Cor").
+// - Setas e Home/End andam entre as opções e só a escolhida entra na ordem do Tab. marcarAoAndar (padrão): a seta já
+//   escolhe (o formulário grava depois); false (a coluna do quadro, que grava na hora): a seta só leva o foco, e Enter,
+//   espaço ou clique escolhem.
 import { Check } from 'lucide-react'
 import { useId } from 'react'
-import { CORES_DO_AVATAR } from '@/lib/cores'
+import { corDoTextoSobre } from '@/lib/cores'
 import { cn } from '@/lib/utils'
 
-export default function SeletorDeCor({ valor = null, aoMudar, rotulo = 'Cor do avatar' }) {
+const ANIMACAO = 'outline-none transition-[box-shadow,translate,scale,background-color,border-color] hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-card'
+
+export default function SeletorDeCor({
+  cores, valor = null, aoMudar, rotulo, mostrarRotulo = true, automatica = null, marcarAoAndar = true, className,
+}) {
   const id = useId()
-  // As opções na ordem do teclado: as 8 cores e, por último, a automática (valor null).
-  const opcoes = [...CORES_DO_AVATAR.map((c) => c.valor), null]
-  const indiceAtual = Math.max(0, opcoes.findIndex((o) => o === (valor || null)))
-  const idDe = (opcao) => `${id}-${opcao ? opcao.slice(1) : 'automatica'}`
+  const opcoes = automatica ? [...cores.map((c) => c.valor), null] : cores.map((c) => c.valor)
+  const escolhida = opcoes.indexOf(valor ?? null)
+  const naOrdemDoTab = Math.max(0, escolhida)
+  const idDe = (indice) => `${id}-${indice}`
 
   function teclar(evento, indice) {
     const total = opcoes.length
     const destino = { ArrowRight: indice + 1, ArrowDown: indice + 1, ArrowLeft: indice - 1, ArrowUp: indice - 1, Home: 0, End: total - 1 }[evento.key]
     if (destino === undefined) return
     evento.preventDefault()
-    const opcao = opcoes[(destino + total) % total]
-    aoMudar(opcao)
-    document.getElementById(idDe(opcao))?.focus()
+    const proximo = (destino + total) % total
+    if (marcarAoAndar) aoMudar(opcoes[proximo])
+    document.getElementById(idDe(proximo))?.focus()
   }
 
+  const comum = (indice) => ({
+    id: idDe(indice), type: 'button', role: 'radio', 'aria-checked': indice === escolhida, tabIndex: indice === naOrdemDoTab ? 0 : -1,
+    onClick: () => aoMudar(opcoes[indice]), onKeyDown: (e) => teclar(e, indice),
+  })
+
   return (
-    <div className="grid gap-2">
-      <span id={`${id}-rotulo`} className="text-corpo font-medium">{rotulo}</span>
+    <div className={cn('grid gap-2', className)}>
+      <span id={`${id}-rotulo`} className={mostrarRotulo ? 'text-corpo font-medium' : 'sr-only'}>{rotulo}</span>
       <div role="radiogroup" aria-labelledby={`${id}-rotulo`} className="flex flex-wrap items-center gap-2.5">
-        {CORES_DO_AVATAR.map((cor, i) => {
-          const escolhida = i === indiceAtual
+        {cores.map((cor, i) => {
+          const marcada = i === escolhida
           return (
-            <button key={cor.valor} id={idDe(cor.valor)} type="button" role="radio" aria-checked={escolhida} aria-label={cor.nome}
-              title={cor.nome} tabIndex={escolhida || (indiceAtual === opcoes.length - 1 && i === 0) ? 0 : -1}
-              onClick={() => aoMudar(cor.valor)} onKeyDown={(e) => teclar(e, i)}
-              style={{ backgroundColor: cor.valor, '--tw-ring-color': cor.valor }}
-              className={cn('botao-animado grid size-8 place-items-center rounded-xl text-white outline-none transition-[box-shadow,translate,scale] hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-offset-2',
-                escolhida && 'scale-105 ring-2 ring-offset-2')}>
-              {escolhida && <Check className="size-4" strokeWidth={3} aria-hidden="true" />}
+            <button key={String(cor.valor)} {...comum(i)} aria-label={cor.nome} title={cor.nome}
+              style={cor.fundo ? { backgroundColor: cor.fundo, color: corDoTextoSobre(cor.fundo) } : undefined}
+              className={cn('botao-animado', ANIMACAO, 'grid size-8 shrink-0 place-items-center rounded-full pointer-coarse:size-11', cor.classe, !cor.fundo && 'text-white',
+                marcada && 'scale-105 ring-2 ring-foreground ring-offset-2 ring-offset-card')}>
+              {marcada && <Check className="size-4" strokeWidth={3} aria-hidden="true" />}
             </button>
           )
         })}
-        {(() => {
-          const escolhida = indiceAtual === opcoes.length - 1
+        {automatica && (() => {
+          const indice = opcoes.length - 1
+          const marcada = indice === escolhida
           return (
-            <button id={idDe(null)} type="button" role="radio" aria-checked={escolhida} tabIndex={escolhida ? 0 : -1}
-              title="Cor automática: a que o sistema escolhe para a pessoa" onClick={() => aoMudar(null)}
-              onKeyDown={(e) => teclar(e, opcoes.length - 1)}
-              className={cn('botao-animado h-8 rounded-xl border px-3 text-rotulo font-medium outline-none transition-[box-shadow,translate,scale,border-color] hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50',
-                escolhida ? 'border-primary bg-primary/5 ring-primary/15 ring-2' : 'bg-card hover:border-primary/40')}>
-              Automática
+            <button {...comum(indice)} title={automatica.titulo}
+              className={cn('botao-animado', ANIMACAO, 'inline-flex h-8 items-center gap-2 rounded-full border px-3 text-rotulo font-medium pointer-coarse:min-h-11',
+                marcada ? 'border-primary bg-primary/10 text-foreground ring-2 ring-primary/15' : 'bg-card text-foreground hover:border-primary/40')}>
+              {automatica.classe && <span className={cn('size-3 shrink-0 rounded-full opacity-70', automatica.classe)} aria-hidden="true" />}
+              {automatica.rotulo}
             </button>
           )
         })()}

@@ -25,8 +25,8 @@ function LogoDoGoogle({ conectado }) {
   )
 }
 
-// "Mostrar: tudo" / "Mostrar: 3 de 4": caixas com a bolinha de cada tipo (os `tipos` que a barra oferece), numa lista
-// que abre sobre o botão.
+// "Mostrar: tudo" / "Mostrar: 3 de 4": caixas com a amostra de cada tipo (a mesma dos chips e da legenda; os `tipos`
+// que a barra oferece), numa lista que abre sobre o botão.
 function MostrarTipos({ tipos, mostrar, aoMudar }) {
   const [aberto, setAberto] = useState(false)
   const botao = useRef(null)
@@ -35,8 +35,8 @@ function MostrarTipos({ tipos, mostrar, aoMudar }) {
     <>
       <Button ref={botao} type="button" variant="outline" size="sm" aria-expanded={aberto} aria-haspopup="dialog" onClick={() => setAberto((a) => !a)}
         className={cn(escondidos > 0 && 'border-primary/40 bg-accent text-accent-foreground')}>
-        <span className="flex -space-x-1" aria-hidden="true">
-          {tipos.map((t) => <span key={t.chave} className={cn('size-2.5 rounded-full ring-2 ring-card', t.bolinha)} />)}
+        <span className="flex -space-x-1.5" aria-hidden="true">
+          {tipos.map((t) => <span key={t.chave} className={t.amostra} />)}
         </span>
         {escondidos === 0 ? 'Mostrar: tudo' : `Mostrar: ${tipos.length - escondidos} de ${tipos.length}`}
         <ChevronDown className={cn('size-3.5 transition-transform', aberto && 'rotate-180')} aria-hidden="true" />
@@ -50,7 +50,7 @@ function MostrarTipos({ tipos, mostrar, aoMudar }) {
                 className="rounded-lg px-2 py-1.5 hover:bg-muted/60"
                 rotulo={(
                   <span className="inline-flex items-center gap-2">
-                    <span className={cn('size-2.5 rounded-full', t.bolinha, !mostrar[t.chave] && 'opacity-30')} aria-hidden="true" />
+                    <span className={cn(t.amostra, !mostrar[t.chave] && 'opacity-30')} aria-hidden="true" />
                     <span className={cn('text-rotulo', !mostrar[t.chave] && 'text-muted-foreground line-through')}>{t.rotulo}</span>
                   </span>
                 )} />

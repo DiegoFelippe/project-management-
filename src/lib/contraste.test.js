@@ -167,11 +167,6 @@ function varrer(codigo) {
   return [...achados]
 }
 
-// O lote D está trocando este trecho do JanelaEvento (tire daqui quando trocar); só o trecho exato passa, o resto do arquivo não.
-const PENDENTES_DO_LOTE_D = [
-  "data === a.dia ? 'bg-primary-cheio text-primary-foreground' : 'bg-primary/10 text-primary hover:bg-primary/15'",
-]
-
 describe('varredura das combinações sem contraste', () => {
   it('pega texto branco no bg-primary e text-primary no azul-claro, na mesma linha, em cn() quebrado e com variantes', () => {
     expect(varrer("'bg-primary text-primary-foreground'")).toHaveLength(1)
@@ -192,8 +187,7 @@ describe('varredura das combinações sem contraste', () => {
   it('nenhuma tela usa essas combinações', () => {
     const achados = []
     for (const arquivo of arquivos(join(process.cwd(), 'src'))) {
-      let codigo = readFileSync(arquivo, 'utf8')
-      for (const trecho of PENDENTES_DO_LOTE_D) codigo = codigo.replace(trecho, "''")
+      const codigo = readFileSync(arquivo, 'utf8')
       achados.push(...varrer(codigo).map((a) => `${arquivo.split('/src/')[1]}:${a}`))
     }
     expect(achados).toEqual([])

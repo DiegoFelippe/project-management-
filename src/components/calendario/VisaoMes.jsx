@@ -7,11 +7,13 @@ import { TIPOS } from './cores'
 const CHIPS_POR_DIA = 3
 
 // Mês, como no Hub: grade de 7 colunas começando no domingo, até 3 chips por dia e "+N", hoje em destaque, fora do mês
-// apagado. Clicar seleciona o dia (o detalhe aparece embaixo), dois cliques criam evento. Setas andam entre os dias.
-// No celular as células encolhem e os chips viram faixas de cor, para a grade caber em 360 px sem rolar de lado.
-// `detalheAbaixo` false (a agenda do cliente, que tem a tabela dos eventos no lugar do detalhe): a dica não o promete.
+// apagado. Clicar (ou Enter) escolhe o dia: aoSelecionar(dia, { escolheu: true }), e o detalhe dele aparece (ao lado a
+// partir de 1280 px; embaixo, e a página rola até ele, nas telas menores). Dois cliques criam evento. Setas andam entre
+// os dias (aoSelecionar(dia), sem rolar). No celular as células encolhem e os chips viram faixas de cor, para a grade
+// caber em 360 px sem rolar de lado; no toque o alvo é o dia. A legenda mostra a amostra de cada tipo, a mesma dos chips.
+// `comDetalhe` false (a agenda do cliente, que não tem o detalhe do dia): a dica não o promete.
 export default function VisaoMes({
-  dias, mes, rotulo, porDia, hoje, selecionado, deVariasPessoas, mostrar, detalheAbaixo = true, aoSelecionar, aoCriar, aoAbrir,
+  dias, mes, rotulo, porDia, hoje, selecionado, deVariasPessoas, mostrar, comDetalhe = true, aoSelecionar, aoCriar, aoAbrir,
 }) {
   const base = useId()
   const semanas = Array.from({ length: dias.length / 7 }, (_, i) => dias.slice(i * 7, i * 7 + 7))
@@ -20,7 +22,7 @@ export default function VisaoMes({
   function teclar(e, dia) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      aoSelecionar(dia)
+      aoSelecionar(dia, { escolheu: true })
       return
     }
     const passo = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key]
@@ -57,7 +59,7 @@ export default function VisaoMes({
                 <div key={dia} id={`${base}-${dia}`} role="gridcell" tabIndex={dia === focavel ? 0 : -1}
                   aria-label={`${nomeDoDia(dia)}${ehHoje ? ', hoje' : ''}${itens.length ? `, ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}` : ''}`}
                   aria-selected={escolhido} aria-current={ehHoje ? 'date' : undefined}
-                  onClick={() => aoSelecionar(dia)} onDoubleClick={aoCriar ? () => aoCriar(dia) : undefined} onKeyDown={(e) => teclar(e, dia)}
+                  onClick={() => aoSelecionar(dia, { escolheu: true })} onDoubleClick={aoCriar ? () => aoCriar(dia) : undefined} onKeyDown={(e) => teclar(e, dia)}
                   className={cn(
                     'min-h-16 min-w-0 cursor-pointer rounded-lg border p-0.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-24 sm:rounded-xl sm:p-1.5',
                     escolhido ? 'border-primary/30 bg-accent shadow-[0_0_0_3px] shadow-primary/10'
@@ -83,14 +85,16 @@ export default function VisaoMes({
         ))}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        {TIPOS.filter((t) => mostrar[t.chave]).map((t) => (
-          <span key={t.chave} className="inline-flex items-center gap-1.5 text-legenda text-muted-foreground">
-            <span className={cn('size-2 rounded-full', t.bolinha)} aria-hidden="true" />{t.rotulo}
-          </span>
-        ))}
-        {detalheAbaixo ? (
+        <ul aria-label="Legenda" className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          {TIPOS.filter((t) => mostrar[t.chave]).map((t) => (
+            <li key={t.chave} className="inline-flex items-center gap-1.5 text-legenda text-muted-foreground">
+              <span data-amostra="" className={t.amostra} aria-hidden="true" />{t.rotulo}
+            </li>
+          ))}
+        </ul>
+        {comDetalhe ? (
           <span className="text-legenda text-muted-foreground sm:ml-auto">
-            Clique num dia para ver os detalhes abaixo{aoCriar ? ' · dois cliques criam um evento' : ''}
+            Clique num dia para ver os detalhes{aoCriar ? ' · dois cliques criam um evento' : ''}
           </span>
         ) : aoCriar && <span className="text-legenda text-muted-foreground sm:ml-auto">Dois cliques num dia criam um evento</span>}
       </div>

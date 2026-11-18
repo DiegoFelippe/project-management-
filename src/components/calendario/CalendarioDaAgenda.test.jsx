@@ -400,7 +400,7 @@ describe('Calendário do menu (sem cliente)', () => {
     expect(await screen.findByRole('region', { name: 'Detalhe do dia' })).toBeInTheDocument()
     expect(visoes()).toEqual(['Mês', 'Semana', 'Agenda'])
     expect(screen.getByRole('region', { name: 'Próximos 7 dias' })).toBeInTheDocument()
-    expect(screen.getByText('Clique num dia para ver os detalhes abaixo · dois cliques criam um evento')).toBeInTheDocument()
+    expect(screen.getByText('Clique num dia para ver os detalhes · dois cliques criam um evento')).toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'Eventos do cliente' })).not.toBeInTheDocument()
     expect(eventosDoCliente).not.toHaveBeenCalled()
   })

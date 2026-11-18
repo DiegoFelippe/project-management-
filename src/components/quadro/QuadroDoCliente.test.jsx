@@ -123,6 +123,13 @@ const pronto = async () => {
   await waitFor(() => expect(ordem('Em andamento')).toEqual(['Configurar OLT']))
 }
 
+// Ações da coluna: um "⋯" por coluna (auditoria de 17/11, M5) com Renomear, Cor e, para a gestão, Apagar coluna.
+const acoesDaColuna = async (user, nome) => {
+  await user.click(screen.getByRole('button', { name: `Ações da coluna ${nome}` }))
+  return screen.getByRole('menu', { name: `Ações da coluna ${nome}` })
+}
+const naColuna = async (user, nome, acao) => user.click(within(await acoesDaColuna(user, nome)).getByRole('menuitem', { name: acao }))
+
 describe('aba Quadro: o que cada um vê', () => {
   it('barra de filtros, sem cartões de números abaixo (pedido do Diego, 17/11), e as colunas com os cartões', async () => {
     tela()
@@ -155,21 +162,44 @@ describe('aba Quadro: o que cada um vê', () => {
   })
 
   it('o consultor do cliente mexe: Novo cartão, Nova coluna, renomear e cor; apagar coluna não (é da gestão)', async () => {
+    const user = userEvent.setup()
     tela()
     await pronto()
     expect(screen.getByRole('button', { name: 'Novo cartão' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Nova coluna' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Renomear a coluna A fazer' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cor da coluna A fazer' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Apagar a coluna/ })).not.toBeInTheDocument()
+    const menu = await acoesDaColuna(user, 'A fazer')
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Renomear', 'Cor'])
     expect(screen.getByRole('button', { name: 'Arquivados' })).toBeInTheDocument()
   })
 
-  it('a gestão também apaga coluna', async () => {
+  it('cada coluna tem um "⋯" só, sempre à vista, no lugar dos três ícones (auditoria, M5)', async () => {
     vi.mocked(quadroDoCliente).mockResolvedValue({ ...QUADRO, pode_gerir: true })
     tela(gestora)
     await pronto()
-    expect(screen.getByRole('button', { name: 'Apagar a coluna A fazer' })).toBeInTheDocument()
+    for (const nome of ['A fazer', 'Em andamento', 'Concluído']) {
+      const coluna = screen.getByRole('region', { name: `Coluna ${nome}` })
+      expect(within(coluna).getByRole('button', { name: `Ações da coluna ${nome}` })).toHaveAttribute('aria-haspopup', 'menu')
+      expect(within(coluna).queryByRole('button', { name: /^(Renomear|Cor da coluna|Apagar a coluna)/ })).not.toBeInTheDocument()
+    }
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('o contador da coluna com cor escolhida tem texto com 4,5:1 sobre a cor (auditoria de 17/11)', async () => {
+    tela()
+    await pronto()
+    const contador = within(screen.getByRole('region', { name: 'Coluna Em andamento' })).getByTitle('1 cartão')
+    expect(contador).toHaveStyle({ backgroundColor: '#10b981', color: '#0f172a' })
+    expect(contador.className).not.toMatch(/text-white/)
+  })
+
+  it('a gestão também apaga coluna (Apagar coluna no menu, em vermelho)', async () => {
+    vi.mocked(quadroDoCliente).mockResolvedValue({ ...QUADRO, pode_gerir: true })
+    const user = userEvent.setup()
+    tela(gestora)
+    await pronto()
+    const menu = await acoesDaColuna(user, 'A fazer')
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Renomear', 'Cor', 'Apagar coluna'])
+    expect(within(menu).getByRole('menuitem', { name: 'Apagar coluna' })).toHaveClass('text-destructive')
   })
 
   it('a central só lê: sem Novo cartão, Nova coluna, ações nas colunas nem arrastar', async () => {
@@ -184,7 +214,7 @@ describe('aba Quadro: o que cada um vê', () => {
     expect(quadroDoCliente).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Novo cartão' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Nova coluna' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Renomear a coluna/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Ações da coluna/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Adicionar cartão/ })).not.toBeInTheDocument()
     // Um quadro só: sem o seletor de consultoria.
     expect(screen.queryByLabelText('Consultoria')).not.toBeInTheDocument()
@@ -708,8 +738,10 @@ describe('colunas', () => {
     const user = userEvent.setup()
     tela()
     await pronto()
-    await user.click(screen.getByRole('button', { name: 'Renomear a coluna A fazer' }))
+    await naColuna(user, 'A fazer', 'Renomear')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     const campo = screen.getByRole('textbox', { name: 'Nome da coluna' })
+    expect(campo).toHaveFocus()
     expect(campo).toHaveValue('A fazer')
     await user.clear(campo)
     await user.type(campo, 'Backlog{Enter}')
@@ -720,13 +752,15 @@ describe('colunas', () => {
     const user = userEvent.setup()
     tela()
     await pronto()
-    await user.click(screen.getByRole('button', { name: 'Cor da coluna Em andamento' }))
+    await naColuna(user, 'Em andamento', 'Cor')
     const painel = screen.getByRole('dialog', { name: 'Cor da coluna' })
     expect(within(painel).getAllByRole('radio')).toHaveLength(11)
     expect(within(painel).getByRole('radio', { name: 'Verde' })).toHaveAttribute('aria-checked', 'true')
+    // O foco entra no painel, na cor escolhida (o painel fica no fim da página: o Tab não chegaria nele).
+    expect(within(painel).getByRole('radio', { name: 'Verde' })).toHaveFocus()
     await user.click(within(painel).getByRole('radio', { name: 'Vermelho' }))
     expect(editarColuna).toHaveBeenCalledWith('col2', { cor: 7 })
-    await user.click(screen.getByRole('button', { name: 'Cor da coluna Em andamento' }))
+    await naColuna(user, 'Em andamento', 'Cor')
     await user.click(screen.getByRole('switch', { name: 'Coluna de concluídos' }))
     expect(editarColuna).toHaveBeenCalledWith('col2', { concluidos: true })
   })
@@ -736,7 +770,7 @@ describe('colunas', () => {
     const user = userEvent.setup()
     tela(gestora)
     await pronto()
-    await user.click(screen.getByRole('button', { name: 'Apagar a coluna Em andamento' }))
+    await naColuna(user, 'Em andamento', 'Apagar coluna')
     const janela = screen.getByRole('dialog', { name: 'Apagar a coluna Em andamento?' })
     expect(within(janela).getByLabelText('Para qual coluna')).toHaveTextContent('A fazer')
     await user.click(within(janela).getByRole('button', { name: 'Apagar coluna' }))
@@ -765,7 +799,7 @@ describe('recusas do banco relêem o quadro', () => {
     tela()
     await pronto()
     vi.mocked(quadroDoCliente).mockClear()
-    await user.click(screen.getByRole('button', { name: 'Renomear a coluna A fazer' }))
+    await naColuna(user, 'A fazer', 'Renomear')
     const campo = screen.getByRole('textbox', { name: 'Nome da coluna' })
     await user.clear(campo)
     await user.type(campo, 'Backlog{Enter}')
@@ -780,7 +814,7 @@ describe('recusas do banco relêem o quadro', () => {
     const user = userEvent.setup()
     tela(gestora)
     await pronto()
-    await user.click(screen.getByRole('button', { name: 'Apagar a coluna Em andamento' }))
+    await naColuna(user, 'Em andamento', 'Apagar coluna')
     vi.mocked(quadroDoCliente).mockClear()
     const janela = screen.getByRole('dialog', { name: 'Apagar a coluna Em andamento?' })
     await user.click(within(janela).getByRole('button', { name: 'Apagar coluna' }))
@@ -833,7 +867,7 @@ describe('tempo real', () => {
     vi.mocked(quadroDoCliente).mockReturnValueOnce(new Promise((pronto) => { leituraVelha = pronto }))
     await act(async () => avisar({ eventos: [{ motivo: 'reconectou' }], tudo: true, acesso: false, tabelas: [], colunas: [], cartoes: [] }))
     // Abrir "Apagar coluna" relê o quadro e atropela a leitura do "reler tudo".
-    await user.click(screen.getByRole('button', { name: 'Apagar a coluna Em andamento' }))
+    await naColuna(user, 'Em andamento', 'Apagar coluna')
     await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledTimes(3))
     expect(cartoesDoQuadro.mock.calls.map(([p]) => p.colunaId).sort()).toEqual(['col1', 'col2', 'col3'])
     await act(async () => leituraVelha({ ...QUADRO, pode_gerir: true }))

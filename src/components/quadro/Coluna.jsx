@@ -1,46 +1,38 @@
 import { useRef, useState } from 'react'
 import { Droppable } from '@hello-pangea/dnd'
-import { Check, ChevronsDown, CircleCheck, Loader2, Palette, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronsDown, CircleCheck, Loader2, Palette, Pencil, Plus, Trash2 } from 'lucide-react'
 import Chave from '@/components/campos/Chave'
 import Flutuante from '@/components/campos/Flutuante'
+import MenuDeAcoes from '@/components/comum/MenuDeAcoes'
+import SeletorDeCor from '@/components/comum/SeletorDeCor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CARTOES_POR_PAGINA } from '@/data/quadro'
+import { corDoTextoSobre } from '@/lib/cores'
 import { cn } from '@/lib/utils'
 import CartaoNoQuadro from './CartaoNoQuadro'
 import { CORES_DAS_COLUNAS, corDaColuna, CORPO_NEUTRO } from './cores'
 
-const BOTAO_PERIGO = 'hover:bg-destructive/10 hover:text-destructive'
 const contar = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
 
-// Painel da cor: as 10 cores e "Automática" (radios; um clique grava na hora, para todos que veem o quadro) e a chave
-// "Coluna de concluídos" (prazo não conta como atrasado), como no Mochi.
+// As 10 cores das colunas no SeletorDeCor (o banco guarda o número, 0 a 9; null = a automática pela posição).
+const CORES_DO_SELETOR = CORES_DAS_COLUNAS.map((c, i) => ({ valor: i, nome: c.nome, fundo: c.solido }))
+
+// Painel da cor: as 10 cores e "Automática" (um clique grava na hora, para todos que veem o quadro; as setas só andam,
+// para não gravar a cada tecla) e a chave "Coluna de concluídos" (prazo não conta como atrasado), como no Mochi. Abre
+// com o foco na cor escolhida (o painel fica no fim da página: o Tab não chegaria nele).
 function PainelDaCor({ ancora, coluna, automatica, aoFechar, aoMudarCor, aoMudarConcluidos }) {
   const escolher = (cor) => {
     aoFechar()
+    ancora.current?.focus()
     if ((cor ?? null) !== (coluna.cor ?? null)) aoMudarCor(cor)
   }
   return (
-    <Flutuante ancora={ancora} aoFechar={aoFechar} largura={240} altura={250} rotulo="Cor da coluna" className="p-3">
-      <p className="mb-2 text-rotulo font-semibold text-muted-foreground">Cor da coluna</p>
-      <div role="radiogroup" aria-label="Cor da coluna">
-        <div className="grid grid-cols-5 gap-2">
-          {CORES_DAS_COLUNAS.map((cor, i) => (
-            <button key={cor.nome} type="button" role="radio" aria-checked={coluna.cor === i} aria-label={cor.nome} title={cor.nome}
-              onClick={() => escolher(i)}
-              className={cn('botao-animado grid size-8 place-items-center rounded-full text-white outline-none transition-[translate,scale,box-shadow] hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-card',
-                cor.ponto, coluna.cor === i && 'ring-2 ring-foreground ring-offset-2 ring-offset-card')}>
-              {coluna.cor === i && <Check className="size-4" strokeWidth={3} aria-hidden="true" />}
-            </button>
-          ))}
-        </div>
-        <button type="button" role="radio" aria-checked={coluna.cor == null} onClick={() => escolher(null)}
-          className={cn('botao-animado mt-2.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-rotulo font-medium outline-none transition-[background-color,translate,scale] hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/50',
-            coluna.cor == null ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-accent')}>
-          <span className={cn('size-4 shrink-0 rounded-full opacity-60', CORES_DAS_COLUNAS[automatica].ponto)} aria-hidden="true" />
-          Automática, pela posição
-        </button>
-      </div>
+    <Flutuante ancora={ancora} aoFechar={aoFechar} largura={248} altura={260} rotulo="Cor da coluna" className="p-3"
+      aoAbrir={(painel) => painel.querySelector('[role="radio"][tabindex="0"]')?.focus()}>
+      <p className="mb-2 text-rotulo font-semibold text-muted-foreground" aria-hidden="true">Cor da coluna</p>
+      <SeletorDeCor rotulo="Cor da coluna" mostrarRotulo={false} cores={CORES_DO_SELETOR} valor={coluna.cor ?? null} marcarAoAndar={false}
+        automatica={{ rotulo: 'Automática, pela posição', classe: CORES_DAS_COLUNAS[automatica].ponto }} aoMudar={escolher} />
       <div className="mt-3 border-t pt-3">
         <Chave ligada={coluna.concluidos} aoMudar={aoMudarConcluidos} rotulo="Coluna de concluídos" className="text-rotulo font-semibold" />
         <p className="mt-1 text-legenda text-muted-foreground">Cartões aqui não aparecem como atrasados.</p>
@@ -71,8 +63,9 @@ function NomeNoLugar({ nome, aoSalvar, aoTerminar }) {
   )
 }
 
-// Uma coluna do quadro (300 px): cabeçalho com o contador na cor da coluna, o nome e as ações de quem mexe (renomear,
-// cor e concluídos; apagar só a gestão); os cartões (lista onde se solta o arrasto) com o "ver mais" (50 por vez) no fim;
+// Uma coluna do quadro (300 px): cabeçalho com o contador na cor da coluna, o nome e, para quem mexe, um "⋯" com as
+// ações (Renomear, Cor — com a chave de concluídos — e Apagar coluna, só da gestão; auditoria de 17/11, M5); os cartões
+// (lista onde se solta o arrasto) com o "ver mais" (50 por vez) no fim;
 // e "Adicionar cartão" no pé. A coluna vai até a altura da faixa e a lista rola por dentro: ela é a área de rolagem do
 // arrasto (a biblioteca rola a lista perto da borda e acompanha a rolagem). `alca`: as dragHandleProps da coluna
 // (reordenar arrastando o cabeçalho); nula para quem só lê.
@@ -82,7 +75,7 @@ export default function Coluna({
 }) {
   const [renomeando, setRenomeando] = useState(false)
   const [pintando, setPintando] = useState(false)
-  const botaoCor = useRef(null)
+  const botaoDoMenu = useRef(null)
   const cor = corDaColuna(coluna, posicao)
   const paleta = CORES_DAS_COLUNAS[cor]
   const escolhida = coluna.cor != null
@@ -101,7 +94,8 @@ export default function Coluna({
           <div {...(alca ?? {})} aria-label={alca ? `Mover a coluna ${coluna.nome}` : undefined}
             className={cn('flex min-w-0 flex-1 items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary/50', alca && 'cursor-grab active:cursor-grabbing')}>
             <span title={contar(total, 'cartão', 'cartões')}
-              className={cn('grid h-7 min-w-7 shrink-0 place-items-center rounded-lg px-1.5 text-rotulo font-bold tabular-nums', escolhida ? paleta.solido : paleta.tom)}>
+              style={escolhida ? { backgroundColor: paleta.solido, color: corDoTextoSobre(paleta.solido) } : undefined}
+              className={cn('grid h-7 min-w-7 shrink-0 place-items-center rounded-lg px-1.5 text-rotulo font-bold tabular-nums', !escolhida && paleta.tom)}>
               {total.toLocaleString('pt-BR')}
             </span>
             <h3 className="truncate text-corpo font-semibold text-foreground">{coluna.nome}</h3>
@@ -113,20 +107,15 @@ export default function Coluna({
           </div>
         )}
         {podeMexer && !renomeando && (
-          <div className="flex shrink-0 items-center">
-            <Button type="button" variant="ghost" size="icon" aria-label={`Renomear a coluna ${coluna.nome}`} title="Renomear"
-              onClick={() => setRenomeando(true)}><Pencil className="size-3.5" /></Button>
-            <Button ref={botaoCor} type="button" variant="ghost" size="icon" aria-label={`Cor da coluna ${coluna.nome}`} title="Cor e concluídos"
-              aria-expanded={pintando} aria-haspopup="dialog" onClick={() => setPintando((p) => !p)}><Palette className="size-3.5" /></Button>
-            {podeApagar && (
-              <Button type="button" variant="ghost" size="icon" aria-label={`Apagar a coluna ${coluna.nome}`} title="Apagar coluna"
-                className={BOTAO_PERIGO} onClick={aoApagar}><Trash2 className="size-3.5" /></Button>
-            )}
-          </div>
+          <MenuDeAcoes ref={botaoDoMenu} rotulo={`Ações da coluna ${coluna.nome}`} className="shrink-0" itens={[
+            { rotulo: 'Renomear', icone: Pencil, aoEscolher: () => setRenomeando(true) },
+            { rotulo: 'Cor', icone: Palette, aoEscolher: () => setPintando(true) },
+            ...(podeApagar ? [{ rotulo: 'Apagar coluna', icone: Trash2, aoEscolher: aoApagar, perigo: true }] : []),
+          ]} />
         )}
       </div>
       {pintando && (
-        <PainelDaCor ancora={botaoCor} coluna={coluna} automatica={corDaColuna({ cor: null }, posicao)} aoFechar={() => setPintando(false)}
+        <PainelDaCor ancora={botaoDoMenu} coluna={coluna} automatica={corDaColuna({ cor: null }, posicao)} aoFechar={() => setPintando(false)}
           aoMudarCor={aoMudarCor} aoMudarConcluidos={aoMudarConcluidos} />
       )}
 

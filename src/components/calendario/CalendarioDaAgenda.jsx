@@ -17,6 +17,7 @@ import {
 import { hoje as hojeEmSP } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
 import { useLeitura } from '@/lib/useLeitura'
+import { cn } from '@/lib/utils'
 import BarraDoCalendario from './BarraDoCalendario'
 import DetalheDoDia from './DetalheDoDia'
 import EventosDoCliente from './EventosDoCliente'
@@ -46,6 +47,10 @@ const TUDO_DO_CLIENTE = { ...TUDO, compromissos: false, ausencias: false }
 
 // No celular (abaixo de md) a visão inicial é a Agenda: o mês do Hub não cabe.
 const ehCelular = () => typeof window.matchMedia === 'function' && !window.matchMedia('(min-width: 768px)').matches
+// A partir de 1280 px (xl), no Mês, o detalhe do dia fica ao lado do mês (auditoria, M3).
+const telaLarga = () => typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 1280px)').matches
+// "Reduzir movimento" ligado: a rolagem até o detalhe é sem animação.
+const semMovimento = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // Leituras do banco (uma chamada cada, só do intervalo pedido; os filtros rodam lá).
 const lerEventos = ({ de, ate, consultorId, consultoriaId, clienteId, tipo }) => eventosDoPeriodo({ de, ate, consultorId, consultoriaId, clienteId, tipo })
@@ -83,9 +88,11 @@ function useItensDoPeriodo({ de, ate, filtros, mostrar, versao, ligado = true })
   }
 }
 
-// O calendário, no layout do Hub: barra de filtros, 4 indicadores, Mês/Semana/Agenda e, embaixo, o detalhe do dia e os
-// próximos 7 dias. Cada pessoa vê o que o banco deixa (consultor: a própria agenda e os convites; gestão: a da
-// consultoria; central: todas). Só o período visível é lido. ?evento=<id> no endereço abre o evento.
+// O calendário, no layout do Hub: barra de filtros, 4 indicadores, Mês/Semana/Agenda, o detalhe do dia e os próximos 7
+// dias (auditoria de 17/11): no Mês, a partir de 1280 px, o mês ocupa dois terços e os dois ficam à direita, o detalhe em
+// cima (M3); nas telas menores e na Semana ficam embaixo, e clicar num dia rola a página até o detalhe; na visão Agenda,
+// que já lista tudo, eles não aparecem (R5). Cada pessoa vê o que o banco deixa (consultor: a própria agenda e os
+// convites; gestão: a da consultoria; central: todas). Só o período visível é lido. ?evento=<id> no endereço abre o evento.
 // - Sem `cliente`: o menu Calendário. Aqui também termina a conexão do Google da pessoa (o Google volta para
 //   /calendario?code=…&state=…).
 // - Com `cliente` ({ id, nome, consultoria_id, arquivado, contato_nome, contato_email }, a aba Agenda do cliente): só os
@@ -121,6 +128,7 @@ export default function CalendarioDaAgenda({ cliente = null }) {
   const [avisoDoGoogle, setAvisoDoGoogle] = useState(() => (volta?.recusou
     ? 'Você não autorizou o Google, então nada mudou. Clique em Conectar Google quando quiser.' : null))
   const voltaTratada = useRef(false)
+  const detalhe = useRef(null)
   const recarregar = () => setVersao((v) => v + 1)
 
   const clienteId = cliente?.id
@@ -142,7 +150,10 @@ export default function CalendarioDaAgenda({ cliente = null }) {
   // Próximos 7 dias (só no menu): do mesmo pedido quando o período visível já os cobre; senão, uma leitura só deles.
   const proximos = { de: hoje, ate: somarDias(hoje, 7) }
   const cobre = periodo.de <= proximos.de && periodo.ate >= proximos.ate
-  const daSemana = useItensDoPeriodo({ ...proximos, filtros, mostrar, versao, ligado: !cliente && !cobre })
+  // Os painéis do detalhe do dia e dos próximos 7 dias: só no menu e fora da visão Agenda (R5).
+  const comPaineis = !cliente && visao !== 'agenda'
+  const aoLado = comPaineis && visao === 'mes'
+  const daSemana = useItensDoPeriodo({ ...proximos, filtros, mostrar, versao, ligado: comPaineis && !cobre })
   const porDiaProximos = cobre ? doPeriodo.porDia : daSemana.porDia
   // Dentro do cliente a agenda não tem cartões de números (pedido do Diego, 17/11): nem lê.
   const indicadores = useLeitura(lerIndicadores, cliente ? null : { dia: hoje, versao })
@@ -258,10 +269,18 @@ export default function CalendarioDaAgenda({ cliente = null }) {
     recarregar()
   }
 
+  // Escolher um dia (clique ou Enter; as setas só andam): quando o detalhe fica embaixo, a página rola até ele, para o
+  // clique não parecer sem efeito (M3).
+  function selecionar(dia, { escolheu = false } = {}) {
+    setSelecionado(dia)
+    if (!escolheu || !comPaineis || (aoLado && telaLarga())) return
+    detalhe.current?.scrollIntoView?.({ behavior: semMovimento() ? 'auto' : 'smooth', block: 'start' })
+  }
+
   const rotulo = rotuloDoPeriodo(visaoDoPeriodo, diaDaVisao)
   const propsDaVisao = {
     dias: periodo.dias, porDia: doPeriodo.porDia, hoje, selecionado: diaDoDetalhe, deVariasPessoas,
-    aoSelecionar: setSelecionado, aoCriar: criar, aoAbrir: abrir,
+    aoSelecionar: selecionar, aoCriar: criar, aoAbrir: abrir,
   }
 
   return (
@@ -285,8 +304,8 @@ export default function CalendarioDaAgenda({ cliente = null }) {
           {cliente ? ' Use a visão Semana para ver menos de cada vez.' : ' Use os filtros (consultor, cliente) para ver menos de cada vez.'}
         </p>
       )}
-      <div className="space-y-4">
-        <section aria-label="Calendário" className="card min-w-0 overflow-hidden">
+      <div className={cn('grid gap-4', aoLado && 'xl:grid-cols-3 xl:items-start')}>
+        <section aria-label="Calendário" className={cn('card min-w-0 overflow-hidden', aoLado && 'xl:col-span-2')}>
           <div className="flex flex-wrap items-center gap-2 border-b px-3 py-3 sm:px-4">
             {todos ? (
               <h2 className="text-janela font-bold">Todos os eventos do cliente</h2>
@@ -314,15 +333,15 @@ export default function CalendarioDaAgenda({ cliente = null }) {
           ) : (
             <div className="p-2 sm:p-4">
               {doPeriodo.erro && <p role="alert" className="mb-3 text-corpo text-destructive">Não foi possível carregar a agenda. Tente de novo.</p>}
-              {visao === 'mes' && <VisaoMes {...propsDaVisao} mes={diaDaVisao.slice(0, 7)} rotulo={rotulo} mostrar={mostrar} detalheAbaixo={!cliente} />}
+              {visao === 'mes' && <VisaoMes {...propsDaVisao} mes={diaDaVisao.slice(0, 7)} rotulo={rotulo} mostrar={mostrar} comDetalhe={!cliente} />}
               {visao === 'semana' && <VisaoSemana {...propsDaVisao} />}
               {visao === 'agenda' && <VisaoAgenda {...propsDaVisao} />}
             </div>
           )}
         </section>
-        {!cliente && (
-          <div className="grid items-stretch gap-4 md:grid-cols-2">
-            <DetalheDoDia dia={diaDoDetalhe} itens={doPeriodo.porDia.get(diaDoDetalhe) ?? []} deVariasPessoas={deVariasPessoas} aoCriar={criar} aoAbrir={abrir} />
+        {comPaineis && (
+          <div className={cn('grid items-stretch gap-4 md:grid-cols-2', aoLado && 'xl:grid-cols-1 xl:items-start')}>
+            <DetalheDoDia ref={detalhe} dia={diaDoDetalhe} itens={doPeriodo.porDia.get(diaDoDetalhe) ?? []} deVariasPessoas={deVariasPessoas} aoCriar={criar} aoAbrir={abrir} />
             <ProximosDias dias={diasEntre(proximos.de, proximos.ate)} porDia={porDiaProximos} deVariasPessoas={deVariasPessoas}
               aoSelecionar={(dia) => { setSelecionado(dia); if (!periodo.dias.includes(dia)) setDiaDaVisao(dia) }} aoAbrir={abrir} />
           </div>

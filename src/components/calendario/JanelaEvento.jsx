@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { CalendarDays, Check, CheckCircle2, Info, Mail, Plus, Send, Trash2, Users, Video, X } from 'lucide-react'
+import { CalendarDays, Check, CheckCircle2, Info, Mail, Plus, Send, Trash2, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import CampoData from '@/components/campos/CampoData'
@@ -9,6 +9,7 @@ import Seletor from '@/components/campos/Seletor'
 import Avatar from '@/components/comum/Avatar'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import SeletorDeCor from '@/components/comum/SeletorDeCor'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,7 +25,8 @@ import { hoje as hojeEmSP } from '@/lib/mes'
 import { primeiroNome } from '@/lib/nomes'
 import { veTudo } from '@/lib/papeis'
 import { cn } from '@/lib/utils'
-import { CORES_DO_EVENTO, corDoEvento } from './cores'
+import ChipDoEvento from './ChipDoEvento'
+import { CORES_DO_EVENTO } from './cores'
 import DetalheDoEvento from './DetalheDoEvento'
 
 // Limites da Edge Function e do banco, conferidos também aqui (o banco continua mandando).
@@ -146,30 +148,8 @@ function ConviteDoEvento({ evento, convite, aoMudar }) {
   )
 }
 
-// Cor do evento: as 8 do Hub, num radiogroup (setas mudam a escolha).
-function CorDoEvento({ valor, aoMudar }) {
-  function teclar(e, i) {
-    const destino = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1 }[e.key]
-    if (destino === undefined) return
-    e.preventDefault()
-    const proxima = (destino + CORES_DO_EVENTO.length) % CORES_DO_EVENTO.length
-    aoMudar(proxima)
-    e.currentTarget.parentElement.children[proxima]?.focus()
-  }
-  return (
-    <div role="radiogroup" aria-label="Cor" className="flex flex-wrap items-center gap-2">
-      {CORES_DO_EVENTO.map((cor, i) => (
-        <button key={cor.valor} type="button" role="radio" aria-checked={valor === i} aria-label={cor.nome} title={cor.nome}
-          tabIndex={valor === i ? 0 : -1} onClick={() => aoMudar(i)} onKeyDown={(e) => teclar(e, i)}
-          style={{ backgroundColor: cor.valor, '--tw-ring-color': cor.valor }}
-          className={cn('botao-animado grid size-7 place-items-center rounded-full text-white transition-[box-shadow,translate,scale] outline-none hover:-translate-y-px active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-offset-2',
-            valor === i && 'scale-110 ring-2 ring-offset-2 ring-offset-card')}>
-          {valor === i && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}
-        </button>
-      ))}
-    </div>
-  )
-}
+// Cor do evento: as 8 do Hub (o banco guarda o número, 0 a 7). No calendário ela é a bolinha no começo do chip.
+const CORES_DA_JANELA = CORES_DO_EVENTO.map((c, i) => ({ valor: i, nome: c.nome, fundo: c.valor }))
 
 // Atalhos do Quando, como no Hub ("Semana que vem" é a próxima segunda).
 function atalhosDeData() {
@@ -452,11 +432,12 @@ function FormularioDoEvento({
           </SecaoFormulario>
 
           <SecaoFormulario titulo="Quando">
-            <div className="flex flex-wrap gap-1">
+            {/* No toque, 44 px e 8 px entre os atalhos (auditoria, G5); o azul do texto sobre o azul-claro é o --primary-texto. */}
+            <div role="group" aria-label="Atalhos da data" className="flex flex-wrap gap-1 pointer-coarse:gap-2">
               {atalhosDeData().map((a) => (
                 <button key={a.rotulo} type="button" aria-pressed={data === a.dia} onClick={() => { setData(a.dia); if (dataFim && dataFim < a.dia) setDataFim('') }}
-                  className={cn('botao-animado rounded-md px-2 py-1 text-legenda font-medium transition-[background-color,color,translate,scale] outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]',
-                    data === a.dia ? 'bg-primary-cheio text-primary-foreground' : 'bg-primary/10 text-primary hover:bg-primary/15')}>
+                  className={cn('botao-animado rounded-md px-2 py-1 text-legenda font-medium transition-[background-color,color,translate,scale] outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97] pointer-coarse:min-h-11 pointer-coarse:px-3',
+                    data === a.dia ? 'bg-primary-cheio text-primary-foreground' : 'bg-primary/10 text-primary-texto hover:bg-primary/15')}>
                   {a.rotulo}
                 </button>
               ))}
@@ -555,10 +536,9 @@ function FormularioDoEvento({
           <SecaoFormulario titulo="Prévia">
             <div className="space-y-2 rounded-xl border bg-card p-3">
               <p className="text-legenda text-muted-foreground">Como aparece no calendário</p>
-              <span className="inline-flex max-w-full items-center gap-1 rounded-md px-2 py-1 text-legenda font-medium text-white" style={{ backgroundColor: corDoEvento(cor) }}>
-                {comMeet && <Video className="size-3 shrink-0" strokeWidth={2.2} aria-hidden="true" />}
-                <span className="truncate">{titulo.trim() || 'Título do evento'}</span>
-              </span>
+              {/* O chip do calendário: o tipo (reunião com cliente ou compromisso) e a cor escolhida na bolinha. */}
+              <ChipDoEvento tamanho="rotulo" className="w-fit max-w-full"
+                item={{ tipo: 'evento', id: 'previa', evento: { titulo: titulo.trim() || 'Título do evento', cor, cliente_id: cliente?.id ?? null, com_meet: comMeet } }} />
               <p className="text-rotulo text-foreground/80">{quandoDaPrevia({ data, horaInicio, horaFim, dataFim: outroDia ? dataFim : '' })}</p>
               {(participantes.length > 0 || convidados.length > 0) && (
                 <p className="text-legenda text-muted-foreground">
@@ -569,7 +549,7 @@ function FormularioDoEvento({
           </SecaoFormulario>
 
           <SecaoFormulario titulo="Cor">
-            <CorDoEvento valor={cor} aoMudar={setCor} />
+            <SeletorDeCor rotulo="Cor do evento" mostrarRotulo={false} cores={CORES_DA_JANELA} valor={cor} aoMudar={setCor} />
           </SecaoFormulario>
 
           <SecaoFormulario titulo="Google Meet">
