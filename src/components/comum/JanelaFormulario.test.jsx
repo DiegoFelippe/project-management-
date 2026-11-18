@@ -212,9 +212,10 @@ describe('JanelaFormulario', () => {
   describe('erros dos campos', () => {
     function ComErros() {
       const [erros, setErros] = useState({})
+      const [tentativa, setTentativa] = useState(0)
       return (
-        <JanelaFormulario aberto aoFechar={() => {}} titulo="Novo cliente" erros={erros} form="f" rotuloEnviar="Salvar">
-          <form id="f" onSubmit={(e) => { e.preventDefault(); setErros({ email: 'E-mail errado.', nome: 'Nome curto.' }) }}>
+        <JanelaFormulario aberto aoFechar={() => {}} titulo="Novo cliente" tentativa={tentativa} form="f" rotuloEnviar="Salvar">
+          <form id="f" onSubmit={(e) => { e.preventDefault(); setErros({ email: 'E-mail errado.', nome: 'Nome curto.' }); setTentativa((t) => t + 1) }}>
             <Campo id="j-nome" rotulo="Nome" erro={erros.nome}><Input id="j-nome" /></Campo>
             <Campo id="j-cidade" rotulo="Cidade"><Input id="j-cidade" /></Campo>
             <Campo id="j-email" rotulo="E-mail" erro={erros.email}><Input id="j-email" /></Campo>
@@ -237,8 +238,8 @@ describe('JanelaFormulario', () => {
       expect(screen.getByLabelText('Nome')).toHaveFocus()
     })
 
-    it('sem erros, o foco não sai do lugar', () => {
-      render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A" erros={{}}><Input aria-label="Nome" /></JanelaFormulario>)
+    it('sem tentativa, o foco não sai do lugar (nem com um campo marcado)', () => {
+      render(<JanelaFormulario aberto aoFechar={() => {}} titulo="A"><Input aria-label="Nome" /><Input aria-label="Cidade" aria-invalid /></JanelaFormulario>)
       expect(screen.getByLabelText('Nome')).toHaveFocus()
     })
   })

@@ -14,18 +14,20 @@ import { urlPublica } from '@/lib/imagem'
 export default function EditarConsultoria({ aberto, aoFechar, consultoria, aoSalvar }) {
   const [nome, setNome] = useState(consultoria?.nome ?? '')
   const [logo, setLogo] = useState(null)
-  const { erro, erros, conferir, enviando, enviar } = useEnvio(aoFechar)
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(aoFechar, {
+    validar: () => (nome.trim().length < 2 ? { nome: 'Use pelo menos 2 caracteres.' } : {}),
+  })
   const alterado = useAlterado({ nome, logo })
 
   async function salvar(evento) {
     evento.preventDefault()
-    if (!conferir(nome.trim().length < 2 ? { nome: 'Use pelo menos 2 caracteres.' } : {})) return
+    if (!conferir()) return
     await enviar(() => aoSalvar({ nome: nome.trim(), logo }))
   }
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo="Editar consultoria" icone={Building2} enviando={enviando}
-      descricao="A logo e o nome aparecem para todos da consultoria." erros={erros} alterado={alterado}
+      descricao="A logo e o nome aparecem para todos da consultoria." tentativa={tentativa} alterado={alterado}
       form="form-editar-consultoria" rotuloEnviar="Salvar">
       <form id="form-editar-consultoria" noValidate onSubmit={salvar} className="space-y-5">
         <CampoImagem rotulo="logo" redondo={false} atual={urlPublica('logos', consultoria?.logo)}

@@ -15,20 +15,24 @@ import { useEnvio } from '@/components/comum/useEnvio'
 // pergunta antes (usabilidade, U2 e U4; as ausências gravam na hora, no formulário delas).
 export default function CapacidadeDaPessoa({ pessoa, aoFechar, aoSalvar, aoMudarAusencias }) {
   const [carga, setCarga] = useState(String(Number(pessoa.carga_semanal ?? 44)).replace('.', ','))
-  const { erro, erros, conferir, enviando, enviar } = useEnvio(aoFechar)
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(aoFechar, {
+    validar: () => {
+      const horas = lerHoras(carga)
+      return horas === null || horas > 60 ? { carga: 'Use de 0 a 60 horas.' } : {}
+    },
+  })
   const alterado = useAlterado(carga)
 
   // Sem <form>: as ausências têm o formulário delas, então o Salvar do rodapé chama esta função.
   async function salvar() {
     if (enviando) return
-    const horas = lerHoras(carga)
-    if (!conferir(horas === null || horas > 60 ? { carga: 'Use de 0 a 60 horas.' } : {})) return
-    await enviar(() => aoSalvar(horas))
+    if (!conferir()) return
+    await enviar(() => aoSalvar(lerHoras(carga)))
   }
 
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo={`Capacidade de ${pessoa.nome}`} icone={Gauge} largura="xl" enviando={enviando}
-      descricao="A carga semanal e as ausências (férias, licenças) definem a capacidade do mês." erros={erros} alterado={alterado}
+      descricao="A carga semanal e as ausências (férias, licenças) definem a capacidade do mês." tentativa={tentativa} alterado={alterado}
       rotuloEnviar="Salvar" aoEnviar={salvar}>
       <SecaoFormulario titulo="Carga semanal">
         <Campo id="capacidade-carga" rotulo="Carga semanal (horas)" erro={erros.carga} dica="De 0 a 60. Com 0, a pessoa sai da sugestão de consultor."

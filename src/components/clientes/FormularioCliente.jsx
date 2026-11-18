@@ -43,12 +43,14 @@ export default function FormularioCliente({ aberto, aoFechar, cliente, aoSalvar 
   const [contatoEmail, setContatoEmail] = useState(cliente?.contato_email ?? '')
   const [observacoes, setObservacoes] = useState(cliente?.observacoes ?? '')
   const [horas, setHoras] = useState(String(cliente?.horas_mes ?? '').replace('.', ','))
-  const { erro, erros, conferir, enviando, enviar } = useEnvio(aoFechar)
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(aoFechar, {
+    validar: () => errosDoCliente({ nome, cnpj, contatoTelefone, contatoEmail, horas }),
+  })
   const alterado = useAlterado({ nome, razaoSocial, cnpj, cidade, uf, contatoNome, contatoTelefone, contatoEmail, observacoes, horas })
 
   async function salvar(evento) {
     evento.preventDefault()
-    if (!conferir(errosDoCliente({ nome, cnpj, contatoTelefone, contatoEmail, horas }))) return
+    if (!conferir()) return
     await enviar(() => aoSalvar({
       nome: nome.trim(),
       razaoSocial: razaoSocial.trim(),
@@ -65,7 +67,7 @@ export default function FormularioCliente({ aberto, aoFechar, cliente, aoSalvar 
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={cliente ? 'Editar cliente' : 'Novo cliente'} icone={Building2} largura="lg" enviando={enviando}
-      descricao="Dados do provedor e quantas horas por mês estão previstas para ele." erros={erros} alterado={alterado}
+      descricao="Dados do provedor e quantas horas por mês estão previstas para ele." tentativa={tentativa} alterado={alterado}
       form="form-cliente" rotuloEnviar={cliente ? 'Salvar' : 'Criar cliente'} rotuloEnviando={cliente ? 'Salvando…' : 'Criando…'}>
       <form id="form-cliente" noValidate onSubmit={salvar} className="space-y-5">
         <SecaoFormulario titulo="Dados">

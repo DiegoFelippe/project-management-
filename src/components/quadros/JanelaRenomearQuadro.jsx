@@ -13,13 +13,15 @@ import { renomearQuadro } from '@/data/quadros'
 // O erro fica embaixo do nome, e fechar com o nome mudado pergunta antes (usabilidade, U2 e U4).
 export default function JanelaRenomearQuadro({ quadro, aoFechar, aoSalvo }) {
   const [nome, setNome] = useState(quadro.nome ?? '')
-  const { erro, erros, conferir, enviando, enviar } = useEnvio()
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(undefined, {
+    validar: () => (nome.trim() ? {} : { nome: 'Dê um nome ao quadro.' }),
+  })
   const alterado = useAlterado(nome)
 
   function aoEnviar(evento) {
     evento.preventDefault()
     const limpo = nome.trim()
-    if (!conferir(limpo ? {} : { nome: 'Dê um nome ao quadro.' })) return
+    if (!conferir()) return
     if (limpo === quadro.nome) return aoFechar()
     enviar(async () => {
       const resposta = await renomearQuadro(quadro.id, limpo)
@@ -29,7 +31,7 @@ export default function JanelaRenomearQuadro({ quadro, aoFechar, aoSalvo }) {
   }
 
   return (
-    <JanelaFormulario aberto aoFechar={aoFechar} titulo="Renomear quadro" icone={Pencil} enviando={enviando} erros={erros} alterado={alterado}
+    <JanelaFormulario aberto aoFechar={aoFechar} titulo="Renomear quadro" icone={Pencil} enviando={enviando} tentativa={tentativa} alterado={alterado}
       form="form-renomear-quadro" rotuloEnviar="Salvar" rotuloEnviando="Salvando…">
       <form id="form-renomear-quadro" noValidate onSubmit={aoEnviar} className="space-y-5">
         <SecaoFormulario>

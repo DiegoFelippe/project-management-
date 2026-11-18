@@ -19,19 +19,20 @@ function erroDasHoras(horas) {
 // fechar com o número mudado pergunta antes (usabilidade, U2 e U4).
 export default function JanelaPrevisao({ aberto, cliente, aoFechar, aoSalvar }) {
   const [horas, setHoras] = useState(String(cliente.horas_mes ?? '').replace('.', ','))
-  const { erro, erros, conferir, enviando, enviar } = useEnvio(aoFechar)
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(aoFechar, {
+    validar: () => (erroDasHoras(horas) ? { horas: erroDasHoras(horas) } : {}),
+  })
   const alterado = useAlterado(horas)
 
   async function salvar(evento) {
     evento.preventDefault()
-    const problema = erroDasHoras(horas)
-    if (!conferir(problema ? { horas: problema } : {})) return
+    if (!conferir()) return
     await enviar(() => aoSalvar(lerHoras(horas)))
   }
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={`Ajustar a previsão de ${cliente.nome}`} icone={Gauge} enviando={enviando}
-      descricao="Quantas horas por mês estão previstas para este cliente." erros={erros} alterado={alterado} form="form-previsao" rotuloEnviar="Salvar">
+      descricao="Quantas horas por mês estão previstas para este cliente." tentativa={tentativa} alterado={alterado} form="form-previsao" rotuloEnviar="Salvar">
       <form id="form-previsao" noValidate onSubmit={salvar} className="space-y-5">
         <Campo id="previsao-horas" rotulo="Previsão de horas por mês" erro={erros.horas}>
           <CampoNumero id="previsao-horas" valor={horas} aoMudar={setHoras} min={0} max={999} passo={0.5} decimal unidade="h" />

@@ -7,31 +7,49 @@ export const FALHA_NO_ENVIO = 'Não deu para salvar. Tente de novo.'
 const SEM_ERROS = {}
 const temErros = (erros) => Boolean(erros) && Object.keys(erros).length > 0
 
-// O envio comum das janelas: limpa os erros, marca "enviando" (o rodapé mostra "Salvando…"), espera a ação e, se ela
+// O envio comum das janelas: limpa os avisos, marca "enviando" (o rodapé mostra "Salvando…"), espera a ação e, se ela
 // devolver { erro } (o aviso do servidor) ou { erros } ({ campo: mensagem }, o campo recusado), mostra e deixa a janela
 // aberta; se não, chama `aoConcluir` (em geral, fechar a janela). `enviar(acao)` devolve true quando deu certo.
-// A conferência da tela fica antes, com `conferir(achados)` (usabilidade, U2): todos os erros de uma vez, cada um no seu
-// campo ({ campo: mensagem }); devolve true quando não há nenhum. Cada `conferir` cria um objeto novo, e a
-// JanelaFormulario (prop `erros`) leva o foco ao primeiro campo marcado. `erro` fica para o servidor e o resumo.
+// Conferência da tela (usabilidade, U2): `validar()` devolve todos os erros de uma vez ({ campo: mensagem }, cada um
+// embaixo do seu campo) e `conferir()` diz se pode enviar. Depois do primeiro Salvar, os erros acompanham o que está na
+// tela: corrigiu, a marca some (como no modelo de check-in). `conferir(achados)` também aceita os erros prontos.
+// `tentativa` sobe a cada Salvar com erro (da tela ou do servidor): a JanelaFormulario leva o foco ao primeiro campo
+// marcado só nessa hora, nunca enquanto a pessoa digita. `erro` fica para o servidor e o resumo; `limpar()` zera tudo.
 // Um segundo envio enquanto o primeiro roda é ignorado. Se a ação lançar (sem rede), os botões voltam, a janela mostra
 // FALHA_NO_ENVIO, o erro vai para o console (um defeito do código deixa rastro) e `enviar` devolve false.
-export function useEnvio(aoConcluir) {
+export function useEnvio(aoConcluir, { validar } = {}) {
   const [erro, setErro] = useState(null)
-  const [erros, setErros] = useState(SEM_ERROS)
+  const [errosDaTela, setErrosDaTela] = useState(SEM_ERROS)
+  const [errosDoServidor, setErrosDoServidor] = useState(SEM_ERROS)
+  const [tentou, setTentou] = useState(false)
+  const [tentativa, setTentativa] = useState(0)
   const [enviando, setEnviando] = useState(false)
   const emCurso = useRef(false)
+  const daTela = tentou && validar ? validar() : errosDaTela
+  const erros = temErros(errosDoServidor) ? { ...daTela, ...errosDoServidor } : daTela
 
-  function conferir(achados) {
+  function conferir(achados = validar?.() ?? SEM_ERROS) {
     setErro(null)
-    setErros({ ...achados })
-    return !temErros(achados)
+    setErrosDoServidor(SEM_ERROS)
+    setErrosDaTela({ ...achados })
+    setTentou(true)
+    const pode = !temErros(achados)
+    if (!pode) setTentativa((t) => t + 1)
+    return pode
+  }
+
+  function limpar() {
+    setErro(null)
+    setErrosDaTela(SEM_ERROS)
+    setErrosDoServidor(SEM_ERROS)
+    setTentou(false)
   }
 
   async function enviar(acao) {
     if (emCurso.current) return false
     emCurso.current = true
     setErro(null)
-    setErros(SEM_ERROS)
+    setErrosDoServidor(SEM_ERROS)
     setEnviando(true)
     let resposta
     try {
@@ -45,12 +63,15 @@ export function useEnvio(aoConcluir) {
     }
     if (resposta?.erro || temErros(resposta?.erros)) {
       if (resposta.erro) setErro(resposta.erro)
-      if (temErros(resposta.erros)) setErros({ ...resposta.erros })
+      if (temErros(resposta.erros)) {
+        setErrosDoServidor({ ...resposta.erros })
+        setTentativa((t) => t + 1)
+      }
       return false
     }
     aoConcluir?.()
     return true
   }
 
-  return { erro, setErro, erros, setErros, conferir, enviando, enviar }
+  return { erro, setErro, erros, tentativa, conferir, limpar, enviando, enviar }
 }

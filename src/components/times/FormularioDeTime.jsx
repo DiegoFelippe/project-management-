@@ -27,7 +27,7 @@ export default function FormularioDeTime({ time, papel, buscarGestores, buscarPe
   const [descricao, setDescricao] = useState(time?.descricao ?? '')
   const [gestorId, setGestorId] = useState(time?.gestor_id ?? '')
   const [pessoas, setPessoas] = useState([])
-  const { erro, erros, conferir, enviando, enviar } = useEnvio(aoFechar)
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(aoFechar, { validar: errosDoTime })
   const alterado = useAlterado({ nome, descricao, gestorId, pessoas: pessoas.map((p) => p.id) })
   const buscarDisponiveis = useCallback((termo) => buscarPessoas(termo, gestorId ? [gestorId] : []), [buscarPessoas, gestorId])
 
@@ -40,7 +40,7 @@ export default function FormularioDeTime({ time, papel, buscarGestores, buscarPe
 
   async function salvar(evento) {
     evento.preventDefault()
-    if (!conferir(errosDoTime())) return
+    if (!conferir()) return
     const dados = { nome: nome.trim(), descricao: descricao.trim() }
     if (escolheGestor) dados.gestorId = gestorId
     // Quem virou gestor não entra também como pessoa do time.
@@ -54,7 +54,7 @@ export default function FormularioDeTime({ time, papel, buscarGestores, buscarPe
 
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo={novo ? 'Novo time' : 'Editar time'} icone={UsersRound} enviando={enviando}
-      descricao={descricaoDaJanela} erros={erros} alterado={alterado}
+      descricao={descricaoDaJanela} tentativa={tentativa} alterado={alterado}
       form="form-do-time" rotuloEnviar={novo ? 'Criar time' : 'Salvar'} rotuloEnviando={novo ? 'Criando…' : 'Salvando…'}>
       <form id="form-do-time" noValidate onSubmit={salvar} className="space-y-5">
         <Campo id="time-nome" rotulo="Nome do time" erro={erros.nome}>

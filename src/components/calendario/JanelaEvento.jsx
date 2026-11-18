@@ -249,16 +249,18 @@ function FormularioDoEvento({
   const [gravar, setGravar] = useState(() => evento?.gravar ?? (clienteTravado && !semGoogleProprio))
   const [meetTocado, setMeetTocado] = useState(false)
   const [apagando, setApagando] = useState(false)
-  const { erro, erros, conferir, enviando, enviar } = useEnvio()
+  // O horário que vai ao banco: com "Dia inteiro" (ou ainda sem hora), sem as horas.
+  const semHora = diaInteiro || !horaInicio
+  const horario = montarHorario({ data, horaInicio: semHora ? '' : horaInicio, horaFim: semHora ? '' : horaFim, dataFim: outroDia ? dataFim : '' })
+  // Depois do primeiro Salvar, os erros acompanham a tela (corrigiu, a marca some).
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(undefined, {
+    validar: () => errosDoEvento({ titulo, consultor, horario, diaInteiro, horaInicio }),
+  })
   const alterado = useAlterado({
     titulo, descricao, data, horaInicio, horaFim, diaInteiro, outroDia, dataFim, cor, consultor: consultor?.id ?? null, cliente: cliente?.id ?? null,
     participantes: participantes.map((p) => p.perfil_id), convidados: convidados.map((c) => c.email), novoConvidado, comMeet, gravar,
   })
 
-  // Os erros do horário somem quando a pessoa mexe em algum campo do Quando (os outros ficam até o próximo Salvar).
-  const chaveDoQuando = [data, horaInicio, horaFim, diaInteiro, outroDia ? dataFim : ''].join('|')
-  const [chaveDosErros, setChaveDosErros] = useState(null)
-  const erroDoQuando = (campo) => (chaveDosErros === chaveDoQuando ? erros[campo] : undefined)
   const meetFixo = !novo && Boolean(evento.com_meet)
   // A pasta da reunião já foi criada nos Arquivos do cliente: o cliente não muda mais.
   const clienteFixo = !novo && Boolean(evento.pasta_id)
@@ -329,11 +331,7 @@ function FormularioDoEvento({
 
   async function salvar(e) {
     e.preventDefault()
-    if (enviando) return
-    const semHora = diaInteiro || !horaInicio
-    const horario = montarHorario({ data, horaInicio: semHora ? '' : horaInicio, horaFim: semHora ? '' : horaFim, dataFim: outroDia ? dataFim : '' })
-    setChaveDosErros(chaveDoQuando)
-    if (!conferir(errosDoEvento({ titulo, consultor, horario, diaInteiro, horaInicio }))) return
+    if (enviando || !conferir()) return
     const dados = {
       id,
       ...(novo ? { novo: true, consultor_id: consultor.id } : {}),
@@ -398,7 +396,7 @@ function FormularioDoEvento({
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={novo ? 'Novo evento' : 'Editar evento'} icone={CalendarDays} largura="5xl" enviando={enviando}
-      erros={erros} alterado={alterado}
+      tentativa={tentativa} alterado={alterado}
       descricao={novo ? 'Marque a reunião ou o compromisso e convide quem vai.' : 'Mude o que precisar: o Google e os convidados são avisados.'}
       acaoEsquerda={!novo && (
         <Button type="button" variant="ghost" disabled={enviando} onClick={() => setApagando(true)}
@@ -451,15 +449,15 @@ function FormularioDoEvento({
             </div>
             <div role="group" aria-label="Quando" className="space-y-3">
               <div className={cn('grid grid-cols-2 items-start gap-3', !diaInteiro && 'sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]')}>
-                <Campo id="evento-data" rotulo={outroDia ? 'Começa em' : 'Data'} erro={erroDoQuando('data')} className={cn('col-span-2', !diaInteiro && 'sm:col-span-1')}>
+                <Campo id="evento-data" rotulo={outroDia ? 'Começa em' : 'Data'} erro={erros.data} className={cn('col-span-2', !diaInteiro && 'sm:col-span-1')}>
                   <CampoData id="evento-data" valor={data} obrigatorio aoMudar={(v) => { setData(v); if (dataFim && dataFim < v) setDataFim('') }} />
                 </Campo>
                 {!diaInteiro && (
                   <>
-                    <Campo id="evento-das" rotulo="Das" erro={erroDoQuando('horaInicio')}>
+                    <Campo id="evento-das" rotulo="Das" erro={erros.horaInicio}>
                       <CampoHora id="evento-das" valor={horaInicio} aoMudar={setHoraInicio} />
                     </Campo>
-                    <Campo id="evento-ate" rotulo="Até" erro={erroDoQuando('horaFim')}>
+                    <Campo id="evento-ate" rotulo="Até" erro={erros.horaFim}>
                       <CampoHora id="evento-ate" valor={horaFim} aoMudar={setHoraFim} />
                     </Campo>
                   </>
@@ -467,7 +465,7 @@ function FormularioDoEvento({
               </div>
               {outroDia && (
                 <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,2fr)]">
-                  <Campo id="evento-termina" rotulo="Termina em" erro={erroDoQuando('dataFim')} className="col-span-2 sm:col-span-1">
+                  <Campo id="evento-termina" rotulo="Termina em" erro={erros.dataFim} className="col-span-2 sm:col-span-1">
                     <CampoData id="evento-termina" valor={dataFim} min={data} aoMudar={setDataFim} />
                   </Campo>
                   <Button type="button" variant="link" size="sm" className="justify-self-start" onClick={() => { setOutroDia(false); setDataFim('') }}>

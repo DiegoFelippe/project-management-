@@ -25,7 +25,9 @@ export default function JanelaNovoCartao({ quadro, colunaId, aoFechar, aoCriado,
   const [prioridade, setPrioridade] = useState('')
   const [prazo, setPrazo] = useState('')
   const [responsaveis, setResponsaveis] = useState([])
-  const { erro, erros, conferir, enviando, enviar: enviarComAviso } = useEnvio()
+  const { erro, erros, tentativa, conferir, enviando, enviar: enviarComAviso } = useEnvio(undefined, {
+    validar: () => (titulo.trim() ? {} : { titulo: 'Dê um título ao cartão.' }),
+  })
   const alterado = useAlterado({ titulo, coluna, prioridade, prazo, responsaveis: responsaveis.map((p) => p.id) })
   const [atalhos] = useState(() => atalhosDoPrazo())
 
@@ -42,7 +44,7 @@ export default function JanelaNovoCartao({ quadro, colunaId, aoFechar, aoCriado,
   async function enviar(evento) {
     evento.preventDefault()
     if (enviando) return
-    if (!conferir(titulo.trim() ? {} : { titulo: 'Dê um título ao cartão.' })) return
+    if (!conferir()) return
     await enviarComAviso(async () => {
       const resposta = await criarCartao({
         colunaId: coluna, titulo: titulo.trim(), prioridade: prioridade || null, prazo: prazo || null,
@@ -61,7 +63,7 @@ export default function JanelaNovoCartao({ quadro, colunaId, aoFechar, aoCriado,
 
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo="Novo cartão" icone={SquarePlus} largura="lg" enviando={enviando}
-      descricao="Entra no fim da coluna. Descrição, checklist e anexos ficam no cartão, depois de criado." erros={erros} alterado={alterado}
+      descricao="Entra no fim da coluna. Descrição, checklist e anexos ficam no cartão, depois de criado." tentativa={tentativa} alterado={alterado}
       form="form-novo-cartao" rotuloEnviar="Criar cartão" rotuloEnviando="Criando…">
       <form id="form-novo-cartao" noValidate onSubmit={enviar} className="space-y-5">
         <SecaoFormulario>

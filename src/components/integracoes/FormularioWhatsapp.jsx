@@ -19,7 +19,7 @@ export default function FormularioWhatsapp({ integracao, aoFechar, aoSalvar, aoT
   const [contaId, setContaId] = useState(atual.waba_id ?? '')
   const [token, setToken] = useState('')
   const [numeroDeTeste, setNumeroDeTeste] = useState('')
-  const { erro, erros, enviando, testando, resultado, salvar, testar } = useEnvioDaIntegracao(montar, aoSalvar, aoTestar)
+  const { erro, erros, tentativa, enviando, testando, resultado, salvar, testar } = useEnvioDaIntegracao(montar, aoSalvar, aoTestar)
   const alterado = useAlterado({ numeroId, contaId, token, numeroDeTeste })
 
   function montar() {
@@ -40,7 +40,7 @@ export default function FormularioWhatsapp({ integracao, aoFechar, aoSalvar, aoT
   }
 
   return (
-    <JanelaIntegracao titulo="WhatsApp" aoFechar={aoFechar} aoSalvar={salvar} aoTestar={testar} erro={erro} erros={erros} alterado={alterado} enviando={enviando}
+    <JanelaIntegracao titulo="WhatsApp" aoFechar={aoFechar} aoSalvar={salvar} aoTestar={testar} erro={erro} tentativa={tentativa} alterado={alterado} enviando={enviando}
       testando={testando} resultado={resultado}
       descricao="O número do WhatsApp Business da consultoria, pela API oficial da Meta (Cloud API).">
       <SecaoFormulario titulo="Conta">

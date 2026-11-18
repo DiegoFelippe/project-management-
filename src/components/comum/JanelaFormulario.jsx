@@ -26,9 +26,9 @@ const FOCAVEL = 'input:not([disabled]):not([type="hidden"]), textarea:not([disab
 // diferentes (Fechar, Testar, a mensagem do modelo...) e vence o padrão.
 // Convenção de envio: enquanto `enviando`, Esc e X não fecham e os botões do rodapé ficam desabilitados. O componente
 // mostra o spinner e marca aria-busy.
-// Erros dos campos (usabilidade, U2): `erros` é o objeto do useEnvio ({ campo: mensagem }); cada vez que ele muda e tem
-// algum erro (cada Salvar conferido cria um objeto novo), o foco vai para o primeiro campo marcado (aria-invalid) do
-// corpo, na ordem da tela. As mensagens ficam embaixo de cada campo (Campo, de src/components/campos/).
+// Erros dos campos (usabilidade, U2): `tentativa` é a do useEnvio (sobe a cada Salvar com erro); quando ela sobe, o foco
+// vai para o primeiro campo marcado (aria-invalid) do corpo, na ordem da tela (nunca enquanto a pessoa digita). As
+// mensagens ficam embaixo de cada campo (Campo, de src/components/campos/).
 // Pergunta ao descartar (usabilidade, U4): com `alterado` (cada janela compara o que está na tela com o que abriu),
 // Cancelar, Esc e o X perguntam "Descartar o que você digitou?" (Continuar editando / Descartar) antes de chamar
 // `aoFechar`. O sucesso fecha sem perguntar (o useEnvio chama o `aoFechar` da janela direto). Num `rodape` diferente,
@@ -37,7 +37,7 @@ const ContextoDaJanela = createContext(null)
 
 export default function JanelaFormulario({
   aberto, aoFechar, titulo, descricao, icone: Icone, largura = 'md', rodape, abas, alturaFixa = false, acaoEsquerda, enviando = false,
-  rotuloEnviar, rotuloEnviando = 'Salvando…', form, aoEnviar, envioDesabilitado = false, erros, alterado = false, children,
+  rotuloEnviar, rotuloEnviando = 'Salvando…', form, aoEnviar, envioDesabilitado = false, tentativa = 0, alterado = false, children,
 }) {
   const corpo = useRef(null)
   const [confirmando, setConfirmando] = useState(false)
@@ -50,9 +50,8 @@ export default function JanelaFormulario({
   }
 
   useEffect(() => {
-    if (!erros || Object.keys(erros).length === 0) return
-    corpo.current?.querySelector('[aria-invalid="true"]')?.focus()
-  }, [erros])
+    if (tentativa > 0) corpo.current?.querySelector('[aria-invalid="true"]')?.focus()
+  }, [tentativa])
 
   // Ao abrir, o foco vai para o primeiro campo do corpo (e não para o X do cabeçalho, onde um Enter fecharia a janela).
   function focarPrimeiroCampo(e) {

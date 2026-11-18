@@ -56,20 +56,22 @@ const quantosArquivos = (n) => (n === 1 ? 'O 1 arquivo dela some de vez.' : `Os 
 // O erro fica embaixo do nome, e fechar com o nome mudado pergunta antes (usabilidade, U2 e U4).
 function FormularioDePasta({ pasta, aoFechar, aoSalvar }) {
   const [nome, setNome] = useState(pasta?.nome ?? '')
-  const { erro, erros, conferir, enviando, enviar } = useEnvio(aoFechar)
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(aoFechar, {
+    validar: () => (nome.trim() ? {} : { nome: 'Dê um nome à pasta.' }),
+  })
   const alterado = useAlterado(nome)
   const novo = !pasta
 
   async function salvar(evento) {
     evento.preventDefault()
-    if (!conferir(nome.trim() ? {} : { nome: 'Dê um nome à pasta.' })) return
+    if (!conferir()) return
     await enviar(() => aoSalvar(nome.trim()))
   }
 
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo={novo ? 'Nova pasta' : 'Renomear pasta'} icone={novo ? FolderPlus : Pencil}
       descricao={novo ? 'Agrupa arquivos deste cliente.' : 'O nome é único entre as pastas do cliente.'} enviando={enviando}
-      erros={erros} alterado={alterado}
+      tentativa={tentativa} alterado={alterado}
       form="form-pasta" rotuloEnviar={novo ? 'Criar pasta' : 'Salvar'} rotuloEnviando={novo ? 'Criando…' : 'Salvando…'}>
       <form id="form-pasta" noValidate onSubmit={salvar} className="space-y-5">
         <Campo id="nome-da-pasta" rotulo="Nome da pasta" erro={erros.nome}>

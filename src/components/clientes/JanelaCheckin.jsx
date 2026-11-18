@@ -117,12 +117,21 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
   const [descricao, setDescricao] = useState(checkin?.descricao ?? '')
   // O "O que foi feito" como abriu (ou como veio pronto das tarefas, no check-out): o que muda dali é da pessoa.
   const [descricaoDeBase, setDescricaoDeBase] = useState(checkin?.descricao ?? '')
-  const { erro, erros, conferir, enviando, enviar } = useEnvio(aoFechar)
   const checkout = modo === 'checkout'
   const lancar = modo === 'lancar'
   const fechando = Boolean(checkin?.inicio && !checkin?.fim)
   // Data do fim: sempre no check-out; nos outros, quando o check-in atravessa a meia-noite.
   const comDataDoFim = checkout || iniciais.dataFim !== iniciais.data
+  const diaDoFim = comDataDoFim ? dataFim : data
+  const mudouInicio = data !== iniciais.data || inicio !== iniciais.inicio
+  const mudouFim = diaDoFim !== iniciais.dataFim || fim !== iniciais.fim
+  // O que vai ao banco: o início e o fim que a pessoa mudou (sem mexer, ficam os guardados, com os segundos).
+  const de = mudouInicio ? new Date(`${data}T${inicio}`) : new Date(checkin?.inicio)
+  const ate = mudouFim ? new Date(`${diaDoFim}T${fim}`) : checkin?.fim ? new Date(checkin.fim) : fimSugerido(de)
+  // Depois do primeiro Salvar, os erros acompanham a tela (corrigiu, a marca some).
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(aoFechar, {
+    validar: () => errosDoCheckin({ checkout, data, inicio, diaDoFim, comDataDoFim, fim, de, ate, descricao }),
+  })
   const textos = TEXTOS[modo]
   const [tarefas, setTarefas] = useState({ itens: [] })
   const idDoCheckin = modo === 'lancar' ? null : checkin?.id
@@ -151,9 +160,6 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
     }
   }, [idDoCheckin, checkout])
 
-  const diaDoFim = comDataDoFim ? dataFim : data
-  const mudouInicio = data !== iniciais.data || inicio !== iniciais.inicio
-  const mudouFim = diaDoFim !== iniciais.dataFim || fim !== iniciais.fim
   const alterado = mudouInicio || mudouFim || descricao !== descricaoDeBase
   // A duração calculada, ao lado do Fim (U8): só com os dois horários e o fim depois do início.
   const duracao = (() => {
@@ -164,9 +170,7 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
 
   async function salvar(evento) {
     evento.preventDefault()
-    const de = mudouInicio ? new Date(`${data}T${inicio}`) : new Date(checkin?.inicio)
-    const ate = mudouFim ? new Date(`${diaDoFim}T${fim}`) : checkin?.fim ? new Date(checkin.fim) : fimSugerido(de)
-    if (!conferir(errosDoCheckin({ checkout, data, inicio, diaDoFim, comDataDoFim, fim, de, ate, descricao }))) return
+    if (!conferir()) return
 
     const dados = { descricao: descricao.trim() }
     if (mudouInicio) dados.inicio = de.toISOString()
@@ -188,7 +192,7 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
   return (
     <JanelaFormulario aberto={aberto} aoFechar={aoFechar} titulo={`${textos.titulo} ${nomeDoCliente}`} icone={Clock} largura="lg" enviando={enviando}
       descricao={modo === 'editar' && fechando ? 'Informe o fim e o que foi feito para fechar o check-in.' : textos.descricao}
-      erros={erros} alterado={alterado} form="form-checkin" rotuloEnviar={textos.botao}>
+      tentativa={tentativa} alterado={alterado} form="form-checkin" rotuloEnviar={textos.botao}>
       <form id="form-checkin" noValidate onSubmit={salvar} className="space-y-5">
         {lancar && (
           // No toque, 44 px e 8 px entre os atalhos (auditoria, G5), como os do evento.

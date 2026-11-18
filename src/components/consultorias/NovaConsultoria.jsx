@@ -18,14 +18,13 @@ const VAZIO = { nome: '', forma: 'convite', adminNome: '', adminEmail: '', senha
 // pergunta antes (usabilidade, U2 e U4): a pergunta da JanelaFormulario vem antes do `fechar`, que limpa.
 export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
   const [dados, setDados] = useState(VAZIO)
-  const { erro, setErro, erros, setErros, conferir, enviando, enviar } = useEnvio(fechar)
+  const { erro, erros, tentativa, conferir, limpar, enviando, enviar } = useEnvio(fechar, { validar: errosDaConsultoria })
   const alterado = useAlterado(dados)
   const mudar = (campo) => (evento) => setDados((d) => ({ ...d, [campo]: evento.target.value }))
 
   function fechar() {
     setDados(VAZIO)
-    setErros({})
-    setErro(null)
+    limpar()
     aoFechar()
   }
 
@@ -41,7 +40,7 @@ export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
 
   async function criar(evento) {
     evento.preventDefault()
-    if (enviando || !conferir(errosDaConsultoria())) return
+    if (enviando || !conferir()) return
     const admin = { forma: dados.forma, nome: dados.adminNome.trim(), email: dados.adminEmail.trim() }
     if (dados.forma === 'senha') admin.senha = dados.senha
     await enviar(() => aoCriar({ nome: dados.nome.trim(), admin }))
@@ -55,7 +54,7 @@ export default function NovaConsultoria({ aberto, aoFechar, aoCriar }) {
 
   return (
     <JanelaFormulario aberto={aberto} aoFechar={fechar} titulo="Nova consultoria" icone={Building2} largura="lg" enviando={enviando}
-      descricao="A consultoria que contratou a plataforma e quem vai administrá-la." erros={erros} alterado={alterado}
+      descricao="A consultoria que contratou a plataforma e quem vai administrá-la." tentativa={tentativa} alterado={alterado}
       form="form-nova-consultoria" rotuloEnviar="Criar consultoria" rotuloEnviando="Criando…">
       <form id="form-nova-consultoria" noValidate onSubmit={criar} className="space-y-5">
         <SecaoFormulario titulo="Consultoria">

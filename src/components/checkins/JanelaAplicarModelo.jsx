@@ -32,7 +32,7 @@ export default function JanelaAplicarModelo({ cliente, checklist = null, aoFecha
   const [modelo, setModelo] = useState(null)
   const [inicioPadrao] = useState(() => hoje())
   const [inicio, setInicio] = useState(inicioPadrao)
-  const { erro, erros, conferir, enviando, enviar } = useEnvio()
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(undefined, { validar: errosDaAplicacao })
   const alterado = Boolean(modelo) || inicio !== inicioPadrao
   const trocando = Boolean(checklist)
   const atualId = checklist?.modelo_id
@@ -42,12 +42,16 @@ export default function JanelaAplicarModelo({ cliente, checklist = null, aoFecha
     return { itens: itens.map((m) => ({ valor: m.id, rotulo: m.nome, detalhe: detalheDoModelo(m, atualId), modelo: m })), total }
   }, [cliente.id, atualId])
 
-  async function aplicar(e) {
-    e.preventDefault()
+  function errosDaAplicacao() {
     const achados = {}
     if (!modelo) achados.modelo = 'Escolha um modelo.'
     if (!inicio) achados.inicio = 'Escolha o início dos prazos.'
-    if (!conferir(achados)) return
+    return achados
+  }
+
+  async function aplicar(e) {
+    e.preventDefault()
+    if (!conferir()) return
     await enviar(async () => {
       const resposta = await aplicarModelo({ clienteId: cliente.id, modeloId: modelo.id, inicio })
       if (resposta.erro) return resposta
@@ -64,7 +68,7 @@ export default function JanelaAplicarModelo({ cliente, checklist = null, aoFecha
   const rotulo = trocando ? 'Trocar modelo' : 'Aplicar modelo'
 
   return (
-    <JanelaFormulario aberto aoFechar={aoFechar} icone={ListChecks} largura="lg" enviando={enviando} erros={erros} alterado={alterado}
+    <JanelaFormulario aberto aoFechar={aoFechar} icone={ListChecks} largura="lg" enviando={enviando} tentativa={tentativa} alterado={alterado}
       titulo={trocando ? `Trocar o modelo de ${cliente.nome}` : `Aplicar modelo em ${cliente.nome}`}
       descricao={`${quemSegue} vai seguir as tarefas como check-list. Aparecem os modelos que a consultoria do cliente pode usar.`}
       rodape={(

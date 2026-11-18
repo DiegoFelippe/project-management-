@@ -27,7 +27,7 @@ export default function FormularioSmtp({ integracao, aoFechar, aoSalvar, aoTesta
   const [senha, setSenha] = useState('')
   const [remetente, setRemetente] = useState(atual.remetente ?? '')
   const [nomeRemetente, setNomeRemetente] = useState(atual.nome_remetente ?? '')
-  const { erro, erros, enviando, testando, resultado, salvar, testar } = useEnvioDaIntegracao(montar, aoSalvar, aoTestar)
+  const { erro, erros, tentativa, enviando, testando, resultado, salvar, testar } = useEnvioDaIntegracao(montar, aoSalvar, aoTestar)
   const alterado = useAlterado({ host, porta, seguranca, usuario, senha, remetente, nomeRemetente })
 
   function trocarSeguranca(nova) {
@@ -53,7 +53,7 @@ export default function FormularioSmtp({ integracao, aoFechar, aoSalvar, aoTesta
   }
 
   return (
-    <JanelaIntegracao titulo="E-mail (SMTP)" aoFechar={aoFechar} aoSalvar={salvar} aoTestar={testar} erro={erro} erros={erros} alterado={alterado} enviando={enviando}
+    <JanelaIntegracao titulo="E-mail (SMTP)" aoFechar={aoFechar} aoSalvar={salvar} aoTestar={testar} erro={erro} tentativa={tentativa} alterado={alterado} enviando={enviando}
       testando={testando} resultado={resultado}
       descricao="O servidor de e-mail que o sistema usa para mandar mensagens em nome da consultoria.">
       <SecaoFormulario titulo="Servidor">

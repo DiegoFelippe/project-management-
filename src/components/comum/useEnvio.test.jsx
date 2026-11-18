@@ -31,13 +31,38 @@ describe('useEnvio', () => {
     expect(result.current.erros).toEqual({})
   })
 
-  it('conferir com os mesmos erros cria outro objeto (a janela leva o foco ao primeiro de novo)', () => {
+  it('cada conferir com erro soma uma tentativa (a janela leva o foco ao primeiro campo só nessa hora)', () => {
     const { result } = renderHook(() => useEnvio(vi.fn()))
+    expect(result.current.tentativa).toBe(0)
     act(() => { result.current.conferir({ nome: 'x' }) })
-    const antes = result.current.erros
     act(() => { result.current.conferir({ nome: 'x' }) })
-    expect(result.current.erros).not.toBe(antes)
-    expect(result.current.erros).toEqual(antes)
+    expect(result.current.tentativa).toBe(2)
+    act(() => { result.current.conferir({}) })
+    expect(result.current.tentativa).toBe(2)
+  })
+
+  it('com validar, os erros só aparecem depois do primeiro Salvar e, dali em diante, acompanham a tela', () => {
+    const { result, rerender } = renderHook(({ nome }) => useEnvio(vi.fn(), { validar: () => (nome.length < 2 ? { nome: 'Curto.' } : {}) }),
+      { initialProps: { nome: '' } })
+    expect(result.current.erros).toEqual({})
+    let pode
+    act(() => { pode = result.current.conferir() })
+    expect(pode).toBe(false)
+    expect(result.current.erros).toEqual({ nome: 'Curto.' })
+    rerender({ nome: 'Ana' })
+    expect(result.current.erros).toEqual({})
+    expect(result.current.tentativa).toBe(1)
+    rerender({ nome: 'A' })
+    expect(result.current.erros).toEqual({ nome: 'Curto.' })
+  })
+
+  it('limpar zera os erros e o aviso (a janela que fica montada volta ao começo)', () => {
+    const { result } = renderHook(() => useEnvio(vi.fn(), { validar: () => ({ nome: 'Curto.' }) }))
+    act(() => { result.current.conferir() })
+    act(() => result.current.setErro('Falhou.'))
+    act(() => result.current.limpar())
+    expect(result.current.erros).toEqual({})
+    expect(result.current.erro).toBeNull()
   })
 
   it('com { erros } (o servidor recusou um campo), marca os campos, não conclui e devolve false', async () => {
@@ -48,6 +73,7 @@ describe('useEnvio', () => {
     expect(deuCerto).toBe(false)
     expect(result.current.erros).toEqual({ senha: 'A senha não foi aceita.' })
     expect(result.current.erro).toBeNull()
+    expect(result.current.tentativa).toBe(1)
     expect(aoConcluir).not.toHaveBeenCalled()
   })
 
@@ -58,10 +84,11 @@ describe('useEnvio', () => {
     expect(result.current.erros).toEqual({ nome: 'Já existe.' })
   })
 
-  it('um envio novo limpa os erros dos campos; { erros: {} } vazio conta como sucesso', async () => {
+  it('um envio novo limpa os erros que o servidor deu; { erros: {} } vazio conta como sucesso', async () => {
     const aoConcluir = vi.fn()
     const { result } = renderHook(() => useEnvio(aoConcluir))
-    act(() => { result.current.conferir({ nome: 'x' }) })
+    await act(async () => { await result.current.enviar(async () => ({ erros: { nome: 'Já existe.' } })) })
+    expect(result.current.erros).toEqual({ nome: 'Já existe.' })
     await act(async () => { await result.current.enviar(async () => ({ erro: null, erros: {} })) })
     expect(result.current.erros).toEqual({})
     expect(aoConcluir).toHaveBeenCalledTimes(1)

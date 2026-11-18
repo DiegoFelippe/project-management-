@@ -28,15 +28,15 @@ function Formulario({ ausencia, aoSalvar, aoCancelar }) {
   const [de, setDe] = useState(ausencia?.de ?? '')
   const [ate, setAte] = useState(ausencia?.ate ?? '')
   const [motivo, setMotivo] = useState(ausencia?.motivo ?? '')
-  const { erro, erros, conferir, enviando, enviar } = useEnvio()
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(undefined, { validar: () => errosDaAusencia({ de, ate, motivo }) })
   const formulario = useRef(null)
   useEffect(() => {
-    if (Object.keys(erros).length) formulario.current?.querySelector('[aria-invalid="true"]')?.focus()
-  }, [erros])
+    if (tentativa > 0) formulario.current?.querySelector('[aria-invalid="true"]')?.focus()
+  }, [tentativa])
 
   async function salvar(evento) {
     evento.preventDefault()
-    if (!conferir(errosDaAusencia({ de, ate, motivo }))) return
+    if (!conferir()) return
     await enviar(() => aoSalvar({ de, ate, motivo: motivo.trim() }))
   }
 

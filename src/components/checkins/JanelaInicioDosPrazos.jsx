@@ -27,12 +27,14 @@ function previaDasDatas(inicio, tarefas, proxima) {
 // pergunta antes (usabilidade, U2 e U4).
 export default function JanelaInicioDosPrazos({ checklist, tarefas, proximaId, aoFechar, aoSalvar }) {
   const [inicio, setInicio] = useState(checklist.inicio)
-  const { erro, erros, conferir, enviando, enviar } = useEnvio()
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(undefined, {
+    validar: () => (inicio ? {} : { inicio: 'Escolha o início dos prazos.' }),
+  })
   const proxima = tarefas.find((t) => t.id === proximaId)
 
   async function salvar(e) {
     e.preventDefault()
-    if (!conferir(inicio ? {} : { inicio: 'Escolha o início dos prazos.' })) return
+    if (!conferir()) return
     if (inicio === checklist.inicio) return aoFechar()
     await enviar(async () => {
       const resposta = await mudarInicio(checklist.id, inicio)
@@ -45,7 +47,7 @@ export default function JanelaInicioDosPrazos({ checklist, tarefas, proximaId, a
 
   return (
     <JanelaFormulario aberto aoFechar={aoFechar} titulo="Mudar o início dos prazos" icone={CalendarCog} enviando={enviando}
-      descricao="Os prazos das tarefas contam em dias corridos a partir desta data." erros={erros} alterado={inicio !== checklist.inicio}
+      descricao="Os prazos das tarefas contam em dias corridos a partir desta data." tentativa={tentativa} alterado={inicio !== checklist.inicio}
       form="form-inicio-dos-prazos" rotuloEnviar="Salvar">
       <form id="form-inicio-dos-prazos" noValidate onSubmit={salvar} className="space-y-5">
         <Campo id="inicio-dos-prazos" rotulo="Início dos prazos" erro={erros.inicio}>

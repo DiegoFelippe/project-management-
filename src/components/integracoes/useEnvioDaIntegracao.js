@@ -8,21 +8,30 @@ const SEM_ERROS = {}
 // mensagem }, todos de uma vez, cada um embaixo do seu campo: usabilidade, U2) quando o que foi digitado não serve, ou
 // { config, segredo, extras? } (extras: o que só vai no teste, como o número do WhatsApp). Salvar grava
 // (aoSalvar(config, segredo)); Testar testa sem gravar (aoTestar(config, segredo, extras)) e devolve { erro, mensagem }.
-// O resultado do teste fica preso aos dados testados: qualquer campo que mude o esconde. Uma falha da rede vira aviso na
-// janela (e o erro vai para o console), e os botões sempre voltam.
+// O resultado do teste fica preso aos dados testados: qualquer campo que mude o esconde. Depois do primeiro Salvar ou
+// Testar, os erros acompanham a tela (corrigiu, a marca some); `tentativa` sobe a cada clique com erro (a janela leva o
+// foco ao primeiro campo marcado). Uma falha da rede vira aviso na janela (e o erro vai para o console), e os botões
+// sempre voltam.
 export function useEnvioDaIntegracao(montar, aoSalvar, aoTestar) {
   const [erro, setErro] = useState(null)
-  const [erros, setErros] = useState(SEM_ERROS)
+  const [tentou, setTentou] = useState(false)
+  const [tentativa, setTentativa] = useState(0)
   const [enviando, setEnviando] = useState(false)
   const [testando, setTestando] = useState(false)
   const [teste, setTeste] = useState(null) // { dados: o JSON do que foi testado, resultado }
-  const resultado = teste && teste.dados === JSON.stringify(montar()) ? teste.resultado : null
+  const agora = montar()
+  const resultado = teste && teste.dados === JSON.stringify(agora) ? teste.resultado : null
+  const erros = (tentou && agora.erros) || SEM_ERROS
 
   function dados() {
     const montado = montar()
     setErro(null)
-    setErros({ ...montado.erros })
-    return montado.erros && Object.keys(montado.erros).length ? null : montado
+    setTentou(true)
+    if (montado.erros && Object.keys(montado.erros).length) {
+      setTentativa((t) => t + 1)
+      return null
+    }
+    return montado
   }
 
   async function salvar(evento) {
@@ -58,5 +67,5 @@ export function useEnvioDaIntegracao(montar, aoSalvar, aoTestar) {
     }
   }
 
-  return { erro, erros, enviando, testando, resultado, salvar, testar }
+  return { erro, erros, tentativa, enviando, testando, resultado, salvar, testar }
 }

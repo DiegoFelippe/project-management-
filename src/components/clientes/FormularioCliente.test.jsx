@@ -145,6 +145,20 @@ describe('FormularioCliente', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it('depois do Salvar, corrigir um campo tira a marca dele na hora, sem tirar o foco de onde a pessoa digita', async () => {
+    const user = userEvent.setup()
+    abrir({ cliente: CLIENTE })
+    await user.type(screen.getByLabelText('Telefone do contato (opcional)'), '49999')
+    await user.type(screen.getByLabelText('E-mail do contato (opcional)'), 'contato@')
+    await user.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(screen.getByLabelText('Telefone do contato (opcional)')).toHaveFocus()
+    await user.click(screen.getByLabelText('E-mail do contato (opcional)'))
+    await user.type(screen.getByLabelText('E-mail do contato (opcional)'), 'alfa.com.br')
+    expect(screen.getByLabelText('E-mail do contato (opcional)')).not.toHaveAttribute('aria-invalid')
+    expect(screen.getByLabelText('E-mail do contato (opcional)')).toHaveFocus()
+    expect(screen.getByLabelText('Telefone do contato (opcional)')).toHaveAttribute('aria-invalid', 'true')
+  })
+
   it('telefone com DDD (10 ou 11 números) e e-mail certo passam e vão como digitados', async () => {
     const user = userEvent.setup()
     const { aoSalvar } = abrir({ cliente: CLIENTE })

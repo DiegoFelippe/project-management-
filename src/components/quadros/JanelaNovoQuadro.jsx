@@ -24,7 +24,7 @@ export default function JanelaNovoQuadro({ perfil, aoFechar, aoCriado }) {
   const [dono, setDono] = useState('pessoa')
   const [time, setTime] = useState(null) // { valor, rotulo }
   const [semTimes, setSemTimes] = useState(false)
-  const { erro, erros, conferir, enviando, enviar } = useEnvio()
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(undefined, { validar: errosDoQuadro })
   const alterado = useAlterado({ nome, dono, time: time?.valor ?? null })
 
   // Está em algum time? (só para desligar "Um time" com a explicação; a lista vem do banco ao abrir o Seletor)
@@ -44,14 +44,18 @@ export default function JanelaNovoQuadro({ perfil, aoFechar, aoCriado }) {
     return { itens: itens.map((t) => ({ valor: t.id, rotulo: t.nome })), total }
   }, [])
 
+  function errosDoQuadro() {
+    const achados = {}
+    if (!nome.trim()) achados.nome = 'Dê um nome ao quadro.'
+    if (dono === 'time' && !time?.valor) achados.time = 'Escolha o time.'
+    return achados
+  }
+
   function aoEnviar(evento) {
     evento.preventDefault()
     const limpo = nome.trim()
     const timeId = dono === 'time' ? time?.valor : null
-    const achados = {}
-    if (!limpo) achados.nome = 'Dê um nome ao quadro.'
-    if (dono === 'time' && !timeId) achados.time = 'Escolha o time.'
-    if (!conferir(achados)) return
+    if (!conferir()) return
     enviar(async () => {
       const resposta = await criarQuadro({ nome: limpo, timeId })
       if (!resposta.erro) aoCriado(resposta.id, limpo)
@@ -60,7 +64,7 @@ export default function JanelaNovoQuadro({ perfil, aoFechar, aoCriado }) {
   }
 
   return (
-    <JanelaFormulario aberto aoFechar={aoFechar} titulo="Novo quadro" icone={SquareKanban} enviando={enviando} erros={erros} alterado={alterado}
+    <JanelaFormulario aberto aoFechar={aoFechar} titulo="Novo quadro" icone={SquareKanban} enviando={enviando} tentativa={tentativa} alterado={alterado}
       descricao="Já vem com as colunas A fazer, Em andamento e Concluído."
       form="form-novo-quadro" rotuloEnviar="Criar quadro" rotuloEnviando="Criando…">
       <form id="form-novo-quadro" noValidate onSubmit={aoEnviar} className="space-y-5">
