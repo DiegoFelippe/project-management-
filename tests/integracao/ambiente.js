@@ -121,6 +121,36 @@ export function conferirLimpeza(acao, { error }) {
     'Os dados de teste que sobraram continuam no banco local.')
 }
 
+// O filtro in(...) do PostgREST vai na URL: com centenas de ids ela passa do limite ("URI too long", 414 já com 300
+// no Supabase local). Por isso cada passo da limpeza manda os ids em lotes de 50, todos os lotes de um passo antes do
+// próximo (a mesma ordem de antes). Os objetos do Storage vão no corpo do pedido, em lotes de 1000.
+const LOTE = 50
+const LOTE_DO_STORAGE = 1000
+
+export function lotes(lista, tamanho = LOTE) {
+  const todos = [...lista]
+  const pedacos = []
+  for (let inicio = 0; inicio < todos.length; inicio += tamanho) pedacos.push(todos.slice(inicio, inicio + tamanho))
+  return pedacos
+}
+
+// Um passo da limpeza: `pedir(lote)` para cada lote de ids, cada resposta conferida; devolve as linhas lidas.
+async function emLotes(acao, ids, pedir) {
+  const linhas = []
+  for (const lote of lotes(ids)) {
+    const resposta = await pedir(lote)
+    conferirLimpeza(acao, resposta)
+    linhas.push(...(resposta.data ?? []))
+  }
+  return linhas
+}
+
+async function removerDoStorage(acao, balde, caminhos) {
+  for (const lote of lotes(caminhos, LOTE_DO_STORAGE)) {
+    conferirLimpeza(acao, await admin.storage.from(balde).remove(lote))
+  }
+}
+
 // Objetos do bucket "arquivos" na pasta de cada cliente de teste, inclusive os que ficaram sem linha.
 async function objetosNasPastas(clientes) {
   const caminhos = []
@@ -136,25 +166,17 @@ async function objetosNasPastas(clientes) {
 // consultoria, restrict; o objeto não sai junto com o cliente).
 async function limparArquivos(clientes, consultorias) {
   const caminhos = new Set(await objetosNasPastas(clientes))
-  if (consultorias.length) {
-    const resposta = await admin.from('cliente_arquivos').select('caminho').in('consultoria_id', consultorias)
-    conferirLimpeza('ler os arquivos das consultorias de teste', resposta)
-    for (const linha of resposta.data ?? []) caminhos.add(linha.caminho)
-  }
-  if (caminhos.size) {
-    conferirLimpeza('apagar os objetos dos arquivos de teste', await admin.storage.from('arquivos').remove([...caminhos]))
-  }
-  if (clientes.length) {
-    conferirLimpeza('apagar os arquivos dos clientes de teste',
-      await admin.from('cliente_arquivos').delete().in('cliente_id', clientes))
-  }
-  if (consultorias.length) {
-    conferirLimpeza('apagar os arquivos das consultorias de teste',
-      await admin.from('cliente_arquivos').delete().in('consultoria_id', consultorias))
-    // As pastas seguram a consultoria (restrict); as dos clientes de teste saem com o cliente.
-    conferirLimpeza('apagar as pastas das consultorias de teste',
-      await admin.from('cliente_pastas').delete().in('consultoria_id', consultorias))
-  }
+  const linhas = await emLotes('ler os arquivos das consultorias de teste', consultorias,
+    (lote) => admin.from('cliente_arquivos').select('caminho').in('consultoria_id', lote))
+  for (const linha of linhas) caminhos.add(linha.caminho)
+  await removerDoStorage('apagar os objetos dos arquivos de teste', 'arquivos', caminhos)
+  await emLotes('apagar os arquivos dos clientes de teste', clientes,
+    (lote) => admin.from('cliente_arquivos').delete().in('cliente_id', lote))
+  await emLotes('apagar os arquivos das consultorias de teste', consultorias,
+    (lote) => admin.from('cliente_arquivos').delete().in('consultoria_id', lote))
+  // As pastas seguram a consultoria (restrict); as dos clientes de teste saem com o cliente.
+  await emLotes('apagar as pastas das consultorias de teste', consultorias,
+    (lote) => admin.from('cliente_pastas').delete().in('consultoria_id', lote))
 }
 
 // Objetos do balde "quadros" numa pasta e nas subpastas (cartões e imagens): a pasta de um cliente de teste.
@@ -181,34 +203,26 @@ async function limparQuadros(clientes, consultorias) {
   const caminhos = []
   // Só as pastas dos clientes e dos quadros de teste (nunca a raiz do balde nem a pasta "quadro", que têm as de todos).
   for (const pasta of [...clientes.filter(Boolean), ...pastas]) caminhos.push(...await objetosDoQuadro(pasta))
-  for (let inicio = 0; inicio < caminhos.length; inicio += 1000) {
-    conferirLimpeza('apagar os objetos dos quadros de teste',
-      await admin.storage.from('quadros').remove(caminhos.slice(inicio, inicio + 1000)))
-  }
+  await removerDoStorage('apagar os objetos dos quadros de teste', 'quadros', caminhos)
 }
 
 // Apaga os quadros de teste; devolve as pastas no balde dos que não são de cliente (quadro/<id>).
 async function limparQuadrosDoBanco(clientes, consultorias) {
   const quadros = new Map()
-  const juntar = (acao, resposta) => {
-    conferirLimpeza(acao, resposta)
-    for (const linha of resposta.data ?? []) quadros.set(linha.id, linha.tipo)
+  const juntar = (linhas) => {
+    for (const linha of linhas) quadros.set(linha.id, linha.tipo)
   }
-  if (clientes.length) {
-    juntar('ler os quadros dos clientes de teste', await admin.from('quadros').select('id, tipo').in('cliente_id', clientes))
-  }
-  if (consultorias.length) {
-    juntar('ler os quadros das consultorias de teste',
-      await admin.from('quadros').select('id, tipo').in('consultoria_id', consultorias))
-  }
+  juntar(await emLotes('ler os quadros dos clientes de teste', clientes,
+    (lote) => admin.from('quadros').select('id, tipo').in('cliente_id', lote)))
+  juntar(await emLotes('ler os quadros das consultorias de teste', consultorias,
+    (lote) => admin.from('quadros').select('id, tipo').in('consultoria_id', lote)))
   // Os quadros pessoais da central e do dono (de teste) não têm consultoria.
-  if (criados.usuarios.size) {
-    juntar('ler os quadros pessoais das pessoas de teste',
-      await admin.from('quadros').select('id, tipo').in('pessoa_id', [...criados.usuarios]))
-  }
+  juntar(await emLotes('ler os quadros pessoais das pessoas de teste', criados.usuarios,
+    (lote) => admin.from('quadros').select('id, tipo').in('pessoa_id', lote)))
   if (!quadros.size) return []
-  conferirLimpeza('apagar os cartões dos quadros de teste', await admin.from('cartoes').delete().in('quadro_id', [...quadros.keys()]))
-  conferirLimpeza('apagar os quadros de teste', await admin.from('quadros').delete().in('id', [...quadros.keys()]))
+  await emLotes('apagar os cartões dos quadros de teste', quadros.keys(),
+    (lote) => admin.from('cartoes').delete().in('quadro_id', lote))
+  await emLotes('apagar os quadros de teste', quadros.keys(), (lote) => admin.from('quadros').delete().in('id', lote))
   return [...quadros].filter(([, tipo]) => tipo !== 'cliente').map(([id]) => `quadro/${id}`)
 }
 
@@ -216,74 +230,53 @@ async function limparQuadrosDoBanco(clientes, consultorias) {
 // (os da Central para todas não têm consultoria). Etapas, tarefas e dependências saem junto. Antes de apagar as pessoas:
 // depois, quem criou fica nulo e o modelo não seria mais achado.
 async function limparModelos(consultorias) {
-  if (consultorias.length) {
-    conferirLimpeza('apagar os modelos das consultorias de teste',
-      await admin.from('modelos').delete().in('consultoria_id', consultorias))
-  }
-  if (criados.usuarios.size) {
-    conferirLimpeza('apagar os modelos das pessoas de teste',
-      await admin.from('modelos').delete().in('criado_por', [...criados.usuarios]))
-  }
+  await emLotes('apagar os modelos das consultorias de teste', consultorias,
+    (lote) => admin.from('modelos').delete().in('consultoria_id', lote))
+  await emLotes('apagar os modelos das pessoas de teste', criados.usuarios,
+    (lote) => admin.from('modelos').delete().in('criado_por', lote))
 }
 
 // Check-lists dos clientes e das consultorias de teste: seguram o cliente e a consultoria (restrict), e o modelo com
 // check-list ativo não se apaga. Saem antes dos clientes e dos modelos; etapas, tarefas, dependências e as tarefas
 // marcadas nos check-ins saem junto.
 async function limparChecklists(clientes, consultorias) {
-  if (clientes.length) {
-    conferirLimpeza('apagar os check-lists dos clientes de teste',
-      await admin.from('cliente_checklists').delete().in('cliente_id', clientes))
-  }
-  if (consultorias.length) {
-    conferirLimpeza('apagar os check-lists das consultorias de teste',
-      await admin.from('cliente_checklists').delete().in('consultoria_id', consultorias))
-  }
+  await emLotes('apagar os check-lists dos clientes de teste', clientes,
+    (lote) => admin.from('cliente_checklists').delete().in('cliente_id', lote))
+  await emLotes('apagar os check-lists das consultorias de teste', consultorias,
+    (lote) => admin.from('cliente_checklists').delete().in('consultoria_id', lote))
 }
 
 export async function limparTudo() {
   const consultorias = [...criados.consultorias]
   // Arquivos, check-lists, check-ins, quadros e clientes seguram consultorias e clientes (restrict): saem antes.
   const clientes = new Set(criados.clientes)
-  if (consultorias.length) {
-    const resposta = await admin.from('clientes').select('id').in('consultoria_id', consultorias)
-    conferirLimpeza('ler os clientes das consultorias de teste', resposta)
-    for (const linha of resposta.data ?? []) clientes.add(linha.id)
-  }
+  const dasConsultorias = await emLotes('ler os clientes das consultorias de teste', consultorias,
+    (lote) => admin.from('clientes').select('id').in('consultoria_id', lote))
+  for (const linha of dasConsultorias) clientes.add(linha.id)
   await limparQuadros([...clientes], consultorias)
   await limparArquivos([...clientes], consultorias)
   await limparChecklists([...clientes], consultorias)
-  if (consultorias.length) {
-    // Eventos da agenda seguram consultoria e consultor (restrict); os participantes saem com o evento.
-    conferirLimpeza('apagar os eventos da agenda das consultorias de teste',
-      await admin.from('agenda_eventos').delete().in('consultoria_id', consultorias))
-  }
-  if (clientes.size) {
-    conferirLimpeza('apagar os check-ins dos clientes de teste',
-      await admin.from('checkins').delete().in('cliente_id', [...clientes]))
-  }
-  if (consultorias.length) {
-    conferirLimpeza('apagar os check-ins das consultorias de teste',
-      await admin.from('checkins').delete().in('consultoria_id', consultorias))
-  }
-  if (clientes.size) {
-    conferirLimpeza('apagar os clientes de teste', await admin.from('clientes').delete().in('id', [...clientes]))
-  }
-  if (consultorias.length) {
-    conferirLimpeza('apagar os times das consultorias de teste',
-      await admin.from('times').delete().in('consultoria_id', consultorias))
-    const resposta = await admin.from('perfis').select('id').in('consultoria_id', consultorias)
-    conferirLimpeza('ler as pessoas das consultorias de teste', resposta)
-    for (const linha of resposta.data ?? []) criados.usuarios.add(linha.id)
-  }
+  // Eventos da agenda seguram consultoria e consultor (restrict); os participantes saem com o evento.
+  await emLotes('apagar os eventos da agenda das consultorias de teste', consultorias,
+    (lote) => admin.from('agenda_eventos').delete().in('consultoria_id', lote))
+  await emLotes('apagar os check-ins dos clientes de teste', clientes,
+    (lote) => admin.from('checkins').delete().in('cliente_id', lote))
+  await emLotes('apagar os check-ins das consultorias de teste', consultorias,
+    (lote) => admin.from('checkins').delete().in('consultoria_id', lote))
+  await emLotes('apagar os clientes de teste', clientes, (lote) => admin.from('clientes').delete().in('id', lote))
+  await emLotes('apagar os times das consultorias de teste', consultorias,
+    (lote) => admin.from('times').delete().in('consultoria_id', lote))
+  const pessoas = await emLotes('ler as pessoas das consultorias de teste', consultorias,
+    (lote) => admin.from('perfis').select('id').in('consultoria_id', lote))
+  for (const linha of pessoas) criados.usuarios.add(linha.id)
   await limparModelos(consultorias)
   for (const id of criados.usuarios) {
     const resposta = await admin.auth.admin.deleteUser(id)
     // Usuário que já não existe é o que se queria.
     if (resposta.error?.status !== 404) conferirLimpeza(`apagar o usuário de teste ${id}`, resposta)
   }
-  if (consultorias.length) {
-    conferirLimpeza('apagar as consultorias de teste', await admin.from('consultorias').delete().in('id', consultorias))
-  }
+  await emLotes('apagar as consultorias de teste', consultorias,
+    (lote) => admin.from('consultorias').delete().in('id', lote))
   criados.consultorias.clear()
   criados.usuarios.clear()
   criados.clientes.clear()

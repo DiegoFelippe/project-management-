@@ -8,7 +8,9 @@ import {
   criarPerfilDeTeste,
   entrarComo,
   limparTudo,
+  lotes,
   registrarCliente,
+  registrarConsultoria,
 } from './ambiente.js'
 
 const admin = clienteAdmin()
@@ -23,6 +25,35 @@ describe('limparTudo', () => {
       .toThrow(/limparTudo: não foi possível apagar os clientes de teste \(23503: update or delete on table "clientes"/)
     expect(() => conferirLimpeza('apagar os clientes de teste', { error: null })).not.toThrow()
   })
+
+  it('lotes: corta a lista em pedaços de 50 (o in(...) vai na URL), na mesma ordem', () => {
+    const ids = Array.from({ length: 120 }, (_, i) => i)
+    expect(lotes(ids).map((l) => l.length)).toEqual([50, 50, 20])
+    expect(lotes(ids).flat()).toEqual(ids)
+    expect(lotes(new Set(['a', 'b']))).toEqual([['a', 'b']])
+    expect(lotes([])).toEqual([])
+  })
+
+  it('com centenas de clientes e consultorias (a URL do in(...) passaria do limite: 414 URI too long), limpa tudo', async () => {
+    // 300 ids na URL já dão 414 no Supabase local; ids que não existem passam pelos mesmos passos sem apagar nada alheio.
+    for (let i = 0; i < 300; i++) {
+      registrarCliente(randomUUID())
+      registrarConsultoria(randomUUID())
+    }
+    const consultoria = await criarConsultoriaDeTeste()
+    const { data: cliente, error } = await admin
+      .from('clientes')
+      .insert({ nome: 'Limpeza em lotes', horas_mes: 1, consultoria_id: consultoria })
+      .select('id')
+      .single()
+    expect(error).toBeNull()
+    registrarCliente(cliente.id)
+
+    await limparTudo()
+
+    expect((await admin.from('clientes').select('id').eq('id', cliente.id)).data).toEqual([])
+    expect((await admin.from('consultorias').select('id').eq('id', consultoria)).data).toEqual([])
+  }, 120_000)
 
   it('apaga a consultoria, a pessoa, o cliente e o check-in que o teste criou', async () => {
     const consultoria = await criarConsultoriaDeTeste()
