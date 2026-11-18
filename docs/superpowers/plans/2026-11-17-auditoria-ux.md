@@ -37,3 +37,43 @@ M2 (chips pelo tipo + bolinha da cor), M3 (painel do dia à direita a partir de 
 
 ### Lote E — textos e janelas
 R9 (texto de Integrações), R10 (ilustração do login com o que o app faz), R11 ("Criar cliente"/"Criando…" e "(opcional)" certo), C2 (`useEnvio`), C3 (rodapé montado pela `JanelaFormulario`), C7 (`CartoesDeOpcao`).
+
+## Achados de usabilidade (18/11)
+
+Relatório: https://claude.ai/artifact/1RL6ajK2ozhYDGDEtYBQ5m (cópia local `docs/auditoria-ux/usabilidade/relatorio.html`).
+**Pedido do Diego (18/11 08:34):** "Pode aplicar" — vale para U1–U12, inclusive U6 (muda a regra de apagar do
+check-list) e as regras novas do CLAUDE.md (U2, U3, U4, U5), que cada lote escreve dizendo "pedido do Diego, 18/11
+(usabilidade)". Cada item entra no lote que já mexe nos mesmos arquivos; o lote F é novo.
+
+**Decisões do controlador (o Diego pode mudar):**
+- **U1:** com algo na busca, Clientes procura em todas as situações e mostra a situação de cada linha (as abas ficam,
+  mas a busca passa por cima delas, dizendo "Buscando em todas as situações"); sem busca, tudo como hoje. No banco.
+- **U3:** "Desfazer" só onde o banco já tem o caminho de volta para a mesma pessoa (check-in recém-feito: apagar o
+  check-in; os outros, se houver função que volta ao estado anterior com a mesma regra). Onde não houver, o aviso ganha
+  só "Ver cliente" e o relatório do lote diz qual ficou sem. Aviso com botões dura ~10 s e para com o foco ou o mouse.
+- **U5:** cartão vira link quando a lista da tela tem (ou ganha, no banco) o filtro daquele número; os outros continuam
+  só número. Clicar aplica o filtro e volta à página 1.
+- **U6:** "Tirar modelo" sem nenhuma tarefa marcada apaga o check-list de verdade (função do banco; as linhas do
+  Histórico ficam); com tarefa marcada, continua encerrando. A confirmação diz qual dos dois vai acontecer e, no
+  segundo caso, que o cliente não poderá ser apagado (só arquivado).
+- **U2:** formato de e-mail e telefone conferido na tela (os dois opcionais; telefone com 10 ou 11 dígitos); o banco
+  continua com as regras que tem.
+- **U9:** chave "Dia inteiro" explícita, desligada por padrão; sem hora e com a chave desligada, o erro aponta a hora.
+
+### Lote B (acrescenta) — U1, U5, U7
+U1 (busca em todas as situações), U5 (cartões que levam ao filtro; `CartoesDeNumeros` com destino por cartão — depois
+da T4 dos gráficos, que mexe nele), U7 (Novo time com "Pessoas", várias de uma vez, e abrir o time ao criar; na página
+do time, várias pessoas antes de "Colocar no time").
+
+### Lote C (acrescenta) — U3, U6, U11, U12
+U3 ("Desfazer" e "Ver cliente" nos avisos de check-in, Mandar para consultoria, Escolher/Trocar consultor), U6 (tirar
+modelo sem tarefa marcada apaga; migração, teste pgTAP e de integração), U11 ("Fazendo check-in…" e o aviso de tempo
+esgotado com "Tentar de novo"), U12 (a caixa da sessão relê depois do check-out). **Depois** da T6/T7 dos check-ins.
+
+### Lote F — formulários (novo, depois do lote E)
+U2 (erros embaixo de cada campo, todos de uma vez, borda vermelha, `aria-describedby`, foco no primeiro; e-mail e
+telefone conferidos — na `JanelaFormulario`, nos campos de `src/components/campos/` e no `useEnvio`), U4 (a
+`JanelaFormulario` pergunta "Descartar o que você digitou?" — Continuar editando / Descartar — ao fechar com mudança,
+por Cancelar, Esc ou clique fora), U8 (Lançar horas: data em hoje, atalhos Hoje/Ontem, duração ao lado do Fim, erro no
+campo), U9 (chave "Dia inteiro", "Conectar Google" no aviso, visão do Calendário no endereço `?visao=`), U10 ("As senhas
+não são iguais" ao digitar).
