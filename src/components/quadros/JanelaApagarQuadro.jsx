@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Archive, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
-import JanelaFormulario, { SecaoFormulario } from '@/components/comum/JanelaFormulario'
+import JanelaFormulario, { BotaoCancelar, SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import { useEnvio } from '@/components/comum/useEnvio'
 import { Button } from '@/components/ui/button'
 import { quadroPorId } from '@/data/quadro'
@@ -61,7 +61,7 @@ export default function JanelaApagarQuadro({ quadro, aoFechar, aoApagado, aoArqu
     <JanelaFormulario aberto aoFechar={aoFechar} titulo={`Apagar o ${oQuadro(quadro.nome)}?`} icone={Trash2} enviando={enviando}
       rodape={(
         <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
+          <BotaoCancelar />
           {aoArquivar && (
             <Button type="button" variant="outline" onClick={arquivar} disabled={enviando}>
               <Archive /> {enviando && acao === 'arquivar' ? 'Arquivando…' : 'Arquivar'}

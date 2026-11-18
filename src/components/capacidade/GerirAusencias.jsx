@@ -1,52 +1,58 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import Campo from '@/components/campos/Campo'
 import CampoData from '@/components/campos/CampoData'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import { AcaoDaLinha } from '@/components/comum/Tabela'
+import { useEnvio } from '@/components/comum/useEnvio'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { apagarAusencia, criarAusencia, editarAusencia } from '@/data/capacidade'
 import { formatarDia } from '@/lib/mes'
 import AusenciasDaPessoa from './AusenciasDaPessoa'
 
+// Os erros da ausência, todos de uma vez, cada um no seu campo (usabilidade, U2).
+function errosDaAusencia({ de, ate, motivo }) {
+  const erros = {}
+  if (!de) erros.de = 'Informe a data inicial.'
+  if (!ate) erros.ate = 'Informe a data final.'
+  else if (de && ate < de) erros.ate = 'A data final não pode ser antes da inicial.'
+  const texto = motivo.trim()
+  if (texto.length < 2 || texto.length > 120) erros.motivo = 'O motivo precisa ter de 2 a 120 caracteres.'
+  return erros
+}
+
+// O formulário em linha (dentro da ficha e da Capacidade): sem a JanelaFormulario, o foco vai ao primeiro campo errado aqui.
 function Formulario({ ausencia, aoSalvar, aoCancelar }) {
   const [de, setDe] = useState(ausencia?.de ?? '')
   const [ate, setAte] = useState(ausencia?.ate ?? '')
   const [motivo, setMotivo] = useState(ausencia?.motivo ?? '')
-  const [erro, setErro] = useState(null)
-  const [enviando, setEnviando] = useState(false)
+  const { erro, erros, conferir, enviando, enviar } = useEnvio()
+  const formulario = useRef(null)
+  useEffect(() => {
+    if (Object.keys(erros).length) formulario.current?.querySelector('[aria-invalid="true"]')?.focus()
+  }, [erros])
 
   async function salvar(evento) {
     evento.preventDefault()
-    if (!de || !ate) return setErro('Informe as datas inicial e final.')
-    if (ate < de) return setErro('A data final não pode ser antes da inicial.')
-    const texto = motivo.trim()
-    if (texto.length < 2 || texto.length > 120) return setErro('O motivo precisa ter de 2 a 120 caracteres.')
-    setErro(null)
-    setEnviando(true)
-    const resposta = await aoSalvar({ de, ate, motivo: texto })
-    setEnviando(false)
-    if (resposta?.erro) return setErro(resposta.erro)
+    if (!conferir(errosDaAusencia({ de, ate, motivo }))) return
+    await enviar(() => aoSalvar({ de, ate, motivo: motivo.trim() }))
   }
 
   return (
-    <form noValidate onSubmit={salvar} aria-label={ausencia ? 'Editar ausência' : 'Nova ausência'} className="grid gap-4 rounded-xl border p-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-2">
-          <Label htmlFor="ausencia-de">De</Label>
+    <form ref={formulario} noValidate onSubmit={salvar} aria-label={ausencia ? 'Editar ausência' : 'Nova ausência'} className="grid gap-4 rounded-xl border p-4">
+      <div className="grid items-start gap-4 sm:grid-cols-2">
+        <Campo id="ausencia-de" rotulo="De" erro={erros.de}>
           <CampoData id="ausencia-de" valor={de} aoMudar={setDe} obrigatorio />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="ausencia-ate">Até</Label>
+        </Campo>
+        <Campo id="ausencia-ate" rotulo="Até" erro={erros.ate}>
           <CampoData id="ausencia-ate" valor={ate} aoMudar={setAte} obrigatorio />
-        </div>
+        </Campo>
       </div>
-      <div className="grid gap-2">
-        <Label htmlFor="ausencia-motivo">Motivo</Label>
+      <Campo id="ausencia-motivo" rotulo="Motivo" erro={erros.motivo}>
         <Input id="ausencia-motivo" className="h-10" maxLength={120} placeholder="Férias, licença, feriado…" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-      </div>
+      </Campo>
       {erro && <Aviso>{erro}</Aviso>}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={aoCancelar}>Cancelar</Button>

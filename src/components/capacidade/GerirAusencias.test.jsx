@@ -46,7 +46,9 @@ describe('GerirAusencias', () => {
     await escolherData(userEvent, 'Até', '2026-12-03')
     await userEvent.type(screen.getByLabelText('Motivo'), 'F')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar ausência' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('O motivo precisa ter de 2 a 120 caracteres.')
+    // O erro fica embaixo do campo, que recebe o foco (usabilidade, U2).
+    expect(screen.getByLabelText('Motivo')).toHaveAccessibleDescription('O motivo precisa ter de 2 a 120 caracteres.')
+    expect(screen.getByLabelText('Motivo')).toHaveFocus()
     expect(criarAusencia).not.toHaveBeenCalled()
   })
 
@@ -56,7 +58,17 @@ describe('GerirAusencias', () => {
     await escolherData(userEvent, 'Até', '2026-12-03')
     await userEvent.type(screen.getByLabelText('Motivo'), 'Licença')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar ausência' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('A data final não pode ser antes da inicial.')
+    expect(screen.getByLabelText('Até')).toHaveAccessibleDescription(/A data final não pode ser antes da inicial\./)
+    expect(criarAusencia).not.toHaveBeenCalled()
+  })
+
+  it('sem datas e sem motivo: os três erros aparecem juntos, cada um no seu campo (usabilidade, U2)', async () => {
+    await userEvent.click(await screen.findByRole('button', { name: /Nova ausência/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar ausência' }))
+    expect(screen.getByLabelText('De')).toHaveAccessibleDescription(/Informe a data inicial\./)
+    expect(screen.getByLabelText('Até')).toHaveAccessibleDescription(/Informe a data final\./)
+    expect(screen.getByLabelText('Motivo')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('De')).toHaveFocus()
     expect(criarAusencia).not.toHaveBeenCalled()
   })
 

@@ -3,7 +3,7 @@ import { Trash2 } from 'lucide-react'
 import Seletor from '@/components/campos/Seletor'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
-import JanelaFormulario from '@/components/comum/JanelaFormulario'
+import JanelaFormulario, { BotaoCancelar } from '@/components/comum/JanelaFormulario'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
@@ -45,7 +45,7 @@ export default function ApagarColuna({ coluna, colunas, aoFechar, aoApagar }) {
       descricao="Apagar não se desfaz." enviando={enviando}
       rodape={(
         <>
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={enviando}>Cancelar</Button>
+          <BotaoCancelar />
           <Button type="submit" form="form-apagar-coluna" variant="destructive" disabled={enviando}>
             {enviando ? 'Apagando…' : 'Apagar coluna'}
           </Button>

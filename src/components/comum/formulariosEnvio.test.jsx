@@ -94,4 +94,47 @@ describe('envio dos formulários em janela', () => {
     }
     expect(problemas).toEqual([])
   })
+
+  // Usabilidade, U4 (pedido do Diego, 18/11): toda janela que envia o que a pessoa digitou pergunta antes de descartar.
+  // A janela calcula `alterado` (useAlterado) e a JanelaFormulario pergunta no Cancelar, no Esc e no X. Fora: as janelas
+  // de uma escolha só (sem nada digitado) e as confirmações, listadas aqui com o motivo.
+  const SEM_PERGUNTA = {
+    '/src/components/clientes/EscolhaDeOcupacao.jsx': 'uma escolha só (consultor ou consultoria), sem nada digitado',
+    '/src/components/quadro/ApagarColuna.jsx': 'confirmação de apagar',
+    '/src/components/quadros/JanelaApagarQuadro.jsx': 'confirmação de apagar',
+    '/src/components/quadro/AbrirCartao.jsx': 'a janela do cartão grava campo a campo e pergunta pelo NaoSalvo',
+  }
+  // As janelas dos check-ins entram depois da rodada da T8 dos check-ins (lote F, 18/11): até lá, ficam de fora.
+  const PENDENTES = [
+    '/src/components/checkins/JanelaAplicarModelo.jsx', '/src/components/checkins/JanelaDaTarefa.jsx',
+    '/src/components/checkins/JanelaInicioDosPrazos.jsx', '/src/components/clientes/JanelaCheckin.jsx',
+  ]
+
+  it('toda JanelaFormulario que envia (rotuloEnviar= ou um submit no rodape=) passa alterado=', () => {
+    const problemas = []
+    for (const arquivo of arquivosJsx(join(process.cwd(), 'src'))) {
+      const codigo = readFileSync(arquivo, 'utf8')
+      if (!codigo.includes('<JanelaFormulario')) continue
+      const nome = arquivo.replace(process.cwd(), '')
+      if (SEM_PERGUNTA[nome] || PENDENTES.includes(nome)) continue
+      for (const tag of aberturasDaJanela(codigo)) {
+        const envia = /\srotuloEnviar=/.test(tag) || (/\srodape=/.test(tag) && /type="submit"|onClick=\{enviar\}/.test(tag))
+        if (envia && !/\salterado=/.test(tag)) problemas.push(`${nome}: JanelaFormulario que envia sem alterado=`)
+      }
+    }
+    expect(problemas).toEqual([])
+  })
+
+  it('nenhum rodape= de JanelaFormulario tem um Cancelar escrito à mão: é o BotaoCancelar (passa pela pergunta)', () => {
+    const problemas = []
+    for (const arquivo of arquivosJsx(join(process.cwd(), 'src'))) {
+      const codigo = readFileSync(arquivo, 'utf8')
+      if (!codigo.includes('<JanelaFormulario') || PENDENTES.includes(arquivo.replace(process.cwd(), ''))) continue
+      for (const tag of aberturasDaJanela(codigo)) {
+        if (/>\s*Cancelar\s*</.test(tag)) problemas.push(arquivo.replace(process.cwd(), ''))
+      }
+    }
+    expect(problemas).toEqual([])
+  })
 })
+
