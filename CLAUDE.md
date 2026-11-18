@@ -78,7 +78,8 @@ Toda tela nova segue esta ordem e estes componentes (detalhes nas seções abaix
    Editar abre o formulário preenchido.
 6. **Formulário:** `JanelaFormulario` + `SecaoFormulario` (abas `AbasSegmentadas` e 2 colunas quando é grande, como
    o Hub), rodapé Cancelar + botão principal com a ação em andamento ("Salvando…"), campos só de
-   `src/components/campos/`, apagar com confirmação dizendo o que some junto.
+   `src/components/campos/` dentro do `Campo` (erro embaixo de cada campo, todos de uma vez), `alterado` (pergunta ao
+   descartar), apagar com confirmação dizendo o que some junto.
 7. **Layout:** largura toda (nada de `max-w-*` + `mx-auto` no conteúdo), claro e escuro, e a 360 px nada rola para o
    lado (tabelas rolam dentro do cartão).
 8. **Sempre:** tipografia da escala (números em colunas com `tabular-nums`), botões animados, CRUD completo, banco com
@@ -181,6 +182,23 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   ausências têm o formulário delas) e o formulário em linha de `GerirAusencias` tem o próprio botão dentro dele.
   `VerificacaoDoPerfil` e `CadastroDoAutenticador` (`src/components/verificacao/`, na
   aba Acesso da `FichaDoConsultor` no modo próprio) têm formulário em linha com o próprio botão, como `GerirAusencias`.
+- **Erros embaixo de cada campo, todos de uma vez** (pedido do Diego, 18/11 (usabilidade), U2): cada campo fica num
+  `Campo` (`src/components/campos/Campo.jsx`: rótulo, `dica` e `erro`), e o campo de dentro (`Input`, `Textarea` e os
+  de `src/components/campos/`, pelo mesmo `id`) ganha sozinho `aria-invalid` (borda vermelha) e `aria-describedby`. A
+  janela confere tudo numa função que junta as falhas (`{ campo: mensagem }`, nunca `if … return setErro(...)` em
+  fila) e passa ao `useEnvio(aoConcluir, { validar })`: `conferir()` diz se pode enviar; depois do primeiro Salvar os
+  erros acompanham a tela (corrigiu, a marca some). A ação pode devolver `{ erros }` (o campo que o servidor recusou).
+  `tentativa` vai para a `JanelaFormulario`, que leva o foco ao primeiro campo errado a cada Salvar com erro (nunca
+  enquanto a pessoa digita). O `erro` (texto único, no `Aviso`) fica para o servidor e o resumo. E-mail e telefone são
+  conferidos só na tela (`src/lib/validacao.js`; opcionais: vazio passa; telefone com DDD, 10 ou 11 números); o banco
+  continua com as regras dele.
+- **Pergunta ao descartar** (pedido do Diego, 18/11 (usabilidade), U4): toda janela que envia o que a pessoa digitou
+  passa `alterado` à `JanelaFormulario` (compara com o que abriu: `useAlterado`), e Cancelar, Esc e o X perguntam
+  "Descartar o que você digitou?" (Continuar editando / Descartar). O sucesso fecha sem perguntar; enquanto envia,
+  nada fecha. Num `rodape` diferente, o Cancelar é o `BotaoCancelar` (passa pela pergunta). Texto que a janela
+  preenche sozinha (as tarefas no check-out) não conta como digitado. `formulariosEnvio.test.jsx` falha se uma janela
+  que envia ficar sem `alterado` ou com Cancelar escrito à mão (exceções com o motivo: escolhas de uma opção e
+  confirmações de apagar).
 - **Exceção registrada: `JanelaDoCartao`** (Quadro) grava campo a campo, com o estado "Salvando… / Salvo / Erro ao
   salvar" e sem botão Salvar; ao fechar com algo não salvo, pergunta. O rodapé tem Fechar, e Arquivar/Apagar ficam só
   com o ícone no celular (`max-sm:sr-only`).
@@ -340,6 +358,10 @@ Design: `docs/superpowers/specs/2026-11-16-calendario-design.md` (decisões da c
   desconectar) e `reunioes-depois` (pasta com gravação e transcrição, chamada pelo `pg_cron`). O navegador só lê.
 - **O núcleo fica em `supabase/functions/_shared/agenda/`, sem imports do Deno**, e é testado com o Google falso
   (`npm test`), sem rede.
+- **Evento e visão** (pedido do Diego, 18/11 (usabilidade), U9): o evento tem a chave "Dia inteiro" explícita,
+  desligada por padrão (sem hora e desligada, o erro aponta o Das); o aviso "Fica só no app" do próprio evento traz
+  "Conectar Google" (o mesmo conectar do Calendário). A visão fica no endereço (`?visao=mes|semana|agenda`, e `todos`
+  no cliente): recarregar ou voltar reabre nela.
 - **Edge Function NOVA no Supabase local** exige `npx supabase stop && npx supabase start` (faça antes um backup com
   `pg_dumpall`; os dados ficam). `npm run functions:reiniciar` só recarrega as que o runtime já conhece.
 - **Agenda dentro do cliente** (pedido do Diego, 17/11): a aba Agenda usa o mesmo calendário do menu
