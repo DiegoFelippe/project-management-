@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowRight, CalendarClock, CheckCheck, Eye, ListOrdered, ShieldCheck, TriangleAlert, Workflow } from 'lucide-react'
 import { toast } from 'sonner'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
@@ -31,6 +31,18 @@ function avisoDaMarcacao(tarefa, estado, resposta) {
   return `${tarefa.titulo} feita.${liberadas}${sessao}`
 }
 
+// A releitura traz objetos novos para todas as tarefas; as que não mudaram ficam com o objeto de antes, para a lista
+// (memorizada por item) só redesenhar o que mudou.
+function estabilizar(antes, lido) {
+  if (!antes?.tarefas || !lido?.tarefas) return lido
+  const velhas = new Map(antes.tarefas.map((t) => [t.id, t]))
+  const tarefas = lido.tarefas.map((t) => {
+    const velha = velhas.get(t.id)
+    return velha && JSON.stringify(velha) === JSON.stringify(t) ? velha : t
+  })
+  return { ...lido, tarefas }
+}
+
 // Por que a caixa do modelo não tem "Aplicar modelo" (para quem não aplica).
 function semModeloPorque(cliente) {
   if (cliente.arquivado) return 'Cliente arquivado: reative o cliente para aplicar um modelo.'
@@ -54,7 +66,7 @@ function avisoDeQuemAcompanha(cliente, consultor) {
 // fluxograma começa em pé. Marcar pela caixa é otimista (se o banco recusar, volta e avisa); pela janela da tarefa, grava
 // e fecha. Toda mudança relê o check-list e chama `aoMudar` (o recarregar da página: o botão de check-in, a sessão e a
 // tabela andam juntos). `versao` muda quando a página recarrega. Quem faz o quê vem do banco (pode_aplicar, pode_marcar).
-export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar }) {
+export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, checkinAberto = null }) {
   const [dados, setDados] = useState(undefined) // undefined = carregando; null = não vê o cliente
   const [erro, setErro] = useState(null)
   const [recarga, setRecarga] = useState(0)
@@ -65,17 +77,30 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar })
   const [ocupadas, setOcupadas] = useState(() => new Set())
   const [janela, setJanela] = useState(null)
   const indo = useRef(new Set()) // marcações a caminho do banco (a leitura não apaga o otimista delas)
+  const jaLeu = useRef(false)
+  const aoMudarAtual = useRef(aoMudar)
+  const idTitulo = useId()
+
+  useEffect(() => {
+    aoMudarAtual.current = aoMudar
+  }, [aoMudar])
 
   useEffect(() => {
     let ativo = true
     lerChecklist(cliente.id).then(
       (lido) => {
         if (!ativo) return
-        setDados(lido ?? null)
+        jaLeu.current = true
+        setDados((antes) => estabilizar(antes, lido ?? null))
         setErro(null)
         setOtimista((antes) => Object.fromEntries(Object.entries(antes).filter(([id]) => indo.current.has(id))))
       },
-      () => ativo && setErro('Não foi possível carregar o check-list.'),
+      () => {
+        if (!ativo) return
+        // Só a primeira leitura troca a aba pelo erro; depois, o check-list que está na tela fica e um aviso pede atualizar.
+        if (jaLeu.current) toast.error('Não foi possível atualizar o check-list. Atualize a página para ver o de agora.')
+        else setErro('Não foi possível carregar o check-list.')
+      },
     )
     return () => {
       ativo = false
@@ -92,18 +117,21 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar })
     return new Map(tarefas.map((t) => [t.id, situacaoDaTarefa(t, porId, dia)]))
   }, [tarefas, dia])
 
-  function mudou() {
+  // Funções estáveis (o memo dos itens da lista depende disso): relê o check-list e avisa a página.
+  const mudou = useCallback(() => {
     setRecarga((n) => n + 1)
-    aoMudar?.()
-  }
+    aoMudarAtual.current?.()
+  }, [])
 
-  function ocupar(id, sim) {
+  const ocupar = useCallback((id, sim) => {
     if (sim) indo.current.add(id)
     else indo.current.delete(id)
     setOcupadas(new Set(indo.current))
-  }
+  }, [])
 
-  async function marcar(tarefa, estado) {
+  // Pela caixa: na hora (otimista). Recusa: volta e avisa; se a tela ficou velha (check-list trocado ou tirado, outro
+  // consultor, cliente arquivado…), relê a aba e a página.
+  const marcar = useCallback(async (tarefa, estado) => {
     if (indo.current.has(tarefa.id)) return
     ocupar(tarefa.id, true)
     setOtimista((antes) => ({ ...antes, [tarefa.id]: estado }))
@@ -116,25 +144,35 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar })
         return resto
       })
       toast.error(resposta.erro)
+      if (resposta.desatualizado) mudou()
       return
     }
     toast.success(avisoDaMarcacao(tarefa, estado, resposta))
     mudou()
-  }
+  }, [mudou, ocupar])
 
-  // Pela janela da tarefa: a nota (se mudou) e depois a situação (se pediu). { erro } fica na janela.
+  const abrirTarefa = useCallback((t) => setJanela({ tipo: 'tarefa', id: t.id }), [])
+
+  // Pela janela da tarefa: a nota (se mudou) e depois a situação (se pediu). { erro } fica na janela; recusa de tela
+  // velha fecha a janela, avisa e relê (a tarefa pode nem estar mais na aba).
   async function agir(tarefa, { estado, nota }) {
+    const recusou = (resposta) => {
+      if (!resposta.desatualizado) return resposta
+      toast.error(resposta.erro)
+      mudou()
+      return { erro: null }
+    }
     const notaNova = nota?.trim() ?? ''
     const mudouNota = nota !== undefined && notaNova !== (tarefa.nota ?? '')
     if (mudouNota) {
       const resposta = await anotarTarefa(tarefa.id, notaNova)
-      if (resposta.erro) return resposta
+      if (resposta.erro) return recusou(resposta)
     }
     if (estado) {
       const resposta = await marcarTarefa(tarefa.id, estado)
       if (resposta.erro) {
-        if (mudouNota) mudou()
-        return resposta
+        if (mudouNota && !resposta.desatualizado) mudou()
+        return recusou(resposta)
       }
       toast.success(avisoDaMarcacao(tarefa, estado, resposta))
     } else if (mudouNota) {
@@ -151,13 +189,17 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar })
   const { checklist, resumo } = dados
   const fechar = () => setJanela(null)
   const souConsultor = Boolean(dados.consultor && dados.consultor.id === perfil?.id && !cliente.arquivado)
+  const emOutroCliente = souConsultor && checkinAberto && checkinAberto.cliente_id !== cliente.id
+    ? { nome: checkinAberto.cliente?.nome, inicio: checkinAberto.inicio }
+    : null
+  const titulo = <h2 id={idTitulo} className="sr-only">Check-list do cliente</h2>
   const caixas = (
     <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
       <CartaoDoModelo checklist={checklist} resumo={resumo} podeAplicar={dados.pode_aplicar} semModelo={semModeloPorque(cliente)}
         aoAplicar={() => setJanela({ tipo: 'aplicar' })} aoMudarInicio={() => setJanela({ tipo: 'inicio' })}
         aoTirar={() => setJanela({ tipo: 'tirar' })} />
       <PainelDaSessao key={dados.sessao?.checkin_id ?? 'sem-sessao'} sessao={dados.sessao} ultimo={dados.ultimo_checkin}
-        souConsultor={souConsultor} comChecklist={Boolean(checklist)} />
+        souConsultor={souConsultor} comChecklist={Boolean(checklist)} emOutroCliente={emOutroCliente} />
     </div>
   )
   const janelaDeAplicar = janela?.tipo === 'aplicar' && (
@@ -174,15 +216,15 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar })
 
   if (!checklist) {
     return (
-      <div className="grid min-w-0 grid-cols-1 gap-4">
+      <section aria-labelledby={idTitulo} className="grid min-w-0 grid-cols-1 gap-4">
+        {titulo}
         {caixas}
         {janelaDeAplicar}
-      </div>
+      </section>
     )
   }
 
   const pct = resumo.tarefas ? Math.round((resumo.feitas / resumo.tarefas) * 100) : 0
-  const abrirTarefa = (t) => setJanela({ tipo: 'tarefa', id: t.id })
   const tarefaAberta = janela?.tipo === 'tarefa' ? tarefas.find((t) => t.id === janela.id) : null
   const apagada = (t) => (filtro === 'pendentes' && t.estado === 'feita') || (filtro === 'feitas' && t.estado !== 'feita')
   const infoNoFluxo = (t) => {
@@ -193,7 +235,8 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar })
   const quemAcompanha = !dados.pode_marcar && avisoDeQuemAcompanha(cliente, dados.consultor)
 
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-4">
+    <section aria-labelledby={idTitulo} className="grid min-w-0 grid-cols-1 gap-4">
+      {titulo}
       <BarraDeFiltros className="mb-0">
         <AbasSegmentadas rotulo="Visualização" abas={VISOES} valor={visao} aoMudar={setVisao} />
         <AbasSegmentadas rotulo="Mostrar" valor={filtro} aoMudar={setFiltro} abas={[
@@ -266,6 +309,6 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar })
             return resposta
           }} />
       )}
-    </div>
+    </section>
   )
 }

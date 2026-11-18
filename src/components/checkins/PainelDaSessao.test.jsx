@@ -51,6 +51,13 @@ describe('PainelDaSessao', () => {
     expect(painel()).toHaveTextContent('Último: 12/11/2026, 1 h 30 (outro consultor)')
   })
 
+  it('o consultor com check-in aberto em outro cliente: diz onde, em vez de mandar fazer check-in aqui', () => {
+    render(<PainelDaSessao sessao={null} ultimo={ULTIMO} souConsultor comChecklist
+      emOutroCliente={{ nome: 'Provedor Beta', inicio: INICIO.toISOString() }} />)
+    expect(painel()).toHaveTextContent(`Você tem um check-in aberto em Provedor Beta desde ${HORA.format(INICIO)}. Faça o check-out lá para começar aqui.`)
+    expect(painel()).not.toHaveTextContent('Faça o check-in no botão')
+  })
+
   it('sem nenhum check-in ainda', () => {
     render(<PainelDaSessao sessao={null} ultimo={null} souConsultor={false} comChecklist={false} />)
     expect(painel()).toHaveTextContent('Ainda não há check-ins neste cliente.')

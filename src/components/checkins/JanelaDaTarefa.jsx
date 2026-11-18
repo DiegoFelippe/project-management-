@@ -124,7 +124,7 @@ export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nom
         <Button type="button" variant="outline" onClick={aoFechar}>Fechar</Button>
       )}>
       <form id="form-tarefa" noValidate onSubmit={(e) => { e.preventDefault(); if (principal) agir(principal) }} className="space-y-5">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <div data-selos className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <SelosDaTarefa tarefa={tarefa} situacao={s} />
         </div>
         {tarefa.descricao && <p className="text-corpo break-words">{tarefa.descricao}</p>}

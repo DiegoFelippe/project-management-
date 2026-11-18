@@ -105,6 +105,9 @@ describe('JanelaDaTarefa', () => {
 
   it('em andamento e bloqueada (uma dependência foi reaberta): Voltar para a fazer e Salvar nota, sem marcar', () => {
     const { botoes, janela } = abrir('t5')
+    const selos = janela.querySelector('[data-selos]')
+    expect(selos).toHaveTextContent('Em andamento · espera 2 tarefas')
+    expect(selos).not.toHaveTextContent('Bloqueada')
     expect(janela).toHaveTextContent('Ainda não dá para marcar: espera Análise do DRE e Mapa de custos.')
     expect(botoes()).toEqual(['Cancelar', 'Voltar para a fazer', 'Salvar nota'])
   })

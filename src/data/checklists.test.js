@@ -94,12 +94,23 @@ describe('escritas do check-list', () => {
   it('marcarTarefa traduz as recusas', async () => {
     rpcResponde(null, { code: 'P0001', message: 'tarefa_bloqueada' })
     expect(await marcarTarefa('t1', 'feita')).toEqual({
-      erro: 'Esta tarefa depende de outras que ainda não foram feitas.',
+      erro: 'Esta tarefa depende de outras que ainda não foram feitas.', desatualizado: true,
     })
     rpcResponde(null, { code: 'P0001', message: 'so_o_consultor_marca' })
     expect((await marcarTarefa('t1', 'feita')).erro).toBe('Só o consultor do cliente marca as tarefas.')
     rpcResponde(null, { code: 'P0001', message: 'estado_invalido' })
-    expect((await marcarTarefa('t1', 'outra')).erro).toBe('Essa situação de tarefa não existe. Atualize a página.')
+    expect(await marcarTarefa('t1', 'outra')).toEqual({ erro: 'Essa situação de tarefa não existe. Atualize a página.' })
+  })
+
+  it('recusa de tela velha (trocado, tirado, outro consultor, arquivado, sem acesso, dependência reaberta) diz para reler', async () => {
+    for (const codigo of ['checklist_encerrado', 'so_o_consultor_marca', 'sem_permissao', 'cliente_arquivado', 'tarefa_bloqueada']) {
+      rpcResponde(null, { code: 'P0001', message: codigo })
+      expect((await marcarTarefa('t1', 'feita')).desatualizado, codigo).toBe(true)
+      expect((await anotarTarefa('t1', 'nota')).desatualizado, codigo).toBe(true)
+    }
+    // Outras falhas (rede, regra da coluna) não: a tela não ficou velha.
+    rpcResponde(null, { message: 'Failed to fetch' })
+    expect((await marcarTarefa('t1', 'feita')).desatualizado).toBeUndefined()
   })
 
   it('anotarTarefa manda a nota (o banco tira os espaços; em branco vira nula)', async () => {

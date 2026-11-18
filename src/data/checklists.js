@@ -7,6 +7,12 @@ import { supabase } from '@/lib/supabase'
 
 const traduzir = (error) => traduzirErroBanco(error, { sobre: 'checklist' })
 
+// Recusas que dizem que a tela ficou velha: o check-list foi trocado ou tirado, o consultor do cliente mudou, o cliente
+// foi arquivado, a pessoa perdeu o acesso ou uma dependência foi reaberta. Com elas a resposta traz desatualizado: true,
+// e quem chama relê o check-list.
+const DESATUALIZADO = new Set(['checklist_encerrado', 'so_o_consultor_marca', 'sem_permissao', 'cliente_arquivado', 'tarefa_bloqueada'])
+const recusa = (error) => (DESATUALIZADO.has(error?.message) ? { erro: traduzir(error), desatualizado: true } : { erro: traduzir(error) })
+
 async function ler(funcao, argumentos) {
   const { data, error } = await supabase.rpc(funcao, argumentos)
   if (error) throw error
@@ -15,7 +21,7 @@ async function ler(funcao, argumentos) {
 
 async function escrever(funcao, argumentos) {
   const { error } = await supabase.rpc(funcao, argumentos)
-  return { erro: error ? traduzir(error) : null }
+  return error ? recusa(error) : { erro: null }
 }
 
 // A aba Check-ins do cliente numa leitura: { pode_aplicar, pode_marcar, consultor, checklist (o ativo, ou null), etapas,
@@ -50,14 +56,15 @@ export const mudarInicio = (checklistId, inicio) =>
 export const tirarModelo = (checklistId) => escrever('tirar_modelo', { p_checklist: checklistId })
 
 // estado: 'a_fazer' | 'andamento' | 'feita'. { estado, feita_em, liberadas: [{ id, titulo }], na_sessao, erro } — o que
-// ficou livre e se a tarefa entrou no check-in aberto; com erro, só { erro }.
+// ficou livre e se a tarefa entrou no check-in aberto; com erro, só { erro } (e desatualizado, se a tela ficou velha).
 export async function marcarTarefa(tarefaId, estado) {
   const { data, error } = await supabase.rpc('marcar_tarefa', { p_tarefa: tarefaId, p_estado: estado })
-  if (error) return { erro: traduzir(error) }
+  if (error) return recusa(error)
   return { ...data, erro: null }
 }
 
-// A nota da tarefa (até 500 letras; o banco tira os espaços das pontas e grava a em branco como nula). { erro }.
+// A nota da tarefa (até 500 letras; o banco tira os espaços das pontas e grava a em branco como nula). { erro } (e
+// desatualizado, como em marcarTarefa).
 export const anotarTarefa = (tarefaId, nota) => escrever('anotar_tarefa', { p_tarefa: tarefaId, p_nota: nota ?? null })
 
 // Quantos clientes usam o modelo (todos) e até 5 nomes que a pessoa vê: { clientes, nomes }; null quando não vê o

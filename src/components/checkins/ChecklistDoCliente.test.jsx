@@ -139,6 +139,18 @@ describe('ChecklistDoCliente: com modelo', () => {
     expect(item('Mapa de custos')).toHaveTextContent('Bloqueada')
     expect(item('Plano de ação')).toHaveTextContent('Em andamento')
     expect(item('Análise do DRE')).not.toHaveTextContent('Nesta sessão')
+    // "Nesta sessão" tem a cor dele (não a de "Em andamento").
+    const nestaSessao = within(item('Reunião de alinhamento')).getByText('Nesta sessão')
+    const emAndamento = within(item('Plano de ação')).getByText('Em andamento')
+    expect(nestaSessao.className).not.toBe(emAndamento.className)
+  })
+
+  it('títulos em ordem: um h2 do check-list antes dos h3 das caixas e das etapas', async () => {
+    tela(consultor)
+    await screen.findByRole('region', { name: '1 · Diagnóstico' })
+    const titulos = screen.getAllByRole('heading').map((h) => [Number(h.tagName[1]), h.textContent])
+    expect(titulos[0]).toEqual([2, 'Check-list do cliente'])
+    expect(titulos.slice(1).every(([nivel]) => nivel === 3)).toBe(true)
   })
 
   it('o consultor marca pela caixa na hora (antes do banco responder); o aviso diz o que liberou e que entrou no check-in', async () => {
@@ -175,23 +187,82 @@ describe('ChecklistDoCliente: com modelo', () => {
     expect(caixa).toBeChecked()
     await userEvent.click(caixa)
     expect(caixa).not.toBeChecked()
-    expect(caixa).toBeDisabled()
     expect(marcarTarefa).toHaveBeenCalledWith('t1', 'a_fazer')
+    // Ocupada sem desligar: o foco do teclado fica na caixa; outro clique não manda de novo.
+    expect(caixa).toBeEnabled()
+    expect(caixa).toHaveFocus()
+    expect(caixa.closest('li')).toHaveAttribute('aria-busy', 'true')
+    await userEvent.click(caixa)
+    expect(marcarTarefa).toHaveBeenCalledTimes(1)
     responder({ estado: 'a_fazer', liberadas: [], na_sessao: false, erro: null })
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Reunião de alinhamento voltou para a fazer.'))
-    await waitFor(() => expect(caixa).toBeEnabled())
+    await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(caixa.closest('li')).not.toHaveAttribute('aria-busy'))
+    expect(screen.getByRole('checkbox', { name: 'Reunião de alinhamento' })).toBe(caixa)
+    expect(caixa).toHaveFocus()
   })
 
-  it('se o banco recusa, a caixa volta como estava e avisa o motivo (sem reler nem avisar a página)', async () => {
-    vi.mocked(marcarTarefa).mockResolvedValue({ erro: 'Este check-list foi trocado ou tirado. Atualize a página para ver o atual.' })
+  it('recusa de tela velha (check-list trocado ou tirado, outro consultor…): a caixa volta, avisa e relê a aba e a página', async () => {
+    vi.mocked(marcarTarefa).mockResolvedValue({
+      erro: 'Este check-list foi trocado ou tirado. Atualize a página para ver o atual.', desatualizado: true,
+    })
     const { aoMudar } = tela(consultor)
     const caixa = await screen.findByRole('checkbox', { name: 'Reunião de alinhamento' })
     await userEvent.click(caixa)
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       'Este check-list foi trocado ou tirado. Atualize a página para ver o atual.'))
     expect(caixa).toBeChecked()
+    // Relê: a aba mostra o check-list de agora (sem caixas vivas num check-list encerrado ou para quem saiu).
+    await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
+    expect(aoMudar).toHaveBeenCalledTimes(1)
+  })
+
+  it('outra falha (rede): a caixa volta e avisa, sem reler nem avisar a página', async () => {
+    vi.mocked(marcarTarefa).mockResolvedValue({ erro: 'Não foi possível concluir agora. Tente de novo.' })
+    const { aoMudar } = tela(consultor)
+    const caixa = await screen.findByRole('checkbox', { name: 'Reunião de alinhamento' })
+    await userEvent.click(caixa)
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Não foi possível concluir agora. Tente de novo.'))
+    expect(caixa).toBeChecked()
     expect(lerChecklist).toHaveBeenCalledTimes(1)
     expect(aoMudar).not.toHaveBeenCalled()
+  })
+
+  it('na janela, recusa de tela velha fecha a janela, avisa e relê', async () => {
+    vi.mocked(marcarTarefa).mockResolvedValue({ erro: 'Só o consultor do cliente marca as tarefas.', desatualizado: true })
+    const { aoMudar } = tela(consultor)
+    await userEvent.click(await screen.findByRole('button', { name: 'Análise do DRE' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Marcar como feita' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(toast.error).toHaveBeenCalledWith('Só o consultor do cliente marca as tarefas.')
+    await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
+    expect(aoMudar).toHaveBeenCalled()
+  })
+
+  it('se a releitura depois de marcar falha, o check-list continua na tela (com o que foi marcado) e um aviso pede atualizar', async () => {
+    vi.mocked(lerChecklist).mockResolvedValueOnce(DADOS).mockRejectedValueOnce(new Error('rede'))
+    vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'feita', liberadas: [], na_sessao: false, erro: null })
+    tela(consultor)
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Coleta de documentos' }))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Não foi possível atualizar o check-list. Atualize a página para ver o de agora.'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Coleta de documentos' })).toBeChecked()
+    expect(screen.getByRole('region', { name: 'Andamento do check-list' })).toBeInTheDocument()
+  })
+
+  it('em andamento e bloqueada: um selo só, "Em andamento · espera N tarefas", como no fluxograma e na janela', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue({
+      ...DADOS, tarefas: TAREFAS.map((t) => (t.id === 't5' ? { ...t, depende_de: ['t2', 't3'] } : t)),
+    })
+    tela(consultor)
+    const caixa = await screen.findByRole('checkbox', { name: 'Plano de ação' })
+    const selos = caixa.closest('li').querySelector('[data-selos]')
+    expect(within(selos).getAllByText(/Em andamento/)).toHaveLength(1)
+    expect(selos).toHaveTextContent('Em andamento · espera 2 tarefas')
+    expect(selos).not.toHaveTextContent('Bloqueada')
+    expect(caixa).toBeDisabled()
+    expect(caixa).toHaveAccessibleDescription('Em andamento · espera 2 tarefas Análise do DRE e Coleta de documentos')
   })
 
   it('a bloqueada fica desligada, com o motivo (o que ela espera) à vista e ligado à caixa', async () => {
@@ -371,6 +442,19 @@ describe('ChecklistDoCliente: com modelo', () => {
     expect(within(caixa).getByText('1 h 05')).toBeInTheDocument()
     expect(within(within(caixa).getByRole('list', { name: 'Nesta sessão' })).getAllByRole('listitem').map((i) => i.textContent))
       .toEqual(['Reunião de alinhamento'])
+  })
+
+  it('consultor com check-in aberto em outro cliente: a caixa diz onde está, não manda fazer check-in aqui', async () => {
+    const inicio = new Date(AGORA.getTime() - 30 * 60_000).toISOString()
+    renderizarTela(
+      <ChecklistDoCliente cliente={CLIENTE} perfil={consultor} versao={0} aoMudar={vi.fn()}
+        checkinAberto={{ id: 'c7', cliente_id: 'k2', inicio, cliente: { nome: 'Provedor Beta' } }} />,
+      { perfil: consultor },
+    )
+    const caixa = await screen.findByRole('region', { name: 'Check-in' })
+    expect(caixa).toHaveTextContent('Você tem um check-in aberto em Provedor Beta desde')
+    expect(caixa).toHaveTextContent('Faça o check-out lá para começar aqui.')
+    expect(caixa).not.toHaveTextContent('Faça o check-in no botão')
   })
 
   it('caixa Check-in sem check-in aberto: "Sem check-in aberto" e o último', async () => {

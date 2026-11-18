@@ -158,7 +158,8 @@ export default function Cliente() {
       rotulo: 'Check-ins',
       conteudo: (
         <div className="grid min-w-0 grid-cols-1 gap-6">
-          <ChecklistDoCliente key={cliente.id} cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar} />
+          <ChecklistDoCliente key={cliente.id} cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar}
+            checkinAberto={aberto} />
           <CheckinsDoCliente cliente={cliente} perfil={perfil} versao={versao} aoMudar={recarregar} />
         </div>
       ),

@@ -31,6 +31,16 @@ export function situacaoDaTarefa(tarefa, porId, hoje) {
   return { cor, bloqueada, atrasada, venceHoje, faltam, espera }
 }
 
+// Duas situações iguais em tudo o que a tela mostra (a mesma cor, os mesmos avisos, os mesmos dias e as mesmas tarefas
+// esperadas): a lista não precisa redesenhar a tarefa.
+export function mesmaSituacao(a, b) {
+  if (a === b) return true
+  if (!a || !b) return false
+  const esperadas = (s) => s.espera.map((d) => `${d.id}:${d.titulo}`).join('|')
+  return a.cor === b.cor && a.bloqueada === b.bloqueada && a.atrasada === b.atrasada && a.venceHoje === b.venceHoje
+    && a.faltam === b.faltam && esperadas(a) === esperadas(b)
+}
+
 // A situação em palavras (nome do nó no fluxograma: "título: situação"), com o aviso do prazo junto. Combina com a cor:
 // em andamento e bloqueada (uma dependência foi reaberta depois de ela começar) é "Em andamento · espera N tarefas".
 export function rotuloDaSituacao(tarefa, situacao) {

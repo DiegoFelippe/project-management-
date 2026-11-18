@@ -46,12 +46,23 @@ export default function Fluxograma({
   const caixa = useRef(null)
   const arraste = useRef(null)
 
-  // O desenho é calculado uma vez por mudança das etapas, das tarefas ou da orientação.
-  const { layout, daEtapa } = useMemo(() => {
+  // O desenho só depende da estrutura (as etapas, a ordem das tarefas, a etapa de cada uma e o "depende de") e da
+  // orientação: marcar uma tarefa (que só muda a cor) não recalcula o desenho, nem num check-list de 500. A estrutura vira
+  // um texto (a chave do memo) e o desenho é feito a partir dele.
+  const estrutura = JSON.stringify([etapas.map((e) => e.id), tarefas.map((t) => [t.id, t.etapa_id, t.depende_de ?? []])])
+  const layout = useMemo(() => {
+    const [idsDasEtapas, esqueleto] = JSON.parse(estrutura)
+    return layoutDoFluxo(
+      idsDasEtapas.map((id) => ({ id })),
+      esqueleto.map(([id, etapa, dependeDe]) => ({ id, etapa_id: etapa, depende_de: dependeDe })),
+      { vertical },
+    )
+  }, [estrutura, vertical])
+  const daEtapa = useMemo(() => {
     const grupos = new Map(etapas.map((e) => [e.id, []]))
     for (const t of tarefas) grupos.get(t.etapa_id)?.push(t)
-    return { layout: layoutDoFluxo(etapas, tarefas, { vertical }), daEtapa: grupos }
-  }, [etapas, tarefas, vertical])
+    return grupos
+  }, [etapas, tarefas])
   const { nos, raias, largura, altura } = layout
 
   const infos = new Map(tarefas.map((t) => [t.id, { ...INFO_PADRAO, ...infoDaTarefa?.(t) }]))

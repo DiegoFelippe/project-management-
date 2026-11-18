@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { diaCurto, feitaPorEm, quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa } from './situacao'
+import { diaCurto, feitaPorEm, mesmaSituacao, quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa } from './situacao'
 
 const HOJE = '2026-11-17'
 const t = (id, campos = {}) => ({ id, titulo: id, estado: 'a_fazer', vence_em: '2026-11-25', depende_de: [], ...campos })
@@ -63,6 +63,18 @@ describe('situacaoDaTarefa', () => {
     const porMapa = new Map(TODAS.map((x) => [x.id, x]))
     expect(situacao(BLOQUEADA, porMapa).espera.map((x) => x.id)).toEqual(['pendente', 'andamento'])
     expect(situacao(t('x', { vence_em: null }))).toMatchObject({ cor: 'livre', faltam: null, atrasada: false, venceHoje: false })
+  })
+})
+
+describe('mesmaSituacao', () => {
+  it('compara pelo que a tela mostra, não pela identidade do objeto', () => {
+    expect(mesmaSituacao(situacao(BLOQUEADA), situacao(BLOQUEADA))).toBe(true)
+    expect(mesmaSituacao(situacao(LIVRE), situacao(PENDENTE))).toBe(true)
+    // A de que ela depende ficou feita: deixa de esperar.
+    const liberou = { ...POR_ID, pendente: { ...PENDENTE, estado: 'feita' } }
+    expect(mesmaSituacao(situacao(BLOQUEADA), situacao(BLOQUEADA, liberou))).toBe(false)
+    expect(mesmaSituacao(situacao(LIVRE), situacao({ ...LIVRE, vence_em: '2026-11-26' }))).toBe(false)
+    expect(mesmaSituacao(situacao(LIVRE), undefined)).toBe(false)
   })
 })
 

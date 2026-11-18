@@ -7,8 +7,12 @@ import TarefasMarcadas from './TarefasMarcadas'
 const DATA = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' })
 const HORA = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' })
 
-function textoSemSessao(souConsultor, comChecklist) {
+function textoSemSessao(souConsultor, comChecklist, emOutroCliente) {
   if (!souConsultor) return 'Nenhum check-in aberto neste cliente agora.'
+  if (emOutroCliente) {
+    const desde = emOutroCliente.inicio ? ` desde ${HORA.format(new Date(emOutroCliente.inicio))}` : ''
+    return `Você tem um check-in aberto em ${emOutroCliente.nome ?? 'outro cliente'}${desde}. Faça o check-out lá para começar aqui.`
+  }
   return comChecklist
     ? 'Faça o check-in no botão lá em cima ao começar a trabalhar. O que você marcar no check-list com ele aberto entra no resumo da sessão.'
     : 'Faça o check-in no botão lá em cima ao começar a trabalhar.'
@@ -17,8 +21,9 @@ function textoSemSessao(souConsultor, comChecklist) {
 // Caixa "Check-in" da aba Check-ins do cliente: o check-in aberto neste cliente (o relógio, quem, desde quando e o que foi
 // marcado nele, "Nesta sessão"), ou "Sem check-in aberto"; embaixo, o último check-in fechado. Só mostra: o botão de
 // check-in e check-out continua no topo da página. O relógio anda a cada 30 s, como o do botão. `sessao` e `ultimo` são
-// os do checklist_do_cliente; `souConsultor`: quem vê é o consultor do cliente (o texto diz onde fazer o check-in).
-export default function PainelDaSessao({ sessao, ultimo, souConsultor = false, comChecklist = false }) {
+// os do checklist_do_cliente; `souConsultor`: quem vê é o consultor do cliente (o texto diz onde fazer o check-in);
+// `emOutroCliente` ({ nome, inicio }): o check-in aberto dele em outro cliente (o texto diz onde ele está).
+export default function PainelDaSessao({ sessao, ultimo, souConsultor = false, comChecklist = false, emOutroCliente = null }) {
   const [agora, setAgora] = useState(() => Date.now())
   const aberta = Boolean(sessao)
 
@@ -77,7 +82,7 @@ export default function PainelDaSessao({ sessao, ultimo, souConsultor = false, c
           )}
         </>
       ) : (
-        <p className="text-muted-foreground text-rotulo">{textoSemSessao(souConsultor, comChecklist)}</p>
+        <p className="text-muted-foreground text-rotulo">{textoSemSessao(souConsultor, comChecklist, emOutroCliente)}</p>
       )}
 
       <p className="text-muted-foreground mt-auto text-legenda">{textoDoUltimo}</p>
