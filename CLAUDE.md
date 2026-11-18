@@ -135,7 +135,9 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   banco aceita dela (nome, foto, cor, contato, senha e o app autenticador); o resto aparece só para ler.
 - **Campos só de `src/components/campos/`**: `Seletor`, `CampoData`, `CampoHora`, `CampoNumero`, `Caixa`, `Chave`.
   **Nunca** `<select>` nem `type="date|time|number|datetime-local"` nativos.
-- **`Seletor` com muitas opções** usa `buscar` (busca no banco), nunca a lista inteira.
+- **`Seletor` com muitas opções** usa `buscar` (busca no banco), nunca a lista inteira. Para escolher **várias de uma
+  vez**, `multiplo` (a lista fica aberta e cada clique marca ou desmarca; as escolhidas aparecem fora do campo, com
+  "Tirar", como `EscolhaDePessoas` no Novo time e em "Colocar pessoas") — pedido do Diego, 18/11 (usabilidade).
 - **Todo menu do trilho abre com `BarraDeFiltros`** (Início, Clientes, Calendário, Check-ins, Times, Usuários,
   Consultorias, Integrações), e a barra **sempre começa com o ícone e a palavra "Filtros"** (como no Calendário; o componente já
   traz, não repita na tela). Pedido do Diego (2026-11-17). Nada de prop para esconder o rótulo. Depois vêm abas,
@@ -156,8 +158,10 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   celular o ícone fica em cima do número. Teste de tela com `cartoesAbaixoDaBarra` (`src/test/cartoes.js`).
 - **Botões do cabeçalho da página** (`Cabecalho`): a ação principal do contexto é `default` (cheia, `--primary`) e as
   demais são `outline`, tamanho padrão, com ícone. Apagar no cabeçalho é `outline` com o realce de perigo no hover.
-  `ghost sm` só dentro de linhas de tabela e listas. Ações que servem aos dois lugares (`AcoesDaLinha`,
-  `BotaoCheckin`) recebem `noCabecalho` e usam `estiloDaAcao` (`src/components/clientes/estiloDaAcao.js`).
+  Nas linhas de tabela as ações são a `AcaoDaLinha` (seção Listas); `ghost sm` com texto só para a ação principal única
+  da linha. Ações que servem aos dois lugares (`AcoesDaLinha`, `BotaoCheckin`) recebem `noCabecalho` e usam
+  `estiloDaAcao` (`src/components/clientes/estiloDaAcao.js`). Página de detalhe: `Cabecalho` com `voltarPara`
+  (`{ caminho, rotulo }`) põe o "← Lista" em cima; nada de link de voltar à mão — pedido do Diego, 17/11 (auditoria).
 - **Página do cliente:** o título fica sozinho no topo; abas e ações ficam numa barra no estilo da `BarraDeFiltros`
   (abas à esquerda, botões à direita) — pedido do Diego, 17/11.
 - **Mês sempre pela `NavegacaoDoMes`** (`maximo` trava o Próximo); nunca montar Anterior/Próximo de mês à mão.
@@ -174,6 +178,13 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
 - **Use o componente** `Tabela` (`src/components/comum/Tabela.jsx`) com `Linha`, `Celula` e
   `CelulaAcoes`, e `ListaVazia` quando não houver nada. A tabela tem nome (`rotulo`), uma linha por item
   e as ações da linha na última coluna (Editar, Desativar, Apagar...).
+- **Ações da linha: `AcaoDaLinha`** (`Tabela.jsx`) — pedido do Diego, 17/11 (auditoria). Só o ícone, com o nome no
+  `aria-label` e no `title`, **sempre na mesma ordem**: a que não vale para a linha fica com `visivel={false}` e guarda o
+  lugar (o lápis nunca muda de lugar). Exceção: a ação principal única da linha (Conectar, Mandar para consultoria,
+  Escolher consultor, Fazer check-in) tem texto (`ghost sm`), à esquerda dos ícones. Quem só olha (nenhuma ação em linha
+  nenhuma) fica sem a coluna (`semAcoes`). No celular a primeira coluna tem 160 px no mínimo e as ações não ficam fixas.
+  A tabela cabe na área de conteúdo de uma tela de 1440 px (cerca de 1.317 px): mais larga, a coluna de ações fixa cobre
+  a última coluna de dados.
 - **Editar abre um formulário (janela) com o item daquela linha já preenchido.** Salvar atualiza a
   lista. O mesmo formulário serve para a tela de detalhe, quando houver.
 - **Teste de tela para cada lista:** a tabela pelo nome e o Editar abrindo com os dados da linha
@@ -187,7 +198,10 @@ times e consultorias.** Nada pode depender de "são poucos registros".
 - **Toda lista em tabela tem paginação quando passa de 15 registros**: 15 por página, com
   "1–15 de 230" e Anterior/Próxima (`Paginacao`, dentro da `Tabela`, prop `paginacao`).
 - **A paginação vem do banco**: `range()` com `count: 'exact'` (ajudante `faixa()` em
-  `src/data/paginar.js`), devolvendo `{ itens, total }`. Nunca carregar tudo e fatiar no navegador.
+  `src/data/paginar.js`), devolvendo `{ itens, total }`. Nunca carregar tudo e fatiar no navegador. Na tela, a lista
+  usa `useListaPaginada(ler, parametros)` (`src/lib/useListaPaginada.js`): filtro novo volta à página 1, página que
+  sumiu volta à 1, resposta velha é descartada; nada de efeito de leitura escrito à mão — pedido do Diego, 17/11
+  (auditoria).
 - **Filtro, busca e ordenação rodam no banco** (`eq`, `ilike`, `order`), e mudar o filtro volta para
   a página 1. Totais e resumos saem de `count` no banco, não de somar a lista na tela.
 - **Nada de buscar a lista inteira de outra tabela só para contar ou mostrar uma amostra**: use
@@ -348,6 +362,10 @@ Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as
   arquivamento com check-in aberto fecha o check-in na hora.
 - **Uma consultoria nunca vê clientes, horas ou nomes de outra.** Quem não é da central só alcança dados de
   colegas pelas funções do banco, não por leitura direta.
+- **A busca de Clientes passa por cima da situação** (pedido do Diego, 18/11, usabilidade): com algo na busca, a lista
+  procura no banco em todas as situações (a central também nos arquivados, `aba: 'qualquer'`; a gestão nas da
+  consultoria; o consultor continua nos dele), paginada, diz "Buscando em todas as situações" e mostra a situação de
+  cada linha. Sem busca, vale a situação escolhida, e a lista vazia diz o próximo passo com "Ver" (17/11, auditoria).
 - **Ocupação, capacidade, sugestões e o painel do Início vêm do banco**: `consultores_por_ocupacao`, `consultorias_por_ocupacao`,
   `ocupacao_das_pessoas` (a lista de Usuários) e `painel_do_inicio` (os números do Início). Nunca recalcular na tela.
 
