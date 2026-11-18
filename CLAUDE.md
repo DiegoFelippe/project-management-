@@ -32,8 +32,9 @@ Regra do Diego (2026-11-12): **tudo que o app cria tem as quatro operações na 
   itens do menu, a bolinha da pessoa e o Sair. Pedido do Diego (2026-11-12). O menu não tem itens "em breve"
   (o Projetos saiu em 2026-11-16): só entra no trilho o que já funciona.
 - **Item novo no menu:** em `src/components/shell/menu.js`, preencha `animacao` com uma de
-  `ANIMACOES_DO_MENU` (`subir`, `balancar`, `pulsar`, `abrir`, `erguer`, `conectar`, `transmitir`, `folhear`, `sair`). Prefira uma que
-  combine com o ícone e que ainda não esteja em uso no trilho.
+  `ANIMACOES_DO_MENU` (`subir`, `balancar`, `pulsar`, `abrir`, `erguer`, `conectar`, `transmitir`, `folhear`, `arrastar`,
+  `sair`). Prefira uma que combine com o ícone e que ainda não esteja em uso no trilho (desde o Quadros, com `arrastar`,
+  todas estão em uso: item novo pede animação nova).
 - **Animação nova:** keyframes `icone-<nome>` + a regra `.group:hover .anim-<nome>` (e `:focus-visible`)
   em `src/index.css`, e o nome em `ANIMACOES_DO_MENU`. O elemento clicável precisa da classe `group`
   e de `data-item-trilho`.
@@ -62,7 +63,8 @@ Toda tela nova segue esta ordem e estes componentes (detalhes nas seções abaix
 4. **Cartões de números** logo abaixo da barra: até 4, com o componente comum dos cartões (`CartoesDeNumeros`, o mesmo
    do Início e do Calendário), contados no banco no recorte de quem vê e seguindo os filtros de consultoria/consultor da
    barra. Animam ao passar o mouse (sobem 1px com sombra e o ícone dá o pulinho, como os botões). Exceção: as abas
-   Quadro, Agenda e Check-ins da página do cliente não têm cartões (pedido do Diego, 17/11 e 18/11).
+   Quadro, Agenda e Check-ins da página do cliente não têm cartões (pedido do Diego, 17/11 e 18/11), nem a tela Quadros
+   do menu (o mesmo quadro; seção Quadro).
 5. **Conteúdo:** lista sempre em `Tabela` (paginação de 15 vinda do banco, `ListaVazia`, ações na última coluna);
    Editar abre o formulário preenchido.
 6. **Formulário:** `JanelaFormulario` + `SecaoFormulario` (abas `AbasSegmentadas` e 2 colunas quando é grande, como
@@ -75,23 +77,26 @@ Toda tela nova segue esta ordem e estes componentes (detalhes nas seções abaix
 
 ## Quadro (Kanban)
 
-Design: `docs/superpowers/specs/2026-11-17-kanban-do-cliente-design.md` (inclui a "Resposta do Diego").
+Design: `docs/superpowers/specs/2026-11-17-kanban-do-cliente-design.md` (inclui a "Resposta do Diego"). Quadros
+pessoais e de time (menu Quadros): `docs/superpowers/specs/2026-11-17-quadros-pessoais-e-de-time-design.md` (com as
+aprovações do Diego e a tabela do CRUD).
 
-- **Quem faz o quê:** o consultor do cliente e a gestão (admin e gestor da consultoria) mexem no quadro: colunas,
-  cartões, checklist, comentários e anexos. Central e dono só leem. **Apagar cartão:** quem criou ou a gestão (os
-  demais arquivam). **Apagar coluna:** só a gestão (`apagar_coluna`, com destino ou apagando os cartões). A regra é do
-  banco (RLS e funções `quadro_do_cliente`, `cartoes_do_quadro`, `mover_cartao`...), nunca só da tela.
+- **Quem faz o quê (quadro do cliente):** o consultor do cliente e a gestão (admin e gestor da consultoria) mexem no
+  quadro: colunas, cartões, checklist, comentários e anexos. Central e dono só leem. **Apagar cartão:** quem criou ou a
+  gestão (os demais arquivam). **Apagar coluna:** só a gestão (`apagar_coluna`, com destino ou apagando os cartões). A
+  regra é do banco (RLS e funções `quadro_do_cliente`, `cartoes_do_quadro`, `mover_cartao`...), nunca só da tela.
 - **Um quadro por cliente e consultoria:** cliente que volta a uma consultoria reencontra o quadro antigo; a central
   vê os quadros das consultorias anteriores só para ler, pelo seletor "Consultoria".
 - **Posição fracionária** (`numeric`, passos de 1024): mover grava só a linha movida entre os vizinhos
   (`mover_cartao`, `mover_coluna`); o banco renumera quando o espaço acaba.
 - **Descrição é JSON do TipTap, validada no banco** (nunca HTML): links só `http`, `https` e `mailto`; imagem só do
-  balde `quadros`, com o caminho no nó (`<cliente>/<cartão>/...`) e URL assinada na hora de mostrar (com download).
-  Anexos e imagens ficam no balde privado `quadros`.
+  balde `quadros`, com o caminho no nó (`<pasta do quadro>/<cartão>/...`) e URL assinada na hora de mostrar (com
+  download). Anexos e imagens ficam no balde privado `quadros`, na pasta do quadro (abaixo).
 - **Tempo real por canal privado:** o aviso leva só ids, nunca dados; a tela relê pelo banco ao receber o aviso e ao
   `conectou`, `reconectou`, `plano_b` e `sem_acesso` (e quando o acesso muda). O plano B (releitura) roda a cada 30 s
   enquanto o canal não está de pé.
-- **As abas Quadro, Agenda e Check-ins do cliente não têm cartões de números** (pedido do Diego, 17/11 e 18/11).
+- **As abas Quadro, Agenda e Check-ins do cliente não têm cartões de números** (pedido do Diego, 17/11 e 18/11), nem a
+  tela Quadros do menu (o mesmo quadro, que ocupa o resto da tela; decisão 7 do desenho dos quadros pessoais e de time).
 - **Cartões lidos por coluna** (50 por vez, "ver mais"): nunca o quadro inteiro de uma vez.
 - **Apagar cartão só por `apagar_cartao`** (sem delete direto na tabela): a função devolve os caminhos no Storage e o
   app os tira do balde em seguida. **Cartões seguram o cliente:** apagar cliente com cartões dá 23503 e a tela manda
@@ -99,13 +104,53 @@ Design: `docs/superpowers/specs/2026-11-17-kanban-do-cliente-design.md` (inclui 
 - **Comentários:** cada um edita e apaga os seus; a gestão apaga qualquer um. **Anexos:** apaga quem enviou ou a
   gestão; anexo não se edita.
 - **Quem vê é uma regra só, `private.vejo_quadro`:** RLS, funções, Storage (balde `quadros`) e o canal do Realtime
-  (tópico `quadro:<id>`) passam por ela. Mudou quem vê, muda lá.
+  (tópico `quadro:<id>`) passam por ela. Mudou quem vê, muda lá. Ao lado dela, com um ramo por tipo de quadro:
+  `mexo_no_quadro`, `gerencio_quadro` (apaga coluna e o que é dos outros) e `administro_quadro` (renomear, arquivar,
+  restaurar e apagar o quadro; no do cliente, ninguém).
 - **Travas em ordem de id:** quem trava duas colunas (`mover_cartao`, `apagar_coluna`) trava as duas numa consulta só,
   ordenadas por id, antes dos cartões (senão duas pessoas trocando cartões entre as mesmas colunas travam, 40P01).
 - **O quadro ocupa o resto da tela e cada coluna rola sozinha** (decisão do Diego, 17/11, como no Trello): a lista de
   cartões da coluna é a área de rolagem do arrasto, então arrastar perto da borda rola a coluna e o cartão cai onde
   aparece. Durante o arrasto a página e a faixa das colunas não rolam (`src/components/quadro/travaDaRolagem.js`); a
   altura vem de `alturaDoQuadro.js` (tela baixa ou celular: a faixa fica com a altura da tela e a página rola até ela).
+
+**Quadros pessoais e de time (menu Quadros).** Pedido do Diego (17/11, "como o Mochi"). A mesma tabela `quadros`, com
+`tipo` (`cliente`, `pessoa`, `time`): colunas, cartões, checklist, comentários, anexos e tempo real são os mesmos, e a
+tela também (`QuadroKanban`, usado pela aba do cliente e pela tela Quadros).
+
+- **Quadro pessoal:** só a pessoa dele vê e mexe (nem o administrador), em todos os papéis, quantos quiser. Fica **na
+  consultoria em que nasceu**: quem muda de consultoria (ou vai para a central) deixa de vê-lo e o reencontra se voltar.
+- **Quadro do time:** os membros e o gestor do time (`times.gestor_id`) mexem em colunas e cartões; o administrador da
+  consultoria vê e mexe em todos os quadros de time dela. **Qualquer membro cria** quadro do time, mas renomear,
+  arquivar, restaurar e apagar são só do gestor do time e do admin (`administro_quadro`; no pessoal, a pessoa). Apagar
+  coluna, e cartão, comentário ou anexo dos outros: gestor do time e admin. Responsáveis: membros e gestor do time,
+  ativos (o admin só se for membro); no pessoal, só a pessoa. Quem sai do time perde os quadros dele na hora (o canal
+  avisa e a tela dela mostra que não tem mais acesso); o que ela fez fica, com o nome dela.
+- **Central e dono só têm quadros pessoais** (não estão em times): sem quadro de time e sem o grupo "Dos times". E a
+  central **só lê os quadros do cliente**: a leitura direta de `quadros`, `quadro_colunas` e `cartoes` que ela tinha
+  vale só para os do cliente; o resto passa pela lista `private.meus_quadros()` (que traz os pessoais dela).
+- **Escrita:** o quadro nasce só por `criar_quadro` (com "A fazer", "Em andamento" e "Concluído") e sai só por
+  `apagar_quadro` (devolve os caminhos da pasta, que o app tira do balde); renomear, arquivar e restaurar são update
+  direto em `nome` e `arquivado_em`, pela regra `administro_quadro`. Tipo e dono não mudam e favorito
+  (`quadro_favoritos`) não se edita (aprovado pelo Diego, 17/11). **Arquivado é só para ler** para todo mundo (nem o
+  nome muda): quem administra restaura ou apaga. Nome único entre os abertos de cada dono (sem acento e sem
+  maiúscula); restaurar com nome repetido diz "Já existe um quadro aberto com esse nome. Renomeie um deles e tente de
+  novo." Apagar oferece arquivar ao lado e diz quantas colunas e cartões somem.
+- **Quadro segura o time:** apagar time com quadro (aberto ou arquivado) dá 23503 (`quadros_time_id_fkey`) e a tela
+  manda apagar os quadros dele antes, em Quadros.
+- **Pasta no balde `quadros`:** a do quadro do cliente continua `<cliente>/`; a dos pessoais e de time é
+  `quadro/<id do quadro>/` (anexo em `quadro/<quadro>/<cartão>/<uuid>-<nome>`, imagem em `.../<cartão>/imagens/`).
+  `private.pasta_do_quadro` (na tela, `pastaDoQuadro` de `src/lib/arquivos.js`) dá a pasta; o banco recusa caminho de
+  outro quadro, de outro cartão ou na forma errada para o tipo. A central nunca vê nem tira nada de `quadro/...`.
+- **O navegador guarda só ids** (`localStorage` `ixc.quadros.<perfil>`: o último e os 8 recentes, em
+  `src/lib/quadrosRecentes.js`), sempre conferidos no banco (`quadro_por_id`, `quadros_por_ids`); o que não volta sai
+  da memória. Nome e contagem vêm sempre do banco.
+- **Tela `/quadros`** (todos os papéis; no trilho depois de Check-ins, com a animação `arrastar`): sem id abre o último
+  quadro (senão o primeiro favorito, de Meus ou Dos times; sem nenhum, "Você ainda não tem quadros." com Novo quadro);
+  `/quadros/<id>` abre aquele (o do cliente manda para a página do cliente). Cabeçalho com quem vê, o
+  `SeletorDeQuadro` (busca no banco; Favoritos, Recentes, Meus e Dos times), a estrela e o "⋯"; depois a
+  `BarraDoQuadro` (sem o seletor Consultoria) e o quadro, sem cartões de números. O quadro aberto é um filho montado
+  com `key={quadroId}`: trocar de quadro começa do zero (filtros, janela do cartão, arrasto).
 
 ## Padrão Hub: botões, formulários, campos e abas
 
@@ -138,8 +183,8 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
 - **`Seletor` com muitas opções** usa `buscar` (busca no banco), nunca a lista inteira. Para escolher **várias de uma
   vez**, `multiplo` (a lista fica aberta e cada clique marca ou desmarca; as escolhidas aparecem fora do campo, com
   "Tirar", como `EscolhaDePessoas` no Novo time e em "Colocar pessoas") — pedido do Diego, 18/11 (usabilidade).
-- **Todo menu do trilho abre com `BarraDeFiltros`** (Início, Clientes, Calendário, Check-ins, Times, Usuários,
-  Consultorias, Integrações), e a barra **sempre começa com o ícone e a palavra "Filtros"** (como no Calendário; o componente já
+- **Todo menu do trilho abre com `BarraDeFiltros`** (Início, Clientes, Calendário, Check-ins, Quadros — a
+  `BarraDoQuadro` do cliente, sem o seletor Consultoria —, Times, Usuários, Consultorias, Integrações), e a barra **sempre começa com o ícone e a palavra "Filtros"** (como no Calendário; o componente já
   traz, não repita na tela). Pedido do Diego (2026-11-17). Nada de prop para esconder o rótulo. Depois vêm abas,
   busca, filtros e o botão principal no fim. Tela sem filtro natural ainda ganha a barra com o recorte que faz
   sentido (Início: o período — Mês com a `NavegacaoDoMes`, Últimos 30/90 dias, Este ano ou Personalizado com De e
@@ -147,7 +192,8 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   `AbasSegmentadas`; `comoAbas` só nas abas de página, como as do cliente. Times: "Novo time" é o botão principal
   da barra (administrador e gestor), e o dono vê a consultoria no lugar dele. **Toda tela do menu: barra de filtros
   (ícone + "Filtros") → cartões de números → conteúdo** (exceção: as abas Quadro, Agenda e Check-ins da página do cliente
-  não têm cartões, pedido do Diego, 17/11 e 18/11). Os cartões (pedido do Diego, 17/11) são o
+  não têm cartões, pedido do Diego, 17/11 e 18/11, nem a tela Quadros, que é o mesmo quadro). Os cartões (pedido do
+  Diego, 17/11) são o
   `CartoesDeNumeros` (`src/components/comum/`): até 4, logo depois da barra, com "—" enquanto carregam, **contados no
   banco** por uma função por tela (`indicadores_de_clientes`, `_de_times`, `_de_usuarios`, `_de_consultorias`,
   `_de_integracoes`; Check-ins: `indicadores_de_checkins` no Andamento e `indicadores_de_modelos` em Modelos; Início e

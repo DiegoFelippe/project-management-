@@ -1,7 +1,8 @@
 // Dados de exemplo só para o Supabase local: npm run exemplo:local
 // Cria a "Consultoria Exemplo" com admin, gestor, duas pessoas e o time Implantação,
 // e a central de exemplo (central@exemplo.test, fora de qualquer consultoria).
-// Depois: eventos na agenda, um quadro e os modelos de check-in (com um check-list num cliente), só na Consultoria Exemplo.
+// Depois: eventos na agenda, o quadro de um cliente, um quadro pessoal da Ana e um do time Implantação (menu Quadros) e os
+// modelos de check-in (com um check-list num cliente), só na Consultoria Exemplo.
 // Contas NOVAS entram com a senha abaixo (logins @exemplo.test); o Auth exige senha forte desde 16/11.
 // Contas que já existem são puladas e não mudam: as criadas antes de 16/11 seguem com exemplo-123.
 // Nunca rode isto na nuvem.
@@ -72,6 +73,7 @@ if (jaExiste) {
 }
 await eventosDeExemplo()
 await quadroDeExemplo()
+await quadrosDoMenuDeExemplo()
 await checklistsDeExemplo()
 process.exit(0)
 
@@ -206,8 +208,8 @@ async function quadroDeExemplo() {
   const { data: existentes } = await admin.from('quadro_colunas').select('id').eq('quadro_id', quadro.id)
   if (!existentes?.length) {
     const { error } = await admin.from('quadro_colunas').insert([
-      { quadro_id: quadro.id, nome: 'A fazer', posicao: 1024 },
-      { quadro_id: quadro.id, nome: 'Em andamento', posicao: 2048 },
+      { quadro_id: quadro.id, nome: 'A fazer', posicao: 1024, concluidos: false },
+      { quadro_id: quadro.id, nome: 'Em andamento', posicao: 2048, concluidos: false },
       { quadro_id: quadro.id, nome: 'Concluído', posicao: 3072, concluidos: true },
     ])
     if (error) parar(`Não consegui criar as colunas do quadro: ${error.message}`)
@@ -255,6 +257,136 @@ async function quadroDeExemplo() {
   console.log(criados
     ? `Quadro de exemplo (${cliente.nome}): ${criados} cartões criados.`
     : `Quadro de exemplo (${cliente.nome}): já tinha os cartões, nada foi alterado.`)
+}
+
+// Quadros do menu de exemplo (desenho: docs/superpowers/specs/2026-11-17-quadros-pessoais-e-de-time-design.md), só na
+// Consultoria Exemplo: o pessoal "Minhas tarefas" da Ana (só ela vê) e o "Rotina do time" do time Implantação (os
+// membros e o gestor mexem; a admin vê), cada um com as colunas que criar_quadro põe e alguns cartões. Com a chave
+// secreta (sem pessoa logada) o banco aceita a escrita direta, como no quadro do cliente acima: o dono, a consultoria do
+// pessoal (a da Ana) e quem criou vão escritos; a consultoria do quadro do time vem do time (gatilho). Responsável só
+// quem a regra do banco aceita: no pessoal, a Ana; no do time, quem é membro ou gestor dele hoje. Rodar de novo não muda
+// nada: o quadro com o mesmo nome e dono (aberto ou arquivado) é reaproveitado, o arquivado fica como está, e o cartão
+// cujo título já está no quadro é pulado. Sem a Ana na consultoria de exemplo (ou sem o time), o quadro dela (ou o do
+// time) não é criado.
+async function quadrosDoMenuDeExemplo() {
+  const { data: perfis, error: erroPerfis } = await admin.from('perfis').select('id, email, consultoria_id, ativo')
+    .in('email', PESSOAS.map((p) => p.email))
+  if (erroPerfis) parar(`Não consegui ler as pessoas de exemplo: ${erroPerfis.message}`)
+  const pessoa = Object.fromEntries(perfis
+    .filter((p) => p.ativo && p.consultoria_id === consultoria.id)
+    .map((p) => [PESSOAS.find((x) => x.email === p.email).chave, p.id]))
+  if (!pessoa.ana) {
+    console.log('Quadros do menu de exemplo: a Ana não está ativa na consultoria de exemplo; nada criado.')
+    return
+  }
+  const dia = (dias) => diaEmSaoPaulo(dias)
+
+  await quadroDoMenuDeExemplo({
+    tipo: 'pessoa',
+    nome: 'Minhas tarefas',
+    dono: { pessoa_id: pessoa.ana, consultoria_id: consultoria.id },
+    criadoPor: pessoa.ana,
+    podeSerResponsavel: [pessoa.ana],
+    cartoes: [
+      { titulo: 'Preparar a pauta da reunião de segunda', col: 0, prioridade: 'alta', prazo: dia(2), autor: 'ana', resp: ['ana'],
+        checklist: [['Listar as pendências dos clientes', true], ['Separar os números do mês', false]] },
+      { titulo: 'Estudar o novo módulo de cobrança', col: 1, prioridade: 'media', prazo: dia(7), autor: 'ana', resp: ['ana'] },
+      { titulo: 'Organizar as notas das visitas', col: 0, prioridade: 'baixa', autor: 'ana' },
+      { titulo: 'Atualizar o relatório de horas', col: 2, prioridade: 'media', prazo: dia(-2), autor: 'ana', resp: ['ana'],
+        checklist: [['Lançar as horas da semana', true], ['Conferir com a agenda', true]] },
+    ],
+    pessoa,
+  })
+
+  const { data: time, error: erroTime } = await admin.from('times').select('id, gestor_id')
+    .eq('consultoria_id', consultoria.id).eq('nome', 'Implantação').maybeSingle()
+  if (erroTime) parar(`Não consegui ler o time de exemplo: ${erroTime.message}`)
+  if (!time) {
+    console.log('Quadro do time de exemplo: a consultoria de exemplo não tem o time Implantação; nada criado.')
+    return
+  }
+  const { data: membros, error: erroMembros } = await admin.from('time_membros').select('pessoa_id').eq('time_id', time.id)
+  if (erroMembros) parar(`Não consegui ler os membros do time de exemplo: ${erroMembros.message}`)
+  await quadroDoMenuDeExemplo({
+    tipo: 'time',
+    nome: 'Rotina do time',
+    dono: { time_id: time.id },
+    criadoPor: pessoa.gestor ?? pessoa.ana,
+    podeSerResponsavel: [time.gestor_id, ...membros.map((m) => m.pessoa_id)],
+    cartoes: [
+      { titulo: 'Padronizar o roteiro de kickoff', col: 1, prioridade: 'alta', prazo: dia(5), autor: 'gestor', resp: ['ana'],
+        checklist: [['Juntar os roteiros de cada um', true], ['Escrever a versão do time', false], ['Revisar com o gestor', false]],
+        comentario: ['bruno', 'Mandei o meu roteiro no cartão; dá para aproveitar a parte da coleta de documentos.'] },
+      { titulo: 'Revisar o modelo de relatório mensal', col: 0, prioridade: 'media', prazo: dia(10), autor: 'ana', resp: ['bruno'] },
+      { titulo: 'Treinar o time no quadro do cliente', col: 0, prioridade: 'baixa', autor: 'gestor', resp: ['gestor'] },
+      { titulo: 'Fechar a agenda de visitas de dezembro', col: 2, prioridade: 'media', prazo: dia(-4), autor: 'bruno', resp: ['ana', 'bruno'],
+        checklist: [['Confirmar as datas com os clientes', true], ['Lançar no Calendário', true]] },
+    ],
+    pessoa,
+  })
+}
+
+// Um quadro do menu (pessoal ou do time) com os cartões dados; veja quadrosDoMenuDeExemplo. `pessoa` = { chave: id }
+// das contas de exemplo ativas na consultoria; autor ou responsável que não está ali (ou que a regra não aceita) fica de
+// fora: o cartão é da Ana e sem esse responsável.
+async function quadroDoMenuDeExemplo({ tipo, nome, dono, criadoPor, podeSerResponsavel, cartoes, pessoa }) {
+  let busca = admin.from('quadros').select('id, arquivado_em').eq('tipo', tipo).eq('nome', nome)
+  for (const [coluna, valor] of Object.entries(dono)) busca = busca.eq(coluna, valor)
+  const { data: achados, error: erroBusca } = await busca.order('arquivado_em', { nullsFirst: true }).limit(1)
+  if (erroBusca) parar(`Não consegui procurar o quadro "${nome}": ${erroBusca.message}`)
+  let quadro = achados[0]
+  if (quadro?.arquivado_em) {
+    console.log(`Quadro "${nome}": está arquivado, nada foi alterado.`)
+    return
+  }
+  if (!quadro) {
+    const { data, error } = await admin.from('quadros').insert({ tipo, nome, ...dono, criado_por: criadoPor }).select('id').single()
+    if (error) parar(`Não consegui criar o quadro "${nome}": ${error.message}`)
+    quadro = data
+  }
+  const { data: existentes } = await admin.from('quadro_colunas').select('id').eq('quadro_id', quadro.id)
+  if (!existentes?.length) {
+    // Todas as linhas com as mesmas chaves: no insert de várias linhas, a chave que falta numa vai como nulo.
+    const { error } = await admin.from('quadro_colunas').insert([
+      { quadro_id: quadro.id, nome: 'A fazer', posicao: 1024, concluidos: false },
+      { quadro_id: quadro.id, nome: 'Em andamento', posicao: 2048, concluidos: false },
+      { quadro_id: quadro.id, nome: 'Concluído', posicao: 3072, concluidos: true },
+    ])
+    if (error) parar(`Não consegui criar as colunas do quadro "${nome}": ${error.message}`)
+  }
+  const { data: colunas } = await admin.from('quadro_colunas').select('id').eq('quadro_id', quadro.id).order('posicao')
+  const coluna = (i) => colunas[Math.min(i, colunas.length - 1)].id
+  const aceitos = new Set(podeSerResponsavel.filter(Boolean))
+
+  let criados = 0
+  for (const c of cartoes) {
+    const { data: ja } = await admin.from('cartoes').select('id').eq('quadro_id', quadro.id).eq('titulo', c.titulo).limit(1)
+    if (ja?.length) continue
+    const autor = pessoa[c.autor] ?? pessoa.ana
+    const { data: novo, error } = await admin.from('cartoes')
+      .insert({ quadro_id: quadro.id, coluna_id: coluna(c.col), titulo: c.titulo, prioridade: c.prioridade, prazo: c.prazo ?? null, criado_por: autor })
+      .select('id').single()
+    if (error) parar(`Não consegui criar o cartão "${c.titulo}": ${error.message}`)
+    const responsaveis = (c.resp ?? []).map((chave) => pessoa[chave]).filter((id) => aceitos.has(id))
+    if (responsaveis.length) {
+      const { error: erroResp } = await admin.from('cartao_responsaveis').insert(responsaveis.map((id) => ({ cartao_id: novo.id, perfil_id: id })))
+      if (erroResp) parar(`Não consegui pôr os responsáveis no cartão "${c.titulo}": ${erroResp.message}`)
+    }
+    for (const [texto, feito] of c.checklist ?? []) {
+      const { error: erroItem } = await admin.from('cartao_checklist').insert({ cartao_id: novo.id, texto, feito })
+      if (erroItem) parar(`Não consegui criar o item "${texto}": ${erroItem.message}`)
+    }
+    if (c.comentario) {
+      const [quem, texto] = c.comentario
+      const { error: erroCom } = await admin.from('cartao_comentarios').insert({ cartao_id: novo.id, autor_id: pessoa[quem] ?? autor, texto })
+      if (erroCom) parar(`Não consegui criar o comentário: ${erroCom.message}`)
+    }
+    criados += 1
+  }
+  const de = tipo === 'pessoa' ? 'pessoal da Ana' : 'do time Implantação'
+  console.log(criados
+    ? `Quadro "${nome}" (${de}): ${criados} cartões criados.`
+    : `Quadro "${nome}" (${de}): já tinha os cartões, nada foi alterado.`)
 }
 
 // Modelos de check-in de exemplo: [título, descrição, obrigatória, prazo (dia N a partir do início), chaves de que

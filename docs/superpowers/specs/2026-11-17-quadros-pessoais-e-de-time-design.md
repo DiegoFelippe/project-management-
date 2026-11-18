@@ -365,4 +365,5 @@ quadros na página do time.
 10. **A lista dos quadros abertos é o seletor** (aprovado), não uma `Tabela`; a dos arquivados é `Tabela`.
 11. **Quadro arquivado abre só para ler** (pela janela de arquivados), e apagar oferece arquivar ao lado.
 12. **Anexos e imagens dos quadros pessoais e de time** no mesmo balde `quadros`, na pasta `quadro/<id do quadro>/`.
-13. **Item "Quadros" no trilho logo depois de Calendário**, com a animação nova `arrastar`.
+13. **Item "Quadros" no trilho logo depois de Calendário**, com a animação nova `arrastar`. Decisão da construção
+    (18/11): ficou **depois de Check-ins**, que já ocupava o lugar logo depois de Calendário antes desta aprovação.

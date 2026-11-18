@@ -280,9 +280,11 @@ recarrega o código das funções que o runtime já conhece.
    `npx supabase config push` (projeto ligado), mas ele manda todo o Auth do `supabase/config.toml`, inclusive o
    Site URL local: rode antes `npx supabase config diff` e só envie se a diferença for a esperada.
 6. Quadro (Kanban): o balde privado `quadros` (anexos e imagens das descrições, até 25 MB por arquivo) vem das
-   migrações. O quadro ao vivo usa canais privados com RLS em `realtime.messages` e funciona com **"Allow public
-   access"** (**Realtime → Settings**) ligado ou desligado: a opção só vale para canais públicos. Desligá-la (só canais
-   privados) é proteção a mais. Se o Realtime não conectar, a tela cai no plano B (releitura a cada 30 s).
+   migrações. Os quadros dos clientes guardam na pasta `<id do cliente>/`; os pessoais e de time (menu Quadros), na
+   pasta `quadro/<id do quadro>/` do mesmo balde. O quadro ao vivo usa canais privados com RLS em
+   `realtime.messages` e funciona com **"Allow public access"** (**Realtime → Settings**) ligado ou desligado: a opção
+   só vale para canais públicos. Desligá-la (só canais privados) é proteção a mais. Se o Realtime não conectar, a tela
+   cai no plano B (releitura a cada 30 s).
 7. Configure um provedor de e-mail (Resend, SendGrid etc.): o e-mail que vem com o Supabase só entrega para o time do projeto.
 8. Crie o dono: `SUPABASE_URL=... SUPABASE_SECRET_KEY=... APP_URL=https://... npm run dono:criar -- seu@email.com "Seu Nome"`.
 
