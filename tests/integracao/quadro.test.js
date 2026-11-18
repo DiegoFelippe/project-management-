@@ -48,7 +48,6 @@ const {
   editarItemDoChecklist,
   enviarAnexo,
   enviarImagemDaDescricao,
-  indicadoresDoQuadro,
   limparQuadroDoCliente,
   moverCartao,
   moverColuna,
@@ -60,6 +59,13 @@ const {
   urlAssinada,
   urlsAssinadas,
 } = await import('../../src/data/quadro.js')
+
+// Os números do quadro saíram da tela (17/11) e da camada de dados, mas a função do banco continua: lida direto.
+async function indicadoresDoQuadro({ quadroId }) {
+  const { data, error } = await atual.cliente.rpc('indicadores_do_quadro', { p_quadro: quadroId })
+  if (error) throw error
+  return { cartoes: 0, atrasados: 0, vencem_em_7_dias: 0, sem_responsavel: 0, ...data }
+}
 
 const admin = clienteAdmin()
 const SEM_PERMISSAO = 'Você não tem permissão para isso.'
