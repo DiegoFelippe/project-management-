@@ -27,51 +27,75 @@ const texto = (valor) => {
 function Variacao({ variacao }) {
   if (variacao === null) {
     return (
-      <p data-variacao="" className="mt-1 text-legenda text-muted-foreground">
+      <span data-variacao="" className="mt-1 block text-legenda text-muted-foreground max-sm:col-span-full max-sm:mt-0">
         <span aria-hidden="true">—</span><span className="sr-only">Carregando a comparação</span>
-      </p>
+      </span>
     )
   }
   const { texto: mostrado, tom, paraLeitor, comparado } = variacao
   return (
-    <p data-variacao="" className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-legenda">
+    <span data-variacao="" className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-legenda max-sm:col-span-full max-sm:mt-0">
       <span aria-hidden="true" className={cn('font-semibold whitespace-nowrap tabular-nums', TONS_DA_VARIACAO[tom] ?? TONS_DA_VARIACAO.neutro)}>{mostrado}</span>
       {comparado && <span aria-hidden="true" className="text-muted-foreground">{comparado}</span>}
       <span className="sr-only">{comparado ? `${paraLeitor} ${comparado}` : paraLeitor}</span>
-    </p>
+    </span>
   )
 }
 
 // Cartões de números de toda tela do menu, logo abaixo da barra de filtros (CLAUDE.md, Padrão Hub): até 4, cada um com
-// ícone, o número grande (já contado no banco) e o rótulo; 2 colunas no celular e 4 no largo. No celular o ícone vai
-// para cima do número (a 360 px, ao lado dele, o número teria uns 76 px). O conteúdo alinha pelo topo (auditoria, R6):
-// com ou sem a linha de baixo, os números da fileira ficam na mesma altura. Animam ao passar o mouse (pedido do Diego,
-// 17/11): o cartão sobe 1px com sombra e o ícone dá o pulinho dos botões (.cartao-animado em src/index.css; "reduzir
-// movimento" para). Não são clicáveis nem focáveis, então não há animação de foco. `cartoes`: [{ chave, rotulo, valor (número, texto pronto, ou nulo = "—"
-// enquanto carrega), icone, tom (cor do ícone, azul se não disser), destaque ('atencao' | 'perigo', cor do número),
-// detalhe (linha pequena embaixo), variacao: { texto, tom, paraLeitor, comparado } = a linha "▲ 12% vs out.";
-// null = a comparação ainda carrega ("—"); ausente ou undefined = sem a linha (é o que variacao() devolve quando falta
-// um dos números, ex.: ocupação nula com capacidade 0; também quando a comparação falhou) }].
+// ícone, o número grande (já contado no banco) e o rótulo; 2 colunas no celular e 4 no largo. O conteúdo alinha pelo topo
+// (auditoria, R6): com ou sem a linha de baixo, os números da fileira ficam na mesma altura. No celular o cartão fica mais
+// baixo (auditoria, G6): o ícone, menor, vai ao lado do rótulo na linha de cima e o número desce para a linha de baixo,
+// com a largura toda ("1.234,5 h" não caberia ao lado do ícone a 360 px); a caixa do texto vira `contents` e as linhas
+// entram na grade do cartão. A linha de cima tem a altura de dois rótulos: os números da fileira ficam na mesma altura. Animam ao passar o mouse (pedido do Diego, 17/11): o cartão sobe 1px com sombra e o ícone
+// dá o pulinho dos botões (.cartao-animado em src/index.css; "reduzir movimento" para).
+// `cartoes`: [{ chave, rotulo, valor (número, texto pronto, ou nulo = "—" enquanto carrega), icone, tom (cor do ícone, azul
+// se não disser), destaque ('atencao' | 'perigo', cor do número), detalhe (linha pequena embaixo), variacao: { texto, tom,
+// paraLeitor, comparado } = a linha "▲ 12% vs out."; null = a comparação ainda carrega ("—"); ausente ou undefined = sem a
+// linha (é o que variacao() devolve quando falta um dos números, ex.: ocupação nula com capacidade 0; também quando a
+// comparação falhou), destino, ativo }].
+// `destino` (usabilidade, U5; pedido do Diego, 18/11): função que aplica, na lista da tela, o filtro daquele número (e a
+// tela volta à página 1, porque o filtro mudou). Só o cartão cujo número a lista sabe filtrar no banco tem destino: ele
+// vira um botão ("Aguardando consultor: 16. Mostrar na lista"), com o foco à vista e o afundar dos botões; `ativo` marca o
+// do filtro que está valendo (aria-current). Os outros continuam só número, sem foco.
 export default function CartoesDeNumeros({ rotulo, cartoes, className }) {
   return (
     <section aria-label={rotulo} className={cn('mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4', className)}>
-      {cartoes.map(({ chave, rotulo: nome, valor, icone: Icone, tom, destaque, detalhe, variacao }) => (
-        <div key={chave} data-cartao={chave}
-          className={cn('card cartao-animado flex items-start gap-3 px-4 py-3 transition-[translate,box-shadow] duration-200',
-            'hover:-translate-y-px hover:shadow-md max-sm:flex-col max-sm:items-start max-sm:gap-2 max-sm:px-3')}>
-          {Icone && (
-            <span className={cn('grid size-9 shrink-0 place-items-center rounded-xl', TONS[tom] ?? TONS.azul)}>
-              <Icone className="icone-do-cartao size-[17px]" aria-hidden="true" />
+      {cartoes.map(({ chave, rotulo: nome, valor, icone: Icone, tom, destaque, detalhe, variacao, destino, ativo }) => {
+        const classes = cn('card cartao-animado grid items-start gap-x-3 px-4 py-3 transition-[translate,box-shadow] duration-200',
+          Icone ? 'grid-cols-[auto_minmax(0,1fr)]' : 'grid-cols-1',
+          'hover:-translate-y-px hover:shadow-md max-sm:grid-rows-[2.25rem] max-sm:gap-x-2 max-sm:gap-y-1.5 max-sm:px-3 max-sm:py-2.5')
+        const conteudo = (
+          <>
+            {Icone && (
+              <span className={cn('grid size-9 shrink-0 place-items-center rounded-xl max-sm:col-start-1 max-sm:row-start-1 max-sm:size-7 max-sm:self-center max-sm:rounded-lg',
+                TONS[tom] ?? TONS.azul)}>
+                <Icone className="icone-do-cartao size-[17px] max-sm:size-[15px]" aria-hidden="true" />
+              </span>
+            )}
+            <span className={cn('flex min-w-0 flex-col max-sm:contents', Icone && 'col-start-2')}>
+              <span data-numero className={cn('block text-destaque leading-none font-bold tabular-nums max-sm:col-span-full max-sm:row-start-2',
+                DESTAQUES[destaque])}>{texto(valor)}</span>
+              <span title={nome} className={cn('mt-1 block text-rotulo text-muted-foreground max-sm:row-start-1 max-sm:mt-0 max-sm:self-center max-sm:line-clamp-2 sm:truncate',
+                Icone && 'max-sm:col-start-2')}>{nome}</span>
+              {detalhe && (
+                <span className="mt-0.5 block text-legenda text-muted-foreground max-sm:col-span-full max-sm:mt-0 max-sm:line-clamp-2 sm:truncate"
+                  title={detalhe}>{detalhe}</span>
+              )}
+              {variacao !== undefined && <Variacao variacao={variacao} />}
             </span>
-          )}
-          <div className="flex min-w-0 flex-col">
-            <p data-numero className={cn('text-destaque leading-none font-bold tabular-nums', DESTAQUES[destaque])}>{texto(valor)}</p>
-            <p className="mt-1 text-rotulo text-muted-foreground max-sm:line-clamp-2 sm:truncate" title={nome}>{nome}</p>
-            {detalhe && <p className="mt-0.5 text-legenda text-muted-foreground max-sm:line-clamp-2 sm:truncate" title={detalhe}>{detalhe}</p>}
-            {variacao !== undefined && <Variacao variacao={variacao} />}
-          </div>
-        </div>
-      ))}
+          </>
+        )
+        if (!destino) return <div key={chave} data-cartao={chave} className={classes}>{conteudo}</div>
+        return (
+          <button key={chave} type="button" data-cartao={chave} onClick={destino} aria-current={ativo ? 'true' : undefined}
+            aria-label={`${nome}: ${texto(valor)}. Mostrar na lista`} title="Mostrar na lista"
+            className={cn(classes, 'botao-animado text-left outline-none active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring',
+              ativo && 'ring-2 ring-primary/40')}>
+            {conteudo}
+          </button>
+        )
+      })}
     </section>
   )
 }

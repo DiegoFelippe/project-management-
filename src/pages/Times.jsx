@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import Avatar from '@/components/comum/Avatar'
-import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
+import BarraDeFiltros, { AcaoPrincipal, CampoBusca, NaGaveta } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import { GraficoCarregando } from '@/components/comum/Carregando'
@@ -91,9 +91,10 @@ export default function Times() {
   return (
     <>
       <Cabecalho titulo="Times" descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'time' : 'times'}` : null} />
-      <BarraDeFiltros>
+      {/* No celular (auditoria, G6), a Consultoria (só a central e o dono a têm) vai para a gaveta; a busca fica. */}
+      <BarraDeFiltros ativos={ehDono && consultoriaId ? 1 : 0} aoLimpar={() => setConsultoriaId('')}>
         <CampoBusca rotulo="Buscar times" placeholder="Buscar time" valor={busca} aoMudar={setBusca} />
-        {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
+        {ehDono && <NaGaveta><FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} /></NaGaveta>}
         {!ehDono && (
           <AcaoPrincipal>
             <Button onClick={() => setNovo(true)}>

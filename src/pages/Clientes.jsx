@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import Seletor from '@/components/campos/Seletor'
-import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
+import BarraDeFiltros, { AcaoPrincipal, CampoBusca, NaGaveta } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
@@ -85,19 +85,22 @@ function vazioDaSituacao(aba, n, central) {
 const lerNumeros = ({ consultoriaId, consultorId }) => indicadoresDeClientes({ consultoriaId, consultorId })
 
 // Os 4 cartões de cada papel: central e dono, a fila e as situações; administrador e gestor, a consultoria; o
-// consultor, os clientes dele.
-function cartoesDoPapel(papel, n) {
+// consultor, os clientes dele. Os cartões de situação levam à situação na lista (usabilidade, U5): `irPara(situacao)`
+// troca o filtro (e a lista volta à página 1); `situacao` é a escolhida agora, para marcar o cartão dela. "Passaram da
+// previsão" e "Sem check-in há 30 dias" ficam só número: a lista não tem esses filtros.
+function cartoesDoPapel(papel, n, { irPara, situacao } = {}) {
+  const leva = (valor) => (irPara ? { destino: () => irPara(valor), ativo: situacao === valor } : {})
   const passaram = { chave: 'passaram', rotulo: 'Passaram da previsão no mês', icone: TrendingUp, tom: 'perigo',
     valor: n?.passaram_da_previsao, destaque: n?.passaram_da_previsao > 0 ? 'perigo' : null }
   const parados = { chave: 'parados', rotulo: 'Sem check-in há 30 dias', icone: CalendarX, tom: 'aviso',
     valor: n?.sem_checkin_30_dias, destaque: n?.sem_checkin_30_dias > 0 ? 'atencao' : null }
-  const aguardando = { chave: 'aguardando', rotulo: 'Aguardando consultor', icone: Hourglass, tom: 'aviso', valor: n?.aguardando_consultor }
-  const atendimento = { chave: 'atendimento', rotulo: 'Em atendimento', icone: RadioTower, tom: 'positivo', valor: n?.em_atendimento }
+  const aguardando = { chave: 'aguardando', rotulo: 'Aguardando consultor', icone: Hourglass, tom: 'aviso', valor: n?.aguardando_consultor, ...leva('aguardando') }
+  const atendimento = { chave: 'atendimento', rotulo: 'Em atendimento', icone: RadioTower, tom: 'positivo', valor: n?.em_atendimento, ...leva('atendimento') }
   if (papel === 'central') {
     return [
-      { chave: 'distribuir', rotulo: 'Aguardando consultoria', icone: Building2, valor: n?.aguardando_consultoria },
+      { chave: 'distribuir', rotulo: 'Aguardando consultoria', icone: Building2, valor: n?.aguardando_consultoria, ...leva('distribuir') },
       aguardando, atendimento,
-      { chave: 'arquivados', rotulo: 'Arquivados', icone: Archive, tom: 'neutro', valor: n?.arquivados },
+      { chave: 'arquivados', rotulo: 'Arquivados', icone: Archive, tom: 'neutro', valor: n?.arquivados, ...leva('arquivados') },
     ]
   }
   if (papel === 'gestao') return [aguardando, atendimento, passaram, parados]
@@ -126,7 +129,8 @@ export default function Clientes() {
   const gestao = !central && perfil.papel !== 'pessoa'
   const doConsultor = perfil.papel === 'pessoa' // só vê os clientes dele: sem filtro de situação
   const situacoes = central ? SITUACOES_DA_CENTRAL : SITUACOES_DA_CONSULTORIA
-  const [situacao, setSituacao] = useState(doConsultor ? 'meus' : central ? 'distribuir' : 'atendimento')
+  const situacaoInicial = doConsultor ? 'meus' : central ? 'distribuir' : 'atendimento'
+  const [situacao, setSituacao] = useState(situacaoInicial)
   const aba = situacao
   const [busca, setBusca] = useState('')
   const buscaAtrasada = useAtraso(busca.trim(), 300)
@@ -186,27 +190,45 @@ export default function Clientes() {
 
   const clientes = resultado?.itens ?? null
   const vazio = vazioDaSituacao(aba, numeros, central)
+  // No celular, os filtros da gaveta (auditoria, G6): quantos estão fora do padrão e o Limpar que os volta.
+  const filtrosAtivos = [situacao !== situacaoInicial, Boolean(consultoriaId), Boolean(consultorFiltrado)].filter(Boolean).length
+  function limparFiltros() {
+    setSituacao(situacaoInicial)
+    setConsultoriaId('')
+    setConsultor({ valor: '', nome: null })
+  }
+  // Cartão de situação (U5): mostra aquela situação; a busca sai, porque com ela a lista procura em todas (U1).
+  function irParaSituacao(valor) {
+    setSituacao(valor)
+    setBusca('')
+  }
 
   return (
     <>
       <Cabecalho titulo="Clientes"
         descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'cliente' : 'clientes'}` : null} />
-      <BarraDeFiltros>
+      <BarraDeFiltros ativos={filtrosAtivos} aoLimpar={limparFiltros}>
         {!doConsultor && (
-          <div className="flex items-center gap-2">
-            <Label htmlFor="filtro-situacao" className="shrink-0 text-muted-foreground">Situação</Label>
-            <div className="w-52">
-              <Seletor id="filtro-situacao" tamanho="sm" valor={situacao} aoMudar={setSituacao} opcoes={situacoes.map((o) => ({ valor: o.valor, rotulo: o.rotulo }))} />
+          <NaGaveta>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="filtro-situacao" className="shrink-0 text-muted-foreground">Situação</Label>
+              <div className="w-52">
+                <Seletor id="filtro-situacao" tamanho="sm" valor={situacao} aoMudar={setSituacao} opcoes={situacoes.map((o) => ({ valor: o.valor, rotulo: o.rotulo }))} />
+              </div>
             </div>
-          </div>
+          </NaGaveta>
         )}
         <CampoBusca rotulo="Buscar clientes" placeholder="Buscar por nome, cidade ou CNPJ" valor={busca} aoMudar={setBusca} />
         {central && (
-          <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setConsultor({ valor: '', nome: null }) }} />
+          <NaGaveta>
+            <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setConsultor({ valor: '', nome: null }) }} />
+          </NaGaveta>
         )}
         {mostraFiltroConsultor && (
-          <FiltroConsultor valor={consultorFiltrado} nome={consultor.nome} comSemConsultor={semConsultorVale}
-            consultoriaId={central ? (consultoriaId || null) : perfil.consultoria_id} aoMudar={(valor, nome) => setConsultor({ valor, nome })} />
+          <NaGaveta>
+            <FiltroConsultor valor={consultorFiltrado} nome={consultor.nome} comSemConsultor={semConsultorVale}
+              consultoriaId={central ? (consultoriaId || null) : perfil.consultoria_id} aoMudar={(valor, nome) => setConsultor({ valor, nome })} />
+          </NaGaveta>
         )}
         {central && (
           <AcaoPrincipal>
@@ -217,7 +239,8 @@ export default function Clientes() {
         )}
       </BarraDeFiltros>
       <CartoesDeNumeros rotulo="Indicadores dos clientes"
-        cartoes={cartoesDoPapel(central ? 'central' : doConsultor ? 'consultor' : 'gestao', numeros)} />
+        cartoes={cartoesDoPapel(central ? 'central' : doConsultor ? 'consultor' : 'gestao', numeros,
+          { irPara: doConsultor ? null : irParaSituacao, situacao: buscando ? null : situacao })} />
       {!central && aberto && clientes?.some((c) => c.id !== aberto.cliente_id && (doConsultor || c.consultor_id === perfil.id)) && (
         <p id={idDoAviso} className="mb-3 text-corpo text-muted-foreground">
           Você está com check-in aberto em {aberto.cliente?.nome ?? 'outro cliente'} desde {HORA.format(new Date(aberto.inicio))}.

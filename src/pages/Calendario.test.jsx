@@ -596,3 +596,27 @@ describe('Calendário: Google da pessoa', () => {
     expect(meuGoogle).not.toHaveBeenCalled()
   })
 })
+
+// Auditoria, G6 (pedido do Diego, 17/11): no celular, o Mostrar e os filtros vão para a gaveta de baixo; na barra ficam o
+// botão Filtros, o Google e o Novo evento.
+describe('Calendário no celular: filtros na gaveta', () => {
+  it('a gestora abre a gaveta, filtra por consultor (conta 1 ativo) e Limpar volta a todos', async () => {
+    celular(true)
+    const user = userEvent.setup()
+    tela(gestora)
+    await screen.findByText('Próximos 60 dias')
+    expect(screen.queryByLabelText('Consultor')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Mostrar: tudo/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Novo evento/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Filtros' }))
+    const gaveta = screen.getByRole('dialog', { name: 'Filtros' })
+    expect(within(gaveta).getByRole('button', { name: /Mostrar: tudo/ })).toBeInTheDocument()
+    expect(within(gaveta).getByLabelText('Cliente')).toBeInTheDocument()
+    await escolherNoSeletor(user, 'Consultor', 'Beto Lima')
+    await waitFor(() => expect(eventosDoPeriodo).toHaveBeenLastCalledWith(expect.objectContaining({ consultorId: 'p2' })))
+    await user.click(within(gaveta).getByRole('button', { name: 'Ver resultados' }))
+    await user.click(screen.getByRole('button', { name: 'Filtros (1 ativo)' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Filtros' })).getByRole('button', { name: 'Limpar' }))
+    await waitFor(() => expect(eventosDoPeriodo).toHaveBeenLastCalledWith(expect.objectContaining({ consultorId: undefined })))
+  })
+})

@@ -624,6 +624,32 @@ describe('filtros', () => {
     await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ prazo: 'atrasados', responsavel: 'g1' })))
   })
 
+  // Auditoria, G6: no celular, Prioridade, Responsável e Prazo ficam na gaveta; a busca e o Novo cartão, na barra.
+  it('no celular os filtros ficam na gaveta (com "Filtros (1 ativo)"); o Limpar dela mantém a busca', async () => {
+    vi.stubGlobal('matchMedia', vi.fn((consulta) => ({
+      matches: !consulta.includes('min-width: 640px'), media: consulta, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    })))
+    try {
+      const user = userEvent.setup()
+      tela()
+      await pronto()
+      expect(screen.queryByLabelText('Prioridade')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Novo cartão/ })).toBeInTheDocument()
+      await user.type(screen.getByRole('searchbox', { name: 'Buscar cartões' }), 'boleto')
+      await user.click(screen.getByRole('button', { name: 'Filtros' }))
+      const gaveta = screen.getByRole('dialog', { name: 'Filtros' })
+      expect(within(gaveta).getByLabelText('Responsável')).toBeInTheDocument()
+      await escolherNoSeletor(user, 'Prioridade', 'Alta')
+      await waitFor(() => expect(cartoesDoQuadro).toHaveBeenCalledWith(expect.objectContaining({ prioridade: 'alta', busca: 'boleto' })))
+      await user.click(within(gaveta).getByRole('button', { name: 'Ver resultados' }))
+      await user.click(screen.getByRole('button', { name: 'Filtros (1 ativo)' }))
+      await user.click(within(screen.getByRole('dialog', { name: 'Filtros' })).getByRole('button', { name: 'Limpar' }))
+      await waitFor(() => expect(cartoesDoQuadro).toHaveBeenLastCalledWith(expect.objectContaining({ prioridade: '', busca: 'boleto' })))
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('busca no banco, depois que a pessoa para de digitar', async () => {
     const user = userEvent.setup()
     tela()

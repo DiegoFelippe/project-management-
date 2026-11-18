@@ -163,6 +163,25 @@ describe('ModelosDeCheckin: a tela', () => {
     expect(indicadoresDeModelos).toHaveBeenCalledTimes(1)
   })
 
+  // Usabilidade, U5: "Modelos ativos" leva aos ativos, sem busca nem tipo (o que ele conta), na página 1.
+  it('"Modelos ativos" mostra os ativos sem busca nem tipo; os outros cartões ficam só número', async () => {
+    vi.mocked(listarModelos).mockResolvedValue({ itens: [DA_CENTRAL, DA_STI], total: 40 })
+    tela(gestor)
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos modelos')
+    await vi.waitFor(() => expect(numeroDoCartao(cartoes, 'Modelos ativos')).toBe('12'))
+    expect(within(cartoes).getAllByRole('button').map((b) => b.getAttribute('data-cartao'))).toEqual(['ativos'])
+    await userEvent.click(screen.getByRole('button', { name: 'Arquivados' }))
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar modelos' }), 'finan')
+    await escolherNoSeletor(userEvent, 'Tipo', 'Assessoria Jurídica')
+    await vi.waitFor(() => expect(listarModelos).toHaveBeenLastCalledWith(
+      { aba: 'arquivados', busca: 'finan', tipo: 'assessoria_juridica', pagina: 1 }))
+    await userEvent.click(await screen.findByRole('button', { name: /Próxima/ }))
+    await userEvent.click(within(cartoes).getByRole('button', { name: 'Modelos ativos: 12. Mostrar na lista' }))
+    await vi.waitFor(() => expect(listarModelos).toHaveBeenLastCalledWith({ aba: 'ativos', pagina: 1 }))
+    expect(screen.getByRole('searchbox', { name: 'Buscar modelos' })).toHaveValue('')
+    expect(within(cartoes).getByRole('button', { name: /^Modelos ativos/ })).toHaveAttribute('aria-current', 'true')
+  })
+
   it('a Central filtra por consultoria (os modelos que ela vê): vai ao banco, volta à página 1 e muda os cartões', async () => {
     vi.mocked(listarModelos).mockResolvedValue({ itens: [comoCentral(DA_CENTRAL)], total: 40 })
     tela(central)

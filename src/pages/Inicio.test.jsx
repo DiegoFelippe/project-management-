@@ -48,7 +48,7 @@ describe('Início (painel)', () => {
     expect(within(fila).getByRole('link', { name: 'Cliente Novo' })).toHaveAttribute('href', '/clientes/c1')
     expect(within(fila).getByText('A distribuir')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Ana Acima/ })).toHaveAttribute('href', `/usuarios?pessoa=p1&mes=${MES}`)
-    expect(screen.getByText('Ocupação', { selector: 'p' })).toBeInTheDocument()
+    expect(screen.getByText('Ocupação', { selector: '[data-cartao] span' })).toBeInTheDocument()
     expect(screen.queryByText('Seus projetos vão aparecer aqui')).not.toBeInTheDocument()
   })
 
@@ -95,7 +95,7 @@ describe('Início (painel)', () => {
     expect(within(tabela).getByRole('link', { name: 'Cliente Meu' })).toHaveAttribute('href', '/clientes/c3')
     expect(screen.queryByRole('region', { name: /Ocupação por/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Clientes esperando há mais tempo' })).not.toBeInTheDocument()
-    expect(screen.getByText('Meus clientes', { selector: 'p' })).toBeInTheDocument()
+    expect(screen.getByText('Meus clientes', { selector: '[data-cartao] span' })).toBeInTheDocument()
   })
 
   it('vazio: frases curtas em vez dos blocos', async () => {
@@ -108,7 +108,7 @@ describe('Início (painel)', () => {
     vi.mocked(painelDoInicio).mockResolvedValue({ ...PESSOA, passado: true })
     renderizarTela(<Inicio />, { perfil: perfil('pessoa') })
     const tabela = await screen.findByRole('table', { name: 'Meus clientes' })
-    expect(screen.getByText('Utilização', { selector: 'p' })).toBeInTheDocument()
+    expect(screen.getByText('Utilização', { selector: '[data-cartao] span' })).toBeInTheDocument()
     expect(screen.queryByText(/reservado/i)).not.toBeInTheDocument()
     expect(within(tabela).queryByText('Previsto')).not.toBeInTheDocument()
     expect(within(tabela).getByText('Realizado')).toBeInTheDocument()
@@ -177,7 +177,7 @@ describe('Início (painel)', () => {
     vi.mocked(painelDoInicio).mockResolvedValue({ ...ADMIN, passado: true,
       extremos: { acima: [{ id: 'p9', nome: 'Caio Cheio', ocupacao: 1.4, capacidade: 100, consultoria_nome: 'X' }], folga: [] } })
     renderizarTela(<Inicio />, { perfil: perfil('admin') })
-    expect(await screen.findByText('Utilização', { selector: 'p' })).toBeInTheDocument()
+    expect(await screen.findByText('Utilização', { selector: '[data-cartao] span' })).toBeInTheDocument()
     expect(screen.getByText(/Capacidade 200 h/)).toBeInTheDocument()
     expect(screen.queryByText(/reservado/i)).not.toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Beto Consultor: 50% de utilização' })).toBeInTheDocument()

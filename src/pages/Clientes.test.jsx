@@ -692,3 +692,93 @@ describe('Clientes: o vazio diz o próximo passo (auditoria, M1)', () => {
     await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'aguardando', pagina: 1 })))
   })
 })
+
+// Usabilidade, U5 (pedido do Diego, 18/11): o cartão de uma situação leva a ela na lista (página 1).
+describe('Clientes: cartões que levam ao filtro', () => {
+  const gestor = { id: 'g1', papel: 'gestor', consultoria_id: 's1' }
+
+  it('central: os quatro cartões são situações da lista; clicar escolhe a situação e pede a página 1', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: CLIENTES, total: 31 })
+    vi.mocked(indicadoresDeClientes).mockResolvedValue({
+      recorte: 'tudo', aguardando_consultoria: 3, aguardando_consultor: 16, em_atendimento: 2, arquivados: 9,
+    })
+    renderizarTela(<Clientes />, { perfil: central })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos clientes')
+    await userEvent.click(await screen.findByRole('button', { name: /Próxima/ }))
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ pagina: 2 }))
+    expect(within(cartoes).getAllByRole('button')).toHaveLength(4)
+    expect(within(cartoes).getByRole('button', { name: /^Aguardando consultoria: 3/ })).toHaveAttribute('aria-current', 'true')
+    await userEvent.click(within(cartoes).getByRole('button', { name: 'Aguardando consultor: 16. Mostrar na lista' }))
+    expect(screen.getByLabelText('Situação')).toHaveTextContent('Aguardando consultor')
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'aguardando', pagina: 1 }))
+    expect(within(cartoes).getByRole('button', { name: /^Aguardando consultor: 16/ })).toHaveAttribute('aria-current', 'true')
+    expect(within(cartoes).getByRole('button', { name: /^Aguardando consultoria/ })).not.toHaveAttribute('aria-current')
+    await userEvent.click(within(cartoes).getByRole('button', { name: /^Arquivados: 9/ }))
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'arquivados', pagina: 1 }))
+  })
+
+  it('com algo na busca (que procura em todas as situações), o cartão limpa a busca e mostra a situação', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos clientes')
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar clientes' }), 'Alfa')
+    await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'qualquer', busca: 'Alfa' })))
+    expect(within(cartoes).queryByRole('button', { current: true })).not.toBeInTheDocument()
+    await userEvent.click(within(cartoes).getByRole('button', { name: /^Em atendimento/ }))
+    expect(screen.getByRole('searchbox', { name: 'Buscar clientes' })).toHaveValue('')
+    await waitFor(() => expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'atendimento', pagina: 1 })))
+    expect(vi.mocked(listarClientes).mock.lastCall[0].busca).toBeUndefined()
+  })
+
+  it('gestão: Aguardando consultor e Em atendimento levam à situação; os outros dois ficam só número', async () => {
+    vi.mocked(indicadoresDeClientes).mockResolvedValue({
+      recorte: 'consultoria', aguardando_consultor: 2, em_atendimento: 15, passaram_da_previsao: 1, sem_checkin_30_dias: 4,
+    })
+    renderizarTela(<Clientes />, { perfil: gestor })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos clientes')
+    await waitFor(() => expect(numeroDoCartao(cartoes, 'Aguardando consultor')).toBe('2'))
+    expect(within(cartoes).getAllByRole('button').map((b) => b.getAttribute('data-cartao'))).toEqual(['aguardando', 'atendimento'])
+    await userEvent.click(within(cartoes).getByRole('button', { name: /^Aguardando consultor: 2/ }))
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'aguardando', pagina: 1 }))
+  })
+
+  it('o consultor não tem situação: nenhum cartão é botão', async () => {
+    vi.mocked(indicadoresDeClientes).mockResolvedValue({ recorte: 'pessoa', meus_clientes: 7, passaram_da_previsao: 0, horas_no_mes: 1, sem_checkin_30_dias: 1 })
+    renderizarTela(<Clientes />, { perfil: { id: 'p9', papel: 'pessoa', consultoria_id: 's1' } })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos clientes')
+    expect(within(cartoes).queryAllByRole('button')).toHaveLength(0)
+  })
+})
+
+// Auditoria, G6 (pedido do Diego, 17/11): no celular a barra mostra "Filtros (N ativos)", a busca e o Novo cliente; a
+// Situação, a Consultoria e o Consultor ficam na gaveta de baixo.
+describe('Clientes no celular: filtros na gaveta', () => {
+  beforeEach(() => vi.stubGlobal('matchMedia', vi.fn((consulta) => ({
+    matches: !consulta.includes('min-width: 640px'), media: consulta, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }))))
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('a barra tem Filtros, a busca e o Novo cliente; a gaveta tem os campos, conta os ativos e Limpar volta ao padrão', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    await cartoesAbaixoDaBarra('Indicadores dos clientes')
+    expect(screen.getByRole('searchbox', { name: 'Buscar clientes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Novo cliente' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Situação')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Filtros' }))
+    const gaveta = screen.getByRole('dialog', { name: 'Filtros' })
+    expect(within(gaveta).getByLabelText('Situação')).toHaveTextContent('Aguardando consultoria')
+    expect(within(gaveta).getByLabelText('Consultoria')).toBeInTheDocument()
+    await escolherNoSeletor(userEvent, 'Situação', 'Todas')
+    await escolherNoSeletor(userEvent, 'Consultoria', 'STI')
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'todas', consultoriaId: 's1', pagina: 1 }))
+    await userEvent.click(within(gaveta).getByRole('button', { name: 'Ver resultados' }))
+    expect(screen.getByRole('button', { name: 'Filtros (2 ativos)' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Filtros (2 ativos)' }))
+    const deNovo = screen.getByRole('dialog', { name: 'Filtros' })
+    await userEvent.click(within(deNovo).getByRole('button', { name: 'Limpar' }))
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'distribuir', pagina: 1 }))
+    expect(vi.mocked(listarClientes).mock.lastCall[0].consultoriaId).toBeUndefined()
+    expect(within(deNovo).getByRole('button', { name: 'Limpar' })).toBeDisabled()
+    await userEvent.click(within(deNovo).getByRole('button', { name: 'Ver resultados' }))
+    expect(screen.getByRole('button', { name: 'Filtros' })).toBeInTheDocument()
+  })
+})

@@ -3,7 +3,7 @@ import { ChevronDown, Plus, X } from 'lucide-react'
 import Caixa from '@/components/campos/Caixa'
 import Flutuante from '@/components/campos/Flutuante'
 import Seletor from '@/components/campos/Seletor'
-import BarraDeFiltros, { AcaoPrincipal } from '@/components/comum/BarraDeFiltros'
+import BarraDeFiltros, { AcaoPrincipal, NaGaveta } from '@/components/comum/BarraDeFiltros'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
 import FiltroConsultor from '@/components/clientes/FiltroConsultor'
 import { Button } from '@/components/ui/button'
@@ -122,23 +122,31 @@ function GoogleDaPessoa({ google, conectando, aoConectar, aoDesconectar }) {
 // (gestão e central), cliente e Limpar filtros; no fim, o Google da pessoa (Conectar ou o selo; central e dono não têm:
 // nunca organizam eventos) e "Novo evento" (sem `aoNovo`, não aparece). `doCliente` (a aba Agenda do cliente): sem
 // consultoria, consultor e cliente (o recorte já é o cliente). `tipos`: o que o "Mostrar" oferece.
+// No celular (auditoria, G6), Mostrar e os filtros vão para a gaveta da BarraDeFiltros, que tem o próprio Limpar: o
+// "Limpar filtros" da barra fica só no computador.
 export default function BarraDoCalendario({
   perfil, central, gestao, doCliente = false, tipos = TIPOS, mostrar, aoMostrar, consultoria, aoConsultoria, consultor, aoConsultor,
   cliente, aoCliente, temFiltros, aoLimpar, google, conectando, aoConectar, aoDesconectar, aoNovo,
 }) {
+  const ativos = [tipos.some((t) => !mostrar[t.chave]), !doCliente && Boolean(consultoria), !doCliente && Boolean(consultor.valor),
+    !doCliente && Boolean(cliente.valor)].filter(Boolean).length
   return (
-    <BarraDeFiltros className="gap-x-3 gap-y-2">
-      <MostrarTipos tipos={tipos} mostrar={mostrar} aoMudar={aoMostrar} />
-      {!doCliente && central && <FiltroConsultoria valor={consultoria} aoMudar={aoConsultoria} />}
+    <BarraDeFiltros className="gap-x-3 gap-y-2" ativos={ativos} aoLimpar={aoLimpar}>
+      <NaGaveta><MostrarTipos tipos={tipos} mostrar={mostrar} aoMudar={aoMostrar} /></NaGaveta>
+      {!doCliente && central && <NaGaveta><FiltroConsultoria valor={consultoria} aoMudar={aoConsultoria} /></NaGaveta>}
       {!doCliente && (central || gestao) && (
-        <FiltroConsultor valor={consultor.valor} nome={consultor.nome} comSemConsultor={false}
-          consultoriaId={central ? (consultoria || null) : perfil.consultoria_id} aoMudar={(valor, nome) => aoConsultor({ valor, nome })} />
+        <NaGaveta>
+          <FiltroConsultor valor={consultor.valor} nome={consultor.nome} comSemConsultor={false}
+            consultoriaId={central ? (consultoria || null) : perfil.consultoria_id} aoMudar={(valor, nome) => aoConsultor({ valor, nome })} />
+        </NaGaveta>
       )}
       {!doCliente && (
-        <FiltroCliente valor={cliente.valor} nome={cliente.nome} consultoriaId={central ? consultoria : null}
-          aoMudar={(valor, nome) => aoCliente({ valor, nome })} />
+        <NaGaveta>
+          <FiltroCliente valor={cliente.valor} nome={cliente.nome} consultoriaId={central ? consultoria : null}
+            aoMudar={(valor, nome) => aoCliente({ valor, nome })} />
+        </NaGaveta>
       )}
-      {temFiltros && <Button type="button" variant="link" size="sm" onClick={aoLimpar}>Limpar filtros</Button>}
+      {temFiltros && <Button type="button" variant="link" size="sm" className="max-sm:hidden" onClick={aoLimpar}>Limpar filtros</Button>}
       <AcaoPrincipal>
         {!central && <GoogleDaPessoa google={google} conectando={conectando} aoConectar={aoConectar} aoDesconectar={aoDesconectar} />}
         {aoNovo && <Button type="button" onClick={aoNovo}><Plus /> Novo evento</Button>}

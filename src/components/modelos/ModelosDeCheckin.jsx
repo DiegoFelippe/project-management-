@@ -3,7 +3,7 @@ import { Archive, ArchiveRestore, Building2, Copy, Eye, Globe, ListChecks, Penci
 import { toast } from 'sonner'
 import Seletor from '@/components/campos/Seletor'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
-import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
+import BarraDeFiltros, { AcaoPrincipal, CampoBusca, NaGaveta } from '@/components/comum/BarraDeFiltros'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
@@ -131,22 +131,36 @@ export default function ModelosDeCheckin({ perfil }) {
   }
 
   const filtrando = Boolean(buscaAtrasada || tipo || filtroDaCentral)
+  // No celular (auditoria, G6), Mostrar, Tipo e Consultoria vão para a gaveta; a busca e o Novo modelo ficam à vista.
+  const filtrosAtivos = [aba !== 'ativos', Boolean(tipo), Boolean(filtroDaCentral)].filter(Boolean).length
+  function limparFiltros() {
+    setAba('ativos')
+    setTipo('')
+    setConsultoriaId('')
+  }
+  // "Modelos ativos" (usabilidade, U5) mostra exatamente os que ele conta: os ativos, sem busca nem tipo (página 1).
+  function irParaAtivos() {
+    setAba('ativos')
+    setTipo('')
+    setBusca('')
+  }
   const colunaUsando = central ? 'Clientes usando' : gestao ? 'Clientes da consultoria usando' : 'Seus clientes usando'
   const usando = janela?.linha?.clientes_usando ?? 0
 
   return (
     <>
-      <BarraDeFiltros>
-        <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={aba}
-          aoMudar={setAba} />
+      <BarraDeFiltros ativos={filtrosAtivos} aoLimpar={limparFiltros}>
+        <NaGaveta><AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={aba} aoMudar={setAba} /></NaGaveta>
         <CampoBusca rotulo="Buscar modelos" placeholder="Buscar por nome ou descrição" valor={busca} aoMudar={setBusca} />
-        <div className="flex items-center gap-2">
-          <Label htmlFor="filtro-tipo-do-modelo" className="text-muted-foreground shrink-0">Tipo</Label>
-          <div className="w-48">
-            <Seletor id="filtro-tipo-do-modelo" tamanho="sm" valor={tipo} aoMudar={setTipo} opcoes={OPCOES_DE_TIPO} rotuloTodos="Todos" />
+        <NaGaveta>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="filtro-tipo-do-modelo" className="text-muted-foreground shrink-0">Tipo</Label>
+            <div className="w-48">
+              <Seletor id="filtro-tipo-do-modelo" tamanho="sm" valor={tipo} aoMudar={setTipo} opcoes={OPCOES_DE_TIPO} rotuloTodos="Todos" />
+            </div>
           </div>
-        </div>
-        {central && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
+        </NaGaveta>
+        {central && <NaGaveta><FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} /></NaGaveta>}
         {criaModelo && (
           <AcaoPrincipal>
             <Button onClick={() => setJanela({ tipo: 'novo' })}>
@@ -156,7 +170,8 @@ export default function ModelosDeCheckin({ perfil }) {
         )}
       </BarraDeFiltros>
       <CartoesDeNumeros rotulo="Indicadores dos modelos" cartoes={[
-        { chave: 'ativos', rotulo: 'Modelos ativos', icone: ListChecks, valor: numeros?.ativos },
+        { chave: 'ativos', rotulo: 'Modelos ativos', icone: ListChecks, valor: numeros?.ativos, destino: irParaAtivos,
+          ativo: aba === 'ativos' && !tipo && !buscaAtrasada },
         { chave: 'da_central', rotulo: 'Da Central', icone: Globe, tom: 'ceu', valor: numeros?.da_central },
         { chave: 'da_consultoria', rotulo: central ? 'Das consultorias' : 'Da consultoria', icone: Building2, tom: 'neutro', valor: numeros?.da_consultoria },
         { chave: 'usando', rotulo: 'Clientes usando', icone: RadioTower, tom: 'positivo', valor: numeros?.clientes_usando,

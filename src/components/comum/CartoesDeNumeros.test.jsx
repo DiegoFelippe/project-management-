@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Gauge, Users } from 'lucide-react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import CartoesDeNumeros from './CartoesDeNumeros'
 import { numeroDoCartao } from '@/test/cartoes'
 
@@ -81,11 +82,21 @@ describe('CartoesDeNumeros', () => {
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\*, \*::before, \*::after \{ animation-duration: 0\.01ms !important; transition-duration: 0\.01ms !important; \}/)
   })
 
-  it('no celular o ícone fica em cima do número (o número ganha a largura toda do cartão)', () => {
+  // Auditoria, G6: no celular os cartões ficam mais baixos. O ícone (menor) vai ao lado do rótulo, na linha de cima, e o
+  // número embaixo fica com a largura toda (ao lado do ícone, "1.234,5 h" não caberia a 360 px).
+  it('no celular, cartão mais baixo: o ícone menor ao lado do rótulo, e o número embaixo, na largura toda', () => {
     render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={CARTOES} />)
     for (const cartao of screen.getByRole('region').querySelectorAll('[data-cartao]')) {
-      expect(cartao).toHaveClass('flex', 'max-sm:flex-col', 'max-sm:items-start')
+      expect(cartao).toHaveClass('grid', 'max-sm:py-2.5', 'max-sm:gap-y-1.5')
+      // A linha do rótulo tem sempre a altura de dois: o número fica na mesma altura nos vizinhos (R6).
+      expect(cartao).toHaveClass('max-sm:grid-rows-[2.25rem]')
+      expect(cartao).toHaveClass(cartao.querySelector('svg') ? 'grid-cols-[auto_minmax(0,1fr)]' : 'grid-cols-1')
+      expect(cartao.querySelector('[data-numero]')).toHaveClass('max-sm:col-span-full', 'max-sm:row-start-2')
+      expect(cartao.querySelector('[data-numero]').parentElement).toHaveClass('max-sm:contents')
     }
+    const ocupacao = within(screen.getByRole('region')).getByText('Ocupação')
+    expect(ocupacao).toHaveClass('max-sm:col-start-2', 'max-sm:row-start-1')
+    expect(ocupacao.closest('[data-cartao]').querySelector('svg').parentElement).toHaveClass('size-9', 'max-sm:size-7')
   })
 
   // R6 da auditoria: cartão sem detalhe (ou sem variação) não deixa o número mais baixo que o dos vizinhos.
@@ -124,5 +135,50 @@ describe('CartoesDeNumeros', () => {
     expect(variacaoDe('Ocupação')).toHaveTextContent('—')
     expect(variacaoDe('Sem comparação')).toBeNull()
     expect(variacaoDe('Sem número')).toBeNull()
+  })
+})
+
+// Usabilidade, U5 (pedido do Diego, 18/11): o cartão cujo número a lista da tela sabe filtrar leva a esse filtro.
+describe('CartoesDeNumeros com destino', () => {
+  const COM_DESTINO = (destino, extra = {}) => [
+    { chave: 'aguardando', rotulo: 'Aguardando consultor', valor: 16, icone: Users, destino, ...extra },
+    { chave: 'parados', rotulo: 'Sem check-in há 30 dias', valor: 2, icone: Gauge },
+  ]
+
+  it('vira um botão com nome (o número e o que ele faz), que aplica o filtro', async () => {
+    const destino = vi.fn()
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_DESTINO(destino)} />)
+    const botao = screen.getByRole('button', { name: 'Aguardando consultor: 16. Mostrar na lista' })
+    expect(botao).toHaveAttribute('data-cartao', 'aguardando')
+    expect(botao).toHaveAttribute('type', 'button')
+    await userEvent.click(botao)
+    expect(destino).toHaveBeenCalledTimes(1)
+  })
+
+  it('os sem destino continuam só número (nem botão nem foco)', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_DESTINO(() => {})} />)
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+    const parados = screen.getByRole('region').querySelector('[data-cartao="parados"]')
+    expect(parados.tagName).toBe('DIV')
+    expect(parados).not.toHaveAttribute('tabindex')
+  })
+
+  it('mantém a animação do cartão, anima ao apertar como os botões e tem foco à vista', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_DESTINO(() => {})} />)
+    const botao = screen.getByRole('button')
+    expect(botao).toHaveClass('card', 'cartao-animado', 'botao-animado', 'hover:-translate-y-px', 'hover:shadow-md',
+      'active:scale-[0.97]', 'focus-visible:ring-2', 'focus-visible:ring-ring', 'text-left')
+    expect(botao.querySelector('svg')).toHaveClass('icone-do-cartao')
+  })
+
+  it('o cartão do filtro que está valendo fica marcado (aria-current)', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_DESTINO(() => {}, { ativo: true })} />)
+    expect(screen.getByRole('button')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByRole('button')).toHaveClass('ring-2')
+  })
+
+  it('o número ainda carregando diz "—" no nome', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={[{ chave: 'a', rotulo: 'Ativas', valor: null, destino: () => {} }]} />)
+    expect(screen.getByRole('button', { name: 'Ativas: —. Mostrar na lista' })).toBeInTheDocument()
   })
 })

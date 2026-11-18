@@ -65,7 +65,9 @@ export function Tabela({ rotulo, titulo, colunas, larguraMinima = 720, paginacao
   return (
     <div className={cn('overflow-hidden', !semCartao && 'card')}>
       {titulo && <h2 className="px-4 pt-4 pb-2 text-subtitulo font-semibold text-muted-foreground">{titulo}</h2>}
-      <div ref={rolagem} className="overflow-x-auto focus-visible:-outline-offset-2"
+      {/* relative: o "Ações" só para leitor de tela (sr-only, absoluto) fica preso aqui e não faz a página rolar para o lado
+          no celular, onde a coluna das ações deixa de ser fixa (achado na conferência do lote C1). */}
+      <div ref={rolagem} className="relative overflow-x-auto focus-visible:-outline-offset-2"
         {...(rola ? { role: 'region', 'aria-label': `Tabela ${rotulo}`, tabIndex: 0 } : {})}>
         <table aria-label={rotulo} className="w-full text-left text-corpo" style={{ minWidth: larguraMinima }}>
           <thead className="border-b bg-muted/50 text-rotulo text-muted-foreground">

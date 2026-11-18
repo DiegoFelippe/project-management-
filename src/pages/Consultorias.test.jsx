@@ -226,6 +226,22 @@ describe('Consultorias: cartões de números abaixo dos filtros', () => {
     await vi.waitFor(() => expect(numeroDoCartao(cartoes, 'Utilização média do mês')).toBe('40%'))
   })
 
+  // Usabilidade, U5: "Consultorias ativas" leva à aba Ativas (página 1); os outros três ficam só número.
+  it('"Consultorias ativas" leva à aba Ativas; os outros cartões não são botão', async () => {
+    renderizarTela(<Consultorias />, { perfil: dono })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores das consultorias')
+    await vi.waitFor(() => expect(numeroDoCartao(cartoes, 'Consultorias ativas')).toBe('12'))
+    expect(within(cartoes).getAllByRole('button').map((b) => b.getAttribute('data-cartao'))).toEqual(['ativas'])
+    expect(within(cartoes).getByRole('button', { name: 'Consultorias ativas: 12. Mostrar na lista' })).toHaveAttribute('aria-current', 'true')
+    await userEvent.click(screen.getByRole('button', { name: 'Ocupação do mês' }))
+    await screen.findByRole('table', { name: 'Ocupação do mês' })
+    expect(within(cartoes).getByRole('button', { name: /^Consultorias ativas/ })).not.toHaveAttribute('aria-current')
+    await userEvent.click(within(cartoes).getByRole('button', { name: /^Consultorias ativas/ }))
+    expect(await screen.findByRole('table', { name: 'Consultorias' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ativas' })).toHaveAttribute('aria-pressed', 'true')
+    expect(listarConsultorias).toHaveBeenLastCalledWith({ arquivadas: false, pagina: 1 })
+  })
+
   it('quem não vê todas as consultorias não tem os cartões nem pede os números', async () => {
     renderizarTela(<Consultorias />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
     await screen.findByRole('table', { name: 'Consultorias' })

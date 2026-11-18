@@ -22,8 +22,10 @@ export async function listarUsuarios({ consultoriaId, ativos = true, pagina = 1,
     .order('nome')
     .order('id')
   if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
-  // Pessoas que têm aquele tipo de consultoria (a lista é de vários; índice GIN).
-  if (tipo) consulta = consulta.contains('tipos_de_consultoria', [tipo])
+  // Pessoas que têm aquele tipo de consultoria (a lista é de vários; índice GIN). 'sem': quem é de consultoria
+  // (administrador, gestor ou consultor) e não tem nenhum, o recorte do cartão "Sem tipo de consultoria" (U5).
+  if (tipo === 'sem') consulta = consulta.in('papel', ['admin', 'gestor', 'pessoa']).eq('tipos_de_consultoria', '{}')
+  else if (tipo) consulta = consulta.contains('tipos_de_consultoria', [tipo])
   const resultado = await buscarPagina(consulta, pagina)
   return { ...resultado, itens: resultado.itens.map((p) => ({ ...p, times: (p.times ?? []).map((m) => m.time).filter(Boolean) })) }
 }

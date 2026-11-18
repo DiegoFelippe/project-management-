@@ -35,6 +35,16 @@ describe('listarUsuarios: tipo de consultoria', () => {
     expect(banco.chamou('contains', 'tipos_de_consultoria', ['gestao'])).toBe(true)
   })
 
+  // Usabilidade, U5: o cartão "Sem tipo de consultoria" leva a este filtro (o mesmo recorte do número: consultores
+  // ativos — administrador, gestor e consultor — com a lista vazia; o índice GIN serve ao "=").
+  it("tipo 'sem': quem é de consultoria e não tem tipo nenhum", async () => {
+    banco.resposta = { data: [], error: null, count: 0 }
+    await listarUsuarios({ pagina: 1, tipo: 'sem' })
+    expect(banco.chamou('eq', 'tipos_de_consultoria', '{}')).toBe(true)
+    expect(banco.chamou('in', 'papel', ['admin', 'gestor', 'pessoa'])).toBe(true)
+    expect(banco.chamadas.some(([m]) => m === 'contains')).toBe(false)
+  })
+
   it('sem tipo, não filtra', async () => {
     banco.resposta = { data: [], error: null, count: 0 }
     await listarUsuarios({ pagina: 1 })

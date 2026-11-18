@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
-import BarraDeFiltros, { AcaoPrincipal, CampoBusca } from '@/components/comum/BarraDeFiltros'
+import BarraDeFiltros, { AcaoPrincipal, CampoBusca, NaGaveta } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
@@ -42,8 +42,10 @@ const lerConsultorias = ({ filtro, mes, busca, pagina }) => (filtro === 'ocupaca
   ? consultoriasPorOcupacao({ limite: POR_PAGINA, deslocamento: (pagina - 1) * POR_PAGINA, mes, busca })
     .then((r) => ({ ...r, foraDaFaixa: r.itens.length === 0 }))
   : listarConsultorias({ arquivadas: filtro === 'arquivadas', pagina }))
-const cartoesDoMes = (n, passado, mes) => [
-  { chave: 'ativas', rotulo: 'Consultorias ativas', icone: Building2, valor: n?.consultorias_ativas },
+// "Consultorias ativas" leva à aba Ativas (usabilidade, U5: a lista é exatamente essas); os outros ficam só número.
+const cartoesDoMes = (n, passado, mes, { irParaAtivas, filtro } = {}) => [
+  { chave: 'ativas', rotulo: 'Consultorias ativas', icone: Building2, valor: n?.consultorias_ativas,
+    ...(irParaAtivas && { destino: irParaAtivas, ativo: filtro === 'ativas' }) },
   { chave: 'clientes', rotulo: 'Clientes ativos', icone: RadioTower, tom: 'positivo', valor: n?.clientes_ativos },
   { chave: 'consultores', rotulo: 'Consultores', icone: Users, tom: 'ceu', valor: n?.consultores },
   { chave: 'ocupacao', rotulo: passado ? 'Utilização média do mês' : 'Ocupação média do mês', icone: Gauge, tom: 'aviso',
@@ -138,9 +140,11 @@ export default function Consultorias() {
         descricao={resultado && !emOcupacao
           ? (filtro === 'ativas' ? plural(total, 'consultoria ativa', 'consultorias ativas') : plural(total, 'consultoria arquivada', 'consultorias arquivadas'))
           : null} />
-      <BarraDeFiltros>
+      {/* No celular (auditoria, G6), as abas trocam a tela (a Ocupação do mês é outra tabela) e ficam à vista; o mês vai
+          para a gaveta. */}
+      <BarraDeFiltros ativos={emOcupacao && mes !== mesAtual() ? 1 : 0} aoLimpar={() => setMes(mesAtual())}>
         <AbasSegmentadas rotulo="Mostrar" abas={abas} valor={filtro} aoMudar={setFiltro} />
-        {emOcupacao && <NavegacaoDoMes mes={mes} aoMudar={setMes} />}
+        {emOcupacao && <NaGaveta><NavegacaoDoMes mes={mes} aoMudar={setMes} /></NaGaveta>}
         {emOcupacao && (
           <CampoBusca rotulo="Buscar consultorias" placeholder="Buscar consultoria" valor={busca}
             aoMudar={setBusca} />
@@ -153,7 +157,10 @@ export default function Consultorias() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
-      {veTudo(perfil) && <CartoesDeNumeros rotulo="Indicadores das consultorias" cartoes={cartoesDoMes(numeros, numeros ? numeros.passado : passado, mes)} />}
+      {veTudo(perfil) && (
+        <CartoesDeNumeros rotulo="Indicadores das consultorias"
+          cartoes={cartoesDoMes(numeros, numeros ? numeros.passado : passado, mes, { irParaAtivas: () => setFiltro('ativas'), filtro })} />
+      )}
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as consultorias…" className="py-12" />}
       {resultado && lista.length === 0 && (

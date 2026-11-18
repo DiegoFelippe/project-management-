@@ -302,11 +302,13 @@ describe('Integrações: cartões de números abaixo dos filtros', () => {
     expect(indicadoresDeIntegracoes).toHaveBeenCalledWith({ consultoriaId: 'c1' })
   })
 
-  it('no celular (360 px) o ícone vai para cima do número, para "Nenhum" e a data caberem', async () => {
+  // Auditoria, G6: no celular o cartão fica mais baixo — o ícone vai ao lado do rótulo e o número desce, com a largura
+  // toda do cartão, para "Nenhum" e a data caberem.
+  it('no celular (360 px) o número fica com a largura toda do cartão, para "Nenhum" e a data caberem', async () => {
     renderizarTela(<Integracoes />, { perfil: admin })
     const cartoes = await cartoesAbaixoDaBarra('Indicadores das integrações')
     const ultimo = within(cartoes).getByText('Último teste').closest('[data-cartao]')
-    expect(ultimo).toHaveClass('max-sm:flex-col', 'max-sm:items-start')
+    expect(ultimo.querySelector('[data-numero]')).toHaveClass('max-sm:col-span-full')
   })
 
   it('nunca testada: "Nenhum"; o filtro Conectadas/Não conectadas não muda os cartões; Testar recarrega', async () => {

@@ -7,7 +7,7 @@ import Seletor from '@/components/campos/Seletor'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import Avatar from '@/components/comum/Avatar'
 import BarraDeOcupacao from '@/components/comum/BarraDeOcupacao'
-import BarraDeFiltros, { AcaoPrincipal } from '@/components/comum/BarraDeFiltros'
+import BarraDeFiltros, { AcaoPrincipal, NaGaveta } from '@/components/comum/BarraDeFiltros'
 import NavegacaoDoMes from '@/components/comum/NavegacaoDoMes'
 import Cabecalho from '@/components/comum/Cabecalho'
 import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
@@ -39,16 +39,23 @@ import { useLeitura } from '@/lib/useLeitura'
 import { useListaPaginada } from '@/lib/useListaPaginada'
 
 const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'desativados', rotulo: 'Desativados' }]
+// O Tipo da barra, com "Sem tipo" no fim: quem é de consultoria e não tem nenhum (o cartão "Sem tipo de consultoria").
+const TIPOS_DO_FILTRO = [...OPCOES_DE_TIPO, { valor: 'sem', rotulo: 'Sem tipo' }]
 
 // Cartões (contados no banco, no recorte de quem vê): seguem a consultoria do filtro e o mês; as abas e o Tipo, não.
+// "Pessoas ativas" e "Sem tipo de consultoria" levam ao filtro da lista (usabilidade, U5): `ir(tipo)` mostra os ativos
+// com aquele Tipo ('' = todos) e `filtro` diz qual vale agora. "Acima de 100%" fica só número: a lista não sabe filtrar
+// pela ocupação do mês sem uma função nova no banco (pendente, relatório do lote C1); a ocupação média também.
 const lerNumeros = ({ consultoriaId, mes }) => indicadoresDeUsuarios({ consultoriaId, mes })
-const cartoesDoMes = (n, passado, mes) => [
-  { chave: 'ativas', rotulo: 'Pessoas ativas', icone: Users, valor: n?.pessoas_ativas },
+const cartoesDoMes = (n, passado, mes, { ir, filtro } = {}) => [
+  { chave: 'ativas', rotulo: 'Pessoas ativas', icone: Users, valor: n?.pessoas_ativas,
+    ...(ir && { destino: () => ir(''), ativo: filtro === 'ativos:' }) },
   { chave: 'ocupacao', rotulo: passado ? 'Utilização média do mês' : 'Ocupação média do mês', icone: Gauge, tom: 'ceu',
     valor: n ? formatarOcupacao(n.ocupacao_media) : null, detalhe: `média por pessoa · ${rotuloCurto(mes)}` },
   { chave: 'acima', rotulo: 'Acima de 100%', icone: TrendingUp, tom: 'perigo', valor: n?.acima_de_100,
     destaque: n?.acima_de_100 > 0 ? 'perigo' : null },
-  { chave: 'sem_tipo', rotulo: 'Sem tipo de consultoria', icone: Tags, tom: 'aviso', valor: n?.sem_tipo },
+  { chave: 'sem_tipo', rotulo: 'Sem tipo de consultoria', icone: Tags, tom: 'aviso', valor: n?.sem_tipo,
+    ...(ir && { destino: () => ir('sem'), ativo: filtro === 'ativos:sem' }) },
 ]
 
 // Situação é etiqueta ao lado do nome, só quando não é o estado normal ("Ativo" não aparece).
@@ -179,6 +186,20 @@ export default function Usuarios() {
   const passado = numeros.mes === mes ? numeros.passado : mes < mesAtual()
   const lista = resultado?.itens ?? []
   const total = resultado?.total ?? 0
+  // No celular, os filtros da gaveta (auditoria, G6): quantos estão fora do padrão e o Limpar que os volta.
+  const filtrosAtivos = [filtro !== 'ativos', comNumeros && mes !== mesAtual(), Boolean(tipo), ehDono && Boolean(consultoriaId)]
+    .filter(Boolean).length
+  function limparFiltros() {
+    setFiltro('ativos')
+    setMes(mesAtual())
+    setTipo('')
+    if (ehDono) setConsultoriaId('')
+  }
+  // Cartão que leva ao filtro (U5): os ativos, com o Tipo do cartão; a lista volta à página 1 (o filtro mudou).
+  function irPara(tipoDoCartao) {
+    setFiltro('ativos')
+    setTipo(tipoDoCartao)
+  }
 
   // Quem mexe em quem (as Edge Functions conferem de novo): dono → administradores; administrador →
   // gestores e pessoas; gestor → só o nome e os times dele das pessoas que vê. Em si mesmo, ninguém administra: a própria
@@ -327,17 +348,19 @@ export default function Usuarios() {
     <>
       <Cabecalho titulo="Usuários"
         descricao={resultado ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'pessoa' : 'pessoas'}` : null} />
-      <BarraDeFiltros>
-        <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={setFiltro} />
-        {comNumeros && <NavegacaoDoMes mes={mes} aoMudar={setMes} />}
-        <div className="flex items-center gap-2">
-          <Label htmlFor="filtro-tipo" className="shrink-0 text-muted-foreground">Tipo</Label>
-          <div className="w-48">
-            <Seletor id="filtro-tipo" tamanho="sm" valor={tipo} aoMudar={setTipo}
-              opcoes={OPCOES_DE_TIPO} rotuloTodos="Todos" />
+      <BarraDeFiltros ativos={filtrosAtivos} aoLimpar={limparFiltros}>
+        <NaGaveta><AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={filtro} aoMudar={setFiltro} /></NaGaveta>
+        {comNumeros && <NaGaveta><NavegacaoDoMes mes={mes} aoMudar={setMes} /></NaGaveta>}
+        <NaGaveta>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="filtro-tipo" className="shrink-0 text-muted-foreground">Tipo</Label>
+            <div className="w-48">
+              <Seletor id="filtro-tipo" tamanho="sm" valor={tipo} aoMudar={setTipo}
+                opcoes={TIPOS_DO_FILTRO} rotuloTodos="Todos" />
+            </div>
           </div>
-        </div>
-        {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} />}
+        </NaGaveta>
+        {ehDono && <NaGaveta><FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} /></NaGaveta>}
         {(!ehDono || ehAdminGeral) && (
           <AcaoPrincipal>
             <Button onClick={() => setNovo(true)}>
@@ -346,7 +369,8 @@ export default function Usuarios() {
           </AcaoPrincipal>
         )}
       </BarraDeFiltros>
-      <CartoesDeNumeros rotulo="Indicadores dos usuários" cartoes={cartoesDoMes(cartoes, cartoes ? cartoes.passado : mes < mesAtual(), mes)} />
+      <CartoesDeNumeros rotulo="Indicadores dos usuários"
+        cartoes={cartoesDoMes(cartoes, cartoes ? cartoes.passado : mes < mesAtual(), mes, { ir: irPara, filtro: `${filtro}:${tipo}` })} />
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {aviso && <p role="status" className="mb-3 text-corpo text-muted-foreground">{aviso}</p>}
       {comNumeros && erroNumeros && !erro && <p role="status" className="mb-3 text-corpo text-muted-foreground">Não foi possível carregar a capacidade do mês.</p>}

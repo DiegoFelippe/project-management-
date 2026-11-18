@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { contarClientesAtivos } from '@/data/clientes'
 import { mudarCor, trocarFoto } from '@/data/imagens'
 import { toast } from 'sonner'
@@ -818,5 +818,69 @@ describe('Usuários: cartões de números abaixo dos filtros', () => {
     expect(screen.queryByRole('button', { name: 'Mês anterior' })).toBeNull()
     const cartoes = screen.getByRole('region', { name: 'Indicadores dos usuários' })
     expect(within(cartoes).getByText(`média por pessoa · ${rotuloCurto(mesAtual())}`)).toBeInTheDocument()
+  })
+})
+
+// Usabilidade, U5 (pedido do Diego, 18/11): os cartões cujo número a lista sabe filtrar levam ao filtro (página 1).
+describe('Usuários: cartões que levam ao filtro', () => {
+  const admin = { id: 'a1', papel: 'admin', consultoria_id: 'c1' }
+
+  it('"Sem tipo de consultoria" mostra os ativos sem tipo (Tipo: Sem tipo) na página 1; "Pessoas ativas" volta a todos', async () => {
+    vi.mocked(listarUsuarios).mockResolvedValue({
+      itens: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [], consultoria_id: 'c1' }], total: 40,
+    })
+    renderizarTela(<Usuarios />, { perfil: admin })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos usuários')
+    await userEvent.click(await screen.findByRole('button', { name: 'Desativados' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Próxima' }))
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith(expect.objectContaining({ ativos: false, pagina: 2 })))
+    await userEvent.click(within(cartoes).getByRole('button', { name: 'Sem tipo de consultoria: 3. Mostrar na lista' }))
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: true, pagina: 1, tipo: 'sem' }))
+    expect(screen.getByLabelText('Tipo')).toHaveTextContent('Sem tipo')
+    expect(screen.getByRole('button', { name: 'Ativos' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(cartoes).getByRole('button', { name: /^Sem tipo de consultoria/ })).toHaveAttribute('aria-current', 'true')
+    await userEvent.click(within(cartoes).getByRole('button', { name: 'Pessoas ativas: 6. Mostrar na lista' }))
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: true, pagina: 1, tipo: undefined }))
+    expect(within(cartoes).getByRole('button', { name: /^Pessoas ativas/ })).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('"Acima de 100%" e a ocupação média ficam só número (a lista não filtra pela ocupação do mês)', async () => {
+    renderizarTela(<Usuarios />, { perfil: admin })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores dos usuários')
+    await waitFor(() => expect(numeroDoCartao(cartoes, 'Acima de 100%')).toBe('1'))
+    expect(within(cartoes).getAllByRole('button').map((b) => b.getAttribute('data-cartao'))).toEqual(['ativas', 'sem_tipo'])
+  })
+
+  it('o Tipo oferece "Sem tipo" no fim', async () => {
+    renderizarTela(<Usuarios />, { perfil: admin })
+    await screen.findByRole('table', { name: 'Usuários' })
+    await escolherNoSeletor(userEvent, 'Tipo', 'Sem tipo')
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith(expect.objectContaining({ tipo: 'sem', pagina: 1 })))
+  })
+})
+
+// Auditoria, G6 (pedido do Diego, 17/11): no celular, Mostrar, o mês, o Tipo e a Consultoria vão para a gaveta.
+describe('Usuários no celular: filtros na gaveta', () => {
+  beforeEach(() => vi.stubGlobal('matchMedia', vi.fn((consulta) => ({
+    matches: !consulta.includes('min-width: 640px'), media: consulta, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }))))
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('a barra tem Filtros e o Novo acesso; o mês e o Tipo contam como ativos e Limpar volta ao mês atual', async () => {
+    renderizarTela(<Usuarios />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'c1' } })
+    await cartoesAbaixoDaBarra('Indicadores dos usuários')
+    expect(screen.getByRole('button', { name: 'Novo acesso' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Mostrar' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Filtros' }))
+    const gaveta = screen.getByRole('dialog', { name: 'Filtros' })
+    expect(within(gaveta).getByRole('group', { name: 'Mostrar' })).toBeInTheDocument()
+    await userEvent.click(within(gaveta).getByRole('button', { name: 'Mês anterior' }))
+    await escolherNoSeletor(userEvent, 'Tipo', 'Gestão')
+    await waitFor(() => expect(indicadoresDeUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', mes: deslocarMes(mesAtual(), -1) }))
+    await userEvent.click(within(gaveta).getByRole('button', { name: 'Ver resultados' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Filtros (2 ativos)' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Filtros' })).getByRole('button', { name: 'Limpar' }))
+    await waitFor(() => expect(indicadoresDeUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', mes: mesAtual() }))
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: true, pagina: 1, tipo: undefined }))
   })
 })

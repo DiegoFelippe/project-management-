@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
-import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
+import BarraDeFiltros, { NaGaveta } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import { GraficoCarregando } from '@/components/comum/Carregando'
@@ -178,9 +178,11 @@ export default function Integracoes() {
     <>
       <Cabecalho titulo="Integrações"
         descricao="Conexões que o sistema usa. Cada consultoria conecta as suas; todos da consultoria usam a mesma conexão." />
-      <BarraDeFiltros>
-        <AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={situacaoFiltro} aoMudar={setSituacaoFiltro} />
-        {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setIntegracoes(null) }} />}
+      {/* No celular (auditoria, G6), o Mostrar e a Consultoria (só o dono) vão para a gaveta. */}
+      <BarraDeFiltros ativos={[situacaoFiltro !== 'todas', ehDono && Boolean(consultoriaId)].filter(Boolean).length}
+        aoLimpar={() => { setSituacaoFiltro('todas'); if (ehDono) { setConsultoriaId(''); setIntegracoes(null) } }}>
+        <NaGaveta><AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={situacaoFiltro} aoMudar={setSituacaoFiltro} /></NaGaveta>
+        {ehDono && <NaGaveta><FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setIntegracoes(null) }} /></NaGaveta>}
       </BarraDeFiltros>
       <CartoesDeNumeros rotulo="Indicadores das integrações" cartoes={cartoesDasIntegracoes(numeros)} />
       {aviso && <div className="mb-4"><Aviso>{aviso}</Aviso></div>}

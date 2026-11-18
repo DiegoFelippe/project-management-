@@ -76,6 +76,19 @@ describe('Tabela (padrão das listas)', () => {
     expect(within(tabela).getByRole('button', { name: 'Editar' }).closest('td')).toHaveClass('sticky', 'right-0')
   })
 
+  // No celular a coluna das ações não é fixa: o "Ações" do leitor de tela (absoluto) ficaria preso à página e a faria rolar
+  // para o lado a 360 px. A área que rola é `relative` e o prende (achado na conferência do lote C1).
+  it('o texto só para leitor de tela do cabeçalho fica preso à área que rola (a página não rola para o lado)', () => {
+    render(
+      <Tabela rotulo="Times" colunas={['Time']}>
+        <Linha><Celula>Suporte</Celula><CelulaAcoes><button type="button" className="botao-animado">Editar</button></CelulaAcoes></Linha>
+      </Tabela>,
+    )
+    const rolagem = screen.getByRole('table', { name: 'Times' }).parentElement
+    expect(rolagem).toHaveClass('relative', 'overflow-x-auto')
+    expect(screen.getByText('Ações')).toHaveClass('sr-only')
+  })
+
   it('no celular (abaixo de sm) a coluna de ações não fica fixa: o nome continua à vista em 360 px (revisão do lote A)', () => {
     render(
       <Tabela rotulo="Times" colunas={['Time']}>
