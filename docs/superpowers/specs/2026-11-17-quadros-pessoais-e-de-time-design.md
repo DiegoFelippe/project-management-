@@ -361,7 +361,7 @@ quadros na página do time.
 7. **A tela Quadros não tem cartões de números**, pela mesma razão da aba Quadro do cliente (exceção no CLAUDE.md).
 8. **Recentes e último quadro ficam no navegador** (só ids, conferidos no banco): não seguem para outro aparelho.
 9. **Quadro não muda de dono nem de tipo** ("Editar" = renomear) e **favorito não se edita** — duas operações fora do
-   CRUD que precisam do OK do Diego (regra do CLAUDE.md).
+   CRUD — **aprovadas pelo Diego em 17/11** ("Pode ser assim").
 10. **A lista dos quadros abertos é o seletor** (aprovado), não uma `Tabela`; a dos arquivados é `Tabela`.
 11. **Quadro arquivado abre só para ler** (pela janela de arquivados), e apagar oferece arquivar ao lado.
 12. **Anexos e imagens dos quadros pessoais e de time** no mesmo balde `quadros`, na pasta `quadro/<id do quadro>/`.
