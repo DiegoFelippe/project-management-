@@ -3,7 +3,7 @@
 -- consultores_por_ocupacao e consultorias_por_ocupacao. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(156);
+select plan(153);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -147,30 +147,32 @@ select is((select (j -> 'indicadores' ->> 'sem_consultor')::bigint from p_centra
 select is((select (j -> 'indicadores' ->> 'aguardando')::bigint from p_central),
   (select (j -> 'indicadores' ->> 'a_distribuir')::bigint + (j -> 'indicadores' ->> 'sem_consultor')::bigint from p_central),
   'central: aguardando = a distribuir + sem consultor');
-select is((select (j -> 'indicadores' ->> 'clientes_ativos')::bigint from p_central),
-  (select count(*) from public.clientes where not arquivado), 'central: clientes ativos = todos os não arquivados');
-select is((select (j -> 'indicadores' ->> 'clientes_novos')::bigint from p_central), 0::bigint,
-  'central: em novembro/2037 nenhum cliente é novo (criado_em dentro do mês)');
-select ok((select jsonb_array_length(j -> 'esperando') between 4 and 5 from p_central),
-  'central: esperando traz no máximo 5 (os 4 da fixture, mais algum de verdade se houver)');
-select is((select array_agg(e ->> 'id' order by o) from p_central, jsonb_array_elements(j -> 'esperando') with ordinality t(e, o) where o <= 4),
+select is((select (j -> 'indicadores' ->> 'clientes_em_atendimento')::bigint from p_central),
+  (select count(*) from public.clientes where not arquivado and consultor_id is not null),
+  'central: clientes em atendimento = todos os não arquivados com consultor');
+-- A fila (que era "esperando" no painel) é de fila_de_clientes, no mesmo cenário.
+create temp table p_fila_central as select public.fila_de_clientes(testes.futuro()) as j;
+grant select on p_fila_central to authenticated;
+select ok((select jsonb_array_length(j -> 'pontos') between 4 and 40 from p_fila_central),
+  'central: a fila traz no máximo 40 pontos (os 4 da fixture, mais algum de verdade se houver)');
+select is((select array_agg(e ->> 'id' order by o) from p_fila_central, jsonb_array_elements(j -> 'pontos') with ordinality t(e, o) where o <= 4),
   array[testes.id('dist1')::text, testes.id('dist2')::text, testes.id('sem_a')::text, testes.id('sem_b')::text],
-  'central: esperando do mais antigo ao mais novo, a distribuir e sem consultor juntos');
-select is((select array_agg(e ->> 'situacao' order by o) from p_central, jsonb_array_elements(j -> 'esperando') with ordinality t(e, o) where o <= 4),
+  'central: fila do mais antigo ao mais novo, a distribuir e sem consultor juntos');
+select is((select array_agg(e ->> 'situacao' order by o) from p_fila_central, jsonb_array_elements(j -> 'pontos') with ordinality t(e, o) where o <= 4),
   array['a_distribuir', 'a_distribuir', 'sem_consultor', 'sem_consultor'], 'central: situação de cada um');
-select is((select e ->> 'consultoria_nome' from p_central, jsonb_array_elements(j -> 'esperando') e
+select is((select e ->> 'consultoria_nome' from p_fila_central, jsonb_array_elements(j -> 'pontos') e
     where e ->> 'id' = testes.id('sem_a')::text), 'Painel Teste A', 'central: o sem consultor mostra a consultoria');
 select ok((select not exists (
-    select 1 from p_central, jsonb_array_elements(j -> 'esperando') e where e ->> 'id' = testes.id('arq_a')::text)),
+    select 1 from p_fila_central, jsonb_array_elements(j -> 'pontos') e where e ->> 'id' = testes.id('arq_a')::text)),
   'central: cliente arquivado não espera');
-select ok((select jsonb_array_length(j -> 'ranking') <= 8 and not exists (
+select ok((select jsonb_array_length(j -> 'ranking') <= 12 and not exists (
     select 1 from p_central, jsonb_array_elements(j -> 'ranking') r
     left join testes.todas_consultorias(testes.futuro()) c on c.id = (r ->> 'id')::uuid
     where c.id is null
       or row(c.nome, c.capacidade, c.ocupacao)
         is distinct from row(r ->> 'nome', (r ->> 'capacidade')::numeric, (r ->> 'ocupacao')::numeric))
     from p_central),
-  'central: ranking de consultorias (até 8) com os números de consultorias_por_ocupacao');
+  'central: ranking de consultorias (até 12) com os números de consultorias_por_ocupacao');
 select ok((select not exists (
     select 1 from p_central, jsonb_array_elements(j -> 'ranking') with ordinality a(r, o)
     join jsonb_array_elements(j -> 'ranking') with ordinality b(r, o) on b.o = a.o + 1
@@ -182,14 +184,18 @@ select ok((select (j -> 'indicadores' ->> 'capacidade')::numeric = (select sum(c
     from p_central),
   'central: capacidade e reservado somam as consultorias de consultorias_por_ocupacao; realizado = soma em segundos, arredondada uma vez');
 select ok((select (j ->> 'passado')::boolean is false from p_central), 'mês futuro: passado = false');
-select ok((select not exists (
-    select 1 from p_central, jsonb_array_elements(j -> 'extremos' -> 'acima') e where (e ->> 'ocupacao')::numeric <= 1)
-  and jsonb_array_length(j -> 'extremos' -> 'acima') <= 3 and jsonb_array_length(j -> 'extremos' -> 'folga') <= 3 from p_central),
-  'central: extremos têm até 3 de cada lado e quem está acima passa de 100%');
-select ok((select j -> 'meus_clientes' = '[]'::jsonb and j -> 'ranking' is not null from p_central), 'central: sem meus clientes');
-select ok((select not exists (select 1 from p_central, jsonb_array_elements(j -> 'extremos' -> 'acima' || (j -> 'extremos' -> 'folga')) e
-    where (e ->> 'visivel')::boolean is not true)),
-  'central: visivel true em todos os extremos');
+-- Os extremos estão na ocupação por unidade: ranking_resumo conta sobre todas as consultorias.
+select ok((select (j -> 'ranking_resumo' ->> 'acima')::int = (select count(*) from testes.todas_consultorias(testes.futuro()) c where c.ocupacao > 1)
+    and (j -> 'ranking_resumo' ->> 'folga')::int = (select count(*) from testes.todas_consultorias(testes.futuro()) c where c.ocupacao < 0.7)
+    from p_central),
+  'central: ranking_resumo conta as consultorias acima de 100% e com folga (abaixo de 70%), todas');
+-- "Meus clientes" virou horas_por_cliente: a central vê os clientes de todos, com a consultoria embaixo do nome.
+select ok((select count(*) = 2 and bool_and(e ->> 'sub' = case when e ->> 'id' = testes.id('a40')::text then 'Painel Teste A' else 'Painel Teste B' end)
+    from jsonb_array_elements(public.horas_por_cliente(testes.passado(), p_pagina => 1) -> 'itens') e
+    where e ->> 'id' in (testes.id('a40')::text, testes.id('b10')::text)),
+  'central: horas por cliente de todos os consultores (a40 da A e b10 da B), com a consultoria');
+select ok((select bool_and(r ? 'pessoas' and not r ? 'visivel') from p_central, jsonb_array_elements(j -> 'ranking') r),
+  'central: o ranking é de consultorias (com quantas pessoas; visivel só no de consultores)');
 reset role;
 
 -- Ocupação do mês passado (utilização) e flag.
@@ -209,10 +215,8 @@ grant select on p_admin to authenticated;
 
 select is((select j ->> 'recorte' from p_admin), 'consultoria', 'administrador: recorte consultoria');
 select is((select j ->> 'mes' from p_admin), '2037-11-01', 'devolve o mês pedido');
-select is((select (public.painel_do_inicio() -> 'indicadores' ->> 'clientes_novos')::int), 3,
-  'administrador: novos do mês atual (a40, a30, c200; sem_a e arq_a são de 1900)');
-select is((select (j -> 'indicadores' ->> 'clientes_ativos')::int from p_admin), 4,
-  'administrador: ativos da consultoria (a40, a30, c200, sem_a; o arquivado não conta)');
+select is((select (j -> 'indicadores' ->> 'clientes_em_atendimento')::int from p_admin), 3,
+  'administrador: em atendimento na consultoria (a40, a30, c200; sem_a não tem consultor e o arquivado não conta)');
 select is((select (j -> 'indicadores' ->> 'aguardando')::int from p_admin), 1, 'administrador: aguardando = sem consultor da consultoria');
 select is((select (j -> 'indicadores' ->> 'sem_consultor')::int from p_admin), 1, 'administrador: sem consultor = 1');
 select is((select (j -> 'indicadores' ->> 'a_distribuir')::int from p_admin), 0, 'administrador: nada a distribuir (a fila é da central)');
@@ -222,8 +226,10 @@ select ok((select (j -> 'indicadores' ->> 'capacidade')::numeric = (select sum(c
     from p_admin), 'administrador: capacidade = soma de consultores_por_ocupacao da consultoria');
 select ok((select (j -> 'indicadores' ->> 'ocupacao')::numeric = round((j -> 'indicadores' ->> 'reservado')::numeric / (j -> 'indicadores' ->> 'capacidade')::numeric, 4)
     from p_admin), 'administrador: ocupação = reservado / capacidade');
-select is((select jsonb_array_length(j -> 'esperando') from p_admin), 1, 'administrador: só espera o sem consultor da própria consultoria');
-select is((select j -> 'esperando' -> 0 ->> 'id' from p_admin), testes.id('sem_a')::text, 'administrador: o que espera é o sem_a');
+select is((select jsonb_array_length(public.fila_de_clientes(testes.futuro()) -> 'pontos')), 1,
+  'administrador: na fila, só o sem consultor da própria consultoria');
+select is((select public.fila_de_clientes(testes.futuro()) -> 'pontos' -> 0 ->> 'id'), testes.id('sem_a')::text,
+  'administrador: o que espera é o sem_a');
 select ok((select not exists (
     select 1 from p_admin, jsonb_array_elements(j -> 'ranking') r
     left join public.consultores_por_ocupacao(testes.id('A'), null, 50, 0, testes.futuro()) c on c.id = (r ->> 'id')::uuid
@@ -233,23 +239,23 @@ select ok((select not exists (
   and (select jsonb_array_length(j -> 'ranking') from p_admin) = 6),
   'administrador: ranking dos 6 consultores da consultoria, com os números de consultores_por_ocupacao');
 select is((select j -> 'ranking' -> 0 ->> 'id' from p_admin), testes.id('pessoa_c')::text, 'ranking: o mais ocupado primeiro');
-select is((select array_agg(e ->> 'id') from p_admin, jsonb_array_elements(j -> 'extremos' -> 'acima') e),
-  array[testes.id('pessoa_c')::text], 'extremos: só pessoa_c passa de 100% (200 h de 167,2)');
-select ok((select jsonb_array_length(j -> 'extremos' -> 'folga') = 3 and not exists (
-    select 1 from p_admin, jsonb_array_elements(j -> 'extremos' -> 'folga') e where (e ->> 'ocupacao')::numeric >= 1) from p_admin),
-  'extremos: 3 com folga, nenhum acima de 100%');
-select ok((select not exists (
-    select 1 from p_admin, jsonb_array_elements(j -> 'extremos' -> 'folga') e where e ->> 'id' = testes.id('pessoa_c')::text)),
-  'extremos: quem está acima não aparece na folga');
+select is((select array_agg(e ->> 'id') from p_admin, jsonb_array_elements(j -> 'ranking') e where (e ->> 'ocupacao')::numeric > 1),
+  array[testes.id('pessoa_c')::text], 'ocupação por consultor: só pessoa_c passa de 100% (200 h de 167,2)');
+select ok((select (j -> 'ranking_resumo' ->> 'acima')::int = 1 and (j -> 'ranking_resumo' ->> 'folga')::int = 4 from p_admin),
+  'ranking_resumo: 1 acima de 100% e 4 com folga (abaixo de 70%: admin_a, gestor_a, pessoa_a e pessoa_d)');
+select ok((select (j -> 'ranking_resumo' ->> 'acima')::int + (j -> 'ranking_resumo' ->> 'folga')::int
+    = (select count(*) from jsonb_array_elements(j -> 'ranking') e where e ->> 'ocupacao' is not null) from p_admin),
+  'ranking_resumo: quem está acima não conta na folga (o de capacidade 0 não está em nenhum)');
 select ok((select j::text not like '%' || testes.id('B')::text || '%'
     and j::text not like '%' || testes.id('pessoa_b')::text || '%'
     and j::text not like '%' || testes.id('sem_b')::text || '%'
     and j::text not like '%Painel Teste B%' and j::text not like '%Cliente dist1%' from p_admin),
   'administrador: nada de outra consultoria nem da fila da central');
-select ok((select j -> 'meus_clientes' = '[]'::jsonb from p_admin), 'administrador: sem meus clientes');
+select ok((select (e ->> 'horas')::numeric = 46.2 and e ->> 'sub' = 'Pessoa pessoa_a'
+    from jsonb_array_elements(public.horas_por_cliente(testes.passado()) -> 'itens') e where e ->> 'id' = testes.id('a40')::text),
+  'administrador: horas por cliente da consultoria (não só as dele), com o consultor embaixo do nome');
 select is((select jsonb_array_length(j -> 'horas_por_mes') from p_admin), 6, 'horas por mês: 6 meses');
 select is((select j -> 'horas_por_mes' -> 5 ->> 'mes' from p_admin), '2037-11-01', 'horas por mês: o último é o mês pedido');
-select is((select (j ->> 'previsao_atual')::numeric from p_admin), 295::numeric, 'previsão atual = soma atual de horas_mes da consultoria');
 
 -- Mês passado: utilização, histórico de horas por mês.
 create temp table p_admin_passado as select public.painel_do_inicio(testes.passado()) as j;
@@ -272,8 +278,9 @@ select testes.como('gestor_a');
 select is((select array_agg((r ->> 'visivel')::boolean order by r ->> 'nome') filter (where (r ->> 'id')::uuid in (testes.id('pessoa_a'), testes.id('pessoa_c'), testes.id('gestor_a')))
     from jsonb_array_elements(public.painel_do_inicio(testes.futuro()) -> 'ranking') r),
   array[true, true, false], 'gestor: visivel true para si e para o time dele (pessoa_a), false para pessoa_c (fora do time)');
-select is((select array_agg((e ->> 'visivel')::boolean) from jsonb_array_elements(public.painel_do_inicio(testes.futuro()) -> 'extremos' -> 'acima') e
-    where (e ->> 'id')::uuid = testes.id('pessoa_c')), array[false], 'gestor: extremos trazem visivel false para quem ele não vê');
+select is((select array_agg((e ->> 'visivel')::boolean) from jsonb_array_elements(public.painel_do_inicio(testes.futuro()) -> 'ranking') e
+    where (e ->> 'id')::uuid = testes.id('pessoa_c') and (e ->> 'ocupacao')::numeric > 1), array[false],
+  'gestor: quem está acima de 100% e ele não vê vem com visivel false');
 select is((select jsonb_array_length(public.painel_do_inicio(testes.futuro()) -> 'ranking')), 6,
   'gestor: ranking cobre todos os consultores da consultoria (decisão do Diego)');
 select is((select public.painel_do_inicio(testes.futuro()) ->> 'recorte'), 'consultoria', 'gestor: recorte consultoria');
@@ -284,22 +291,23 @@ select testes.como('pessoa_a');
 create temp table p_pessoa as select public.painel_do_inicio(testes.futuro()) as j;
 grant select on p_pessoa to authenticated;
 select is((select j ->> 'recorte' from p_pessoa), 'pessoa', 'consultor: recorte pessoa');
-select ok((select (j -> 'indicadores' ->> 'clientes_ativos')::int = 2 and (j -> 'indicadores' ->> 'reservado')::numeric = 70
+select ok((select (j -> 'indicadores' ->> 'clientes_em_atendimento')::int = 2 and (j -> 'indicadores' ->> 'reservado')::numeric = 70
     and (j -> 'indicadores' ->> 'capacidade')::numeric = 167.2 and (j -> 'indicadores' ->> 'aguardando')::int = 0
     from p_pessoa), 'consultor: 2 clientes, 70 h reservadas, capacidade 167,2, nada aguardando');
-select ok((select j -> 'ranking' = '[]'::jsonb and j -> 'esperando' = '[]'::jsonb
-    and j -> 'extremos' = '{"acima": [], "folga": []}'::jsonb from p_pessoa), 'consultor: sem ranking, esperando nem extremos');
-select is((select array_agg(e ->> 'id' order by o) from p_pessoa, jsonb_array_elements(j -> 'meus_clientes') with ordinality t(e, o)),
-  array[testes.id('a40')::text, testes.id('a30')::text], 'consultor: meus clientes pelo maior previsto');
+select ok((select j -> 'ranking' = '[]'::jsonb and (j -> 'ranking_resumo' ->> 'total')::int = 0 from p_pessoa),
+  'consultor: sem ranking (nem os extremos)');
+select throws_ok('select public.fila_de_clientes()', '42501', 'sem_recorte', 'consultor: sem a fila (que era o esperando)');
+select is((select array_agg(e ->> 'id' order by o) from jsonb_array_elements(public.horas_por_cliente() -> 'itens') with ordinality t(e, o)),
+  array[testes.id('a40')::text, testes.id('a30')::text], 'consultor: os clientes dele (0 h no mês atual) pelo maior previsto');
 select ok((select j::text not like '%' || testes.id('c200')::text || '%' and j::text not like '%' || testes.id('sem_a')::text || '%'
     and j::text not like '%Painel Teste B%' from p_pessoa), 'consultor: nenhum cliente de outra pessoa');
-select ok((select j -> 'meus_clientes' -> 0 ->> 'previsto' = '40.0' or (j -> 'meus_clientes' -> 0 ->> 'previsto')::numeric = 40 from p_pessoa),
+select ok((select (j -> 'itens' -> 0 ->> 'previsto')::numeric = 40 from (select public.horas_por_cliente() as j) x),
   'consultor: previsto do cliente');
-select ok((select (j -> 'meus_clientes' -> 0 ->> 'realizado')::numeric = 46.2
-    from (select public.painel_do_inicio(testes.passado()) as j) x),
-  'consultor, mês passado: realizado do cliente = check-ins do mês');
-select ok((select (j -> 'meus_clientes' -> 0 -> 'previsto') = 'null'::jsonb
-    from (select public.painel_do_inicio(testes.passado()) as j) x), 'consultor, mês passado: sem previsto');
+select ok((select (j -> 'itens' -> 0 ->> 'horas')::numeric = 46.2
+    from (select public.horas_por_cliente(testes.passado()) as j) x),
+  'consultor, mês passado: horas do cliente = check-ins do mês');
+select ok((select (j -> 'itens' -> 0 ->> 'previsto')::numeric = 40
+    from (select public.horas_por_cliente(testes.passado()) as j) x), 'consultor, mês passado: previsto = a previsão atual do cliente');
 select ok((select (j -> 'indicadores' ->> 'realizado')::numeric = 46.2 and
     (j -> 'horas_por_mes' -> 4 ->> 'realizado')::numeric = 10
     from (select public.painel_do_inicio(testes.passado()) as j) x), 'consultor: realizado só dele, com histórico');
@@ -418,15 +426,11 @@ select is((select j ->> 'capacidade_ate' from p_admin_periodo), '2026-10-15', 'p
 select ok((select j -> 'capacidade_ate' = 'null'::jsonb from p_admin_passado), 'Mês: sem capacidade_ate');
 select ok((select (j -> 'indicadores' ->> 'ocupacao')::numeric = round(48.7 / 880, 4) from p_admin_periodo),
   'período: ocupação = utilização = realizado / capacidade do período');
-select ok((select j -> 'indicadores' -> 'reservado' = 'null'::jsonb and j -> 'previsao_atual' = 'null'::jsonb from p_admin_periodo),
-  'período passado: sem reservado e sem previsão');
+select ok((select j -> 'indicadores' -> 'reservado' = 'null'::jsonb from p_admin_periodo),
+  'período passado: sem reservado');
 select ok((select (j ->> 'intervalo')::boolean and (j ->> 'passado')::boolean and j -> 'indicadores' -> 'reservado' = 'null'::jsonb
-    and j -> 'previsao_atual' = 'null'::jsonb from p_admin_trinta),
-  'últimos 30 dias (inclui hoje): também sem reservado nem previsão (a previsão só existe no Mês)');
-select is((select (j -> 'indicadores' ->> 'clientes_novos')::int from p_admin_trinta), 3,
-  'últimos 30 dias: novos = criados dentro do período (a40, a30, c200)');
-select is((select (j -> 'indicadores' ->> 'clientes_novos')::int from p_admin_periodo), 0,
-  'período de setembro a outubro: nenhum cliente novo');
+    from p_admin_trinta),
+  'últimos 30 dias (inclui hoje): também sem reservado (o reservado só existe no Mês)');
 select is((select j -> 'ranking' -> 0 ->> 'id' from p_admin_periodo), testes.id('pessoa_a')::text,
   'período: ranking pela utilização no período (pessoa_a, 46,2 de 184,8, primeiro)');
 select ok((select (j -> 'ranking' -> 0 ->> 'ocupacao')::numeric = 0.25 and (j -> 'ranking' -> 0 ->> 'capacidade')::numeric = 184.8
@@ -436,8 +440,8 @@ select ok((select not exists (
     join jsonb_array_elements(j -> 'ranking') with ordinality b(r, o) on b.o = a.o + 1
     where coalesce((a.r ->> 'ocupacao')::numeric, -1) < coalesce((b.r ->> 'ocupacao')::numeric, -1))),
   'período: ranking da maior para a menor utilização');
-select ok((select j -> 'extremos' -> 'acima' = '[]'::jsonb and jsonb_array_length(j -> 'extremos' -> 'folga') = 3
-    from p_admin_periodo), 'período: extremos pela utilização no período (ninguém acima de 100%, 3 com folga)');
+select ok((select (j -> 'ranking_resumo' ->> 'acima')::int = 0 and (j -> 'ranking_resumo' ->> 'folga')::int = 5
+    from p_admin_periodo), 'período: ranking_resumo pela utilização no período (ninguém acima de 100%, 5 com folga)');
 select ok((select j::text not like '%' || testes.id('B')::text || '%'
     and j::text not like '%' || testes.id('pessoa_b')::text || '%'
     and j::text not like '%Painel Teste B%' from p_admin_periodo),
@@ -471,10 +475,10 @@ select ok((select (j -> 'indicadores' ->> 'capacidade')::numeric = 184.8 and (j 
     and (j -> 'indicadores' ->> 'ocupacao')::numeric = 0.25 and j -> 'indicadores' -> 'reservado' = 'null'::jsonb
     from (select public.painel_do_inicio(p_de => '2026-09-16', p_ate => '2026-10-15') as j) x),
   'consultor no período: capacidade do período, o realizado dele e a utilização');
-select ok((select j -> 'meus_clientes' -> 0 ->> 'id' = testes.id('a40')::text
-    and (j -> 'meus_clientes' -> 0 ->> 'realizado')::numeric = 46.2 and j -> 'meus_clientes' -> 0 -> 'previsto' = 'null'::jsonb
-    from (select public.painel_do_inicio(p_de => '2026-09-16', p_ate => '2026-10-15') as j) x),
-  'consultor no período: meus clientes pelo realizado do período, sem previsto');
+select ok((select j -> 'itens' -> 0 ->> 'id' = testes.id('a40')::text
+    and (j -> 'itens' -> 0 ->> 'horas')::numeric = 46.2 and (j -> 'itens' -> 0 ->> 'previsto')::numeric = 39.5
+    from (select public.horas_por_cliente(p_de => '2026-09-16', p_ate => '2026-10-15') as j) x),
+  'consultor no período: os clientes dele pelas horas do período, com o previsto proporcional (40 x 30 / 30,4)');
 reset role;
 select testes.como('pessoa_b');
 select is((select (public.painel_do_inicio(p_de => '2026-09-16', p_ate => '2026-10-15') -> 'indicadores' ->> 'realizado')::numeric),
@@ -756,6 +760,13 @@ select ok(testes.resumo_por_consultor_confere() and testes.resumo_por_consultori
 delete from public.checkins where consultoria_id = testes.id('B');
 select ok(testes.resumo_por_consultor_confere() and testes.resumo_por_consultoria_confere(),
   'apagar os check-ins de uma consultoria: os dois resumos batem com os check-ins');
+
+-- ── As chaves que saíram ─────────────────────────────────────────────────────
+select ok((select not (j ?| array['esperando', 'extremos', 'meus_clientes', 'previsao_atual'])
+    and not (j -> 'indicadores' ?| array['clientes_ativos', 'clientes_novos']) from p_admin)
+  and (select not (j ?| array['esperando', 'extremos', 'meus_clientes', 'previsao_atual']) from p_pessoa)
+  and (select not (j ?| array['esperando', 'extremos', 'meus_clientes', 'previsao_atual']) from p_central),
+  'as chaves que saíram não vêm mais (esperando, extremos, meus_clientes, previsao_atual, clientes_ativos e clientes_novos)');
 
 -- ── Sem recorte ──────────────────────────────────────────────────────────────
 select testes.como('inativo_a');
