@@ -7,11 +7,12 @@ import { TIPOS } from './cores'
 const CHIPS_POR_DIA = 3
 
 // Mês, como no Hub: grade de 7 colunas começando no domingo, até 3 chips por dia e "+N", hoje em destaque, fora do mês
-// apagado. Clicar (ou Enter) escolhe o dia: aoSelecionar(dia, { escolheu: true }), e o detalhe dele aparece (ao lado a
-// partir de 1280 px; embaixo, e a página rola até ele, nas telas menores). Dois cliques criam evento. Setas andam entre
-// os dias (aoSelecionar(dia), sem rolar). No celular as células encolhem e os chips viram faixas de cor, para a grade
+// apagado. Clicar escolhe o dia: aoSelecionar(dia, { escolheu: true }), e o detalhe dele aparece (ao lado a partir de
+// 1280 px; embaixo nas telas menores, e a página rola até ele se estiver fora da vista). Dois cliques criam evento.
+// Setas e Enter escolhem pelo teclado (aoSelecionar(dia), sem rolar: o foco fica na célula, à vista). No celular as células encolhem e os chips viram faixas de cor, para a grade
 // caber em 360 px sem rolar de lado; no toque o alvo é o dia. A legenda mostra a amostra de cada tipo, a mesma dos chips.
-// `comDetalhe` false (a agenda do cliente, que não tem o detalhe do dia): a dica não o promete.
+// `comDetalhe` false (a agenda do cliente, que não tem o detalhe do dia): a dica não o promete e os chips continuam
+// botões no toque (o toque no dia não mostraria nada).
 export default function VisaoMes({
   dias, mes, rotulo, porDia, hoje, selecionado, deVariasPessoas, mostrar, comDetalhe = true, aoSelecionar, aoCriar, aoAbrir,
 }) {
@@ -22,7 +23,7 @@ export default function VisaoMes({
   function teclar(e, dia) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      aoSelecionar(dia, { escolheu: true })
+      aoSelecionar(dia)
       return
     }
     const passo = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key]
@@ -75,7 +76,8 @@ export default function VisaoMes({
                   </div>
                   <div className="grid gap-0.5">
                     {visiveis.map((item) => (
-                      <ChipDoEvento key={`${item.tipo}-${item.id}`} item={item} dia={dia} deVariasPessoas={deVariasPessoas} compacto aoAbrir={aoAbrir} />
+                      <ChipDoEvento key={`${item.tipo}-${item.id}`} item={item} dia={dia} deVariasPessoas={deVariasPessoas} compacto
+                        alvoNoToque={!comDetalhe} aoAbrir={aoAbrir} />
                     ))}
                   </div>
                 </div>

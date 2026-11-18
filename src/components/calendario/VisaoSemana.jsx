@@ -4,8 +4,8 @@ import { cn } from '@/lib/utils'
 import ChipDoEvento from './ChipDoEvento'
 
 // Semana, como no Hub: 7 cartões, um por dia, com os chips e a hora ao lado e "+ adicionar" (lista por dia, sem
-// grade de horas). No celular os dias ficam um embaixo do outro. O dia escolhido mostra o detalhe embaixo (e a página
-// rola até ele).
+// grade de horas). No celular os dias ficam um embaixo do outro. O dia escolhido mostra o detalhe embaixo (no clique a
+// página rola até ele se estiver fora da vista; pelo teclado, não).
 export default function VisaoSemana({ dias, porDia, hoje, selecionado, deVariasPessoas, aoSelecionar, aoCriar, aoAbrir }) {
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-7">
@@ -18,7 +18,7 @@ export default function VisaoSemana({ dias, porDia, hoje, selecionado, deVariasP
             className={cn('flex min-w-0 flex-col rounded-xl border p-2.5 sm:min-h-44',
               ehHoje ? 'border-primary/25 bg-primary/5' : 'border-border/70',
               dia === selecionado && !ehHoje && 'border-primary/30 bg-accent')}>
-            <button type="button" onClick={() => aoSelecionar(dia, { escolheu: true })} aria-label={`Ver o detalhe de ${nomeDoDia(dia)}`}
+            <button type="button" onClick={(e) => aoSelecionar(dia, { escolheu: e.detail > 0 })} aria-label={`Ver o detalhe de ${nomeDoDia(dia)}`}
               className="botao-animado mb-2 flex items-baseline gap-2 rounded-lg text-left transition-[translate,scale] outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97] sm:block">
               <span className={cn('block text-legenda font-semibold', semana === 0 ? 'text-domingo' : semana === 6 ? 'text-sabado' : 'text-muted-foreground')}>
                 {DIAS_DA_SEMANA[semana]}

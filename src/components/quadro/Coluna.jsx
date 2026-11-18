@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Droppable } from '@hello-pangea/dnd'
 import { ChevronsDown, CircleCheck, Loader2, Palette, Pencil, Plus, Trash2 } from 'lucide-react'
 import Chave from '@/components/campos/Chave'
@@ -54,11 +54,11 @@ function NomeNoLugar({ nome, aoSalvar, aoTerminar }) {
     <Input autoFocus aria-label="Nome da coluna" maxLength={60} value={valor} className="h-8 font-semibold"
       onFocus={(e) => e.target.select()} onChange={(e) => setValor(e.target.value)} onBlur={terminar}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur()
-        if (e.key === 'Escape') {
-          desistiu.current = true
-          e.currentTarget.blur()
-        }
+        if (e.key !== 'Enter' && e.key !== 'Escape') return
+        // O foco volta ao "⋯" na hora: sem o preventDefault, o Enter seguiria para ele e abriria o menu de novo.
+        e.preventDefault()
+        if (e.key === 'Escape') desistiu.current = true
+        e.currentTarget.blur()
       }} />
   )
 }
@@ -76,6 +76,14 @@ export default function Coluna({
   const [renomeando, setRenomeando] = useState(false)
   const [pintando, setPintando] = useState(false)
   const botaoDoMenu = useRef(null)
+  const voltarAoMenu = useRef(false)
+  // Fim do "Renomear" (Enter, Esc ou sair do campo): o campo some e o "⋯" volta; o foco vai para ele, a não ser que a
+  // pessoa já tenha clicado em outro lugar que fica com o foco.
+  useEffect(() => {
+    if (renomeando || !voltarAoMenu.current) return
+    voltarAoMenu.current = false
+    if (!document.activeElement || document.activeElement === document.body) botaoDoMenu.current?.focus()
+  }, [renomeando])
   const cor = corDaColuna(coluna, posicao)
   const paleta = CORES_DAS_COLUNAS[cor]
   const escolhida = coluna.cor != null
@@ -89,7 +97,7 @@ export default function Coluna({
       className={cn('flex min-h-0 w-[300px] flex-col gap-2.5 rounded-2xl border p-2.5', escolhida ? paleta.corpo : CORPO_NEUTRO)}>
       <div className="flex min-h-8 shrink-0 items-center justify-between gap-1 px-1 pt-0.5">
         {renomeando ? (
-          <NomeNoLugar nome={coluna.nome} aoSalvar={aoRenomear} aoTerminar={() => setRenomeando(false)} />
+          <NomeNoLugar nome={coluna.nome} aoSalvar={aoRenomear} aoTerminar={() => { voltarAoMenu.current = true; setRenomeando(false) }} />
         ) : (
           <div {...(alca ?? {})} aria-label={alca ? `Mover a coluna ${coluna.nome}` : undefined}
             className={cn('flex min-w-0 flex-1 items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary/50', alca && 'cursor-grab active:cursor-grabbing')}>

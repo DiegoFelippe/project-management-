@@ -4,7 +4,9 @@ import Flutuante, { BotaoCampo } from '@/components/campos/Flutuante'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const ALTURA_DO_ITEM = 40
+// Altura de cada item (para o menu virar para cima quando não cabe embaixo): 36 px no computador, 44 px no toque.
+const noToque = () => typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+const alturaDoMenu = (itens) => itens.length * (noToque() ? 44 : 36) + 12
 
 // Menu "⋯" (auditoria de 17/11, M5): um botão sempre à vista (também no toque) que abre as ações num menu, no lugar de
 // vários ícones fixos. Padrão de botão de menu do WAI-ARIA: Enter, espaço ou seta para baixo abrem no primeiro item,
@@ -61,7 +63,7 @@ export default function MenuDeAcoes({ rotulo, itens, ref, className }) {
         <Ellipsis />
       </Button>
       {aberto && (
-        <Flutuante ancora={botao} aoFechar={fechar} largura={208} altura={itens.length * ALTURA_DO_ITEM + 12} role="menu"
+        <Flutuante ancora={botao} aoFechar={fechar} largura={208} altura={alturaDoMenu(itens)} role="menu"
           rotulo={rotulo} id={`${id}-menu`} aria-orientation="vertical" onKeyDown={teclarNoMenu} className="p-1.5"
           aoAbrir={(lista) => focarItem(lista, aberto === 'ultimo' ? -1 : 0)}>
           {itens.map((item) => {

@@ -51,6 +51,14 @@ const ehCelular = () => typeof window.matchMedia === 'function' && !window.match
 const telaLarga = () => typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 1280px)').matches
 // "Reduzir movimento" ligado: a rolagem até o detalhe é sem animação.
 const semMovimento = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+// O clique no dia só rola até o detalhe depois deste tempo: antes disso, o segundo clique do "dois cliques criam um
+// evento" ainda cai no mesmo dia (e o duplo clique cancela a rolagem).
+const ESPERA_DO_DUPLO_CLIQUE = 300
+// O detalhe "à vista": aparece na tela com espaço para o título e os primeiros itens (160 px).
+function aVista(el) {
+  const { top, bottom } = el.getBoundingClientRect()
+  return bottom > 0 && top < window.innerHeight - 160
+}
 
 // Leituras do banco (uma chamada cada, só do intervalo pedido; os filtros rodam lá).
 const lerEventos = ({ de, ate, consultorId, consultoriaId, clienteId, tipo }) => eventosDoPeriodo({ de, ate, consultorId, consultoriaId, clienteId, tipo })
@@ -129,6 +137,7 @@ export default function CalendarioDaAgenda({ cliente = null }) {
     ? 'Você não autorizou o Google, então nada mudou. Clique em Conectar Google quando quiser.' : null))
   const voltaTratada = useRef(false)
   const detalhe = useRef(null)
+  const rolagem = useRef(null)
   const recarregar = () => setVersao((v) => v + 1)
 
   const clienteId = cliente?.id
@@ -262,20 +271,26 @@ export default function CalendarioDaAgenda({ cliente = null }) {
   }
 
   const abrir = (evento) => setJanela({ evento })
-  const criar = podeCriar ? (dia) => setJanela({ dia }) : undefined
+  const criar = podeCriar ? (dia) => { clearTimeout(rolagem.current); setJanela({ dia }) } : undefined
   const fecharJanela = () => setJanela(null)
   const gravou = () => {
     setJanela(null)
     recarregar()
   }
 
-  // Escolher um dia (clique ou Enter; as setas só andam): quando o detalhe fica embaixo, a página rola até ele, para o
-  // clique não parecer sem efeito (M3).
+  // Escolher um dia com o mouse ou o toque (escolheu): quando o detalhe fica embaixo e fora da vista, a página rola até
+  // ele, para o clique não parecer sem efeito (M3) — depois do tempo do duplo clique, que cancela. Pelo teclado (setas,
+  // Enter) não rola: o foco fica na célula, à vista.
   function selecionar(dia, { escolheu = false } = {}) {
     setSelecionado(dia)
+    clearTimeout(rolagem.current)
     if (!escolheu || !comPaineis || (aoLado && telaLarga())) return
-    detalhe.current?.scrollIntoView?.({ behavior: semMovimento() ? 'auto' : 'smooth', block: 'start' })
+    rolagem.current = setTimeout(() => {
+      const el = detalhe.current
+      if (el && !aVista(el)) el.scrollIntoView?.({ behavior: semMovimento() ? 'auto' : 'smooth', block: 'start' })
+    }, ESPERA_DO_DUPLO_CLIQUE)
   }
+  useEffect(() => () => clearTimeout(rolagem.current), [])
 
   const rotulo = rotuloDoPeriodo(visaoDoPeriodo, diaDaVisao)
   const propsDaVisao = {
@@ -296,7 +311,7 @@ export default function CalendarioDaAgenda({ cliente = null }) {
         consultoria={consultoria} aoConsultoria={(id) => { setConsultoria(id); setConsultor(SEM_FILTRO); setClienteDoFiltro(SEM_FILTRO) }}
         consultor={consultor} aoConsultor={setConsultor} cliente={clienteDoFiltro} aoCliente={setClienteDoFiltro} temFiltros={temFiltros} aoLimpar={limpar}
         google={google} conectando={conectando} aoConectar={conectar} aoDesconectar={() => setDesconectando(true)}
-        aoNovo={criar && (() => criar(diaDoDetalhe))} />
+        aoNovo={podeCriar ? () => criar(diaDoDetalhe) : undefined} />
       {!cliente && <IndicadoresDaAgenda indicadores={indicadores.dados} />}
       {doPeriodo.haMais && (
         <p role="status" className="mb-3 text-corpo text-notice">

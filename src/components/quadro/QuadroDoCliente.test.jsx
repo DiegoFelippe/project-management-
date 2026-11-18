@@ -746,6 +746,20 @@ describe('colunas', () => {
     await user.clear(campo)
     await user.type(campo, 'Backlog{Enter}')
     expect(editarColuna).toHaveBeenCalledWith('col1', { nome: 'Backlog' })
+    // O foco volta ao "⋯" da coluna (o campo sumiu; sem isso ele cairia no fim da página).
+    await waitFor(() => expect(document.activeElement).toHaveAttribute('aria-label', expect.stringMatching(/^Ações da coluna /)))
+    // E o Enter não reabre o menu.
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('desistir de renomear (Esc) também devolve o foco ao "⋯" da coluna, sem gravar', async () => {
+    const user = userEvent.setup()
+    tela()
+    await pronto()
+    await naColuna(user, 'A fazer', 'Renomear')
+    await user.type(screen.getByRole('textbox', { name: 'Nome da coluna' }), 'X{Escape}')
+    expect(editarColuna).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Ações da coluna A fazer' })).toHaveFocus())
   })
 
   it('cor (10 e automática) e coluna de concluídos', async () => {

@@ -82,6 +82,11 @@ function largura(px) {
   })))
 }
 const bolinha = (chip) => chip.querySelector('[data-bolinha]')
+// O detalhe do dia abaixo da dobra (o jsdom não mede nada: tudo fica em 0).
+const foraDaVista = (el) => {
+  el.getBoundingClientRect = () => ({ top: 1400, bottom: 1700, left: 0, right: 600, width: 600, height: 300 })
+}
+const esperar = (ms) => new Promise((pronto) => { setTimeout(pronto, ms) })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -334,19 +339,51 @@ describe('Calendário: detalhe do dia ao lado e visão Agenda (auditoria, M3 e R
     expect(screen.getByRole('region', { name: 'Detalhe do dia' }).parentElement).not.toHaveClass('xl:grid-cols-1')
   })
 
-  it('abaixo de 1280 px, clicar num dia rola até o detalhe; andar pelas setas não rola a página', async () => {
+  it('abaixo de 1280 px, clicar num dia rola até o detalhe fora da vista, depois do tempo do duplo clique', async () => {
     largura(1024)
     const rolar = vi.fn()
     Element.prototype.scrollIntoView = rolar
     const user = userEvent.setup()
     tela(consultor)
     const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    foraDaVista(screen.getByRole('region', { name: 'Detalhe do dia' }))
     await user.click(within(grade).getByRole('gridcell', { name: /^20 de novembro/ }))
-    expect(rolar).toHaveBeenCalledTimes(1)
+    // Não rola na hora: o segundo clique do "dois cliques criam um evento" ainda cai no dia.
+    expect(rolar).not.toHaveBeenCalled()
+    await waitFor(() => expect(rolar).toHaveBeenCalledTimes(1))
     expect(rolar.mock.contexts[0]).toBe(screen.getByRole('region', { name: 'Detalhe do dia' }))
-    await user.keyboard('{ArrowRight}')
+  })
+
+  it('abaixo de 1280 px, dois cliques num dia abrem o Novo evento e a página não rola', async () => {
+    largura(1024)
+    const rolar = vi.fn()
+    Element.prototype.scrollIntoView = rolar
+    const user = userEvent.setup()
+    tela(consultor)
+    const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    foraDaVista(screen.getByRole('region', { name: 'Detalhe do dia' }))
+    await user.dblClick(within(grade).getByRole('gridcell', { name: /^20 de novembro/ }))
+    expect(await screen.findByRole('dialog', { name: 'Novo evento' })).toBeInTheDocument()
+    await esperar(450)
+    expect(rolar).not.toHaveBeenCalled()
+  })
+
+  it('abaixo de 1280 px, com o detalhe já à vista, clicar não rola; pelo teclado (setas e Enter) também não', async () => {
+    largura(1024)
+    const rolar = vi.fn()
+    Element.prototype.scrollIntoView = rolar
+    const user = userEvent.setup()
+    tela(consultor)
+    const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    const detalhe = screen.getByRole('region', { name: 'Detalhe do dia' })
+    detalhe.getBoundingClientRect = () => ({ top: 200, bottom: 500, left: 0, right: 600, width: 600, height: 300 })
+    await user.click(within(grade).getByRole('gridcell', { name: /^20 de novembro/ }))
+    foraDaVista(detalhe)
+    await user.keyboard('{ArrowRight}{Enter}')
     expect(within(grade).getByRole('gridcell', { name: /^21 de novembro/ })).toHaveFocus()
-    expect(rolar).toHaveBeenCalledTimes(1)
+    expect(within(detalhe).getByText('21 de novembro')).toBeInTheDocument()
+    await esperar(450)
+    expect(rolar).not.toHaveBeenCalled()
   })
 
   it('de 1280 px para cima, o detalhe já está ao lado: clicar no dia não rola a página', async () => {
@@ -373,6 +410,9 @@ describe('Calendário: detalhe do dia ao lado e visão Agenda (auditoria, M3 e R
     tela(consultor)
     const agenda = await screen.findByRole('region', { name: 'Agenda dos próximos 60 dias' })
     expect(await within(agenda).findByRole('button', { name: /Kickoff Alfa/ })).toBeInTheDocument()
+    // O dia é um título (sem detalhe embaixo, um botão nele não faria nada).
+    expect(within(agenda).getByRole('heading', { name: 'sexta-feira, 20 de novembro de 2026' })).toBeInTheDocument()
+    expect(within(agenda).queryByRole('button', { name: /sexta-feira/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Detalhe do dia' })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Próximos 7 dias' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Mês' }))

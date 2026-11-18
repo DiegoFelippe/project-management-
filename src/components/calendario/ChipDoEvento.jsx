@@ -27,14 +27,17 @@ export function BolinhaDaCor({ cor, className }) {
 }
 
 // O que vai dentro do chip: a bolinha, vídeo quando tem Meet, pasta quando a pasta da reunião já existe, o título e a hora.
-function Conteudo({ evento, hora, deVariasPessoas, icone }) {
+// `encolher`: no celular fica só a bolinha (o texto vai para o leitor de tela), para o chip caber na célula do mês.
+function Conteudo({ evento, hora, deVariasPessoas, icone, encolher = false }) {
+  const icones = cn(icone, encolher && 'max-sm:hidden')
+  const texto = encolher && 'max-sm:sr-only'
   return (
     <>
       <BolinhaDaCor cor={corDoChip(evento, deVariasPessoas)} />
-      {(evento.meet_link || evento.com_meet) && <Video className={icone} strokeWidth={2.2} aria-hidden="true" />}
-      {evento.pasta_id && <Folder className={icone} strokeWidth={2.2} aria-hidden="true" />}
-      <span className="min-w-0 flex-1 truncate">{evento.titulo}</span>
-      {hora && <span className="shrink-0 font-normal tabular-nums">{hora}</span>}
+      {(evento.meet_link || evento.com_meet) && <Video className={icones} strokeWidth={2.2} aria-hidden="true" />}
+      {evento.pasta_id && <Folder className={icones} strokeWidth={2.2} aria-hidden="true" />}
+      <span className={cn('min-w-0 flex-1 truncate', texto)}>{evento.titulo}</span>
+      {hora && <span className={cn('shrink-0 font-normal tabular-nums', texto)}>{hora}</span>}
     </>
   )
 }
@@ -45,7 +48,11 @@ function Conteudo({ evento, hora, deVariasPessoas, icone }) {
 // imagem do chip.
 // `compacto` (o mês): no computador, um botão de 24 px; no celular, só uma faixa na cor do tipo, para o mês caber em
 // 360 px; no toque (celular e tablet) o chip não é um alvo pequeno: o toque cai no dia, que mostra o detalhe dele.
-export default function ChipDoEvento({ item, dia, deVariasPessoas, comHora = false, compacto = false, tamanho = 'mini', aoAbrir, className }) {
+// `alvoNoToque` (o mês sem o detalhe do dia: a agenda do cliente): o chip continua botão no toque, com 44 px, e no
+// celular vira um bloco do tipo só com a bolinha — senão não haveria como abrir o evento pela grade.
+export default function ChipDoEvento({
+  item, dia, deVariasPessoas, comHora = false, compacto = false, alvoNoToque = false, tamanho = 'mini', aoAbrir, className,
+}) {
   const base = cn('flex w-full min-w-0 items-center text-left font-medium', TAMANHOS[tamanho], classeDoChip(item), className)
   const faixa = compacto && <span aria-hidden="true" className={cn('hidden h-1.5 w-full rounded-full max-sm:block', faixaDoChip(item))} />
 
@@ -64,18 +71,20 @@ export default function ChipDoEvento({ item, dia, deVariasPessoas, comHora = fal
 
   const { evento } = item
   const hora = comHora ? horaDoChip(evento, dia) : ''
-  const conteudo = <Conteudo evento={evento} hora={hora} deVariasPessoas={deVariasPessoas} icone="size-3 shrink-0" />
+  const tocavel = compacto && alvoNoToque
+  const conteudo = <Conteudo evento={evento} hora={hora} deVariasPessoas={deVariasPessoas} icone="size-3 shrink-0" encolher={tocavel} />
   const titulo = evento.consultor?.nome ? `${evento.titulo} · ${evento.consultor.nome}` : evento.titulo
   if (!aoAbrir) return <span title={titulo} className={base}>{conteudo}</span>
 
+  const alvo = !compacto ? 'pointer-coarse:min-h-11' : tocavel ? 'pointer-coarse:min-h-11 max-sm:justify-center max-sm:px-0.5' : 'max-sm:hidden pointer-coarse:hidden'
   const botao = (
     <button type="button" aria-label={nomeDoEvento(evento, hora)} title={titulo}
       onClick={(e) => { e.stopPropagation(); aoAbrir(evento) }} onDoubleClick={(e) => e.stopPropagation()}
-      className={cn(base, 'botao-animado', ANIMADO, compacto ? 'max-sm:hidden pointer-coarse:hidden' : 'pointer-coarse:min-h-11')}>
+      className={cn(base, 'botao-animado', ANIMADO, alvo)}>
       {conteudo}
     </button>
   )
-  if (!compacto) return botao
+  if (!compacto || tocavel) return botao
   return (
     <>
       {faixa}

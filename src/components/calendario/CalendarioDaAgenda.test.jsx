@@ -375,6 +375,19 @@ describe('Agenda do cliente (calendário do menu com o recorte do cliente)', () 
     await waitFor(() => expect(screen.getByTestId('endereco')).toHaveTextContent(/^\/clientes\/k1\?aba=agenda$/))
   })
 
+  it('no Mês, o chip do evento continua botão no toque (a aba não tem o detalhe do dia: o toque no dia não mostraria nada)', async () => {
+    const user = userEvent.setup()
+    tela(consultor)
+    const grade = await screen.findByRole('grid', { name: 'Calendário de Novembro de 2026' })
+    const chip = await within(grade).findByRole('button', { name: /Kickoff Alfa/ })
+    expect(chip.className).toContain('pointer-coarse:min-h-11')
+    expect(chip.className).not.toMatch(/pointer-coarse:hidden|max-sm:hidden/)
+    // No celular a faixa vira o próprio botão: o título fica para o leitor de tela.
+    expect(within(chip).getByText('Kickoff Alfa')).toHaveClass('max-sm:sr-only')
+    await user.click(chip)
+    expect(await screen.findByRole('dialog', { name: 'Editar evento' })).toBeInTheDocument()
+  })
+
   it('no celular abre na visão Agenda, só com o cliente', async () => {
     celular(true)
     tela(consultor)

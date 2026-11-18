@@ -1,5 +1,5 @@
 import { CalendarDays } from 'lucide-react'
-import { DIAS_DA_AGENDA, diaDaSemanaPorExtenso, horarioNoDia, textoDoItem } from '@/lib/calendario'
+import { DIAS_DA_AGENDA, diaDaSemanaPorExtenso, horarioNoDia, nomeDoDia, textoDoItem } from '@/lib/calendario'
 import { cn } from '@/lib/utils'
 import { BOLINHA, corDoChip } from './cores'
 
@@ -7,8 +7,9 @@ const MES_E_ANO = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', month: 'lo
 const mesEAno = (dia) => MES_E_ANO.format(new Date(`${dia}T12:00:00Z`))
 
 // Agenda, como no Hub: os próximos 60 dias que têm algo, um bloco por dia (número grande, dia da semana, "Hoje") e
-// uma linha por item com a bolinha da cor, o título e o horário. É a visão inicial no celular.
-export default function VisaoAgenda({ dias, porDia, hoje, deVariasPessoas, aoSelecionar, aoAbrir }) {
+// uma linha por item com a bolinha da cor, o título e o horário. É a visão inicial no celular. O dia é um título, não
+// um botão: a visão já lista tudo e não tem o detalhe do dia embaixo (auditoria, R5).
+export default function VisaoAgenda({ dias, porDia, hoje, deVariasPessoas, aoAbrir }) {
   const comItens = dias.filter((dia) => porDia.get(dia)?.length)
   return (
     <section aria-label={`Agenda dos próximos ${DIAS_DA_AGENDA} dias`} className="grid gap-2">
@@ -22,9 +23,8 @@ export default function VisaoAgenda({ dias, porDia, hoje, deVariasPessoas, aoSel
         const ehHoje = dia === hoje
         return (
           <div key={dia} className="overflow-hidden rounded-xl border">
-            <button type="button" onClick={() => aoSelecionar(dia)}
-              className={cn('botao-animado flex w-full items-center gap-3 border-b px-4 py-2.5 text-left transition-[background-color,translate,scale] outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset active:scale-[0.97]',
-                ehHoje ? 'bg-primary/10' : 'bg-muted/50')}>
+            <h3 aria-label={`${diaDaSemanaPorExtenso(dia)}, ${nomeDoDia(dia)}${ehHoje ? ', hoje' : ''}`}
+              className={cn('flex w-full items-center gap-3 border-b px-4 py-2.5 text-left', ehHoje ? 'bg-primary/10' : 'bg-muted/50')}>
               <span className={cn('w-8 text-center text-titulo leading-none font-bold tabular-nums', ehHoje ? 'text-primary' : 'text-foreground/80')}>
                 {Number(dia.slice(8, 10))}
               </span>
@@ -35,7 +35,7 @@ export default function VisaoAgenda({ dias, porDia, hoje, deVariasPessoas, aoSel
                 </span>
                 <span className="block text-legenda text-muted-foreground">{mesEAno(dia)}</span>
               </span>
-            </button>
+            </h3>
             <ul className="divide-y">
               {porDia.get(dia).map((item) => {
                 const linha = 'flex w-full items-center gap-3 px-4 py-2.5 text-left'
