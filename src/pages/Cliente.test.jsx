@@ -377,12 +377,20 @@ describe('Cliente (página)', () => {
     expect(regiao).not.toContainElement(screen.getByRole('tabpanel'))
   })
 
-  it('no celular as ações secundárias ficam só com o ícone, mantendo o nome; a principal mantém o texto', async () => {
+  // Auditoria, R12: "Lançar horas", tarefa do dia a dia do consultor, fica escrito no celular (um relógio solto não diz
+  // o que faz). As outras secundárias (Editar, Arquivar...) continuam só com o ícone, mantendo o nome.
+  it('no celular a principal e o Lançar horas mantêm o texto; as outras secundárias ficam só com o ícone', async () => {
     tela(consultor)
     const regiao = within(await screen.findByRole('region', { name: 'Abas e ações do cliente' }))
     const principal = await regiao.findByRole('button', { name: 'Fazer check-in' })
     expect(principal.querySelector('[class*="sr-only"]')).toBeNull()
-    expect(within(regiao.getByRole('button', { name: 'Lançar horas' })).getByText('Lançar horas')).toHaveClass('max-sm:sr-only')
+    expect(within(regiao.getByRole('button', { name: 'Lançar horas' })).getByText('Lançar horas')).not.toHaveClass('max-sm:sr-only')
+  })
+
+  it('no celular as outras ações secundárias ficam só com o ícone, mantendo o nome', async () => {
+    tela()
+    const regiao = within(await screen.findByRole('region', { name: 'Abas e ações do cliente' }))
+    expect(within(await regiao.findByRole('button', { name: 'Editar' })).getByText('Editar')).toHaveClass('max-sm:sr-only')
   })
 
   it('as ações da lista seguem o papel: a central edita e arquiva', async () => {

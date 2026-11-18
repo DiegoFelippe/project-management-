@@ -482,6 +482,16 @@ describe('FichaDoConsultor: Editar', () => {
     expect(screen.getByRole('heading', { name: 'Capacidade' })).toBeInTheDocument()
   })
 
+  // Auditoria, R4 (a mesma regra das seções de Check-lists): o gestor, que não mexe no acesso, tem só "Dados pessoais".
+  // Uma barra com uma aba só parece que falta alguma: sem a barra, os dados vêm direto, sem o papel de painel de aba.
+  it('a ficha do gestor tem uma aba só: sem a barra de abas, com os dados direto', () => {
+    montarEditar({ perfilDeQuem: GESTOR })
+    const janela = screen.getByRole('dialog', { name: 'Ficha de Ana Lima' })
+    expect(within(janela).queryByRole('tablist')).not.toBeInTheDocument()
+    expect(within(janela).queryByRole('tabpanel')).not.toBeInTheDocument()
+    expect(within(janela).getByLabelText('Nome')).toHaveValue('Ana Lima')
+  })
+
   it('quem é de outra consultoria não vê a aba Capacidade', () => {
     montarEditar({ perfilDeQuem: { id: 'g2', papel: 'gestor', consultoria_id: 'c2' } })
     expect(screen.queryByRole('heading', { name: 'Capacidade' })).not.toBeInTheDocument()
@@ -496,14 +506,15 @@ describe('FichaDoConsultor: Editar', () => {
     expect(screen.queryByRole('heading', { name: 'Capacidade' })).not.toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'Times' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Papel')).not.toBeInTheDocument()
-    expect(nomesDasAbas()).toEqual(['Dados pessoais'])
+    // Uma aba só: sem a barra de abas (auditoria, R4).
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
   })
 
   it('central edita o administrador: vê Capacidade, sem papel nem times', async () => {
     montarEditar({
       perfilDeQuem: { id: 'c9', papel: 'central' }, times: [], pessoa: { ...PESSOA, papel: 'admin' },
     })
-    expect(nomesDasAbas()).toEqual(['Dados pessoais'])
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Capacidade' })).toBeInTheDocument()
     expect(screen.getByLabelText('Carga semanal (horas)')).toBeInTheDocument()
     expect(screen.queryByLabelText('Papel')).not.toBeInTheDocument()

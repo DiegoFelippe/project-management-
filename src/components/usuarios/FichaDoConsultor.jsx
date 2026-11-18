@@ -444,9 +444,12 @@ export default function FichaDoConsultor({
   // Com foto (a atual ou a escolhida agora) a cor não aparece; ela só vale para as iniciais.
   const semFoto = foto?.arquivo ? false : foto?.tirar ? true : !pessoa?.foto
   const ativa = (valor) => aba === valor
-  const painel = (valor, children) => ativa(valor) && (
-    <div role="tabpanel" id={`${idBase}-painel-${valor}`} aria-labelledby={`${idBase}-aba-${valor}`} className="space-y-5">{children}</div>
-  )
+  // Com uma aba só (o gestor, que não mexe no acesso; a central e o dono em alguns papéis), não há barra de abas: uma aba
+  // sozinha parece que faltam outras (auditoria, R4, a regra das seções de Check-lists). O conteúdo vem direto.
+  const umaAba = abas.length === 1
+  const painel = (valor, children) => ativa(valor) && (umaAba
+    ? <div className="space-y-5">{children}</div>
+    : <div role="tabpanel" id={`${idBase}-painel-${valor}`} aria-labelledby={`${idBase}-aba-${valor}`} className="space-y-5">{children}</div>)
 
   // No celular (360 px) o rodapé não cabe com o texto: fica só o ícone, e o nome continua para o leitor de tela.
   const acaoEsquerda = !novo && !propria && podeDesativar ? (
@@ -465,7 +468,7 @@ export default function FichaDoConsultor({
     <JanelaFormulario aberto={aberto} aoFechar={fechar} titulo={titulo ?? (novo ? 'Nova pessoa' : propria ? 'Meu perfil' : `Ficha de ${pessoa.nome}`)}
       icone={novo ? UserPlus : propria ? UserRound : Pencil}
       largura="5xl" alturaFixa enviando={enviando} acaoEsquerda={acaoEsquerda} alterado={alterado}
-      abas={<AbasSegmentadas rotulo="Seções da ficha" comoAbas idBase={idBase} abas={abas} valor={aba} aoMudar={setAbaEscolhida} />}
+      abas={umaAba ? undefined : <AbasSegmentadas rotulo="Seções da ficha" comoAbas idBase={idBase} abas={abas} valor={aba} aoMudar={setAbaEscolhida} />}
       descricao={propria
         ? 'Sua foto, seu nome, seu contato, sua senha e a verificação em duas etapas. O que aparece apagado quem muda é a administração.'
         : !novo

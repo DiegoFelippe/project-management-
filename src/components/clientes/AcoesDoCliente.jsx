@@ -7,12 +7,13 @@ import { estiloDaAcao } from './estiloDaAcao'
 const PERIGO_NO_CABECALHO = 'text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive'
 
 // Ação secundária: na linha da tabela, só o ícone (AcaoDaLinha, auditoria G1); na barra da página do cliente
-// (noCabecalho), outline com o nome, que fica só com o ícone no celular (o nome continua para o leitor de tela).
-function Acao({ noCabecalho, nome, icone: Icone, perigo = false, onClick }) {
+// (noCabecalho), outline com o nome, que fica só com o ícone no celular (o nome continua para o leitor de tela). `comTexto`
+// mantém o nome escrito no celular: o "Lançar horas" do consultor (auditoria, R12).
+function Acao({ noCabecalho, nome, icone: Icone, perigo = false, comTexto = false, onClick }) {
   if (!noCabecalho) return <AcaoDaLinha nome={nome} icone={Icone} perigo={perigo} onClick={onClick} />
   return (
     <Button {...estiloDaAcao(true)} onClick={onClick} className={perigo ? PERIGO_NO_CABECALHO : undefined}>
-      <Icone /> <span className="max-sm:sr-only">{nome}</span>
+      <Icone /> <span className={comTexto ? undefined : 'max-sm:sr-only'}>{nome}</span>
     </Button>
   )
 }
@@ -42,7 +43,7 @@ export function AcoesDaLinha({ cliente, aba, central, gestao, aberto, idDoAviso,
     return (
       <>
         <BotaoCheckin noCabecalho={noCabecalho} key={aberto?.id ?? 'livre'} cliente={cliente} aberto={aberto} idDoAviso={idDoAviso} aoMudar={aoMudar} />
-        <Acao {...comum} nome="Lançar horas" icone={History} onClick={() => abrir('lancar', cliente)} />
+        <Acao {...comum} nome="Lançar horas" icone={History} comTexto onClick={() => abrir('lancar', cliente)} />
       </>
     )
   }
