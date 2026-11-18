@@ -25,15 +25,17 @@ export default function Indicadores({ painel, pessoa, passado: passadoAgora, int
 
   const cartoes = recorte === 'pessoa'
     ? [
-      { chave: 'clientes', rotulo: `Meus clientes${hoje}`, icone: Users, valor: i?.clientes_ativos },
+      { chave: 'clientes', rotulo: `Meus clientes${hoje}`, icone: Users, valor: i?.clientes_em_atendimento ?? i?.clientes_ativos },
       { chave: 'capacidade', rotulo: 'Minha capacidade', icone: Hourglass, tom: 'neutro', valor: i ? formatarHoras(i.capacidade) : null,
         detalhe: i && !passado ? `Reservado ${formatarHoras(i.reservado)}` : (i && ateHoje ? 'até hoje' : null) },
       ocupacao,
       realizado,
     ]
     : [
-      { chave: 'clientes', rotulo: `Clientes ativos${hoje}`, icone: Users, valor: i?.clientes_ativos,
-        detalhe: i ? `${plural(i.clientes_novos, 'novo', 'novos')} ${noQue}` : null },
+      // O banco trocou clientes_ativos por clientes_em_atendimento e tirou clientes_novos (gráficos, T2); a tela nova
+      // do Início (T5) refaz este cartão. Até lá, aceita os dois nomes e some com o detalhe que não vem mais.
+      { chave: 'clientes', rotulo: `Clientes ativos${hoje}`, icone: Users, valor: i?.clientes_em_atendimento ?? i?.clientes_ativos,
+        detalhe: i?.clientes_novos != null ? `${plural(i.clientes_novos, 'novo', 'novos')} ${noQue}` : null },
       { chave: 'aguardando', rotulo: `Aguardando consultor${hoje}`, icone: Hourglass, tom: 'aviso', valor: i?.aguardando,
         destaque: i?.aguardando > 0 ? 'atencao' : null,
         detalhe: i && recorte === 'tudo'

@@ -88,9 +88,10 @@ export default function Inicio() {
               className={`grid grid-cols-[minmax(0,1fr)] gap-5 transition-opacity xl:grid-cols-[repeat(2,minmax(0,1fr))] ${atualizando ? 'opacity-60' : ''}`}>
               <HorasPorMes meses={painel.horas_por_mes} previsao={painel.previsao_atual} intervalo={intervalo} />
               {veEquipe ? <RankingDeOcupacao recorte={painel.recorte} passado={painel.passado} intervalo={intervalo} ranking={painel.ranking} mes={painel.mes} />
-                : <MeusClientes passado={painel.passado} intervalo={intervalo} clientes={painel.meus_clientes} />}
-              {veEquipe && <ClientesEsperando recorte={painel.recorte} esperando={painel.esperando} passado={painel.passado} intervalo={intervalo} />}
-              {veEquipe && <Extremos recorte={painel.recorte} extremos={painel.extremos} passado={painel.passado} mes={painel.mes} />}
+                : painel.meus_clientes && <MeusClientes passado={painel.passado} intervalo={intervalo} clientes={painel.meus_clientes} />}
+              {/* Blocos que saem do Início (gráficos, T2 tirou as chaves do banco); a tela nova (T5) os troca. */}
+              {veEquipe && painel.esperando && <ClientesEsperando recorte={painel.recorte} esperando={painel.esperando} passado={painel.passado} intervalo={intervalo} />}
+              {veEquipe && painel.extremos && <Extremos recorte={painel.recorte} extremos={painel.extremos} passado={painel.passado} mes={painel.mes} />}
             </div>
           )}
         </>
