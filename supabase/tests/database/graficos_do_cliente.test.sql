@@ -6,7 +6,7 @@
 -- 1.000 cartões, 500 tarefas e 1.000 eventos) ficam no fim. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(71);
+select plan(72);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -453,9 +453,11 @@ select is((select row(c ->> 'modelo_nome', c ->> 'tarefas', c ->> 'feitas', c ->
   'check-list: 8 tarefas, 1 feita, 2 não se aplicam, 3 atrasadas; a próxima é a 2 (a 8 vence antes, mas a 7 está presa)');
 select is((select jsonb_agg(e - 'id' order by o) from jsonb_array_elements(testes.j('c1_admin') -> 'checklist' -> 'etapas')
     with ordinality t(e, o)),
-  '[{"nome": "Diagnóstico", "tarefas": 3, "feitas": 1, "nao_se_aplica": 1, "atrasadas": 1},
-    {"nome": "Plano", "tarefas": 5, "feitas": 0, "nao_se_aplica": 1, "atrasadas": 2}]'::jsonb,
-  'check-list: atrasadas por etapa (não feitas e vencidas antes de hoje; a de hoje não)');
+  '[{"nome": "Diagnóstico", "tarefas": 3, "feitas": 1, "nao_se_aplica": 1, "atrasadas": 1, "andamento": 0, "pausadas": 0},
+    {"nome": "Plano", "tarefas": 5, "feitas": 0, "nao_se_aplica": 1, "atrasadas": 2, "andamento": 0, "pausadas": 0}]'::jsonb,
+  'check-list: atrasadas por etapa (não feitas e vencidas antes de hoje; a de hoje não); a 4, em andamento e vencida, '
+  'conta só em atrasadas');
+select is(testes.j('c1_admin') -> 'checklist' -> 'mais_tempo', '[]'::jsonb, 'check-list: sem tempo marcado, mais_tempo vazio');
 select is((select array_agg(row(e ->> 'id', e ->> 'tarefas', e ->> 'feitas')::text order by o)
     from jsonb_array_elements(testes.j('c1_admin') -> 'checklist' -> 'etapas') with ordinality t(e, o)),
   (select array_agg(row(e ->> 'id', e ->> 'tarefas', e ->> 'feitas')::text order by o)

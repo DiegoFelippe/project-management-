@@ -1,6 +1,6 @@
 // Painel do Início e os gráficos dele: os números do mês ou de um período, já no recorte de quem chama (tudo,
 // consultoria ou pessoa). Cada função chama uma função do banco e devolve o JSON dela como está (a tela não recalcula
-// nada); o Início chama as seis em paralelo e cada bloco carrega e falha sozinho.
+// nada); o Início chama todas em paralelo e cada bloco carrega e falha sozinho.
 import { supabase } from '@/lib/supabase'
 
 // periodo: o mês 'AAAA-MM-01' (ou nulo para o mês atual) ou { de, ate } ('AAAA-MM-DD', dias de São Paulo, inclusive).
@@ -10,7 +10,7 @@ export function argumentosDoPeriodo(periodo) {
 
 // Campos que são sempre texto (nomes, ids, datas e rótulos): um nome "123" continua nome.
 const TEXTO = new Set(['id', 'nome', 'sub', 'consultor_nome', 'consultoria_nome', 'situacao', 'recorte', 'forma', 'mes',
-  'de', 'ate', 'ate_efetivo', 'capacidade_ate', 'semana', 'ultimo_checkin'])
+  'de', 'ate', 'ate_efetivo', 'capacidade_ate', 'semana', 'ultimo_checkin', 'cidade', 'uf'])
 const NUMERO = /^-?\d+(\.\d+)?$/
 
 // O JSON vem do banco com números de verdade; se algum vier como texto, vira Number (os gráficos fazem conta com eles).
@@ -55,3 +55,20 @@ export const horasPorCliente = (periodo, pagina = null) =>
 
 // { semanas, media, pico }.
 export const checkinsPorSemana = (periodo) => chamar('checkins_por_semana', argumentosDoPeriodo(periodo))
+
+// O burn-up: { dias: [{ dia, horas }] (todos os dias do período), capacidade (do período inteiro), hoje }.
+export const horasDoPainelPorDia = (periodo) => chamar('horas_do_painel_por_dia', argumentosDoPeriodo(periodo))
+
+// Central (por consultoria) e gestão (por consultor): { recorte, semanas: ['AAAA-MM-DD'], series: [{ id, nome, horas: [] }] },
+// as 8 maiores e { id: null, nome: 'Outros' }. O consultor recebe sem_recorte (42501).
+export const horasPorUnidadePorSemana = (periodo) => chamar('horas_por_unidade_por_semana', argumentosDoPeriodo(periodo))
+
+// O calor: { celulas: [{ dia_semana (domingo = 0), hora (7 a 20), checkins }] }, as 98 células.
+export const checkinsPorDiaEHora = (periodo) => chamar('checkins_por_dia_e_hora', argumentosDoPeriodo(periodo))
+
+// A rosca, hoje (não depende do período): { feitas, nao_se_aplica, andamento, pausadas, a_fazer, atrasadas, checklists }.
+export const tarefasPorSituacao = () => chamar('tarefas_por_situacao', {})
+
+// Central e gestão, hoje: { cidades: [{ cidade, uf, clientes }] (as 6 maiores e, no fim, "Sem cidade" com cidade nula),
+// outras, total }. O consultor recebe sem_recorte (42501).
+export const clientesPorCidade = () => chamar('clientes_por_cidade', {})

@@ -2,12 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import {
   argumentosDoPeriodo,
+  checkinsPorDiaEHora,
   checkinsPorSemana,
   clientesEmRisco,
+  clientesPorCidade,
   comparacaoDoInicio,
   filaDeClientes,
+  horasDoPainelPorDia,
   horasPorCliente,
+  horasPorUnidadePorSemana,
   painelDoInicio,
+  tarefasPorSituacao,
 } from './painel'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
@@ -58,6 +63,9 @@ describe('as funções dos gráficos do Início', () => {
     ['comparacaoDoInicio', comparacaoDoInicio, 'comparacao_do_inicio'],
     ['filaDeClientes', filaDeClientes, 'fila_de_clientes'],
     ['checkinsPorSemana', checkinsPorSemana, 'checkins_por_semana'],
+    ['horasDoPainelPorDia', horasDoPainelPorDia, 'horas_do_painel_por_dia'],
+    ['horasPorUnidadePorSemana', horasPorUnidadePorSemana, 'horas_por_unidade_por_semana'],
+    ['checkinsPorDiaEHora', checkinsPorDiaEHora, 'checkins_por_dia_e_hora'],
   ])('%s manda o mês ou o período com os nomes do banco', async (_, funcao, rpc) => {
     vi.mocked(supabase.rpc).mockResolvedValue({ data: {}, error: null })
     await funcao('2026-10-01')
@@ -82,6 +90,22 @@ describe('as funções dos gráficos do Início', () => {
     expect(supabase.rpc).toHaveBeenLastCalledWith('clientes_em_risco', { p_pagina: 1 })
     await clientesEmRisco(3)
     expect(supabase.rpc).toHaveBeenLastCalledWith('clientes_em_risco', { p_pagina: 3 })
+  })
+
+  it('tarefasPorSituacao e clientesPorCidade não dependem do período (nenhum argumento)', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: {}, error: null })
+    await tarefasPorSituacao()
+    expect(supabase.rpc).toHaveBeenLastCalledWith('tarefas_por_situacao', {})
+    await clientesPorCidade()
+    expect(supabase.rpc).toHaveBeenLastCalledWith('clientes_por_cidade', {})
+  })
+
+  it('o nome da cidade continua texto mesmo quando parece número', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: { cidades: [{ cidade: '2000', uf: 'SC', clientes: '3' }], outras: '0', total: '3' },
+      error: null,
+    })
+    expect(await clientesPorCidade()).toEqual({ cidades: [{ cidade: '2000', uf: 'SC', clientes: 3 }], outras: 0, total: 3 })
   })
 
   it('devolvem o JSON do banco como está', async () => {
