@@ -502,3 +502,45 @@ resumos), mantidas pelo banco, sem acesso pela tela. Nenhuma operação de CRUD 
 - O tom da Ocupação segue o valor atual, como no protótipo: ir de 105% para 95% aparece como "ruim" (Task 5).
 - Ranking de ocupação: "… N no meio" conta só as unidades com capacidade; as sem capacidade que ficam de fora vão
   para o fim, depois da última barra ("+ N consultores sem capacidade"), pela chave `ranking_resumo.sem_capacidade`.
+
+### Aba Geral do cliente (Task 6)
+
+- **O filtro de período fica em cima da aba, não no meio** (decisão do Diego, 19/11: "não deixe o filtro de data dentro
+  da dashboard do cliente no meio, deixe em cima e personalizado"). Sai a navegação do mês no título da seção (M4).
+  Ordem: ficha compacta → `BarraDeFiltros` (ícone + "Filtros" e o `FiltroDePeriodo` do Início: Mês com a
+  `NavegacaoDoMes`, Últimos 30 e 90 dias, Este ano e Personalizado com De e Até) → faixa **Hoje** (o título diz "A
+  situação de agora: não segue o período do filtro.") → **No período** (os gráficos). O período fica no endereço
+  (`?periodo=…`, ao lado de `?aba=`), com as mesmas regras e frases do Início (`lerPeriodo`, `validarPeriodo`); período
+  inválido mostra a frase na barra e "Ajuste as datas na barra de filtros para ver os gráficos." (a faixa Hoje
+  continua). No Mês, o Anterior para no mês do cadastro do cliente (`minimo`, que a `NavegacaoDoMes` e o
+  `FiltroDePeriodo` ganharam) e o Próximo no mês atual.
+- **Todo título diz o período**: "Horas × previsão · Novembro de 2026", "… · Últimos 30 dias", "… · Este ano" ou
+  "… · 01/09/2026 a 19/11/2026"; o dos meses no Mês é "Últimos 6 meses · até nov/26"; o do check-list é "… · hoje"
+  (ele é a situação de hoje e não segue o filtro). Frases e vazios dizem "no mês" / "no período" / "no ano"
+  (`frasesDosGraficos`: `fraseDoPeriodoDoCliente` e o `periodo` opcional em `fraseDosConsultores` e
+  `fraseDasSemanasDoCliente`); "Ver em tabela" leva o período no nome.
+- **Num período que não é um mês** (funções novas, migração `20261119142801_graficos_do_cliente_periodo`; o Mês continua
+  com as funções de antes, sem mudar):
+  - burn-up: o realizado acumulado do início do período até hoje no máximo contra a **previsão proporcional** aos dias
+    mostrados (cada dia vale horas_mes / dias do mês dele, com a previsão de hoje do cliente), uma linha horizontal
+    "Previsão N h", como a do mês; sem projeção (ela é só do mês atual). Frase: "No período: **52 h** de 60 h previstas
+    (87%)". Na tabela, só os dias com horas (2 anos seriam 730 linhas); no Mês, todos os dias, como antes;
+  - horas por consultor e check-ins por semana: as mesmas contas do mês, no intervalo (semanas que tocam o período, uma
+    coluna cada; com mais de 8 colunas, sem o número em cima);
+  - meses: os que o período cobre, no mínimo 6 e no máximo 24 (o limite de `horas_do_cliente_por_mes`: um Personalizado de
+    2 anos que toca 25 meses perde o primeiro), até o mês do fim; os de fora do período esmaecidos, com "Fora do período"
+    na legenda (no Mês, os 5 anteriores, como antes). São totais do mês inteiro (o gráfico é por mês).
+  - o intervalo passa pelas regras do Início (`private.periodo_do_inicio`, as mesmas recusas `periodo_invalido`), por um
+    ajudante definer só de datas (`private.periodo_do_cliente`), porque as funções são invoker (o RLS isola as
+    consultorias) e `periodo_do_inicio` fica sem grant.
+- **Faixa Hoje**: o "não se aplica" conta como resolvida, como no resto do app: o % e a barra usam feitas + não se aplica
+  ("14 de 28 resolvidas" quando há alguma; "12 de 28 tarefas" quando não), e "N não se aplicam" aparece à parte no
+  rodapé e na dica. O mesmo no gráfico das etapas (legenda "Resolvidas" quando há alguma; a dica e a tabela separam).
+- **Faixa Hoje no celular**: os selos quebram a linha dentro do cartão (a 360 px o cartão tem ~134 px por dentro), e a
+  próxima reunião mostra "21/11" no número grande com "sáb · 14:00" ao lado (no computador, "sáb, 21/11" e "14:00").
+- "Empresa e contato" mantém o nome no botão aberto ou fechado (o estado é o `aria-expanded`; a seta vira).
+- A faixa Hoje é lida uma vez pela página (`hoje_do_cliente`) e repartida: os 5 cartões e as etapas do gráfico do
+  check-list. "Aplicar modelo" aparece para a regra de `pode_aplicar` do banco (a Central e a gestão, cliente ativo e
+  numa consultoria), calculada na página para não ler o check-list inteiro.
+- Horas por consultor com só um check-in aberto (0 h) mostra o vazio, como o burn-up.
+- As colunas de semana têm o rótulo da segunda-feira (como a dica e a tabela, "Semana de").

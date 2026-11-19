@@ -1,7 +1,8 @@
 import { useEffect, useId, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { GraficoCarregando } from '@/components/comum/Carregando'
+import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
 import Cabecalho, { Voltar } from '@/components/comum/Cabecalho'
 import CalendarioDaAgenda from '@/components/calendario/CalendarioDaAgenda'
 import ChecklistDoCliente from '@/components/checkins/ChecklistDoCliente'
@@ -11,44 +12,67 @@ import { AcoesDaLinha } from '@/components/clientes/AcoesDoCliente'
 import { abaDoCliente } from '@/components/clientes/rotulos'
 import { useAcoesDoCliente } from '@/components/clientes/useAcoesDoCliente'
 import CheckinsDoCliente from '@/components/clientes/CheckinsDoCliente'
+import FichaDoCliente from '@/components/clientes/FichaDoCliente'
 import GraficosDoCliente from '@/components/clientes/GraficosDoCliente'
+import HojeDoCliente from '@/components/clientes/HojeDoCliente'
 import HistoricoDoCliente from '@/components/clientes/HistoricoDoCliente'
+import FiltroDePeriodo from '@/components/inicio/FiltroDePeriodo'
+import { useLeituraDoBloco } from '@/components/inicio/useLeituraDoBloco'
 import QuadroDoCliente from '@/components/quadro/QuadroDoCliente'
-import { Badge } from '@/components/ui/badge'
-import { buscarCliente } from '@/data/clientes'
+import { buscarCliente, hojeDoCliente } from '@/data/clientes'
 import { meuCheckinAberto } from '@/data/checkins'
-import { formatarCnpj } from '@/lib/cnpj'
-import { formatarHoras } from '@/lib/horas'
+import { hoje as hojeEmSP, mesAtual } from '@/lib/mes'
 import { veTudo } from '@/lib/papeis'
+import { lerPeriodo, paraEndereco, periodoAoTrocar, validarPeriodo } from '@/lib/periodo'
 
 const HORA = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' })
 
-function situacaoDe(c) {
-  if (c.arquivado) return 'Arquivado'
-  if (!c.consultoria_id) return 'Aguardando distribuição'
-  if (!c.consultor_id) return 'Aguardando consultor'
-  return 'Em atendimento'
-}
+// A faixa "Hoje" numa leitura só (hoje_do_cliente), que a página reparte: os 5 cartões e as etapas do check-list, que vão
+// para o gráfico do check-list (design 2026-11-17-graficos-do-inicio-e-do-cliente). Estável para o useLeitura.
+const lerHoje = ({ id }) => hojeDoCliente(id)
+const CHAVES_DO_PERIODO = ['periodo', 'mes', 'de', 'ate']
 
-function Campo({ rotulo, children }) {
+// Aba Geral: ficha compacta → barra de filtros (o período, como no Início) → Hoje (não segue o período) → os gráficos do
+// período (pedido do Diego, 19/11). O período fica no endereço, ao lado da aba; o Mês vai do mês do cadastro do cliente
+// até o atual. Só a aba aberta monta, então só ela lê.
+function GeralDoCliente({ cliente, versao, podeAplicar }) {
+  const [parametros, setParametros] = useSearchParams()
+  const hoje = hojeEmSP()
+  const periodo = lerPeriodo(parametros, hoje)
+  const erroDoPeriodo = periodo.tipo === 'mes' ? null : validarPeriodo(periodo.de, periodo.ate, hoje)
+  const [tentativa, setTentativa] = useState(0)
+  const leituraDeHoje = useLeituraDoBloco(lerHoje, { id: cliente.id, versao, tentativa })
+
+  function irPara(novo) {
+    setParametros((antes) => {
+      const proximos = new URLSearchParams(antes)
+      for (const chave of CHAVES_DO_PERIODO) proximos.delete(chave)
+      for (const [chave, valor] of Object.entries(paraEndereco({ ...periodo, ...novo }))) proximos.set(chave, valor)
+      return proximos
+    }, { replace: true })
+  }
+
   return (
-    <div>
-      <dt className="text-rotulo text-muted-foreground">{rotulo}</dt>
-      <dd className="font-medium">{children || '—'}</dd>
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
+      <FichaDoCliente cliente={cliente} />
+      <BarraDeFiltros className="mb-0">
+        <FiltroDePeriodo periodo={periodo} hoje={hoje} erro={erroDoPeriodo}
+          minimo={cliente.criado_em ? mesAtual(new Date(cliente.criado_em)) : undefined} maximo={mesAtual()}
+          aoTrocarTipo={(tipo) => irPara(periodoAoTrocar(periodo, tipo, hoje))}
+          aoMudarMes={(mes) => irPara({ mes })}
+          aoMudarDatas={(datas) => irPara(datas)} />
+      </BarraDeFiltros>
+      <HojeDoCliente hoje={leituraDeHoje.dados} erro={leituraDeHoje.erro} atualizando={leituraDeHoje.atualizando} podeAplicar={podeAplicar}
+        aoTentarDeNovo={() => setTentativa((t) => t + 1)} />
+      {erroDoPeriodo
+        ? <p className="card p-4 text-corpo text-muted-foreground">Ajuste as datas na barra de filtros para ver os gráficos.</p>
+        : <GraficosDoCliente key={cliente.id} cliente={cliente} periodo={periodo} versao={versao} etapas={leituraDeHoje.dados?.checklist?.etapas} />}
     </div>
   )
 }
 
-function Bloco({ titulo, children }) {
-  return (
-    <section aria-label={titulo} className="card p-4">
-      <h2 className="mb-3 text-subtitulo font-semibold text-muted-foreground">{titulo}</h2>
-      <dl className="grid gap-3">{children}</dl>
-    </section>
-  )
-}
-
-// Página do cliente: dados, previsão x realizado, check-ins e histórico. O banco decide quem enxerga o quê.
+// Página do cliente: a aba Geral (ficha, período, Hoje e gráficos), quadro, agenda, check-ins, arquivos e histórico. O banco decide
+// quem enxerga o quê.
 export default function Cliente() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -96,7 +120,6 @@ export default function Cliente() {
   const souConsultor = !central && cliente.consultor_id === perfil.id && !cliente.arquivado
   const aba = abaDoCliente(cliente, central)
   const acoes = { cliente, central, gestao, aberto, idDoAviso, abrir, aoMudar: recarregar }
-  const passou = cliente.realizado_no_mes > cliente.horas_mes
 
   // Para uma aba nova (ex.: Agenda), basta uma linha aqui, na ordem em que ela aparece.
   const abas = [
@@ -104,43 +127,8 @@ export default function Cliente() {
       id: 'geral',
       rotulo: 'Geral',
       conteudo: (
-      <>
-        <section aria-label="Resumo" className="mb-4 flex flex-wrap gap-x-8 gap-y-2 card p-4">
-          <dl className="contents">
-            <Campo rotulo="Situação">{situacaoDe(cliente)}</Campo>
-            <Campo rotulo="Consultoria">{cliente.consultoria?.nome}</Campo>
-            <Campo rotulo="Consultor">
-              {cliente.consultor && (
-                <>
-                  {cliente.consultor.nome}
-                  {cliente.consultor.ativo === false && <span className="ml-1 text-rotulo">(desativado)</span>}
-                </>
-              )}
-            </Campo>
-          </dl>
-        </section>
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <Bloco titulo="Empresa">
-            <Campo rotulo="CNPJ">{cliente.cnpj && formatarCnpj(cliente.cnpj)}</Campo>
-            <Campo rotulo="Cidade">{cliente.cidade && `${cliente.cidade}${cliente.uf ? `/${cliente.uf}` : ''}`}</Campo>
-            <Campo rotulo="Observações">{cliente.observacoes}</Campo>
-          </Bloco>
-          <Bloco titulo="Contato">
-            <Campo rotulo="Nome">{cliente.contato_nome}</Campo>
-            <Campo rotulo="Telefone">{cliente.contato_telefone}</Campo>
-            <Campo rotulo="E-mail">{cliente.contato_email}</Campo>
-          </Bloco>
-          <Bloco titulo="Previsão no mês">
-            <Campo rotulo="Realizado de previsto">
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="tabular-nums">{`${formatarHoras(cliente.realizado_no_mes)} de ${formatarHoras(cliente.horas_mes)}`}</span>
-                {passou && <Badge variant="notice">Passou da previsão</Badge>}
-              </span>
-            </Campo>
-          </Bloco>
-        </div>
-        <GraficosDoCliente cliente={cliente} versao={versao} />
-      </>
+        <GeralDoCliente cliente={cliente} versao={versao}
+          podeAplicar={(central || gestao) && Boolean(cliente.consultoria_id) && !cliente.arquivado} />
       ),
     },
     // O quadro Kanban do cliente na consultoria que o atende (a central escolhe o de uma consultoria anterior).

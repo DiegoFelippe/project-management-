@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   fraseDaFila, fraseDaOcupacao, fraseDasEtapas, fraseDasHorasPorCliente, fraseDasSemanas, fraseDasSemanasDoCliente,
-  fraseDoMesDoCliente, fraseDoRisco, fraseDosConsultores, fraseDosMeses, fraseDosSeisMeses,
+  fraseDoMesDoCliente, fraseDoPeriodoDoCliente, fraseDoRisco, fraseDosConsultores, fraseDosMeses, fraseDosSeisMeses,
 } from './frasesDosGraficos'
 
 // As frases viram <Leitura partes>: texto corrido e { forte } (o número que importa, em negrito).
@@ -136,7 +136,26 @@ describe('fraseDoMesDoCliente (burn-up)', () => {
   })
 })
 
+describe('fraseDoPeriodoDoCliente (burn-up num período que não é um mês)', () => {
+  it('o realizado contra a previsão proporcional do banco, dizendo o período', () => {
+    const partes = fraseDoPeriodoDoCliente({ realizado: 52, previsao: 60 }, { tipo: 'ultimos-90' })
+    expect(texto(partes)).toBe('No período: 52 h de 60 h previstas (87%)')
+    expect(fortes(partes)).toEqual(['52 h'])
+    expect(texto(fraseDoPeriodoDoCliente({ realizado: 180, previsao: 300 }, ANO))).toBe('No ano: 180 h de 300 h previstas (60%)')
+    expect(texto(fraseDoPeriodoDoCliente({ realizado: 5, previsao: null }, { tipo: 'personalizado' }))).toBe('No período: 5 h')
+  })
+})
+
 describe('fraseDosConsultores (cliente)', () => {
+  it('num período que não é um mês, a frase diz o período', () => {
+    expect(texto(fraseDosConsultores([{ nome: 'Ana Lima', horas: 41 }, { nome: 'Bruno', horas: 9 }], { tipo: 'ultimos-30' })))
+      .toBe('Ana Lima fez 82% das horas no período')
+    expect(texto(fraseDosConsultores([{ nome: 'Ana Lima', horas: 12 }], ANO))).toBe('Só Ana Lima no ano')
+    expect(texto(fraseDosConsultores([], { tipo: 'personalizado' }))).toBe('Sem horas no período')
+    expect(texto(fraseDosConsultores([{ nome: 'Ana Lima', horas: 12 }], MES))).toBe('Só Ana Lima neste mês')
+  })
+
+
   it('"Ana Lima fez 82% das horas" (a lista vem do banco, mais horas primeiro)', () => {
     const partes = fraseDosConsultores([{ nome: 'Ana Lima', horas: 41 }, { nome: 'Bruno', horas: 9 }])
     expect(texto(partes)).toBe('Ana Lima fez 82% das horas')
@@ -167,6 +186,7 @@ describe('fraseDosSeisMeses (cliente)', () => {
     expect(texto(fraseDosSeisMeses(meses, 33, '2026-11-01'))).toBe('Média de 26 h/mês · 1 mês acima da previsão')
     expect(texto(fraseDosSeisMeses(meses, 0, '2026-11-01'))).toBe('Média de 26 h/mês')
     expect(texto(fraseDosSeisMeses(meses.map((m) => ({ ...m, realizado: 0 })), 30, '2026-11-01'))).toBe('Sem horas nos últimos 6 meses')
+    expect(texto(fraseDosSeisMeses([...meses, ...meses].map((m) => ({ ...m, realizado: 0 })), 30, '2026-11-01'))).toBe('Sem horas nos últimos 12 meses')
   })
 })
 
@@ -180,6 +200,13 @@ describe('fraseDasSemanasDoCliente', () => {
 
   it('sem check-ins', () => {
     expect(texto(fraseDasSemanasDoCliente([{ semana: '2026-11-02', quantidade: 0, horas: 0 }]))).toBe('Sem check-ins neste mês')
+  })
+
+  it('num período que não é um mês, a frase diz o período', () => {
+    const semanas = [{ semana: '2026-11-02', quantidade: 4, horas: 8.4 }, { semana: '2026-11-09', quantidade: 5, horas: 10.5 }]
+    expect(texto(fraseDasSemanasDoCliente(semanas, { tipo: 'ultimos-90' }))).toBe('9 check-ins no período · 2,1 h em média')
+    expect(texto(fraseDasSemanasDoCliente(semanas, MES))).toBe('9 check-ins no mês · 2,1 h em média')
+    expect(texto(fraseDasSemanasDoCliente([], ANO))).toBe('Sem check-ins no ano')
   })
 })
 

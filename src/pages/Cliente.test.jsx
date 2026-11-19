@@ -2,25 +2,29 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { apagarCheckin, editarCheckin, listarCheckins, meuCheckinAberto } from '@/data/checkins'
+import { apagarCheckin, editarCheckin, fazerCheckout, listarCheckins, meuCheckinAberto, tarefasDoCheckin } from '@/data/checkins'
 import { eventosDoCliente, eventosDoPeriodo, feriadosDoPeriodo, indicadoresDaAgenda, meuGoogle } from '@/data/agenda'
 import { limparPastaDoCliente, listarArquivos, listarPastas } from '@/data/arquivos'
 import { lerChecklist, marcarTarefa } from '@/data/checklists'
-import { apagarCliente, buscarCliente, checkinsPorSemana, horasPorConsultor, horasPorMes, listarEventos } from '@/data/clientes'
+import {
+  apagarCliente, buscarCliente, checkinsPorSemana, hojeDoCliente, horasPorConsultor, horasPorDia, horasPorMes, listarEventos,
+} from '@/data/clientes'
 import { cartoesDoQuadro, limparQuadroDoCliente, quadroDoCliente } from '@/data/quadro'
 import { ouvirQuadro } from '@/data/quadroAoVivo'
+import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
+import { escolherNoSeletor } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
 import Cliente from './Cliente'
 
 vi.mock('@/data/clientes', () => ({
   buscarCliente: vi.fn(), listarEventos: vi.fn(), buscarClientes: vi.fn(),
-  horasPorMes: vi.fn(), horasPorConsultor: vi.fn(), checkinsPorSemana: vi.fn(),
+  horasPorMes: vi.fn(), horasPorConsultor: vi.fn(), checkinsPorSemana: vi.fn(), horasPorDia: vi.fn(), hojeDoCliente: vi.fn(),
   criarCliente: vi.fn(), editarCliente: vi.fn(), arquivarCliente: vi.fn(), reativarCliente: vi.fn(), apagarCliente: vi.fn(),
   mandarParaConsultoria: vi.fn(), escolherConsultor: vi.fn(), ajustarPrevisao: vi.fn(),
 }))
 vi.mock('@/data/checkins', () => ({
   meuCheckinAberto: vi.fn(), fazerCheckin: vi.fn(), fazerCheckout: vi.fn(), lancarHoras: vi.fn(),
-  listarCheckins: vi.fn(), editarCheckin: vi.fn(), apagarCheckin: vi.fn(),
+  listarCheckins: vi.fn(), editarCheckin: vi.fn(), apagarCheckin: vi.fn(), tarefasDoCheckin: vi.fn(),
 }))
 vi.mock('@/data/agenda', async (importOriginal) => {
   const real = await importOriginal()
@@ -86,6 +90,18 @@ const COM_MODELO = {
   }],
   resumo: { tarefas: 1, feitas: 0, obrigatorias: 1, obrigatorias_feitas: 0, vencem_7_dias: 0, atrasadas: 0, proxima: { id: 't1', titulo: 'Análise do DRE', vence_em: '2099-11-20' } },
 }
+// A faixa "Hoje" (hoje_do_cliente), com modelo aplicado (as etapas vão para o gráfico do check-list).
+const HOJE = {
+  arquivado_em: null,
+  previsao: { horas_mes: 40, realizado: 42, dia: 19, dias_no_mes: 30, projecao: 64.7, ritmo: 'acima' },
+  checkin: { ultimo: '2026-11-11', dias_sem: 8, situacao: 'em_dia', dias_com_checkin: ['2026-11-10', '2026-11-11'] },
+  reuniao: null,
+  quadro: { id: 'q1', cartoes: 4, atrasados: 1, sem_responsavel: 0 },
+  checklist: {
+    modelo_nome: 'Gestão financeira', tarefas: 2, feitas: 1, nao_se_aplica: 0, atrasadas: 0, proxima: null,
+    etapas: [{ id: 'e1', nome: 'Diagnóstico', tarefas: 2, feitas: 1, nao_se_aplica: 0, atrasadas: 0 }],
+  },
+}
 const central = { id: 'c0', papel: 'central', consultoria_id: null }
 const adminDaSti = { id: 'a1', papel: 'admin', consultoria_id: 's1' }
 const consultor = { id: 'p1', papel: 'pessoa', consultoria_id: 's1' }
@@ -107,6 +123,9 @@ beforeEach(() => {
   vi.mocked(horasPorMes).mockResolvedValue([])
   vi.mocked(horasPorConsultor).mockResolvedValue([])
   vi.mocked(checkinsPorSemana).mockResolvedValue([])
+  vi.mocked(horasPorDia).mockResolvedValue({ mes: '2026-11-01', dias: [], realizado: 0, previsao: 40, projecao: null, dias_no_mes: 30 })
+  vi.mocked(hojeDoCliente).mockResolvedValue(HOJE)
+  vi.mocked(tarefasDoCheckin).mockResolvedValue([])
   vi.mocked(meuCheckinAberto).mockResolvedValue(null)
   vi.mocked(listarArquivos).mockResolvedValue({ itens: [], total: 0 })
   vi.mocked(editarCheckin).mockResolvedValue({ erro: null })
@@ -115,31 +134,121 @@ beforeEach(() => {
 })
 
 describe('Cliente (página)', () => {
-  it('mostra os dados do cliente pedido pela rota', async () => {
+  it('Geral: ficha → barra de filtros (Filtros e o Período, como no Início) → Hoje → os gráficos do período', async () => {
     tela()
     expect(await screen.findByRole('heading', { name: 'Provedor Alfa' })).toBeInTheDocument()
     expect(buscarCliente).toHaveBeenCalledWith('k1')
     expect(screen.getByText('Alfa Telecom Ltda')).toBeInTheDocument()
+    const ficha = within(screen.getByRole('region', { name: 'Resumo do cliente' }))
+    expect(ficha.getByText('Em atendimento')).toBeInTheDocument()
+    expect(ficha.getByText('STI Consult')).toBeInTheDocument()
+    expect(ficha.getByText('Ana')).toBeInTheDocument()
+    expect(ficha.getByText('40 h/mês previstas')).toBeInTheDocument()
+    expect(ficha.getByText('Natal/RN')).toBeInTheDocument()
+    // Saem o Resumo e os blocos Empresa, Contato e Previsão no mês.
+    for (const antigo of ['Resumo', 'Empresa', 'Contato', 'Previsão no mês']) expect(screen.queryByRole('region', { name: antigo })).toBeNull()
+    // A barra de filtros: "Filtros", o Período (Mês) e a navegação do mês (pedido do Diego, 19/11: em cima, não no meio).
+    const barra = screen.getByText('Filtros').closest('.card')
+    expect(within(barra).getByLabelText('Período')).toHaveTextContent('Mês')
+    expect(within(barra).getByRole('group', { name: 'Mês' })).toHaveTextContent(rotuloDoMes(mesAtual()))
+    expect(within(barra).getByRole('button', { name: 'Próximo mês' })).toBeDisabled()
+    // Hoje: os 5 cartões (uma leitura só), com o aviso de que não segue o filtro; passou da previsão aparece no cartão.
+    const hoje = await screen.findByRole('group', { name: 'Previsão do mês' })
+    expect(hoje).toHaveTextContent('42 h de 40 h')
+    expect(within(hoje).getByText('105%')).toHaveClass('text-destructive')
+    expect(screen.getByRole('region', { name: 'Hoje' })).toHaveAccessibleDescription('A situação de agora: não segue o período do filtro.')
+    expect(hojeDoCliente).toHaveBeenCalledTimes(1)
+    expect(hojeDoCliente).toHaveBeenCalledWith('k1')
+    // Os gráficos seguem o período (sem navegação própria); o das etapas usa as etapas da mesma leitura da faixa.
+    const graficos = screen.getByRole('region', { name: 'No período' })
+    expect(within(graficos).queryByRole('group', { name: 'Mês' })).toBeNull()
+    expect(within(graficos).getByRole('region', { name: 'Andamento do check-list por etapa · hoje' })).toBeInTheDocument()
+    await waitFor(() => expect(horasPorDia).toHaveBeenCalledWith('k1', mesAtual()))
+    // A ordem: ficha → filtros → Hoje → gráficos.
+    const ordem = [screen.getByRole('region', { name: 'Resumo do cliente' }), barra, screen.getByRole('region', { name: 'Hoje' }), graficos]
+    for (let i = 1; i < ordem.length; i++) expect(ordem[i - 1].compareDocumentPosition(ordem[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('o período vem do endereço (com a aba ao lado) e as funções do período vão ao banco', async () => {
+    const user = userEvent.setup()
+    tela(central, '/clientes/k1?aba=geral&periodo=ultimos-30')
+    expect(await screen.findByLabelText('Período')).toHaveTextContent('Últimos 30 dias')
+    await waitFor(() => expect(horasPorDia).toHaveBeenCalledWith('k1', { de: expect.any(String), ate: expect.any(String) }))
+    const [, { de, ate }] = vi.mocked(horasPorDia).mock.calls.at(-1)
+    expect(horasPorConsultor).toHaveBeenCalledWith('k1', { de, ate })
+    expect(checkinsPorSemana).toHaveBeenCalledWith('k1', { de, ate })
+    expect(screen.getByRole('tab', { name: 'Geral' })).toHaveAttribute('aria-selected', 'true')
+    // Voltar ao Mês pede o mês, sem reler a faixa Hoje.
+    await escolherNoSeletor(user, 'Período', 'Mês')
+    await waitFor(() => expect(horasPorDia).toHaveBeenLastCalledWith('k1', mesAtual()))
+    expect(hojeDoCliente).toHaveBeenCalledTimes(1)
+  })
+
+  it('período inválido: a frase do Início, e os gráficos não vão ao banco (a faixa Hoje continua)', async () => {
+    tela(central, '/clientes/k1?periodo=personalizado&de=2026-11-10&ate=2026-11-01')
+    expect(await screen.findByText('A data inicial vem depois da final.')).toBeInTheDocument()
+    expect(screen.getByText('Ajuste as datas na barra de filtros para ver os gráficos.')).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: 'Previsão do mês' })).toBeInTheDocument()
+    expect(horasPorDia).not.toHaveBeenCalled()
+    expect(horasPorConsultor).not.toHaveBeenCalled()
+  })
+
+  it('o Mês não volta antes do mês do cadastro do cliente nem passa do atual', async () => {
+    vi.mocked(buscarCliente).mockResolvedValue({ ...CLIENTE, criado_em: new Date().toISOString() })
+    tela()
+    const barra = (await screen.findByText('Filtros')).closest('.card')
+    expect(within(barra).getByRole('button', { name: 'Mês anterior' })).toBeDisabled()
+    expect(within(barra).getByRole('button', { name: 'Próximo mês' })).toBeDisabled()
+  })
+
+  it('Empresa e contato só aparecem ao abrir a ficha', async () => {
+    tela()
+    const botao = await screen.findByRole('button', { name: 'Empresa e contato' })
+    expect(screen.queryByText('11.222.333/0001-81')).not.toBeInTheDocument()
+    expect(screen.queryByText('Joana')).not.toBeInTheDocument()
+    await userEvent.click(botao)
     expect(screen.getByText('11.222.333/0001-81')).toBeInTheDocument()
-    expect(screen.getByText('Natal/RN')).toBeInTheDocument()
     expect(screen.getByText('Joana')).toBeInTheDocument()
-    const resumo = within(screen.getByRole('region', { name: 'Resumo' }))
-    expect(resumo.getByText('STI Consult')).toBeInTheDocument()
-    expect(resumo.getByText('Ana')).toBeInTheDocument()
-    expect(resumo.getByText('Em atendimento')).toBeInTheDocument()
-    expect(screen.getByText('41 h de 40 h')).toBeInTheDocument()
+    expect(screen.getByText('joana@alfa.test')).toBeInTheDocument()
   })
 
-  it('avisa que passou da previsão quando o realizado é maior', async () => {
+  it("arquivado: sem a faixa, com 'Arquivado em 12/10/2026'", async () => {
+    vi.mocked(buscarCliente).mockResolvedValue({ ...CLIENTE, arquivado: true })
+    vi.mocked(hojeDoCliente).mockResolvedValue({ ...HOJE, arquivado_em: '2026-10-12T15:00:00Z' })
     tela()
-    expect(await screen.findByText('Passou da previsão')).toBeInTheDocument()
+    expect(await screen.findByText('Arquivado em 12/10/2026.')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Previsão do mês' })).toBeNull()
+    // Os gráficos do período continuam (histórico).
+    expect(screen.getByRole('region', { name: 'No período' })).toBeInTheDocument()
+    await waitFor(() => expect(horasPorDia).toHaveBeenCalled())
   })
 
-  it('sem passar da previsão não mostra o aviso', async () => {
-    vi.mocked(buscarCliente).mockResolvedValue({ ...CLIENTE, realizado_no_mes: 40 })
+  it('um check-out na página (versao) recarrega a faixa e os gráficos', async () => {
+    vi.mocked(meuCheckinAberto).mockResolvedValue({ id: 'a1', cliente_id: 'k1', inicio: new Date(Date.now() - 3_600_000).toISOString(), fim: null })
+    vi.mocked(fazerCheckout).mockResolvedValue({ erro: null })
+    const usuario = userEvent.setup()
+    tela(consultor)
+    await usuario.click(await screen.findByRole('button', { name: /Fazer check-out/ }))
+    const janela = await screen.findByRole('dialog', { name: 'Fazer check-out em Provedor Alfa' })
+    await usuario.type(within(janela).getByLabelText('O que foi feito'), 'Revisão do DRE')
+    await usuario.click(within(janela).getByRole('button', { name: 'Fazer check-out' }))
+    await waitFor(() => expect(fazerCheckout).toHaveBeenCalled())
+    await waitFor(() => expect(hojeDoCliente).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(horasPorDia).toHaveBeenCalledTimes(2))
+    expect(horasPorMes).toHaveBeenCalledTimes(2)
+    expect(horasPorConsultor).toHaveBeenCalledTimes(2)
+    expect(checkinsPorSemana).toHaveBeenCalledTimes(2)
+  })
+
+  it('trocar o mês na barra de filtros relê os gráficos, e não a faixa Hoje (ela é de hoje)', async () => {
+    const usuario = userEvent.setup()
     tela()
-    await screen.findByRole('heading', { name: 'Provedor Alfa' })
-    expect(screen.queryByText('Passou da previsão')).not.toBeInTheDocument()
+    await screen.findByRole('group', { name: 'Previsão do mês' })
+    await waitFor(() => expect(horasPorDia).toHaveBeenCalledTimes(1))
+    await usuario.click(within(screen.getByText('Filtros').closest('.card')).getByRole('button', { name: 'Mês anterior' }))
+    await waitFor(() => expect(horasPorDia).toHaveBeenLastCalledWith('k1', deslocarMes(mesAtual(), -1)))
+    expect(horasPorMes).toHaveBeenLastCalledWith('k1', deslocarMes(mesAtual(), -1), 6)
+    expect(hojeDoCliente).toHaveBeenCalledTimes(1)
   })
 
   it('cliente inexistente ou invisível mostra Cliente não encontrado.', async () => {
@@ -406,14 +515,14 @@ describe('Cliente (página)', () => {
     expect(barra.getByRole('button', { name: 'Apagar' })).toHaveClass('hover:text-destructive')
   })
 
-  it('o administrador troca o consultor e ajusta a previsão', async () => {
+  it('o administrador troca o consultor, ajusta a previsão e edita os dados', async () => {
     tela(adminDaSti, '/clientes/k1?aba=checkins')
     await screen.findByRole('heading', { name: 'Provedor Alfa' })
     const barra = within(screen.getByRole('region', { name: 'Abas e ações do cliente' }))
-    expect(barra.getAllByRole('button').map((b) => b.textContent.trim())).toEqual(['Trocar consultor', 'Ajustar previsão'])
+    expect(barra.getAllByRole('button').map((b) => b.textContent.trim())).toEqual(['Trocar consultor', 'Ajustar previsão', 'Editar'])
     expect(screen.queryByRole('button', { name: 'Arquivar' })).not.toBeInTheDocument()
     // Padrão Hub: na barra da página, sem a principal do contexto, tudo é outline (nada de link solto).
-    for (const nome of ['Trocar consultor', 'Ajustar previsão']) {
+    for (const nome of ['Trocar consultor', 'Ajustar previsão', 'Editar']) {
       const botao = barra.getByRole('button', { name: nome })
       expect(botao).toHaveClass('border')
       expect(botao).not.toHaveClass('bg-primary-cheio')

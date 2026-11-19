@@ -78,6 +78,10 @@ export function fraseDasSemanas(dados, periodo) {
   return ['Média de ', { forte: media }, ` por semana ${quando(periodo)} · pico na semana de ${diaMes(dados.pico.semana)}`]
 }
 
+// No cliente, o período do filtro da aba Geral: sem ele (ou no Mês), "neste mês" / "no mês"; senão, o de quando().
+const nesse = (periodo) => (!periodo || periodo.tipo === 'mes' ? 'neste mês' : quando(periodo))
+const noMesOu = (periodo) => (!periodo || periodo.tipo === 'mes' ? 'no mês' : quando(periodo))
+
 // Burn-up do cliente (horas_do_cliente_por_dia). Mês atual: a projeção do banco (nula até o dia 6: só o feito);
 // mês passado: com quanto fechou, contra a previsão de hoje.
 export function fraseDoMesDoCliente(dados, atual = dados.mes === mesAtual()) {
@@ -87,19 +91,29 @@ export function fraseDoMesDoCliente(dados, atual = dados.mes === mesAtual()) {
   return ['Fechou o mês com ', { forte: formatarHoras(dados.realizado) }, daPrevisao(dados.realizado, 'da previsão atual')]
 }
 
-// Horas por consultor no mês (a lista inteira do mês, mais horas primeiro; nome nulo = consultor que a pessoa não vê).
-export function fraseDosConsultores(lista) {
-  if (!lista.length) return ['Sem horas neste mês']
-  const [primeiro] = lista
-  if (lista.length === 1) return ['Só ', { forte: primeiro.nome ?? 'outro consultor' }, ' neste mês']
-  const total = lista.reduce((soma, c) => soma + c.horas, 0)
-  return [{ forte: primeiro.nome ?? 'Outro consultor' }, ` fez ${formatarOcupacao(total ? primeiro.horas / total : 0)} das horas`]
+// Burn-up do cliente num período que não é um mês (horas_do_cliente_por_dia_no_periodo): o realizado contra a previsão
+// proporcional aos dias que o banco mandou. "No período: 52 h de 60 h previstas (87%)".
+export function fraseDoPeriodoDoCliente(dados, periodo) {
+  const inicio = [`${maiuscula(quando(periodo))}: `, { forte: formatarHoras(dados.realizado) }]
+  if (!dados.previsao) return inicio
+  return [...inicio, ` de ${formatarHoras(dados.previsao)} previstas (${formatarOcupacao(dados.realizado / dados.previsao)})`]
 }
 
-// Últimos 6 meses do cliente: média e meses acima da previsão atual, só dos meses fechados (o mês em andamento fica de
-// fora), a partir dos 6 pontos do gráfico.
+// Horas por consultor no mês ou no período (a lista inteira, mais horas primeiro; nome nulo = consultor que a pessoa
+// não vê).
+export function fraseDosConsultores(lista, periodo) {
+  if (!lista.length) return [`Sem horas ${nesse(periodo)}`]
+  const [primeiro] = lista
+  if (lista.length === 1) return ['Só ', { forte: primeiro.nome ?? 'outro consultor' }, ` ${nesse(periodo)}`]
+  const total = lista.reduce((soma, c) => soma + c.horas, 0)
+  const fim = periodo && periodo.tipo !== 'mes' ? ` ${quando(periodo)}` : ''
+  return [{ forte: primeiro.nome ?? 'Outro consultor' }, ` fez ${formatarOcupacao(total ? primeiro.horas / total : 0)} das horas${fim}`]
+}
+
+// Os meses do cliente (6, ou os que o período cobre): média e meses acima da previsão atual, só dos meses fechados (o mês
+// em andamento fica de fora), a partir dos pontos do gráfico.
 export function fraseDosSeisMeses(meses, previsao, atual = mesAtual()) {
-  if (meses.every((m) => !m.realizado)) return ['Sem horas nos últimos 6 meses']
+  if (meses.every((m) => !m.realizado)) return [`Sem horas nos últimos ${meses.length} meses`]
   const fechados = meses.filter((m) => m.mes < atual)
   const media = fechados.length ? fechados.reduce((soma, m) => soma + m.realizado, 0) / fechados.length : 0
   const partes = ['Média de ', { forte: formatarHoras(media) }, '/mês']
@@ -108,12 +122,12 @@ export function fraseDosSeisMeses(meses, previsao, atual = mesAtual()) {
   return [...partes, ` · ${acima ? `${plural(acima, 'mês', 'meses')} acima da previsão` : 'nenhum mês acima da previsão'}`]
 }
 
-// Check-ins por semana do cliente no mês: "9 check-ins no mês · 2,1 h em média".
-export function fraseDasSemanasDoCliente(semanas) {
+// Check-ins por semana do cliente no mês ou no período: "9 check-ins no mês · 2,1 h em média".
+export function fraseDasSemanasDoCliente(semanas, periodo) {
   const quantidade = semanas.reduce((soma, s) => soma + s.quantidade, 0)
-  if (!quantidade) return ['Sem check-ins neste mês']
+  if (!quantidade) return [`Sem check-ins ${nesse(periodo)}`]
   const horas = semanas.reduce((soma, s) => soma + s.horas, 0)
-  return [{ forte: plural(quantidade, 'check-in', 'check-ins') }, ` no mês · ${formatarHoras(horas / quantidade)} em média`]
+  return [{ forte: plural(quantidade, 'check-in', 'check-ins') }, ` ${noMesOu(periodo)} · ${formatarHoras(horas / quantidade)} em média`]
 }
 
 // Etapas do check-list (situação de hoje): a etapa com mais tarefas atrasadas.

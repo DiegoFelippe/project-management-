@@ -8,11 +8,12 @@ import { TIPOS_DE_PERIODO, descreverPeriodo, ultimoDiaPermitido } from '@/lib/pe
 // Personalizado) e, ao lado, a navegação do mês (Mês), as datas do atalho ou os campos De e Até (Personalizado).
 // `periodo`: { tipo, mes?, de, ate } de lerPeriodo. `aoTrocarTipo(tipo)`, `aoMudarMes(mes)`, `aoMudarDatas({ de, ate })`.
 // `erro`: a frase do período inválido (vem de validarPeriodo), mostrada numa linha só dela. No celular, De e Até
-// ocupam a linha inteira cada um (a data em 16 px não cabe nos 176 px do computador).
+// ocupam a linha inteira cada um (a data em 16 px não cabe nos 176 px do computador). `minimo` e `maximo` ("AAAA-MM-01",
+// opcionais) limitam a navegação do Mês (o cliente: do mês do cadastro até o atual).
 // Mesma altura da NavegacaoDoMes (42 px), para a barra não pular ao trocar o tipo de período.
 const ALTURA = 'flex min-h-[42px] items-center'
 
-export default function FiltroDePeriodo({ periodo, hoje, erro, aoTrocarTipo, aoMudarMes, aoMudarDatas }) {
+export default function FiltroDePeriodo({ periodo, hoje, erro, aoTrocarTipo, aoMudarMes, aoMudarDatas, minimo, maximo }) {
   const limite = ultimoDiaPermitido(hoje)
   // De depois do Até leva o Até junto, e Até antes do De leva o De: o período nunca fica de trás para a frente.
   const mudarDe = (de) => aoMudarDatas({ de, ate: de > periodo.ate ? de : periodo.ate })
@@ -25,7 +26,7 @@ export default function FiltroDePeriodo({ periodo, hoje, erro, aoTrocarTipo, aoM
           <Seletor id="filtro-periodo" tamanho="sm" valor={periodo.tipo} aoMudar={aoTrocarTipo} opcoes={TIPOS_DE_PERIODO} />
         </div>
       </div>
-      {periodo.tipo === 'mes' && <NavegacaoDoMes mes={periodo.mes} aoMudar={aoMudarMes} />}
+      {periodo.tipo === 'mes' && <NavegacaoDoMes mes={periodo.mes} aoMudar={aoMudarMes} minimo={minimo} maximo={maximo} />}
       {periodo.tipo !== 'mes' && periodo.tipo !== 'personalizado' && (
         <span aria-live="polite" className={`${ALTURA} text-rotulo text-muted-foreground tabular-nums`}>{descreverPeriodo(periodo.de, periodo.ate)}</span>
       )}
