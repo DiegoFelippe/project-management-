@@ -3,6 +3,7 @@
 // e a central de exemplo (central@exemplo.test, fora de qualquer consultoria).
 // Depois: eventos na agenda, o quadro de um cliente, um quadro pessoal da Ana e um do time Implantação (menu Quadros) e os
 // modelos de check-in (com um check-list num cliente), só na Consultoria Exemplo.
+// Com --historico (npm run exemplo:local -- --historico): check-ins fechados nos últimos 6 meses, para os gráficos do Início.
 // Contas NOVAS entram com a senha abaixo (logins @exemplo.test); o Auth exige senha forte desde 16/11.
 // Contas que já existem são puladas e não mudam: as criadas antes de 16/11 seguem com exemplo-123.
 // Nunca rode isto na nuvem.
@@ -75,6 +76,7 @@ await eventosDeExemplo()
 await quadroDeExemplo()
 await quadrosDoMenuDeExemplo()
 await checklistsDeExemplo()
+if (process.argv.includes('--historico')) await historicoDeExemplo()
 process.exit(0)
 
 async function criarConsultoria() {
@@ -593,4 +595,49 @@ async function checklistsDeExemplo() {
   })
   if (erroNota) parar(`Não consegui escrever a nota de "Análise do DRE": ${erroNota.message}`)
   console.log(`Check-list de exemplo (${cliente.nome}): "Gestão financeira" aplicado pelo gestor, com 3 tarefas feitas e 1 em andamento.`)
+}
+
+// --historico: check-ins fechados em dias úteis dos últimos 6 meses, feitos pela Ana e pelo Bruno nos clientes deles da
+// Consultoria Exemplo, para os gráficos do Início terem o que mostrar. Só grava com a consultoria sem nenhum check-in
+// (rodar de novo não muda nada); entra com a conta de cada um, então vale a regra do banco (só o consultor do cliente
+// lança horas, e nunca no futuro), e nunca apaga nada.
+async function historicoDeExemplo() {
+  const { count, error } = await admin.from('checkins').select('id', { count: 'exact', head: true })
+    .eq('consultoria_id', consultoria.id)
+  if (error) parar(`Não consegui contar os check-ins da ${NOME_CONSULTORIA}: ${error.message}`)
+  if (count > 0) {
+    console.log(`Histórico de exemplo: a ${NOME_CONSULTORIA} já tem check-ins, nada foi gravado.`)
+    return
+  }
+  for (const email of ['ana@exemplo.test', 'bruno@exemplo.test']) {
+    const como = await entrarComoExemplo(email)
+    const { data: pessoa } = await admin.from('perfis').select('id').eq('email', email).maybeSingle()
+    if (!como || !pessoa) {
+      console.log(`Histórico de exemplo: não consegui entrar como ${email}; nada gravado para essa conta.`)
+      continue
+    }
+    const { data: clientes, error: erroClientes } = await como.from('clientes').select('id')
+      .eq('consultor_id', pessoa.id).eq('consultoria_id', consultoria.id).is('arquivado_em', null).order('criado_em').limit(4)
+    if (erroClientes) parar(`Não consegui ler os clientes de ${email}: ${erroClientes.message}`)
+    const linhas = []
+    clientes.forEach((cliente, i) => {
+      for (let dias = -182; dias < 0; dias++) {
+        const dia = diaEmSaoPaulo(dias)
+        const semana = new Date(`${dia}T12:00:00Z`).getUTCDay()
+        // Fim de semana fica de fora, e um dia útil em cada cinco também (o ritmo não fica igual todo dia).
+        if (semana === 0 || semana === 6 || (-dias + i) % 5 === 0) continue
+        const inicio = new Date(`${dia}T${String(8 + i * 2).padStart(2, '0')}:00:00-03:00`) // cada cliente na sua faixa de 2 h
+        const minutos = 30 + ((-dias * 7 + i * 3) % 4) * 25 // de 30 min a 1 h 45
+        linhas.push({ cliente_id: cliente.id, inicio: inicio.toISOString(),
+          fim: new Date(inicio.getTime() + minutos * 60_000).toISOString(), descricao: 'Acompanhamento (histórico de exemplo).' })
+      }
+    })
+    if (!linhas.length) {
+      console.log(`Histórico de exemplo: ${email} não tem clientes na ${NOME_CONSULTORIA}; nada gravado.`)
+      continue
+    }
+    const { error: erroGravar } = await como.from('checkins').insert(linhas)
+    if (erroGravar) parar(`Não consegui gravar o histórico de ${email}: ${erroGravar.message}`)
+    console.log(`Histórico de exemplo: ${linhas.length} check-ins fechados de ${email} em ${clientes.length} cliente(s).`)
+  }
 }

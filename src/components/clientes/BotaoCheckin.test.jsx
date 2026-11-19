@@ -76,6 +76,40 @@ describe('BotaoCheckin', () => {
     expect(botao).toHaveAccessibleDescription('Você está com check-in aberto em Beta.')
   })
 
+  it('compacto: só o ícone, com o nome do cliente no aria-label e no title', async () => {
+    const aoMudar = vi.fn()
+    render(<BotaoCheckin compacto cliente={{ id: 'k1', nome: 'Conecta Fibra' }} aberto={null} aoMudar={aoMudar} />)
+    const botao = screen.getByRole('button', { name: 'Fazer check-in em Conecta Fibra' })
+    expect(botao).toHaveAttribute('title', 'Fazer check-in em Conecta Fibra')
+    expect(botao).toHaveTextContent('')
+    expect(botao.querySelector('svg')).not.toBeNull()
+    await userEvent.click(botao)
+    expect(fazerCheckin).toHaveBeenCalledWith('k1')
+    expect(aoMudar).toHaveBeenCalled()
+  })
+
+  it('compacto com o check-in aberto nele: check-out com o tempo no nome; desabilitado e descrito pelo aviso com outro aberto', async () => {
+    const inicio = new Date(Date.now() - HORA - 5 * 60_000).toISOString()
+    const { rerender } = render(
+      <BotaoCheckin compacto cliente={{ id: 'k1', nome: 'Conecta Fibra' }} aberto={{ id: 'a1', cliente_id: 'k1', inicio }} aoMudar={vi.fn()} />,
+    )
+    const saida = screen.getByRole('button', { name: 'Fazer check-out de Conecta Fibra · 1 h 05' })
+    expect(saida).toHaveAttribute('title', 'Fazer check-out de Conecta Fibra · 1 h 05')
+    expect(saida).toHaveTextContent('')
+    await userEvent.click(saida)
+    expect(screen.getByRole('dialog', { name: 'Fazer check-out em Conecta Fibra' })).toBeInTheDocument()
+
+    rerender(
+      <>
+        <p id="aviso">Você está com check-in aberto em Beta.</p>
+        <BotaoCheckin compacto cliente={{ id: 'k1', nome: 'Conecta Fibra' }} aberto={{ id: 'a1', cliente_id: 'k9', inicio }} aoMudar={vi.fn()} idDoAviso="aviso" />
+      </>,
+    )
+    const entrada = screen.getByRole('button', { name: 'Fazer check-in em Conecta Fibra' })
+    expect(entrada).toBeDisabled()
+    expect(entrada).toHaveAccessibleDescription('Você está com check-in aberto em Beta.')
+  })
+
   it('sem check-in aberto não aponta para aviso nenhum', () => {
     render(<BotaoCheckin cliente={cliente} aberto={null} aoMudar={vi.fn()} idDoAviso="aviso" />)
     expect(screen.getByRole('button', { name: 'Fazer check-in' })).not.toHaveAttribute('aria-describedby')

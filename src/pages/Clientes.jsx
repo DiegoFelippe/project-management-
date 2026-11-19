@@ -1,6 +1,6 @@
 import { Archive, Building2, CalendarX, Eye, Hourglass, Plus, RadioTower, Timer, TrendingUp, Users } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import Seletor from '@/components/campos/Seletor'
@@ -130,7 +130,12 @@ export default function Clientes() {
   const doConsultor = perfil.papel === 'pessoa' // só vê os clientes dele: sem filtro de situação
   const situacoes = central ? SITUACOES_DA_CENTRAL : SITUACOES_DA_CONSULTORIA
   const situacaoInicial = doConsultor ? 'meus' : central ? 'distribuir' : 'atendimento'
-  const [situacao, setSituacao] = useState(situacaoInicial)
+  // ?situacao= (links da fila do Início) vale só na abertura e só com um valor da lista do papel.
+  const [parametros] = useSearchParams()
+  const [situacao, setSituacao] = useState(() => {
+    const pedida = parametros.get('situacao')
+    return !doConsultor && situacoes.some((o) => o.valor === pedida) ? pedida : situacaoInicial
+  })
   const aba = situacao
   const [busca, setBusca] = useState('')
   const buscaAtrasada = useAtraso(busca.trim(), 300)

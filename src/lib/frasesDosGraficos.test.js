@@ -105,7 +105,15 @@ describe('fraseDasSemanas (Início)', () => {
     expect(texto(fraseDasSemanas({ media: 2.5, pico: { semana: '2026-11-02', checkins: 4 } }, MES))).toBe('Média de 2,5 por semana no mês · pico na semana de 02/11')
   })
 
+  it('sem semana inteira ainda (média nula, 1ª semana do mês): nada de "Média de 0", só o pico', () => {
+    const partes = fraseDasSemanas({ media: null, pico: { semana: '2026-11-02', checkins: 12 } }, MES)
+    expect(texto(partes)).toBe('Ainda sem semana inteira no mês · pico de 12 na semana de 02/11')
+    expect(fortes(partes)).toEqual(['12'])
+    expect(texto(partes)).not.toMatch(/Média de 0/)
+  })
+
   it('nenhum check-in', () => {
+    expect(texto(fraseDasSemanas({ media: null, pico: null }, MES))).toBe('Nenhum check-in no mês')
     expect(texto(fraseDasSemanas({ media: 0, pico: null }, MES))).toBe('Nenhum check-in no mês')
     expect(texto(fraseDasSemanas({ media: 0, pico: { semana: '2026-11-02', checkins: 0 } }, MES))).toBe('Nenhum check-in no mês')
   })

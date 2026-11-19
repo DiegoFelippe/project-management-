@@ -108,6 +108,24 @@ describe('CartaoDeGrafico', () => {
     expect(screen.queryByRole('button', { name: 'Ver em tabela' })).toBeNull()
   })
 
+  it('tabela própria (lista paginada no banco): o elemento passado no lugar da TabelaDoGrafico', async () => {
+    render(<Cartao tabela={<table aria-label="Clientes em risco"><tbody><tr><td>Alfa</td></tr></tbody></table>} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Ver em tabela' }))
+    expect(screen.getByRole('table', { name: 'Clientes em risco' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Gráfico de teste' })).toBeNull()
+  })
+
+  it('visão controlada de fora (ex.: "Ver todos os 9" abre a tabela): emTabela e aoMudarTabela', async () => {
+    const aoMudarTabela = vi.fn()
+    const { rerender } = render(<Cartao emTabela={false} aoMudarTabela={aoMudarTabela} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Ver em tabela' }))
+    expect(aoMudarTabela).toHaveBeenCalledWith(true)
+    expect(screen.getByRole('group', { name: 'Gráfico de teste' })).toBeInTheDocument()
+    rerender(<Cartao emTabela aoMudarTabela={aoMudarTabela} />)
+    expect(screen.getByRole('table', { name: 'Realizado e capacidade por mês' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ver em tabela' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('atualizando (trocou o período): o gráfico fica a 60% até chegar o novo', () => {
     render(<Cartao atualizando />)
     expect(screen.getByRole('group', { name: 'Gráfico de teste' }).parentElement).toHaveClass('opacity-60')

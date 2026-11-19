@@ -12,7 +12,9 @@ import JanelaCheckin from './JanelaCheckin'
 // Quem usa deve passar key={aberto?.id} para o relógio recomeçar quando o check-in aberto muda.
 // idDoAviso: id do aviso da tela (check-in aberto em outro cliente) que explica o botão desabilitado.
 // aoMudar() é chamado depois de um check-in ou check-out feito, para a tela recarregar.
-export default function BotaoCheckin({ cliente, aberto, aoMudar, idDoAviso, noCabecalho = false }) {
+// compacto: só o ícone (em cada barra do Início do consultor), com o nome do cliente no aria-label e no title: "Fazer
+// check-in em Conecta Fibra" ou "Fazer check-out de Conecta Fibra · 1 h 05" (este cheio, para se ver qual está aberto).
+export default function BotaoCheckin({ cliente, aberto, aoMudar, idDoAviso, noCabecalho = false, compacto = false }) {
   const [agora, setAgora] = useState(() => Date.now())
   const [saindo, setSaindo] = useState(false)
   const [enviando, setEnviando] = useState(false)
@@ -46,7 +48,10 @@ export default function BotaoCheckin({ cliente, aberto, aoMudar, idDoAviso, noCa
     const tempo = formatarDuracao(agora - new Date(aberto.inicio).getTime())
     return (
       <>
-        <Button {...estiloDaAcao(noCabecalho, true)} onClick={() => setSaindo(true)}><LogOut /> Fazer check-out · {tempo}</Button>
+        {compacto ? (
+          <Button size="icon" onClick={() => setSaindo(true)} aria-label={`Fazer check-out de ${cliente.nome} · ${tempo}`}
+            title={`Fazer check-out de ${cliente.nome} · ${tempo}`}><LogOut aria-hidden="true" /></Button>
+        ) : <Button {...estiloDaAcao(noCabecalho, true)} onClick={() => setSaindo(true)}><LogOut /> Fazer check-out · {tempo}</Button>}
         {saindo && (
           <JanelaCheckin aberto modo="checkout" nomeDoCliente={cliente.nome} checkin={aberto}
             aoFechar={() => setSaindo(false)} aoSalvar={sair} />
@@ -57,6 +62,12 @@ export default function BotaoCheckin({ cliente, aberto, aoMudar, idDoAviso, noCa
 
   const emOutro = Boolean(aberto)
   // Desabilitado não recebe mouse nem foco: o motivo é o aviso único da tela, ligado ao botão.
+  if (compacto) {
+    return (
+      <Button variant="ghost" size="icon" disabled={emOutro || enviando} onClick={entrar} aria-describedby={emOutro ? idDoAviso : undefined}
+        aria-label={`Fazer check-in em ${cliente.nome}`} title={`Fazer check-in em ${cliente.nome}`}><LogIn aria-hidden="true" /></Button>
+    )
+  }
   return (
     <Button {...estiloDaAcao(noCabecalho, true)} disabled={emOutro || enviando} onClick={entrar} aria-describedby={emOutro ? idDoAviso : undefined}>
       <LogIn /> Fazer check-in

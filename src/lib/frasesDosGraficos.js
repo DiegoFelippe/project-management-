@@ -65,9 +65,15 @@ export function fraseDasHorasPorCliente(dados, periodo) {
   return [{ forte: formatarHoras(dados.total_horas) }, ` ${quando(periodo)}`]
 }
 
-// Check-ins por semana do Início: "Média de 38 por semana no período · pico na semana de 06/10".
+// Check-ins por semana do Início: "Média de 38 por semana no período · pico na semana de 06/10". A média é só das
+// semanas inteiras do período: sem nenhuma ainda (a 1ª semana do Mês atual), o banco manda nula e a frase fica com o
+// pico, sem um "Média de 0" que não é verdade.
 export function fraseDasSemanas(dados, periodo) {
   if (!dados.pico?.checkins) return [`Nenhum check-in ${quando(periodo)}`]
+  if (dados.media == null) {
+    return [`Ainda sem semana inteira ${quando(periodo)} · pico de `, { forte: INTEIRO.format(dados.pico.checkins) },
+      ` na semana de ${diaMes(dados.pico.semana)}`]
+  }
   const media = dados.media >= 10 ? INTEIRO.format(dados.media) : NUMERO.format(dados.media)
   return ['Média de ', { forte: media }, ` por semana ${quando(periodo)} · pico na semana de ${diaMes(dados.pico.semana)}`]
 }

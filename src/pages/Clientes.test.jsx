@@ -206,6 +206,32 @@ describe('Clientes (outros papéis)', () => {
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
   })
 
+  it('?situacao= (links da fila do Início) abre nessa situação; valor desconhecido ou de outro papel usa o padrão do papel', async () => {
+    const admin = { id: 'a1', papel: 'admin', consultoria_id: 'x' }
+    const { unmount } = renderizarTela(<Clientes />, { perfil: admin, endereco: '/clientes?situacao=aguardando' })
+    await screen.findByRole('table', { name: 'Clientes' })
+    expect(screen.getByLabelText('Situação')).toHaveTextContent('Aguardando consultor')
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'aguardando', pagina: 1 }))
+    unmount()
+
+    // "distribuir" é só da central: na gestão, o padrão (Em atendimento).
+    const { unmount: fechar } = renderizarTela(<Clientes />, { perfil: admin, endereco: '/clientes?situacao=distribuir' })
+    await screen.findByRole('table', { name: 'Clientes' })
+    expect(screen.getByLabelText('Situação')).toHaveTextContent('Em atendimento')
+    fechar()
+
+    renderizarTela(<Clientes />, { perfil: central, endereco: '/clientes?situacao=qualquer-coisa' })
+    await screen.findByRole('table', { name: 'Clientes' })
+    expect(screen.getByLabelText('Situação')).toHaveTextContent('Aguardando consultoria')
+  })
+
+  it('central: ?situacao=distribuir abre em Aguardando consultoria e ?situacao=aguardando em Aguardando consultor', async () => {
+    renderizarTela(<Clientes />, { perfil: central, endereco: '/clientes?situacao=aguardando' })
+    await screen.findByRole('table', { name: 'Clientes' })
+    expect(screen.getByLabelText('Situação')).toHaveTextContent('Aguardando consultor')
+    expect(listarClientes).toHaveBeenLastCalledWith(expect.objectContaining({ aba: 'aguardando' }))
+  })
+
   it('a pessoa vê só os clientes dela, sem filtro de situação', async () => {
     renderizarTela(<Clientes />, { perfil: { id: 'p9', papel: 'pessoa', consultoria_id: 'x' } })
     await screen.findByRole('table', { name: 'Clientes' })

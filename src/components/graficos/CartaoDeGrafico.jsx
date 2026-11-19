@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { isValidElement, useId, useState } from 'react'
 import { ChartColumn, RotateCcw, Table } from 'lucide-react'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import { Button } from '@/components/ui/button'
@@ -18,12 +18,18 @@ import TabelaDoGrafico from './TabelaDoGrafico'
 // cartão passa a mesma que dá ao gráfico (padrões: GraficoDeColunas 210, GraficoDeLinha 200; barras em HTML, uma
 // estimativa). `acoes`: botões ou links extras no topo (ex.: "Ver todos"). `atualizando`: trocou o período e o novo
 // ainda não chegou; o gráfico de antes fica a 60%.
+// `tabela`: { rotulo, colunas, linhas } (a TabelaDoGrafico) ou um elemento pronto, quando a visão em tabela é uma lista
+// de clientes paginada no banco (risco, horas por cliente) ou com colunas que somem no celular (fila). `emTabela` e
+// `aoMudarTabela(bool)`: a visão controlada de fora (ex.: "Ver todos os 9" abre a tabela); sem eles, o cartão guarda.
 export default function CartaoDeGrafico({
   titulo, leitura, legenda, tabela, estado = 'pronto', vazio, erro, aoTentarDeNovo, acoes, altura = 210, atualizando = false,
-  className, children,
+  emTabela: emTabelaDeFora, aoMudarTabela, className, children,
 }) {
   const idDoTitulo = useId()
-  const [emTabela, setEmTabela] = useState(false)
+  const [emTabelaAqui, setEmTabelaAqui] = useState(false)
+  const controlado = emTabelaDeFora !== undefined
+  const emTabela = controlado ? emTabelaDeFora : emTabelaAqui
+  const trocar = () => (controlado ? aoMudarTabela?.(!emTabela) : setEmTabelaAqui((v) => !v))
   const pronto = estado === 'pronto'
   const mostrarTabela = pronto && emTabela && tabela
 
@@ -43,7 +49,7 @@ export default function CartaoDeGrafico({
           <div className="flex shrink-0 items-center gap-1">
             {acoes}
             {pronto && tabela && (
-              <Button type="button" variant="ghost" size="icon" aria-pressed={emTabela} onClick={() => setEmTabela((v) => !v)}
+              <Button type="button" variant="ghost" size="icon" aria-pressed={emTabela} onClick={trocar}
                 aria-label="Ver em tabela" title={emTabela ? 'Ver gráfico' : 'Ver em tabela'}>
                 {emTabela ? <ChartColumn aria-hidden="true" /> : <Table aria-hidden="true" />}
               </Button>
@@ -75,9 +81,11 @@ export default function CartaoDeGrafico({
         </div>
       )}
       {estado === 'vazio' && <div className="py-6 text-corpo text-muted-foreground">{vazio}</div>}
-      {pronto && (mostrarTabela
-        ? <TabelaDoGrafico {...tabela} />
-        : <div className={cn('min-w-0 transition-opacity duration-200', atualizando && 'opacity-60')}>{children}</div>)}
+      {pronto && (
+        <div className={cn('min-w-0 transition-opacity duration-200', atualizando && 'opacity-60')}>
+          {!mostrarTabela ? children : isValidElement(tabela) ? tabela : <TabelaDoGrafico {...tabela} />}
+        </div>
+      )}
     </section>
   )
 }

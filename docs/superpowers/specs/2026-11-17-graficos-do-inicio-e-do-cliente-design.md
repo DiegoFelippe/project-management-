@@ -496,3 +496,8 @@ resumos), mantidas pelo banco, sem acesso pela tela. Nenhuma operação de CRUD 
     e do Bruno, 6 meses de check-ins nos clientes da Consultoria Exemplo, só se ela ainda não tiver nenhum check-in.
     Só acrescenta; nunca apaga nem mexe em outra consultoria.
 15. **SVG próprio, sem biblioteca** (recharts mediu 138 KB gzip) e o texto do SVG medido na largura real.
+
+## Decisões da construção
+
+- O tom da Ocupação segue o valor atual, como no protótipo: ir de 105% para 95% aparece como "ruim" (Task 5).
+- O separador do ranking de ocupação diz só "… N no meio" até a contagem `sem_capacidade` do banco (Task 3) chegar.

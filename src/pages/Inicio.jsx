@@ -1,21 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
-import { GraficoCarregando } from '@/components/comum/Carregando'
-import ClientesEsperando from '@/components/inicio/ClientesEsperando'
-import Extremos from '@/components/inicio/Extremos'
+import CheckinsPorSemana from '@/components/inicio/CheckinsPorSemana'
+import ClientesEmRisco from '@/components/inicio/ClientesEmRisco'
+import FilaDeClientes from '@/components/inicio/FilaDeClientes'
 import FiltroDePeriodo from '@/components/inicio/FiltroDePeriodo'
-import HorasPorMes from '@/components/inicio/HorasPorMes'
+import GraficoDeMeses from '@/components/inicio/GraficoDeMeses'
+import HorasPorCliente from '@/components/inicio/HorasPorCliente'
 import Indicadores from '@/components/inicio/Indicadores'
-import MeusClientes from '@/components/inicio/MeusClientes'
-import RankingDeOcupacao from '@/components/inicio/RankingDeOcupacao'
+import OcupacaoPorUnidade from '@/components/inicio/OcupacaoPorUnidade'
+import { useLeituraDoBloco } from '@/components/inicio/useLeituraDoBloco'
 import { NOME_DO_PAPEL } from '@/components/shell/menu'
-import { painelDoInicio } from '@/data/painel'
+import { meuCheckinAberto } from '@/data/checkins'
+import { checkinsPorSemana, comparacaoDoInicio, filaDeClientes, painelDoInicio } from '@/data/painel'
 import { hoje as hojeEmSP, mesAtual } from '@/lib/mes'
 import { lerPeriodo, paraEndereco, periodoAoTrocar, validarPeriodo } from '@/lib/periodo'
 import { primeiroNome } from '@/lib/nomes'
+import { useLeitura } from '@/lib/useLeitura'
+import { cn } from '@/lib/utils'
+
+// Leituras do módulo (estáveis para o useLeitura). O painel devolve a frase do banco quando ele recusa o período
+// (periodo_invalido, já em português), para a tela mostrar só ela.
+const lerPainel = ({ periodo }) => painelDoInicio(periodo).catch((e) => {
+  if (e?.message === 'periodo_invalido' && e.details) return { periodoInvalido: e.details }
+  throw e
+})
+const lerComparacao = ({ periodo }) => comparacaoDoInicio(periodo)
+const lerFila = ({ periodo }) => filaDeClientes(periodo)
+const lerSemanas = ({ periodo }) => checkinsPorSemana(periodo)
+const lerAberto = ({ id }) => meuCheckinAberto(id)
+
+// Grade de 12 colunas (design "Início"): a partir de 1280 px, 8+4 e 6+6; de 1024 a 1279, o de 8 e o de 4 ocupam a
+// linha e os de 6 ficam lado a lado; abaixo de 1024, uma coluna.
+const LARGURA = { 8: 'lg:col-span-12 xl:col-span-8', 4: 'lg:col-span-12 xl:col-span-4', 6: 'lg:col-span-6' }
 
 export default function Inicio() {
   const { perfil } = useAuth()
@@ -27,41 +46,54 @@ export default function Inicio() {
   const { tipo, mes, de, ate } = periodo
   const noMes = tipo === 'mes'
   const erroDoPeriodo = noMes ? null : validarPeriodo(de, ate, hoje)
-  const [painel, setPainel] = useState(null)
-  const [erro, setErro] = useState(null) // frase do aviso quando o painel não veio
+  const consultor = perfil.papel === 'pessoa'
+  // `versao` muda depois de um check-in ou check-out feito no Início (relê o que muda com ele); cada bloco tem a própria
+  // tentativa ("Tentar de novo" relê só ele).
+  const [versao, setVersao] = useState(0)
+  const [tentativas, setTentativas] = useState({ painel: 0, comparacao: 0, fila: 0, semanas: 0 })
+  const tentarDeNovo = (bloco) => () => setTentativas((t) => ({ ...t, [bloco]: t[bloco] + 1 }))
 
   function irPara(novo) {
-    setErro(null)
     setParametros(paraEndereco({ ...periodo, ...novo }), { replace: true })
   }
 
-  // Uma chamada por período; a resposta de um período antigo nunca sobrescreve a do novo. Período inválido não vai
-  // ao banco (o aviso fica na barra).
-  useEffect(() => {
-    if (erroDoPeriodo) return undefined
-    let ativo = true
-    painelDoInicio(noMes ? mes : { de, ate })
-      .then((p) => {
-        if (!ativo) return
-        setPainel(p)
-        setErro(null)
-      })
-      .catch((e) => {
-        if (!ativo) return
-        // Sem os números do período pedido, não deixa os do anterior sob o rótulo novo. Se o banco recusou o período
-        // (periodo_invalido), a frase dele já está em português; senão, o aviso de sempre.
-        setPainel(null)
-        setErro(e?.message === 'periodo_invalido' && e.details ? e.details : 'Não foi possível carregar o painel. Tente novamente em instantes.')
-      })
-    return () => {
-      ativo = false
-    }
-  }, [noMes, mes, de, ate, erroDoPeriodo])
+  // Uma leitura por função, todas em paralelo; a chave é o período (período inválido não vai ao banco). O risco não
+  // depende do período (ClientesEmRisco lê sozinho) e as horas por cliente também se leem no bloco delas.
+  const argumento = erroDoPeriodo ? null : noMes ? mes : { de, ate }
+  const com = (extra) => (argumento ? { periodo: argumento, ...extra } : null)
+  const painel = useLeituraDoBloco(lerPainel, com({ versao, tentativa: tentativas.painel }))
+  const comparacao = useLeituraDoBloco(lerComparacao, com({ tentativa: tentativas.comparacao }))
+  const fila = useLeituraDoBloco(lerFila, consultor ? null : com({ tentativa: tentativas.fila }))
+  const semanas = useLeituraDoBloco(lerSemanas, com({ versao, tentativa: tentativas.semanas }))
+  const aberto = useLeitura(lerAberto, consultor && argumento ? { id: perfil.id, versao } : null).dados ?? null
 
-  const doPedido = painel && (noMes ? !painel.intervalo && painel.mes === mes : painel.intervalo && painel.de === de && painel.ate === ate)
-  const atualizando = painel && !doPedido && !erro
-  const veEquipe = painel && painel.recorte !== 'pessoa'
-  const intervalo = painel?.intervalo ?? false
+  const recusado = painel.dados?.periodoInvalido
+  const dadosDoPainel = recusado ? null : painel.dados ?? null
+  const recorte = dadosDoPainel?.recorte ?? (consultor ? 'pessoa' : perfil.papel === 'central' || perfil.papel === 'dono' ? 'tudo' : 'consultoria')
+  // Os cartões só mostram a variação quando o painel e a comparação são do mesmo período (nenhum dos dois atualizando).
+  const comparacaoDosCartoes = comparacao.erro ? undefined
+    : comparacao.dados && !comparacao.atualizando && !painel.atualizando ? comparacao.dados : null
+  const recarregar = () => setVersao((v) => v + 1)
+
+  const blocoDoPainel = { erro: Boolean(painel.erro), atualizando: Boolean(painel.atualizando), aoTentarDeNovo: tentarDeNovo('painel') }
+  const blocos = consultor
+    ? [
+      { chave: 'meses', largura: 8, bloco: <GraficoDeMeses painel={dadosDoPainel} periodo={periodo} {...blocoDoPainel} /> },
+      { chave: 'risco', largura: 4, bloco: <ClientesEmRisco recorte={recorte} versao={versao} /> },
+      { chave: 'horas', largura: 6, bloco: <HorasPorCliente periodo={periodo} recorte={recorte} aberto={aberto} aoMudar={recarregar} versao={versao} /> },
+      { chave: 'semanas', largura: 6, bloco: <CheckinsPorSemana dados={semanas.dados} periodo={periodo} erro={Boolean(semanas.erro)}
+        atualizando={Boolean(semanas.atualizando)} aoTentarDeNovo={tentarDeNovo('semanas')} /> },
+    ]
+    : [
+      { chave: 'meses', largura: 8, bloco: <GraficoDeMeses painel={dadosDoPainel} periodo={periodo} {...blocoDoPainel} /> },
+      { chave: 'fila', largura: 4, bloco: <FilaDeClientes fila={fila.dados} recorte={recorte} periodo={periodo} erro={Boolean(fila.erro)}
+        atualizando={Boolean(fila.atualizando)} aoTentarDeNovo={tentarDeNovo('fila')} /> },
+      { chave: 'ocupacao', largura: 6, bloco: <OcupacaoPorUnidade painel={dadosDoPainel} recorte={recorte} {...blocoDoPainel} /> },
+      { chave: 'risco', largura: 6, bloco: <ClientesEmRisco recorte={recorte} versao={versao} /> },
+      { chave: 'horas', largura: 6, bloco: <HorasPorCliente periodo={periodo} recorte={recorte} versao={versao} /> },
+      { chave: 'semanas', largura: 6, bloco: <CheckinsPorSemana dados={semanas.dados} periodo={periodo} erro={Boolean(semanas.erro)}
+        atualizando={Boolean(semanas.atualizando)} aoTentarDeNovo={tentarDeNovo('semanas')} /> },
+    ]
 
   return (
     <section className="grid grid-cols-[minmax(0,1fr)] gap-5">
@@ -75,23 +107,18 @@ export default function Inicio() {
 
       {erroDoPeriodo && <p className="card p-4 text-corpo text-muted-foreground">Ajuste as datas na barra de filtros para ver o painel.</p>}
 
-      {/* Os números do período logo abaixo da barra ("—" enquanto o pedido carrega); com erro, só o aviso. */}
+      {/* Barra → cartões (com a variação) → gráficos. Cada bloco carrega e falha sozinho. */}
       {!erroDoPeriodo && (
         <>
-          {!erro && <Indicadores painel={atualizando ? null : painel} pessoa={perfil.papel === 'pessoa'}
-            passado={noMes ? mes < mesAtual() : true} intervalo={!noMes} />}
-          {erro && <p role="alert" className="card border-destructive/40 p-4 text-corpo text-destructive">{erro}</p>}
-          {!painel && !erro && <GraficoCarregando texto="Carregando o painel…" className="min-h-64 justify-center" />}
-
-          {painel && (
-            <div aria-busy={atualizando ? 'true' : undefined}
-              className={`grid grid-cols-[minmax(0,1fr)] gap-5 transition-opacity xl:grid-cols-[repeat(2,minmax(0,1fr))] ${atualizando ? 'opacity-60' : ''}`}>
-              <HorasPorMes meses={painel.horas_por_mes} previsao={painel.previsao_atual} intervalo={intervalo} />
-              {veEquipe ? <RankingDeOcupacao recorte={painel.recorte} passado={painel.passado} intervalo={intervalo} ranking={painel.ranking} mes={painel.mes} />
-                : painel.meus_clientes && <MeusClientes passado={painel.passado} intervalo={intervalo} clientes={painel.meus_clientes} />}
-              {/* Blocos que saem do Início (gráficos, T2 tirou as chaves do banco); a tela nova (T5) os troca. */}
-              {veEquipe && painel.esperando && <ClientesEsperando recorte={painel.recorte} esperando={painel.esperando} passado={painel.passado} intervalo={intervalo} />}
-              {veEquipe && painel.extremos && <Extremos recorte={painel.recorte} extremos={painel.extremos} passado={painel.passado} mes={painel.mes} />}
+          <Indicadores painel={dadosDoPainel} comparacao={comparacaoDosCartoes} papel={perfil.papel} atualizando={Boolean(painel.atualizando)}
+            passado={noMes ? mes < mesAtual() : true} intervalo={!noMes} />
+          {recusado ? (
+            <p role="alert" className="card border-destructive/40 p-4 text-corpo text-destructive">{recusado}</p>
+          ) : (
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4 max-sm:gap-3 lg:grid-cols-12">
+              {blocos.map(({ chave, largura, bloco }) => (
+                <div key={chave} data-bloco={chave} className={cn('grid min-w-0', LARGURA[largura])}>{bloco}</div>
+              ))}
             </div>
           )}
         </>
