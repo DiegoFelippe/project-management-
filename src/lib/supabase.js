@@ -6,7 +6,46 @@ import { createClient } from '@supabase/supabase-js'
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
-export const supabase = createClient(supabaseUrl, supabasePublishableKey)
+// Recusa do banco, do Storage, do Auth ou de uma Edge Function: pode ser a sessão antiga (aal1) de quem passou a
+// precisar do código do app autenticador. O AuthProvider ouve este aviso e confere de novo (uma conferência por vez),
+// e a tela do código aparece no lugar de um erro solto. Recusa é 401/403 ou um 400 que, no corpo, é recusa: função do
+// banco que levantou erro (P0001, como `sem_permissao`) ou o Storage dizendo 403.
+export const EVENTO_CONFERIR_ACESSO = 'consultoria:conferir-acesso'
+
+const avisar = () => window.dispatchEvent(new Event(EVENTO_CONFERIR_ACESSO))
+
+export function avisarRecusa(status) {
+  if (status === 401 || status === 403) avisar()
+}
+
+const recusaNoCorpo = (corpo) => corpo?.code === 'P0001' || String(corpo?.statusCode ?? '') === '403'
+
+// cache: 'no-store': o navegador nunca guarda resposta do Supabase. Em 17/11 um 300 de um instante (esquema ambíguo)
+// ficou no cache do Chrome e o login lia o perfil de lá para sempre (a pessoa entrava e saía na hora).
+async function buscarAvisando(entrada, opcoes) {
+  const resposta = await fetch(entrada, { ...opcoes, cache: 'no-store' })
+  avisarRecusa(resposta.status)
+  // Lê uma cópia do corpo sem segurar a resposta: quem chamou recebe a original inteira.
+  if (resposta.status === 400) {
+    resposta.clone().json().then((corpo) => recusaNoCorpo(corpo) && avisar(), () => {})
+  }
+  return resposta
+}
+
+// Volta do login na URL (Google, SSO, convite e recuperação, no fluxo implícito: #access_token=… ou ?error=…), a mesma
+// regra do supabase-js, menos em /calendario: lá o ?code=…&state=… (ou ?error=…) é a volta do "Conectar Google" do
+// Calendário, que a própria tela conclui. Sem isto, o ?error= de quem recusou no Google seria lido como falha de login.
+// O ?code= do Google nunca é trocado pelo supabase-js: no fluxo implícito (o padrão, mantido) ele não guarda o
+// code-verifier de PKCE, e só troca código quando há um.
+export function ehVoltaDoLogin(url, parametros) {
+  if (url.pathname === '/calendario') return false
+  return Boolean(parametros.access_token || parametros.error || parametros.error_description || parametros.error_code)
+}
+
+export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
+  auth: { detectSessionInUrl: ehVoltaDoLogin },
+  global: { fetch: buscarAvisando },
+})
 
 // O Supabase responde com uma página de erro crua quando o provedor está desligado;
 // por isso a tela pergunta antes de mandar a pessoa para o Google.
@@ -35,6 +74,7 @@ export async function chamarFuncao(nome, corpo) {
     },
     body: JSON.stringify(corpo),
   })
+  avisarRecusa(resposta.status)
   let corpoResposta = {}
   try {
     corpoResposta = await resposta.json()

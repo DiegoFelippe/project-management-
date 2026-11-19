@@ -1,17 +1,18 @@
 // Times e membros. O banco (RLS) decide o que cada papel vê e pode mexer.
+import { padraoDeBusca } from '@/lib/busca'
 import { traduzirErroBanco } from '@/lib/erros'
 import { supabase } from '@/lib/supabase'
 import { buscarPagina } from './paginar'
 
-const GESTOR = 'gestor:perfis!times_gestor_id_fkey(id, nome, foto)'
+const GESTOR = 'gestor:perfis!times_gestor_id_fkey(id, nome, email, foto, cor)'
 const CAMPOS = `id, nome, descricao, consultoria_id, gestor_id, ${GESTOR}`
 // Na lista: só os 4 primeiros rostos e o total de membros (contado no banco), nunca todos os membros.
 const ROSTOS = 4
 const CAMPOS_DA_LISTA =
-  `${CAMPOS}, membros:time_membros(pessoa:perfis!time_membros_pessoa_id_fkey(id, nome, foto)), total:time_membros(count)`
+  `${CAMPOS}, membros:time_membros(pessoa:perfis!time_membros_pessoa_id_fkey(id, nome, foto, cor)), total:time_membros(count)`
 
 // Uma página de times, paginada no banco. Membro que quem olha não pode ver vem nulo e fica de fora.
-export async function listarTimes({ consultoriaId, pagina = 1 } = {}) {
+export async function listarTimes({ consultoriaId, busca, pagina = 1 } = {}) {
   let consulta = supabase
     .from('times')
     .select(CAMPOS_DA_LISTA, { count: 'exact' })
@@ -19,6 +20,9 @@ export async function listarTimes({ consultoriaId, pagina = 1 } = {}) {
     .order('id')
     .limit(ROSTOS, { referencedTable: 'membros' })
   if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
+  // Busca pelo nome no banco, sem acento e sem maiúscula (nome_busca, com índice trigram), como clientes e pessoas.
+  const padrao = padraoDeBusca(busca)
+  if (padrao) consulta = consulta.ilike('nome_busca', padrao)
   const resultado = await buscarPagina(consulta, pagina)
   const itens = resultado.itens.map(({ total, ...time }) => ({
     ...time,
@@ -47,7 +51,7 @@ export async function buscarTime(id) {
 export async function listarMembros(timeId, { pagina = 1 } = {}) {
   const consulta = supabase
     .from('time_membros')
-    .select('pessoa:perfis!time_membros_pessoa_id_fkey(id, nome, email, foto, papel)', { count: 'exact' })
+    .select('pessoa:perfis!time_membros_pessoa_id_fkey(id, nome, email, foto, cor, papel)', { count: 'exact' })
     .eq('time_id', timeId)
     .order('pessoa(nome)')
     .order('pessoa_id')
@@ -76,6 +80,16 @@ export async function adicionarMembro(timeId, pessoaId) {
   const { error } = await supabase.from('time_membros').insert({ time_id: timeId, pessoa_id: pessoaId })
   if (!error || error.code === '23505') return { erro: null } // 23505: já estava no time
   return { erro: traduzirErroBanco(error) }
+}
+
+// Várias pessoas de uma vez (Novo time e "Colocar no time"): uma chamada só, um comando só no banco — entram todas ou
+// nenhuma (a mesma regra de cada linha: RLS e o gatilho da consultoria). Quem já está no time fica como está.
+export async function adicionarMembros(timeId, pessoaIds) {
+  if (!pessoaIds.length) return { erro: null }
+  const { error } = await supabase
+    .from('time_membros')
+    .upsert(pessoaIds.map((pessoaId) => ({ time_id: timeId, pessoa_id: pessoaId })), { onConflict: 'time_id,pessoa_id', ignoreDuplicates: true })
+  return { erro: error ? traduzirErroBanco(error) : null }
 }
 
 export async function removerMembro(timeId, pessoaId) {

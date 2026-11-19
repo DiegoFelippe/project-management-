@@ -44,3 +44,8 @@ export const trocarFoto = (pessoaId, arquivo, atual) => trocar(FOTO, pessoaId, a
 export const tirarFoto = (pessoaId, atual) => tirar(FOTO, pessoaId, atual)
 export const trocarLogo = (consultoriaId, arquivo, atual) => trocar(LOGO, consultoriaId, arquivo, atual)
 export const tirarLogo = (consultoriaId, atual) => tirar(LOGO, consultoriaId, atual)
+
+// Cor do avatar (perfis.cor): quem muda é quem muda a foto (private.posso_mudar_foto). null = cor automática.
+export async function mudarCor(pessoaId, cor) {
+  return { erro: await gravar({ tabela: 'perfis', coluna: 'cor' }, pessoaId, cor) }
+}

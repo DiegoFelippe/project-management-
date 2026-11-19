@@ -1,11 +1,24 @@
+import { padraoDeBusca } from '@/lib/busca'
 import { supabase } from '@/lib/supabase'
 
-// Pessoas que quem olha pode ver (o banco recorta pelo papel).
-export async function listarPessoas({ consultoriaId, papeis } = {}) {
-  let consulta = supabase.from('perfis').select('id, nome, email, papel, consultoria_id').order('nome')
+// Quantos ids o not.in vai na URL do pedido; o que passar disso é tirado do resultado na tela.
+const MAXIMO_DE_IDS_NA_BUSCA = 100
+
+// Seletores de pessoa com busca no banco (nunca a lista inteira): pelo nome sem acento (ilike em nome_busca), em ordem de nome, `limite` por
+// vez. `papeis` filtra o papel e `excluirIds` esconde quem não deve aparecer (ex.: quem já está no time).
+// Devolve { itens: [{ id, nome, email, papel, foto, cor }], total } (total = quantas combinam, para "N de TOTAL").
+export async function buscarPessoas({ consultoriaId, papeis, termo = '', excluirIds = [], limite = 20 } = {}) {
+  const ids = [...excluirIds]
+  const noBanco = ids.slice(0, MAXIMO_DE_IDS_NA_BUSCA)
+  let consulta = supabase.from('perfis').select('id, nome, email, papel, foto, cor', { count: 'exact' }).order('nome').order('id').limit(limite)
   if (consultoriaId) consulta = consulta.eq('consultoria_id', consultoriaId)
   if (papeis) consulta = consulta.in('papel', papeis)
-  const { data, error } = await consulta
+  if (noBanco.length) consulta = consulta.not('id', 'in', `(${noBanco.join(',')})`)
+  const padrao = padraoDeBusca(termo)
+  if (padrao) consulta = consulta.ilike('nome_busca', padrao)
+  const { data, error, count } = await consulta
   if (error) throw error
-  return data
+  const resto = new Set(ids.slice(MAXIMO_DE_IDS_NA_BUSCA))
+  const itens = data.filter((p) => !resto.has(p.id))
+  return { itens, total: (count ?? 0) - (data.length - itens.length) }
 }

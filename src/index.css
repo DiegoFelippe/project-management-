@@ -7,7 +7,10 @@
 /* Visual "claro e azul" (opção C), no conceito do app de música e do Hub:
    a moldura (trilho e barra de cima) é branca; o conteúdo fica num painel rebaixado cinza-azulado;
    uma cor de ação só, o azul (botão principal, item aberto do menu, seleção, foco, links).
-   Cores no formato do shadcn/ui. */
+   Cores no formato do shadcn/ui. Contraste mínimo de 4,5:1 nos pares do dia a dia (auditoria, pedido do Diego 17/11;
+   src/lib/contraste.test.js confere): --primary-cheio é o fundo azul com texto branco (o botão principal), o próprio
+   --primary no claro; --primary-texto é o texto azul sobre o azul-claro de realce (bg-primary/10, bg-accent: "Hoje",
+   opção escolhida, selos), um tom mais firme do mesmo azul; --domingo e --sabado são os dias do fim de semana. */
 :root {
   --radius: 0.75rem;
   --moldura: #ffffff;
@@ -19,27 +22,112 @@
   --popover: #ffffff;
   --popover-foreground: #0f172a;
   --primary: #2563eb;
+  --primary-cheio: var(--primary);
+  --primary-texto: #1d4ed8;
   --primary-foreground: #ffffff;
   --secondary: #f1f5f9;
   --secondary-foreground: #0f172a;
   --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --muted-foreground: #566174;
   --accent: #eff6ff;
   --accent-foreground: #1e3a8a;
-  --destructive: #dc2626;
+  --destructive: #991b1b;
   --destructive-foreground: #ffffff;
+  --destructive-soft: #fee2e2;
   --border: #e2e8f0;
   --input: #cbd5e1;
   --ring: #2563eb;
-  --notice: #b45309;
+  --notice: #92400e;
   --notice-soft: #fef3c7;
-  --positive: #15803d;
-  --positive-soft: #dcfce7;
+  --positive: #065f46;
+  --positive-soft: #d1fae5;
+  --cor-azul-texto: #075985;
+  --cor-azul-forte: #0ea5e9;
+  --cor-azul-suave: #e0f2fe;
+  /* No Tropical, -cheio = suave e -sobre = texto: alias até o refator do design system. */
+  --cor-azul-cheio: var(--cor-azul-suave);
+  --cor-azul-sobre: var(--cor-azul-texto);
+  --cor-turquesa-texto: #155e75;
+  --cor-turquesa-forte: #0ec8e4;
+  --cor-turquesa-suave: #cffafe;
+  --cor-turquesa-cheio: var(--cor-turquesa-suave);
+  --cor-turquesa-sobre: var(--cor-turquesa-texto);
+  --cor-violeta-texto: #3730a3;
+  --cor-violeta-forte: #818cf8;
+  --cor-violeta-suave: #e0e7ff;
+  --cor-violeta-cheio: var(--cor-violeta-suave);
+  --cor-violeta-sobre: var(--cor-violeta-texto);
+  --cor-mostarda-texto: #713f12;
+  --cor-mostarda-forte: #d7ae05;
+  --cor-mostarda-suave: #fef9c3;
+  --cor-mostarda-cheio: var(--cor-mostarda-suave);
+  --cor-mostarda-sobre: var(--cor-mostarda-texto);
+  --cor-rosa-texto: #9d174d;
+  --cor-rosa-forte: #f472b6;
+  --cor-rosa-suave: #fce7f3;
+  --cor-rosa-cheio: var(--cor-rosa-suave);
+  --cor-rosa-sobre: var(--cor-rosa-texto);
+  --cor-verde-texto: #065f46;
+  --cor-verde-forte: #10b981;
+  --cor-verde-suave: #d1fae5;
+  --cor-verde-cheio: var(--cor-verde-suave);
+  --cor-verde-sobre: var(--cor-verde-texto);
+  --cor-laranja-texto: #9a3412;
+  --cor-laranja-forte: #fb923c;
+  --cor-laranja-suave: #ffedd5;
+  --cor-laranja-cheio: var(--cor-laranja-suave);
+  --cor-laranja-sobre: var(--cor-laranja-texto);
+  --cor-indigo-texto: #3f6212;
+  --cor-indigo-forte: #84cc16;
+  --cor-indigo-suave: #ecfccb;
+  --cor-indigo-cheio: var(--cor-indigo-suave);
+  --cor-indigo-sobre: var(--cor-indigo-texto);
+  --cor-grafite-texto: #536274;
+  --cor-grafite-forte: #64748b;
+  --cor-grafite-suave: #e1e7ee;
+  --cor-grafite-cheio: var(--cor-grafite-suave);
+  --cor-grafite-sobre: var(--cor-grafite-texto);
+  --positive-cheio: #10b981;
+  --sobre-positive: #022c22;
+  --notice-cheio: #fbbf24;
+  --sobre-notice: #78350f;
+  --destructive-cheio: #dc2626;
+  --sobre-destructive: #ffffff;
+  --domingo: #be123c;
+  --sabado: #6d28d9;
+  /* Chips do Calendário pelo tipo (auditoria M2, pedido do Diego 17/11): fundo suave e texto firme de cada tipo, como a
+     legenda; a ausência é listrada (a listra mais escura também segura 4,5:1). A cor escolhida vira só a bolinha. */
+  --evento-reuniao: #dbeafe;
+  --evento-reuniao-texto: #1e40af;
+  --evento-compromisso: #e2e8f0;
+  --evento-compromisso-texto: #334155;
+  --evento-ausencia: #fef3c7;
+  --evento-ausencia-listra: #fde68a;
+  --evento-ausencia-texto: #92400e;
+  --evento-feriado: #ffe4e6;
+  --evento-feriado-texto: #9f1239;
+  /* Gráficos (design 2026-11-17-graficos-do-inicio-e-do-cliente; validados no dataviz, claro e escuro): série (o piscina), acima do limite (vermelho), folga (âmbar), referência (capacidade, previsão), grade, trilha das
+     barras, "a fazer" e a rampa da fila (do claro ao escuro). Paleta Tropical (Diego, 19/11): no escuro toda marca segura 3:1; no claro são tons claros (todo gráfico tem "Ver em tabela" e a dica); o coral de acima segura 3:1 e a referência 4,5:1 (src/lib/contraste.test.js); vermelho e âmbar sempre vêm
+     com ícone. Texto nunca na cor da série. */
+  --grafico-serie: #0ea5e9;
+  --grafico-lavado: rgb(14 165 233 / 0.14);
+  --grafico-acima: #f05252;
+  --grafico-folga: #fbbf24;
+  --grafico-ref: #64748b;
+  --grafico-grade: #e2e8f0;
+  --grafico-trilha: #dbeafe;
+  --grafico-neutro: #cbd5e1;
+  --grafico-fila-1: #3ebcff;
+  --grafico-fila-2: #0790cc;
+  --grafico-fila-3: #006693;
+  --grafico-calor-lilas: #6971e3;
+  --grafico-calor-ciano: #0390a4;
   color-scheme: light;
 }
 
 /* Modo escuro (classe .dark no <html>; botão de tema na barra de cima). Mesmo conceito: moldura um tom
-   acima do painel rebaixado, um azul só de destaque, um pouco mais claro para manter o contraste. */
+   acima do painel rebaixado, um azul só de destaque, um pouco mais claro para manter o contraste do texto azul e do
+   foco. O fundo cheio com texto branco (botão principal) fica no azul da consultoria: o claro dá 3,7:1 com o branco. */
 .dark {
   --moldura: #0e1424;
   --painel: #080c17;
@@ -50,6 +138,8 @@
   --popover: #121a2c;
   --popover-foreground: #e5e9f0;
   --primary: #3b82f6;
+  --primary-cheio: #2563eb;
+  --primary-texto: #60a5fa;
   --primary-foreground: #ffffff;
   --secondary: #1b2438;
   --secondary-foreground: #e5e9f0;
@@ -57,20 +147,96 @@
   --muted-foreground: #94a0b8;
   --accent: #172554;
   --accent-foreground: #bfdbfe;
-  --destructive: #f05252;
+  --destructive: #f6a2a1;
   --destructive-foreground: #ffffff;
+  --destructive-soft: #6b3030;
   --border: #222c42;
   --input: #34405a;
   --ring: #60a5fa;
-  --notice: #fbbf24;
-  --notice-soft: rgb(251 191 36 / 0.14);
-  --positive: #4ade80;
-  --positive-soft: rgb(74 222 128 / 0.14);
+  --notice: #f4c26a;
+  --notice-soft: #5e3e02;
+  --positive: #83d5ad;
+  --positive-soft: #015337;
+  --cor-azul-texto: #7fcbfa;
+  --cor-azul-forte: #009fe1;
+  --cor-azul-suave: #004b6c;
+  --cor-azul-cheio: var(--cor-azul-suave);
+  --cor-azul-sobre: var(--cor-azul-texto);
+  --cor-turquesa-texto: #6bd2e6;
+  --cor-turquesa-forte: #0da6bc;
+  --cor-turquesa-suave: #034e5a;
+  --cor-turquesa-cheio: var(--cor-turquesa-suave);
+  --cor-turquesa-sobre: var(--cor-turquesa-texto);
+  --cor-violeta-texto: #b1bcff;
+  --cor-violeta-forte: #7d87f3;
+  --cor-violeta-suave: #3a3f72;
+  --cor-violeta-cheio: var(--cor-violeta-suave);
+  --cor-violeta-sobre: var(--cor-violeta-texto);
+  --cor-mostarda-texto: #d8bf73;
+  --cor-mostarda-forte: #b29005;
+  --cor-mostarda-suave: #544301;
+  --cor-mostarda-cheio: var(--cor-mostarda-suave);
+  --cor-mostarda-sobre: var(--cor-mostarda-texto);
+  --cor-rosa-texto: #f3a6ca;
+  --cor-rosa-forte: #df5fa3;
+  --cor-rosa-suave: #66304b;
+  --cor-rosa-cheio: var(--cor-rosa-suave);
+  --cor-rosa-sobre: var(--cor-rosa-texto);
+  --cor-verde-texto: #83d5ad;
+  --cor-verde-forte: #0bae79;
+  --cor-verde-suave: #015337;
+  --cor-verde-cheio: var(--cor-verde-suave);
+  --cor-verde-sobre: var(--cor-verde-texto);
+  --cor-laranja-texto: #f3b081;
+  --cor-laranja-forte: #db750f;
+  --cor-laranja-suave: #67370f;
+  --cor-laranja-cheio: var(--cor-laranja-suave);
+  --cor-laranja-sobre: var(--cor-laranja-texto);
+  --cor-indigo-texto: #aacf8a;
+  --cor-indigo-forte: #6ba804;
+  --cor-indigo-suave: #344e18;
+  --cor-indigo-cheio: var(--cor-indigo-suave);
+  --cor-indigo-sobre: var(--cor-indigo-texto);
+  --cor-grafite-texto: #adb7c3;
+  --cor-grafite-forte: #616a75;
+  --cor-grafite-suave: #3c4249;
+  --cor-grafite-cheio: var(--cor-grafite-suave);
+  --cor-grafite-sobre: var(--cor-grafite-texto);
+  --positive-cheio: #0bae79;
+  --sobre-positive: #022c22;
+  --notice-cheio: #fbbf24;
+  --sobre-notice: #451a03;
+  --destructive-cheio: #dc2626;
+  --sobre-destructive: #ffffff;
+  --domingo: #fb7185;
+  --sabado: #a78bfa;
+  --evento-reuniao: #1d3765;
+  --evento-reuniao-texto: #dbeafe;
+  --evento-compromisso: #2f384b;
+  --evento-compromisso-texto: #e2e8f0;
+  --evento-ausencia: #3f3425;
+  --evento-ausencia-listra: #564222;
+  --evento-ausencia-texto: #fde68a;
+  --evento-feriado: #442237;
+  --evento-feriado-texto: #fecdd3;
+  --grafico-serie: #009fe1;
+  --grafico-lavado: rgb(0 159 225 / 0.14);
+  --grafico-acima: #f87171;
+  --grafico-folga: #fbbf24;
+  --grafico-ref: #94a0b8;
+  --grafico-grade: #222c42;
+  --grafico-trilha: #1c2a4a;
+  --grafico-neutro: #34405a;
+  --grafico-fila-1: #046b99;
+  --grafico-fila-2: #0b9ad9;
+  --grafico-fila-3: #6ec9ff;
+  --grafico-calor-lilas: #c5cefe;
+  --grafico-calor-ciano: #91e0f0;
   color-scheme: dark;
 }
 
 @theme inline {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -85,6 +251,8 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-cheio: var(--primary-cheio);
+  --color-primary-texto: var(--primary-texto);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -101,6 +269,79 @@
   --color-notice-soft: var(--notice-soft);
   --color-positive: var(--positive);
   --color-positive-soft: var(--positive-soft);
+  --color-cor-azul-texto: var(--cor-azul-texto);
+  --color-cor-azul-forte: var(--cor-azul-forte);
+  --color-cor-azul-suave: var(--cor-azul-suave);
+  --color-cor-azul-cheio: var(--cor-azul-cheio);
+  --color-cor-azul-sobre: var(--cor-azul-sobre);
+  --color-cor-turquesa-texto: var(--cor-turquesa-texto);
+  --color-cor-turquesa-forte: var(--cor-turquesa-forte);
+  --color-cor-turquesa-suave: var(--cor-turquesa-suave);
+  --color-cor-turquesa-cheio: var(--cor-turquesa-cheio);
+  --color-cor-turquesa-sobre: var(--cor-turquesa-sobre);
+  --color-cor-violeta-texto: var(--cor-violeta-texto);
+  --color-cor-violeta-forte: var(--cor-violeta-forte);
+  --color-cor-violeta-suave: var(--cor-violeta-suave);
+  --color-cor-violeta-cheio: var(--cor-violeta-cheio);
+  --color-cor-violeta-sobre: var(--cor-violeta-sobre);
+  --color-cor-mostarda-texto: var(--cor-mostarda-texto);
+  --color-cor-mostarda-forte: var(--cor-mostarda-forte);
+  --color-cor-mostarda-suave: var(--cor-mostarda-suave);
+  --color-cor-mostarda-cheio: var(--cor-mostarda-cheio);
+  --color-cor-mostarda-sobre: var(--cor-mostarda-sobre);
+  --color-cor-rosa-texto: var(--cor-rosa-texto);
+  --color-cor-rosa-forte: var(--cor-rosa-forte);
+  --color-cor-rosa-suave: var(--cor-rosa-suave);
+  --color-cor-rosa-cheio: var(--cor-rosa-cheio);
+  --color-cor-rosa-sobre: var(--cor-rosa-sobre);
+  --color-cor-verde-texto: var(--cor-verde-texto);
+  --color-cor-verde-forte: var(--cor-verde-forte);
+  --color-cor-verde-suave: var(--cor-verde-suave);
+  --color-cor-verde-cheio: var(--cor-verde-cheio);
+  --color-cor-verde-sobre: var(--cor-verde-sobre);
+  --color-cor-laranja-texto: var(--cor-laranja-texto);
+  --color-cor-laranja-forte: var(--cor-laranja-forte);
+  --color-cor-laranja-suave: var(--cor-laranja-suave);
+  --color-cor-laranja-cheio: var(--cor-laranja-cheio);
+  --color-cor-laranja-sobre: var(--cor-laranja-sobre);
+  --color-cor-indigo-texto: var(--cor-indigo-texto);
+  --color-cor-indigo-forte: var(--cor-indigo-forte);
+  --color-cor-indigo-suave: var(--cor-indigo-suave);
+  --color-cor-indigo-cheio: var(--cor-indigo-cheio);
+  --color-cor-indigo-sobre: var(--cor-indigo-sobre);
+  --color-cor-grafite-texto: var(--cor-grafite-texto);
+  --color-cor-grafite-forte: var(--cor-grafite-forte);
+  --color-cor-grafite-suave: var(--cor-grafite-suave);
+  --color-cor-grafite-cheio: var(--cor-grafite-cheio);
+  --color-cor-grafite-sobre: var(--cor-grafite-sobre);
+  --color-positive-cheio: var(--positive-cheio);
+  --color-sobre-positive: var(--sobre-positive);
+  --color-notice-cheio: var(--notice-cheio);
+  --color-sobre-notice: var(--sobre-notice);
+  --color-destructive-cheio: var(--destructive-cheio);
+  --color-sobre-destructive: var(--sobre-destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-domingo: var(--domingo);
+  --color-sabado: var(--sabado);
+  --color-evento-reuniao: var(--evento-reuniao);
+  --color-evento-reuniao-texto: var(--evento-reuniao-texto);
+  --color-evento-compromisso: var(--evento-compromisso);
+  --color-evento-compromisso-texto: var(--evento-compromisso-texto);
+  --color-evento-ausencia: var(--evento-ausencia);
+  --color-evento-ausencia-texto: var(--evento-ausencia-texto);
+  --color-evento-feriado: var(--evento-feriado);
+  --color-evento-feriado-texto: var(--evento-feriado-texto);
+  --color-grafico-serie: var(--grafico-serie);
+  --color-grafico-lavado: var(--grafico-lavado);
+  --color-grafico-acima: var(--grafico-acima);
+  --color-grafico-folga: var(--grafico-folga);
+  --color-grafico-ref: var(--grafico-ref);
+  --color-grafico-grade: var(--grafico-grade);
+  --color-grafico-trilha: var(--grafico-trilha);
+  --color-grafico-neutro: var(--grafico-neutro);
+  --color-grafico-fila-1: var(--grafico-fila-1);
+  --color-grafico-fila-2: var(--grafico-fila-2);
+  --color-grafico-fila-3: var(--grafico-fila-3);
   --animate-page-enter: page-enter 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   --animate-barra: barra 1.1s ease-in-out infinite;
 }
@@ -124,6 +365,36 @@
 @keyframes surgir {
   from { opacity: 0; transform: scale(0.3); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* Movimento dos gráficos (pedido do Diego, 19/11): colunas crescem da base e barras da esquerda em onda (atraso pelo
+   índice, --i), a linha e o arco se desenham (o elemento com pathLength="1") e células e quadradinhos entram em cascata.
+   Só quando o elemento aparece: a releitura com as mesmas chaves não mexe. Keyframes só com "from", e `backwards`: no fim
+   o elemento fica com o próprio valor (fill-opacity, tracejado). "Reduzir movimento": tudo pronto, sem o atraso. */
+@keyframes onda {
+  from { transform: scaleY(0); }
+}
+@keyframes cascata {
+  from { opacity: 0; }
+}
+.grafico-onda, .grafico-onda-deitada {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: onda 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: min(calc(var(--i, 0) * 60ms), 720ms);
+}
+.grafico-onda-deitada { transform-origin: left; animation-name: encher; }
+.grafico-desenha {
+  stroke-dasharray: 1;
+  animation: desenhar 0.9s cubic-bezier(0.65, 0, 0.35, 1) backwards;
+  animation-delay: calc(150ms + min(calc(var(--i, 0) * 90ms), 720ms));
+}
+.grafico-cascata {
+  animation: cascata 0.35s ease-out backwards;
+  animation-delay: min(calc(var(--i, 0) * 12ms), 600ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .grafico-onda, .grafico-onda-deitada, .grafico-desenha, .grafico-cascata { animation: none; }
 }
 
 /* Tela de entrar: rede da consultoria e cartões de gestão. */
@@ -179,12 +450,64 @@
   to { opacity: 1; transform: none; }
 }
 
+/* Escala única de tamanhos (design 2026-11-16-tipografia): cada passo vira a classe text-<nome>
+   (tamanho + altura da linha). Nada de text-xs/sm/base/lg... nem px avulso nas telas.
+   Os mesmos valores, em número, estão em src/lib/tipografia.js (texto de SVG). */
 @theme {
+  --text-titulo: 20px;
+  --text-titulo--line-height: 28px;
+  --text-titulo--letter-spacing: -0.015em;
+  --text-destaque: 26px;
+  --text-destaque--line-height: 32px;
+  --text-janela: 15px;
+  --text-janela--line-height: 20px;
+  --text-subtitulo: 14px;
+  --text-subtitulo--line-height: 20px;
+  --text-corpo: 13.5px;
+  --text-corpo--line-height: 20px;
+  --text-rotulo: 12.5px;
+  --text-rotulo--line-height: 18px;
+  --text-legenda: 11px;
+  --text-legenda--line-height: 16px;
+  --text-mini: 10.5px;
+  --text-mini--line-height: 14px;
   --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.06);
   --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 4px 12px -4px rgb(15 23 42 / 0.08);
   --shadow-md: 0 2px 4px -1px rgb(15 23 42 / 0.06), 0 12px 28px -10px rgb(15 23 42 / 0.18);
   --shadow-lg: 0 4px 10px -2px rgb(15 23 42 / 0.08), 0 28px 60px -16px rgb(15 23 42 / 0.3);
 }
+
+/* Sombras do padrão Hub como variáveis; no escuro viram contorno de luz. */
+:root {
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 3px 10px -4px rgb(15 23 42 / 0.08);
+  --shadow-elevated: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --shadow-overlay: 0 8px 24px -4px rgb(0 0 0 / 0.12), 0 4px 8px -2px rgb(0 0 0 / 0.08);
+  --shadow-modal: 0 24px 48px -12px rgb(0 0 0 / 0.18), 0 0 0 1px rgb(0 0 0 / 0.04);
+  --sombra-card: 0 1px 2px rgb(18 24 32 / 0.05), 0 10px 28px -8px rgb(18 24 32 / 0.14);
+  --brilho: linear-gradient(115deg, transparent 20%, rgb(134 239 172 / 0.55) 40%, rgb(196 181 253 / 0.55) 55%, rgb(103 232 249 / 0.5) 70%, transparent 85%);
+}
+.dark {
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 0 0 1px rgb(255 255 255 / 0.04);
+  --shadow-elevated: 0 4px 16px -2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.05);
+  --shadow-overlay: 0 8px 32px -4px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.06);
+  --shadow-modal: 0 24px 64px -12px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.07);
+  --sombra-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 28px -8px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.04);
+  --brilho: linear-gradient(115deg, transparent 20%, rgb(74 222 128 / 0.22) 40%, rgb(167 139 250 / 0.24) 55%, rgb(34 211 238 / 0.2) 70%, transparent 85%);
+}
+
+/* O que acabou de mudar brilha uma vez (brilhar.js põe e tira .mudou); a linha da tabela ganha também o tom de sucesso. */
+.mudou { position: relative; }
+.mudou::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: var(--brilho); background-size: 250% 100%;
+  animation: brilho 0.5s cubic-bezier(0.65, 0, 0.35, 1) 0.25s both, brilho-some 1.4s ease 0.75s forwards;
+}
+tr.mudou::after { display: none; }
+tr.mudou td { animation: brilho-tom 1.6s ease 0.25s both; }
+@keyframes brilho { from { background-position: 120% 0; } to { background-position: -20% 0; } }
+@keyframes brilho-some { to { opacity: 0; } }
+@keyframes brilho-tom { 0%, 30% { background: var(--positive-soft); } 100% { background: transparent; } }
+/* Botão com resultado: o rótulo feito sobre o verde-suave, com uma mola curta. */
+@keyframes botao-mola { 0% { transform: scale(0.94); } 100% { transform: scale(1); } }
 
 @keyframes page-enter {
   from { opacity: 0; transform: translateY(6px); }
@@ -194,8 +517,68 @@
 @layer base {
   * { @apply border-border outline-ring/50; }
   html { -webkit-text-size-adjust: 100%; }
-  body { @apply bg-moldura text-foreground antialiased; }
+  body { @apply bg-moldura text-corpo text-foreground antialiased; }
   ::selection { background: color-mix(in oklab, var(--primary) 25%, transparent); }
+  /* Foco global do padrão Hub, na cor de destaque da consultoria. */
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+}
+
+/* Camada de componentes do padrão Hub (cores da consultoria: onde o Hub usa índigo, aqui é o --primary). */
+@layer components {
+  /* Névoa (pedido do Diego, 19/11): o cartão se separa do fundo pela sombra longa, não pela borda (a borda fica
+     transparente: guarda a medida e deixa border-<cor> funcionar nos cartões de aviso). */
+  .card { @apply bg-card rounded-2xl border border-transparent; box-shadow: var(--sombra-card); }
+  /* O que fica dentro do cartão (célula afundada): raio menor que o do cartão. */
+  .dentro-do-cartao { @apply bg-muted/60 rounded-lg; }
+  .section-label { @apply text-muted-foreground text-mini font-semibold tracking-[0.08em] uppercase; }
+  .form-label { @apply text-foreground/80 mb-1.5 block text-rotulo font-medium; }
+  /* Campos de digitar: 16 px no celular (o iPhone dá zoom abaixo disso) e text-corpo a partir de sm.
+     Vale para o .input e para todo campo escrito à mão (<textarea>, campos internos). */
+  .input, .texto-de-campo { @apply text-base sm:text-corpo; }
+  /* No toque (pointer-coarse), o campo tem 44 px de altura (auditoria, G5); no computador nada muda. */
+  .input {
+    @apply bg-card border-input text-foreground placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 transition-[color,box-shadow,border-color] outline-none pointer-coarse:min-h-11;
+    @apply hover:border-primary/40 focus:border-primary/60 focus:ring-primary/15 focus:ring-2 disabled:bg-muted disabled:cursor-not-allowed disabled:opacity-60;
+    @apply aria-invalid:border-destructive aria-invalid:ring-destructive/20;
+  }
+}
+
+/* Ausência no Calendário (chip, amostra da legenda): listras sobre o fundo dela (auditoria M2). */
+@layer components {
+  .listras-de-ausencia {
+    background-image: repeating-linear-gradient(135deg, transparent 0 4px, var(--evento-ausencia-listra) 4px 8px);
+  }
+}
+
+/* Descrição do cartão (editor TipTap, EditorDaDescricao): o texto formatado com a escala da tipografia. O tamanho do
+   corpo vem da .texto-de-campo (16 px no celular); títulos pelo papel. */
+@layer components {
+  .descricao-do-cartao { @apply text-foreground leading-relaxed; overflow-wrap: anywhere; }
+  .descricao-do-cartao[contenteditable='true'] { min-height: 8rem; }
+  .descricao-do-cartao > * + * { margin-top: 0.5rem; }
+  .descricao-do-cartao h1 { @apply text-titulo font-bold; }
+  .descricao-do-cartao h2 { @apply text-janela font-bold; }
+  .descricao-do-cartao h3 { @apply text-subtitulo font-semibold; }
+  .descricao-do-cartao :is(h1, h2, h3):not(:first-child) { margin-top: 1rem; }
+  .descricao-do-cartao ul { list-style: disc; padding-left: 1.5rem; }
+  .descricao-do-cartao ol { list-style: decimal; padding-left: 1.5rem; }
+  .descricao-do-cartao li + li { margin-top: 0.125rem; }
+  .descricao-do-cartao blockquote { @apply border-primary/30 text-muted-foreground border-l-4 pl-3; }
+  .descricao-do-cartao code { @apply bg-muted rounded-md px-1 py-0.5; }
+  .descricao-do-cartao pre { @apply bg-muted rounded-lg p-3; white-space: pre-wrap; }
+  .descricao-do-cartao pre code { @apply bg-transparent p-0; }
+  .descricao-do-cartao a { @apply text-primary underline underline-offset-2; }
+  .descricao-do-cartao hr { @apply border-border my-3; }
+  .descricao-do-cartao .imagem-da-descricao { @apply my-2 w-fit max-w-full rounded-xl; }
+  .descricao-do-cartao .imagem-da-descricao img { @apply bg-muted max-w-full rounded-xl border; height: auto; min-height: 2rem; }
+  .descricao-do-cartao .imagem-indisponivel {
+    @apply text-muted-foreground text-rotulo inline-flex items-center rounded-xl border border-dashed px-3 py-2;
+  }
+  .descricao-do-cartao .imagem-da-descricao.ProseMirror-selectednode { @apply ring-primary/50 ring-2; }
+  .descricao-do-cartao p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    @apply text-muted-foreground pointer-events-none float-left h-0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -238,13 +621,38 @@
   0%, 100% { transform: translateX(0); }
   50% { transform: translateX(3px); }
 }
+@keyframes icone-transmitir {
+  0%, 100% { transform: scale(1); }
+  20% { transform: scale(1.22); }
+  40% { transform: scale(1); }
+  60% { transform: scale(1.22); }
+  80% { transform: scale(1); }
+}
+/* Folhear (Calendário): a folha de cima vira para trás e volta, como a de um calendário de mesa. */
+@keyframes icone-folhear {
+  0%, 100% { transform: perspective(60px) rotateX(0) translateY(0); }
+  35% { transform: perspective(60px) rotateX(38deg) translateY(-1px); }
+  65% { transform: perspective(60px) rotateX(-10deg); }
+}
+/* Arrastar (Quadros): o ícone levanta, vai um pouco para o lado com uma leve inclinação e assenta, como um cartão
+   sendo arrastado para a coluna do lado. */
+@keyframes icone-arrastar {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  25% { transform: translate(0, -2px) rotate(-4deg); }
+  55% { transform: translate(3px, -2px) rotate(5deg); }
+  80% { transform: translate(3px, 0) rotate(0); }
+}
 .anim-erguer { transform-origin: bottom center; }
+.anim-folhear { transform-origin: top center; }
 .group:hover .anim-subir, .group:focus-visible .anim-subir { animation: icone-subir 0.55s ease-out; }
 .group:hover .anim-balancar, .group:focus-visible .anim-balancar { animation: icone-balancar 0.6s ease-in-out; }
 .group:hover .anim-pulsar, .group:focus-visible .anim-pulsar { animation: icone-pulsar 0.5s ease-out; }
 .group:hover .anim-abrir, .group:focus-visible .anim-abrir { animation: icone-abrir 0.55s ease-in-out; }
 .group:hover .anim-erguer, .group:focus-visible .anim-erguer { animation: icone-erguer 0.55s ease-out; }
 .group:hover .anim-conectar, .group:focus-visible .anim-conectar { animation: icone-conectar 0.6s ease-in-out; }
+.group:hover .anim-transmitir, .group:focus-visible .anim-transmitir { animation: icone-transmitir 0.7s ease-in-out; }
+.group:hover .anim-folhear, .group:focus-visible .anim-folhear { animation: icone-folhear 0.6s ease-in-out; }
+.group:hover .anim-arrastar, .group:focus-visible .anim-arrastar { animation: icone-arrastar 0.7s ease-in-out; }
 .group:hover .anim-sair, .group:focus-visible .anim-sair { animation: icone-sair 0.5s ease-in-out 2; }
 
 /* App instalado sem a barra de título (Window Controls Overlay): só os botões da janela ficam sobre o app.
@@ -280,3 +688,25 @@
 .botao-animado:hover:not(:disabled) > svg,
 .botao-animado:focus-visible > svg { animation: icone-botao 0.45s ease-out; }
 
+/* Cartões de números (abaixo da barra de filtros, CartoesDeNumeros): ao passar o mouse, o cartão sobe 1px com sombra
+   (classes do componente) e o ícone dá o mesmo pulinho dos botões. "Reduzir movimento" para tudo (regra acima). */
+.cartao-animado:hover .icone-do-cartao { animation: icone-botao 0.45s ease-out; }
+
+
+/* Botão com Plus (criar): em vez do pulinho, o Plus gira 90° no hover (padrão Hub). */
+.botao-animado > svg.lucide-plus { transition: transform 0.2s ease-out; }
+.botao-animado:hover:not(:disabled) > svg.lucide-plus,
+.botao-animado:focus-visible > svg.lucide-plus { animation: none; transform: rotate(90deg); }
+
+/* Listas que abrem sobre um campo (data, hora, seletor): entram com um leve zoom. */
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.97) translateY(-2px); }
+  to { opacity: 1; transform: none; }
+}
+.pop-in { animation: pop-in 0.14s ease-out; }
+
+/* Avisos (sonner) acima da barra de baixo do menu em toda a faixa em que ela aparece (até md): o mobileOffset do sonner
+   só vale abaixo de 600 px; de 600 a 767 px o aviso cobria a barra e o "Desfazer" (revisão do lote C1). */
+@media (min-width: 600px) and (max-width: 47.99rem) {
+  [data-sonner-toaster][data-y-position='bottom'] { --offset-bottom: calc(4.75rem + env(safe-area-inset-bottom)) !important; }
+}

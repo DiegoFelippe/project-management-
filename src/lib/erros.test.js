@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MENSAGEM_SSO, erroDeRecuperacao, traduzirErroAuth, traduzirErroBanco, traduzirErroFuncao } from './erros'
+import { MENSAGEM_SSO, MOTIVO_OBRIGATORIO, erroDeRecuperacao, traduzirErroAuth, traduzirErroBanco, traduzirErroFuncao } from './erros'
 
 describe('traduzirErroAuth', () => {
   it('traduz os erros de login', () => {
@@ -10,7 +10,9 @@ describe('traduzirErroAuth', () => {
     expect(traduzirErroAuth({ code: 'email_not_confirmed' })).toBe(
       'Esse acesso ainda não foi ativado. Abra o convite que chegou no seu e-mail.',
     )
-    expect(traduzirErroAuth({ code: 'weak_password' })).toBe('A senha precisa ter pelo menos 8 caracteres.')
+    expect(traduzirErroAuth({ code: 'weak_password' })).toBe(
+      'A senha precisa ter pelo menos 10 caracteres, uma letra maiúscula, uma letra minúscula, um número e um símbolo.',
+    )
     expect(traduzirErroAuth({ code: 'same_password' })).toBe('A senha nova precisa ser diferente da atual.')
     expect(traduzirErroAuth({ code: 'over_email_send_rate_limit' })).toBe(
       'Muitas tentativas seguidas. Espere um pouco e tente de novo.',
@@ -22,6 +24,12 @@ describe('traduzirErroAuth', () => {
       traduzirErroAuth({ code: 'validation_failed', message: 'Unsupported provider: provider is not enabled' }),
     ).toBe('O login com Google ainda não foi configurado.')
     expect(traduzirErroAuth({ code: 'provider_disabled' })).toBe('O login com Google ainda não foi configurado.')
+  })
+
+  it('muitos cadastros do app começados: diz o que a própria pessoa pode fazer (o Zerar só existe com o app ativo)', () => {
+    const texto = traduzirErroAuth({ code: 'too_many_enrolled_mfa_factors' })
+    expect(texto).toBe('Há muitos cadastros do app começados e não confirmados. Tente de novo: os começados são apagados antes de começar outro.')
+    expect(texto).not.toMatch(/zerar/i)
   })
 
   it('qualquer outro erro vira a mensagem padrão', () => {
@@ -78,3 +86,197 @@ describe('mensagens do CRUD', () => {
   })
 })
 
+describe('traduzirErroBanco com contexto', () => {
+  it('mantém o padrão de time', () => {
+    expect(traduzirErroBanco({ code: '23505' }, { sobre: 'time' })).toBe('Já existe um time com esse nome.')
+  })
+
+  it('traduz cliente', () => {
+    expect(traduzirErroBanco({ code: '23505' }, { sobre: 'cliente' })).toBe(
+      'Já existe um cliente com esse CNPJ (pode estar entre os arquivados).',
+    )
+    expect(traduzirErroBanco({ code: '23503' }, { sobre: 'cliente' })).toBe(
+      'Este cliente tem horas, arquivos, cartões ou modelo de check-in registrados. Arquive em vez de apagar.',
+    )
+    expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')
+    expect(traduzirErroBanco({ code: '23514' }, { sobre: 'checkin' })).toBe(
+      'Um check-in não pode passar de 24 h. Ajuste o horário de fim.',
+    )
+    expect(traduzirErroBanco({ code: '23P01' }, { sobre: 'checkin' })).toBe(
+      'Esse horário se sobrepõe a outro check-in seu.',
+    )
+  })
+
+  it('traduz arquivo (erros do Storage e do banco)', () => {
+    const arquivo = (erro) => traduzirErroBanco(erro, { sobre: 'arquivo' })
+    // Formas reais do Storage local (HTTP 400 com o código em statusCode).
+    expect(arquivo({ status: 400, statusCode: '413', code: 'EntityTooLarge', message: 'The object exceeded the maximum allowed size' }))
+      .toBe('O arquivo passa de 25 MB.')
+    expect(arquivo({ status: 400, statusCode: '403', code: 'AccessDenied', message: 'new row violates row-level security policy' }))
+      .toBe('Você não tem permissão para isso.')
+    expect(arquivo({ status: 400, statusCode: '404', code: 'NoSuchKey', message: 'Object not found' }))
+      .toBe('Esse arquivo não foi encontrado.')
+    // Resposta sem corpo (ex.: o limite de um proxy): vale o HTTP.
+    expect(arquivo({ status: 413 })).toBe('O arquivo passa de 25 MB.')
+    expect(arquivo({ code: '42501' })).toBe('Você não tem permissão para isso.')
+    expect(arquivo({ code: 'P0001', message: 'objeto_de_outra_pessoa' })).toBe('Você não tem permissão para isso.')
+    expect(arquivo({ code: '23514' })).toBe('Confira os campos destacados.')
+    expect(arquivo({ status: 500, statusCode: '500' })).toBe('Algo deu errado. Tente de novo.')
+    // Fora de "arquivo", os códigos HTTP do Storage não mudam as mensagens de antes.
+    expect(traduzirErroBanco({ status: 413 })).toBe('Algo deu errado. Tente de novo.')
+  })
+
+  it('traduz as mensagens do banco', () => {
+    const msg = (message) => traduzirErroBanco({ code: 'P0001', message }, { sobre: 'cliente' })
+    expect(msg('consultor_invalido')).toBe('Escolha um consultor ativo desta consultoria.')
+    expect(msg('so_central_muda')).toBe('Só a central manda, move ou arquiva o cliente. Cliente arquivado só a central edita.')
+    expect(msg('consultoria_arquivada')).toBe('Essa consultoria está arquivada.')
+    expect(msg('checkin_sem_cliente')).toBe('Você não é o consultor deste cliente.')
+    expect(msg('checkin_no_futuro')).toBe('O horário não pode estar no futuro.')
+    expect(msg('sem_permissao')).toBe('Você não tem permissão para isso.')
+    expect(msg('consultoria_escolhe_consultor')).toBe('Quem escolhe o consultor é a consultoria.')
+    expect(msg('outra_coisa')).toBe('Algo deu errado. Tente de novo.')
+  })
+
+  it('traduz as recusas do quadro do cliente', () => {
+    const msg = (message, code = 'P0001') => traduzirErroBanco({ code, message })
+    expect(msg('responsavel_invalido')).toBe(
+      'Escolha alguém que atende este cliente: o consultor dele ou quem cuida da consultoria.',
+    )
+    expect(msg('coluna_com_cartoes')).toBe('Esta coluna tem cartões. Escolha para qual coluna eles vão ou apague junto.')
+    expect(msg('ultima_coluna')).toBe('O quadro precisa de pelo menos uma coluna.')
+    expect(msg('coluna_invalida')).toBe('Essa coluna não está mais no quadro. Atualize o quadro e tente de novo.')
+    expect(msg('vizinho_invalido')).toBe('O quadro mudou enquanto você arrastava. Atualize o quadro e tente de novo.')
+    expect(msg('cartao_arquivado')).toBe('Este cartão foi arquivado. Restaure antes de mover.')
+    expect(msg('colunas_demais')).toBe('O quadro chegou ao limite de 50 colunas.')
+    expect(msg('checklist_cheio')).toBe('O checklist chegou ao limite de 200 itens.')
+    expect(msg('filtro_invalido', '22023')).toBe('Esse filtro não existe. Limpe os filtros e tente de novo.')
+  })
+
+  it('traduz as recusas dos modelos de check-in', () => {
+    const msg = (message, code = 'P0001') => traduzirErroBanco({ code, message }, { sobre: 'modelo' })
+    expect(msg('sem_permissao')).toBe('Você não tem permissão para isso.')
+    expect(msg('modelo_arquivado')).toBe('Este modelo está arquivado. Reative o modelo antes de editar.')
+    expect(msg('modelo_nome_curto')).toBe('O nome do modelo precisa ter pelo menos 2 letras.')
+    expect(msg('modelo_sem_tarefas')).toBe('O modelo precisa de pelo menos uma tarefa.')
+    expect(msg('etapa_sem_nome')).toBe('Dê um nome a cada etapa.')
+    expect(msg('etapa_sem_tarefas')).toBe('Cada etapa precisa de pelo menos uma tarefa. Acrescente uma ou apague a etapa.')
+    expect(msg('tarefa_sem_titulo')).toBe('Dê um título a cada tarefa.')
+    expect(msg('prazo_invalido')).toBe('O prazo de cada tarefa vai do dia 0 ao dia 365.')
+    expect(msg('dependencia_invalida')).toBe('Uma tarefa só pode depender de tarefas que vêm antes dela na lista.')
+    expect(msg('modelo_grande_demais')).toBe(
+      'O modelo passou do limite: até 50 etapas, 500 tarefas e 30 dependências por tarefa.',
+    )
+    expect(msg('consultoria_invalida')).toBe('Escolha uma consultoria ativa para o modelo.')
+    expect(msg('modelo_mudou')).toBe('Alguém salvou este modelo depois que você abriu. Feche e abra de novo.')
+    expect(msg('filtro_invalido', '22023')).toBe('Esse filtro não existe. Limpe os filtros e tente de novo.')
+    // Texto acima do tamanho (o banco confere ao gravar): diz os limites.
+    expect(msg('new row for relation "modelo_tarefas" violates check constraint "modelo_tarefas_titulo_check"', '23514'))
+      .toBe('Algum texto passou do tamanho: nome do modelo e título da tarefa até 80 letras, descrição do modelo até 400, ' +
+        'nome da etapa até 60 e descrição da tarefa até 160.')
+    expect(msg('new row for relation "modelos" violates check constraint "modelos_nome_check"', '23514'))
+      .toMatch(/^Algum texto passou do tamanho/)
+    // Outra regra da coluna (o tipo, que vem de uma lista): o texto de sempre.
+    expect(msg('new row for relation "modelos" violates check constraint "modelos_tipo_check"', '23514'))
+      .toBe('Confira os campos destacados.')
+    // Fora de "modelo", o 23514 continua o de sempre.
+    expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')
+    expect(traduzirErroBanco({ code: '23514', message: 'violates check constraint "modelos_nome_check"' }))
+      .toBe('Confira os campos destacados.')
+  })
+
+  it('traduz as recusas do check-list do cliente', () => {
+    const msg = (message, code = 'P0001') => traduzirErroBanco({ code, message }, { sobre: 'checklist' })
+    expect(msg('sem_permissao')).toBe('Você não tem permissão para isso.')
+    expect(msg('so_o_consultor_marca')).toBe('Só o consultor do cliente marca as tarefas.')
+    expect(msg('checklist_encerrado')).toBe('Este check-list foi trocado ou tirado. Atualize a página para ver o atual.')
+    expect(msg('cliente_arquivado')).toBe('Este cliente está arquivado: o check-list fica só para ler. Reative o cliente antes.')
+    expect(msg('cliente_sem_consultoria')).toBe('Mande o cliente para uma consultoria antes de aplicar um modelo.')
+    expect(msg('modelo_indisponivel')).toBe('Esse modelo não está mais disponível para este cliente. Escolha outro.')
+    expect(msg('inicio_invalido')).toBe('O início dos prazos precisa estar entre 2 anos atrás e 1 ano à frente.')
+    expect(msg('tarefa_bloqueada')).toBe('Esta tarefa depende de outras que ainda não foram feitas.')
+    expect(msg('estado_invalido')).toBe('Essa situação de tarefa não existe. Atualize a página.')
+    // A nota acima do tamanho (o banco confere ao gravar).
+    expect(msg('new row for relation "checklist_tarefas" violates check constraint "checklist_tarefas_nota_check"', '23514'))
+      .toBe('A nota vai até 500 letras.')
+    // "Não se aplica": o motivo é obrigatório (22023) e vai até 500 letras (a regra da coluna, 23514).
+    expect(msg('motivo_obrigatorio', '22023')).toBe('Conte por que esta tarefa não se aplica.')
+    expect(MOTIVO_OBRIGATORIO).toBe('Conte por que esta tarefa não se aplica.')
+    expect(msg('ja_nao_se_aplica')).toBe('Esta tarefa já está como não se aplica. Para trocar o motivo, use o Editar da tarefa.')
+    expect(msg('new row for relation "checklist_tarefas" violates check constraint "checklist_tarefas_motivo_check"', '23514'))
+      .toBe('O motivo vai até 500 letras.')
+    // Trocar o motivo (o Editar) numa tarefa que deixou de ser "não se aplica".
+    expect(msg('so_em_nao_se_aplica')).toBe('Esta tarefa não está mais como "não se aplica". Atualize a página.')
+    // Comentários da tarefa.
+    expect(msg('comentario_vazio', '22023')).toBe('Escreva o comentário.')
+    expect(msg('comentario_nao_encontrado')).toBe('Este comentário foi apagado. Atualize a tarefa.')
+    expect(msg('new row for relation "checklist_comentarios" violates check constraint "checklist_comentarios_texto_check"', '23514'))
+      .toBe('O comentário vai até 2.000 letras.')
+    // Fora do check-list, estado_invalido e o 23514 continuam os de sempre.
+    expect(traduzirErroBanco({ code: 'P0001', message: 'estado_invalido' })).toBe('Algo deu errado. Tente de novo.')
+    expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')
+  })
+
+  it('modelo em uso não se apaga: pede para arquivar', () => {
+    expect(traduzirErroBanco({ code: 'P0001', message: 'modelo_em_uso' }, { sobre: 'modelo' })).toBe(
+      'Este modelo está em uso: clientes têm check-list dele. Arquive em vez de apagar.',
+    )
+  })
+
+  it('traduz as recusas da descrição do cartão', () => {
+    const msg = (message) => traduzirErroBanco({ code: '23514', message })
+    expect(msg('descricao_invalida')).toBe(
+      'A descrição tem uma formatação que o quadro não aceita. Cole o texto de novo, sem a formatação.',
+    )
+    expect(msg('link_invalido')).toBe('Os links da descrição precisam começar com http://, https:// ou mailto:.')
+    expect(msg('imagem_invalida')).toBe(
+      'A imagem da descrição precisa ser enviada por aqui, para este cartão (imagem de outro endereço não entra).',
+    )
+  })
+})
+
+
+describe('traduzirErroBanco nos quadros do menu', () => {
+  it('nome de quadro em uso entre os abertos (criar, renomear ou restaurar)', () => {
+    expect(traduzirErroBanco({ code: '23505' }, { sobre: 'quadro' })).toBe('Já existe um quadro aberto com esse nome.')
+    // Fora de "quadro", o 23505 continua o de antes.
+    expect(traduzirErroBanco({ code: '23505' })).toBe('Já existe um time com esse nome.')
+  })
+
+  it('nome do quadro em branco ou comprido demais', () => {
+    expect(traduzirErroBanco({ code: '23514' }, { sobre: 'quadro' })).toBe('O nome do quadro precisa ter de 1 a 80 letras.')
+  })
+
+  it('time com quadros não se apaga (23503): diz para apagar os quadros antes', () => {
+    const texto =
+      'Este time tem quadros (abertos ou arquivados). Apague os quadros dele em Quadros antes de apagar o time.'
+    expect(traduzirErroBanco({ code: '23503' }, { sobre: 'time' })).toBe(texto)
+    // A forma real do PostgREST ao apagar o time (apagarTime não passa "sobre"): reconhece pela regra do quadro.
+    expect(traduzirErroBanco({
+      code: '23503',
+      message: 'update or delete on table "times" violates foreign key constraint "quadros_time_id_fkey" on table "quadros"',
+    })).toBe(texto)
+    // Outro 23503 sem contexto continua o texto padrão; o do cliente, o dele.
+    expect(traduzirErroBanco({ code: '23503', message: 'violates foreign key constraint "cartao_comentarios_cartao_id_fkey"' }))
+      .toBe('Algo deu errado. Tente de novo.')
+    expect(traduzirErroBanco({ code: '23503' }, { sobre: 'cliente' })).toBe(
+      'Este cliente tem horas, arquivos, cartões ou modelo de check-in registrados. Arquive em vez de apagar.',
+    )
+  })
+
+  it('responsável recusado: o texto neutro (nos quadros do menu não há cliente); sem "sobre", o do quadro do cliente', () => {
+    const recusa = { code: 'P0001', message: 'responsavel_invalido' }
+    expect(traduzirErroBanco(recusa, { sobre: 'quadro' })).toBe('Essa pessoa não pode ser responsável neste quadro. Escolha outra.')
+    expect(traduzirErroBanco(recusa)).toBe('Escolha alguém que atende este cliente: o consultor dele ou quem cuida da consultoria.')
+  })
+
+  it('time que a pessoa não pode usar e quadro arquivado', () => {
+    expect(traduzirErroBanco({ code: 'P0001', message: 'time_invalido' }, { sobre: 'quadro' })).toBe(
+      'Esse time não está mais disponível para você. Escolha outro time.',
+    )
+    expect(traduzirErroBanco({ code: 'P0001', message: 'quadro_arquivado' }, { sobre: 'quadro' })).toBe(
+      'Este quadro está arquivado: restaure antes de renomear.',
+    )
+    expect(traduzirErroBanco({ code: '42501' }, { sobre: 'quadro' })).toBe('Você não tem permissão para isso.')
+  })
+})

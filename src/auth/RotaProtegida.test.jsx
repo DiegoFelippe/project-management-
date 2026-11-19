@@ -1,10 +1,17 @@
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { describe, expect, it, vi } from 'vitest'
 import RotaProtegida from './RotaProtegida'
 import { AuthContext } from './useAuth'
 
 const sessao = { user: { id: 'u1' } }
+
+// Mostra para onde a tela de verificação manda a pessoa depois do código (o endereço que ela pediu).
+function TelaCodigo() {
+  const { state } = useLocation()
+  return <><p>tela código</p>{state?.de && <p>depois {state.de}</p>}</>
+}
 
 function montar({ valor, rota }) {
   render(
@@ -14,7 +21,11 @@ function montar({ valor, rota }) {
           <Route path="/entrar" element={<p>tela entrar</p>} />
           <Route element={<RotaProtegida />}>
             <Route path="/trocar-senha" element={<p>tela trocar</p>} />
-            <Route path="/" element={<p>tela início</p>} />
+            <Route path="/verificar" element={<TelaCodigo />} />
+            <Route path="/configurar-verificacao" element={<p>tela configurar</p>} />
+            <Route path="/" element={<><p>tela início</p><Link to="/clientes">ir para clientes</Link></>} />
+            <Route path="/clientes" element={<p>tela clientes</p>} />
+            <Route path="/calendario" element={<p>tela calendário</p>} />
             <Route element={<RotaProtegida papeis={['dono', 'admin', 'gestor']} />}>
               <Route path="/times" element={<p>tela times</p>} />
             </Route>
@@ -49,5 +60,49 @@ describe('RotaProtegida', () => {
   it('gestor vê a tela', () => {
     montar({ valor: { sessao, perfil: { papel: 'gestor', precisa_trocar_senha: false } }, rota: '/times' })
     expect(screen.getByText('tela times')).toBeInTheDocument()
+  })
+
+  describe('verificação em duas etapas', () => {
+    const perfil = { papel: 'gestor', precisa_trocar_senha: false }
+
+    it('sem o código (app ativo, sessão aal1) vai para a tela do código', () => {
+      montar({ valor: { sessao, perfil, verificacao: 'codigo' }, rota: '/times' })
+      expect(screen.getByText('tela código')).toBeInTheDocument()
+    })
+
+    it('o código vem antes da senha provisória', () => {
+      montar({ valor: { sessao, perfil: { ...perfil, precisa_trocar_senha: true }, verificacao: 'codigo' }, rota: '/' })
+      expect(screen.getByText('tela código')).toBeInTheDocument()
+    })
+
+    it('exigida e sem o app: vai configurar antes de entrar', () => {
+      montar({ valor: { sessao, perfil, verificacao: 'configurar' }, rota: '/times' })
+      expect(screen.getByText('tela configurar')).toBeInTheDocument()
+    })
+
+    it('a volta do Google (/calendario?code=…&state=…) passa pela tela do código sem perder o endereço', () => {
+      montar({ valor: { sessao, perfil, verificacao: 'codigo' }, rota: '/calendario?code=abc&state=xyz' })
+      expect(screen.getByText('tela código')).toBeInTheDocument()
+      expect(screen.getByText('depois /calendario?code=abc&state=xyz')).toBeInTheDocument()
+    })
+
+    it('na própria tela do código não há desvio', () => {
+      montar({ valor: { sessao, perfil, verificacao: 'codigo' }, rota: '/verificar' })
+      expect(screen.getByText('tela código')).toBeInTheDocument()
+    })
+
+    it('sem 2FA nada muda (verificacao "ok")', () => {
+      montar({ valor: { sessao, perfil, verificacao: 'ok' }, rota: '/times' })
+      expect(screen.getByText('tela times')).toBeInTheDocument()
+    })
+
+    it('a cada tela, confere de novo (sessão antiga de quem passou a precisar do código)', async () => {
+      const conferirVerificacao = vi.fn()
+      montar({ valor: { sessao, perfil, verificacao: 'ok', conferirVerificacao }, rota: '/' })
+      expect(conferirVerificacao).toHaveBeenCalledTimes(1)
+      await userEvent.click(screen.getByRole('link', { name: 'ir para clientes' }))
+      expect(screen.getByText('tela clientes')).toBeInTheDocument()
+      expect(conferirVerificacao).toHaveBeenCalledTimes(2)
+    })
   })
 })

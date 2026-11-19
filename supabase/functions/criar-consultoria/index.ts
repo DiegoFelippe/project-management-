@@ -1,4 +1,4 @@
-// POST /functions/v1/criar-consultoria — só o dono da plataforma.
+// POST /functions/v1/criar-consultoria — só o dono da plataforma e a central.
 // Cria a consultoria e o primeiro administrador dela (por convite ou com senha provisória).
 import { clienteAdmin, quemChama } from '../_shared/clientes.ts'
 import { Falha, lerJson, responder, servir } from '../_shared/http.ts'
@@ -8,7 +8,7 @@ import { validarEmail, validarForma, validarNome, validarRedirect, validarSenha 
 servir(async (req) => {
   const admin = clienteAdmin()
   const quem = await quemChama(req, admin)
-  if (quem.papel !== 'dono') throw new Falha(403, 'sem_permissao')
+  if (quem.papel !== 'dono' && quem.papel !== 'central') throw new Falha(403, 'sem_permissao')
 
   const corpo = await lerJson(req)
   const nome = validarNome(corpo.nome, 'nome')

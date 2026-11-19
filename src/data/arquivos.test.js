@@ -1,0 +1,251 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { supabase } from '@/lib/supabase'
+import { criarBancoFalso } from '@/test/bancoFalso'
+import {
+  apagarArquivo, apagarPasta, buscarPasta, criarPasta, enviarArquivo, limparPastaDoCliente, linkParaBaixar, listarArquivos,
+  listarPastas, renomearPasta,
+} from './arquivos'
+
+vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn(), storage: { from: vi.fn() } } }))
+
+let banco, bucket
+beforeEach(() => {
+  banco = criarBancoFalso()
+  vi.mocked(supabase.from).mockImplementation(banco.from)
+  bucket = {
+    upload: vi.fn().mockResolvedValue({ data: { path: 'x' }, error: null }),
+    remove: vi.fn().mockResolvedValue({ data: [{ name: 'x' }], error: null }),
+    createSignedUrl: vi.fn().mockResolvedValue({ data: { signedUrl: 'http://storage/assinado' }, error: null }),
+    list: vi.fn().mockResolvedValue({ data: [], error: null }),
+  }
+  vi.mocked(supabase.storage.from).mockReturnValue(bucket)
+  vi.mocked(supabase.rpc).mockResolvedValue({ data: [], error: null })
+})
+
+const chamada = (metodo) => banco.chamadas.find(([m]) => m === metodo)
+const arquivo = (conteudo, nome = 'Ata da reunião.pdf', tipo = 'application/pdf') => new File([conteudo], nome, { type: tipo })
+const PERMISSAO = 'Você não tem permissão para isso.'
+
+describe('listarArquivos', () => {
+  it('pede a página do cliente ao banco, mais novos primeiro, com o nome de quem enviou', async () => {
+    banco.resposta = {
+      data: [
+        { id: 'a1', nome: 'x.pdf', consultoria_id: 'k1', autor: { nome: 'Ana' } },
+        { id: 'a2', nome: 'y.pdf', consultoria_id: null, autor: { nome: 'Central' } },
+        { id: 'a3', nome: 'z.pdf', consultoria_id: null, autor: null },
+        { id: 'a4', nome: 'w.pdf', consultoria_id: 'k1', autor: null },
+      ],
+      error: null,
+      count: 20,
+    }
+    const { itens, total } = await listarArquivos('c1', { pagina: 2 })
+    expect(chamada('from')).toEqual(['from', 'cliente_arquivos'])
+    expect(chamada('select')[1]).toContain('autor:autor_do_arquivo(nome)')
+    expect(chamada('select')[1]).toContain('caminho')
+    expect(chamada('select')[2]).toEqual({ count: 'exact' })
+    expect(banco.chamou('eq', 'cliente_id', 'c1')).toBe(true)
+    expect(banco.chamou('order', 'enviado_em', { ascending: false })).toBe(true)
+    expect(banco.chamou('range', 15, 29)).toBe(true)
+    expect(total).toBe(20)
+    expect(itens.map((i) => i.autor)).toEqual(['Ana', 'Central', 'Central', null])
+    expect(banco.chamou('is', 'pasta_id', null)).toBe(true)
+  })
+
+  it('com pastaId, só os arquivos da pasta', async () => {
+    banco.resposta = { data: [], error: null, count: 0 }
+    await listarArquivos('c1', { pastaId: 'd1' })
+    expect(banco.chamou('eq', 'pasta_id', 'd1')).toBe(true)
+    expect(chamada('is')).toBeUndefined()
+  })
+})
+
+describe('enviarArquivo numa pasta', () => {
+  it('grava a linha com o pasta_id', async () => {
+    banco.resposta = { data: null, error: null }
+    await enviarArquivo('c1', arquivo('x'), { pastaId: 'd1' })
+    expect(chamada('insert')[1]).toMatchObject({ pasta_id: 'd1' })
+  })
+})
+
+describe('pastas', () => {
+  it('listarPastas pede a página do cliente, mais novas primeiro, e devolve a contagem de arquivos', async () => {
+    banco.resposta = {
+      data: [{ id: 'd1', nome: 'Contratos', arquivos: [{ count: 3 }] }, { id: 'd2', nome: 'Atas', arquivos: [] }],
+      error: null, count: 17,
+    }
+    const { itens, total } = await listarPastas('c1', { pagina: 2 })
+    expect(chamada('from')).toEqual(['from', 'cliente_pastas'])
+    expect(chamada('select')[1]).toContain('arquivos:cliente_arquivos(count)')
+    expect(chamada('select')[2]).toEqual({ count: 'exact' })
+    expect(banco.chamou('eq', 'cliente_id', 'c1')).toBe(true)
+    expect(banco.chamou('order', 'criada_em', { ascending: false })).toBe(true)
+    expect(banco.chamou('range', 15, 29)).toBe(true)
+    expect(total).toBe(17)
+    expect(itens.map((p) => p.arquivos)).toEqual([3, 0])
+  })
+
+  it('listarPastas traz, numa só chamada, quantos arquivos de cada pasta a pessoa não apagaria', async () => {
+    banco.resposta = { data: [{ id: 'd1', arquivos: [{ count: 3 }] }, { id: 'd2', arquivos: [] }], error: null, count: 2 }
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: [{ pasta_id: 'd1', quantos: '2' }], error: null })
+    const { itens } = await listarPastas('c1')
+    expect(supabase.rpc).toHaveBeenCalledTimes(1)
+    expect(supabase.rpc).toHaveBeenCalledWith('arquivos_que_nao_apago', { p_pastas: ['d1', 'd2'] })
+    expect(itens.map((p) => p.bloqueados)).toEqual([2, 0])
+  })
+
+  it('criarPasta grava o nome sem espaços nas pontas; nome repetido tem mensagem própria', async () => {
+    banco.resposta = { data: null, error: null }
+    expect(await criarPasta('c1', '  Atas ')).toEqual({ erro: null })
+    expect(banco.chamou('insert', { cliente_id: 'c1', nome: 'Atas' })).toBe(true)
+    banco.resposta = { data: null, error: { code: '23505' } }
+    expect(await criarPasta('c1', 'Atas')).toEqual({ erro: 'Já existe uma pasta com esse nome neste cliente.' })
+  })
+
+  it('renomearPasta: sem linha mudada, sem permissão', async () => {
+    banco.resposta = { data: [{ id: 'd1' }], error: null }
+    expect(await renomearPasta('d1', ' Novo ')).toEqual({ erro: null })
+    expect(banco.chamou('update', { nome: 'Novo' })).toBe(true)
+    banco.resposta = { data: [], error: null }
+    expect(await renomearPasta('d1', 'Novo')).toEqual({ erro: PERMISSAO })
+  })
+
+  it('apagarPasta apaga a pasta e depois tira do Storage os objetos dos arquivos dela', async () => {
+    banco.resposta = { data: [{ caminho: 'c1/a-x.pdf', id: 'd1' }], error: null }
+    expect(await apagarPasta({ id: 'd1' })).toEqual({ erro: null })
+    expect(banco.chamou('eq', 'pasta_id', 'd1')).toBe(true)
+    expect(banco.chamou('from', 'cliente_pastas')).toBe(true)
+    expect(bucket.remove).toHaveBeenCalledWith(['c1/a-x.pdf'])
+  })
+
+  it('apagarPasta sem permissão não tira objeto nenhum', async () => {
+    banco.resposta = { data: [], error: null }
+    expect(await apagarPasta({ id: 'd1' })).toEqual({ erro: PERMISSAO })
+    expect(bucket.remove).not.toHaveBeenCalled()
+  })
+
+  it('apagarPasta avisa quando algum objeto não saiu', async () => {
+    banco.resposta = { data: [{ caminho: 'c1/a-x.pdf' }], error: null }
+    bucket.remove.mockResolvedValue({ data: [], error: null })
+    const r = await apagarPasta({ id: 'd1' })
+    expect(r.erro).toBeNull()
+    expect(r.aviso).toMatch(/cópia guardada/)
+  })
+})
+
+describe('enviarArquivo', () => {
+  it('sobe o objeto na pasta do cliente e depois grava a linha', async () => {
+    banco.resposta = { data: null, error: null }
+    const ata = arquivo('conteúdo')
+    expect(await enviarArquivo('c1', ata)).toEqual({ erro: null })
+    expect(supabase.storage.from).toHaveBeenCalledWith('arquivos')
+    const [caminho, corpo, opcoes] = bucket.upload.mock.calls[0]
+    expect(caminho).toMatch(/^c1\/[0-9a-f-]{36}-Ata_da_reuniao\.pdf$/)
+    expect(corpo).toBe(ata)
+    expect(opcoes).toEqual({ contentType: 'application/pdf' })
+    expect(banco.chamou('insert', {
+      cliente_id: 'c1', caminho, nome: 'Ata da reunião.pdf', tamanho: ata.size, tipo: 'application/pdf', pasta_id: null,
+    })).toBe(true)
+    expect(bucket.remove).not.toHaveBeenCalled()
+  })
+
+  it('arquivo acima de 25 MB nem sobe', async () => {
+    const grande = arquivo('x')
+    Object.defineProperty(grande, 'size', { value: 26214401 })
+    expect(await enviarArquivo('c1', grande)).toEqual({ erro: 'O arquivo passa de 25 MB.' })
+    expect(bucket.upload).not.toHaveBeenCalled()
+    expect(banco.chamadas).toEqual([])
+  })
+
+  it('arquivo vazio nem sobe', async () => {
+    expect(await enviarArquivo('c1', arquivo(''))).toEqual({ erro: 'O arquivo está vazio.' })
+    expect(bucket.upload).not.toHaveBeenCalled()
+  })
+
+  it('o Storage recusa: não grava a linha', async () => {
+    bucket.upload.mockResolvedValue({ data: null, error: { status: 400, statusCode: '403', code: 'AccessDenied' } })
+    expect(await enviarArquivo('c1', arquivo('x'))).toEqual({ erro: PERMISSAO })
+    expect(banco.chamadas).toEqual([])
+  })
+
+  it('a linha não grava: tira o objeto que subiu e devolve o erro', async () => {
+    banco.resposta = { data: null, error: { code: '42501' } }
+    expect(await enviarArquivo('c1', arquivo('x'))).toEqual({ erro: PERMISSAO })
+    const [caminho] = bucket.upload.mock.calls[0]
+    expect(bucket.remove).toHaveBeenCalledWith([caminho])
+  })
+
+  it('sem tipo conhecido, sobe como binário e grava o tipo vazio', async () => {
+    banco.resposta = { data: null, error: null }
+    await enviarArquivo('c1', arquivo('x', 'dados', ''))
+    expect(bucket.upload.mock.calls[0][2]).toEqual({ contentType: 'application/octet-stream' })
+    expect(chamada('insert')[1].tipo).toBeNull()
+  })
+})
+
+describe('linkParaBaixar', () => {
+  it('pede um link assinado de 60 s que baixa com o nome do arquivo', async () => {
+    expect(await linkParaBaixar({ caminho: 'c1/u-a.pdf', nome: 'Ata.pdf' })).toEqual({ url: 'http://storage/assinado' })
+    expect(bucket.createSignedUrl).toHaveBeenCalledWith('c1/u-a.pdf', 60, { download: 'Ata.pdf' })
+  })
+
+  it('sem acesso ao arquivo, devolve o erro', async () => {
+    bucket.createSignedUrl.mockResolvedValue({ data: null, error: { status: 400, statusCode: '404', code: 'NoSuchKey' } })
+    expect(await linkParaBaixar({ caminho: 'c1/u-a.pdf', nome: 'Ata.pdf' })).toEqual({
+      erro: 'Esse arquivo não foi encontrado.',
+    })
+  })
+})
+
+describe('apagarArquivo', () => {
+  it('apaga a linha (o banco decide) e depois o objeto guardado nela', async () => {
+    banco.resposta = { data: [{ caminho: 'c1/u-guardado.pdf' }], error: null }
+    expect(await apagarArquivo({ id: 'a1', caminho: 'c1/u-forjado.pdf' })).toEqual({ erro: null })
+    expect(banco.chamadas.map(([m]) => m)).toEqual(['from', 'delete', 'eq', 'select'])
+    expect(banco.chamou('eq', 'id', 'a1')).toBe(true)
+    expect(bucket.remove).toHaveBeenCalledWith(['c1/u-guardado.pdf'])
+  })
+
+  it('sem permissão, a linha fica e o objeto nem é tocado', async () => {
+    banco.resposta = { data: [], error: null }
+    expect(await apagarArquivo({ id: 'a1', caminho: 'c1/u-a.pdf' })).toEqual({ erro: PERMISSAO })
+    expect(bucket.remove).not.toHaveBeenCalled()
+  })
+
+  it('erro do banco volta traduzido', async () => {
+    banco.resposta = { data: null, error: { code: '42501' } }
+    expect(await apagarArquivo({ id: 'a1', caminho: 'c1/u-a.pdf' })).toEqual({ erro: PERMISSAO })
+    expect(bucket.remove).not.toHaveBeenCalled()
+  })
+
+  it('o objeto não sai: a linha continua apagada e vem um aviso', async () => {
+    banco.resposta = { data: [{ caminho: 'c1/u-a.pdf' }], error: null }
+    bucket.remove.mockResolvedValue({ data: [], error: null })
+    const resultado = await apagarArquivo({ id: 'a1', caminho: 'c1/u-a.pdf' })
+    expect(resultado.erro).toBeNull()
+    expect(resultado.aviso).toBe('O arquivo saiu da lista, mas a cópia guardada não foi apagada. Avise o suporte.')
+    bucket.remove.mockResolvedValue({ data: null, error: { status: 500 } })
+    expect((await apagarArquivo({ id: 'a1', caminho: 'c1/u-a.pdf' })).aviso).toBeDefined()
+  })
+})
+
+describe('limparPastaDoCliente', () => {
+  it('lista a pasta do cliente no bucket "arquivos" e tira o que achou', async () => {
+    bucket.list.mockResolvedValue({ data: [{ id: 'o1', name: 'u-a.pdf' }, { id: 'o2', name: 'u-b.pdf' }], error: null })
+    expect(await limparPastaDoCliente('c1')).toEqual({ erro: null })
+    expect(supabase.storage.from).toHaveBeenCalledWith('arquivos')
+    expect(bucket.list).toHaveBeenCalledWith('c1', { limit: 1000, offset: 0 })
+    expect(bucket.remove).toHaveBeenCalledWith(['c1/u-a.pdf', 'c1/u-b.pdf'])
+    expect(banco.chamadas).toEqual([])
+  })
+})
+
+describe('buscarPasta (abrir a pasta da reunião pelo endereço)', () => {
+  it('lê id, nome e cliente de uma pasta; null quando a pessoa não a vê', async () => {
+    banco.resposta = { data: { id: 'd1', nome: 'Reunião 20/11/2026 14:00 — Kickoff', cliente_id: 'k1' }, error: null }
+    expect(await buscarPasta('d1')).toEqual({ id: 'd1', nome: 'Reunião 20/11/2026 14:00 — Kickoff', cliente_id: 'k1' })
+    expect(banco.chamou('from', 'cliente_pastas')).toBe(true)
+    expect(banco.chamou('eq', 'id', 'd1')).toBe(true)
+    banco.resposta = { data: null, error: null }
+    expect(await buscarPasta('d9')).toBeNull()
+  })
+})

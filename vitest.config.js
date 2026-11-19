@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { defineConfig, mergeConfig } from 'vitest/config'
 import viteConfig from './vite.config.js'
 
@@ -14,11 +15,14 @@ export default mergeConfig(
           test: {
             name: 'unidade',
             environment: 'jsdom',
-            include: ['src/**/*.test.{js,jsx}'],
+            // As funções puras das Edge Functions (núcleo sem Deno, em supabase/functions/_shared/) também.
+            include: ['src/**/*.test.{js,jsx}', 'supabase/functions/**/*.test.js'],
             setupFiles: ['./src/test/setup.js'],
           },
         },
         {
+          // O mesmo apelido '@' do app, para testar as funções de src/data/ contra o Supabase local de verdade.
+          resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
           test: {
             name: 'integracao',
             environment: 'node',

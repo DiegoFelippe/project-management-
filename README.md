@@ -8,15 +8,35 @@ Depois o código vai para a Vercel e o banco para o Supabase na nuvem.
 
 | Papel | O que faz |
 | --- | --- |
-| Dono da plataforma | Vê tudo. Cadastra as consultorias e o administrador de cada uma (menu Consultorias). |
-| Administrador da consultoria | Cria gestores e pessoas e vê a consultoria inteira. |
-| Gestor | Cria os times dele e os acessos das pessoas, só mexe nos times dele. |
-| Pessoa | Entra para trabalhar nos times em que está. |
+| Administrador geral (`dono`) | Vê tudo e tem todos os poderes da central. Cadastra as consultorias e o administrador de cada uma (menu Consultorias). |
+| Central | Fica fora das consultorias e vê todas. Cadastra clientes, manda cada um para uma consultoria (com a sugestão de menor ocupação), cria e arquiva consultorias. |
+| Administrador da consultoria | Cria gestores e consultores, vê a consultoria inteira, escolhe o consultor de cada cliente e cuida da capacidade. |
+| Gestor | Cria os times dele e os acessos dos consultores, só mexe nos times dele. Também escolhe consultores e vê a capacidade da consultoria (no painel do Início). |
+| Consultor | Entra para trabalhar nos times em que está. Faz check-in e check-out nos clientes dele e lança horas. No banco o papel se chama `pessoa`. |
 
 Uma consultoria nunca vê nada de outra: as regras ficam no banco (RLS) e são testadas em `supabase/tests`.
 Ninguém se cadastra sozinho; o acesso é criado por convite (e-mail) ou com senha provisória
 (trocada no primeiro acesso). Google entra se o e-mail já tiver acesso. SSO: só o botão, por enquanto.
 O design e o plano estão em `docs/superpowers/`.
+
+## Clientes e capacidade
+
+1. A **central** cadastra o cliente (CNPJ, contato, previsão de horas por mês) e o manda para uma consultoria;
+   a janela já sugere a de menor ocupação.
+2. O **administrador ou gestor** da consultoria escolhe o consultor, também pela menor ocupação.
+3. O **consultor** faz check-in e check-out no cliente (ou lança as horas depois). O check-in é de quem trabalhou.
+4. Em **Usuários**, a ação **Capacidade** da linha abre a carga semanal e as ausências (férias, feriados
+   municipais) de quem é de consultoria e está ativo; os nacionais o sistema calcula. Quem pode: a central e o dono
+   (em qualquer consultoria) e o administrador ou gestor da própria consultoria, inclusive em si mesmo. A ficha
+   (Editar) traz o mesmo bloco Capacidade para quem já podia editar a pessoa. O resumo do mês (com ‹ Anterior · Próximo ›) são as colunas Capacidade, Reservado,
+   Realizado e Ocupação da própria lista (em mês passado, sem Reservado e como Utilização). O resumo por
+   consultoria (só central) fica em **Consultorias**, na aba "Ocupação do mês".
+5. Os números: **capacidade do mês** = dias úteis (sem sábado) x carga, menos ausências; **reservado** = previsão
+   dos clientes que a pessoa atende; **realizado** = horas dos check-ins; **ocupação** = reservado / capacidade.
+   Saem das funções do banco `consultores_por_ocupacao`, `consultorias_por_ocupacao` e, em Usuários,
+   `ocupacao_das_pessoas` (uma chamada por página e mês).
+
+Uma consultoria nunca vê clientes, horas ou nomes de outra. Desenho: `docs/superpowers/specs/2026-11-13-clientes-design.md`.
 
 ## Versões
 
@@ -45,8 +65,8 @@ npm run dono:criar -- seu@email.com "Seu Nome"   # convite do dono (chega no Mai
 npm run exemplo:local                            # consultoria de exemplo, só local
 ```
 
-Logins de exemplo (só no Docker local): `admin@exemplo.test`, `gestor@exemplo.test`, `ana@exemplo.test`
-e `bruno@exemplo.test`, todos com a senha `exemplo-123`.
+Logins de exemplo (só no Docker local): `admin@exemplo.test`, `gestor@exemplo.test`, `ana@exemplo.test`,
+`bruno@exemplo.test` e `central@exemplo.test` (a central, fora das consultorias), com a senha `exemplo-123` nas contas criadas antes de 16/11/2026; contas novas criadas pelo script usam `Exemplo-123!` (o Auth passou a exigir senha forte, e o script nunca muda a senha de uma conta que já existe).
 
 Abra http://localhost:5173. Embaixo do contador aparece "Banco: conectado…" quando o app fala com o Supabase.
 
@@ -72,12 +92,12 @@ Elas estão em `supabase/config.toml`.
 | `npm run app:logs` | Mostra o log do app |
 | `npm run db:start` / `db:stop` | Sobe e para o Supabase local |
 | `npm run db:status` | Mostra endereços e chaves do Supabase local |
-| `npm run db:reset` | Recria o banco local do zero com as migrações de `supabase/migrations` |
+| `npm run db:reset` | Recria o banco local do zero com as migrações de `supabase/migrations` (apaga todos os dados locais) |
 | `npm run env:local` | Refaz o `.env.local` |
 | `npm run functions:reiniciar` | Recarrega as Edge Functions depois de mudar o código delas |
 | `npm test` | Testes das telas (Vitest) |
 | `npm run test:integracao` | Testes das Edge Functions e dos comandos, no Supabase local de verdade |
-| `npm run test:db` | Testes das regras de acesso do banco (pgTAP) |
+| `npm run test:db` | Testes das regras de acesso do banco (pgTAP); no fim roda `vacuum analyze`, porque os testes de volume criam e desfazem milhões de linhas e incham as tabelas |
 | `npm run lint` / `npm run build` | Revisão do código e build de produção |
 
 ## Ligar o login com Google no local
@@ -92,20 +112,61 @@ Elas estão em `supabase/config.toml`.
 
 Enquanto isso não for feito, o botão "Entrar com Google" avisa que o Google ainda não foi configurado.
 
+## Verificação em duas etapas (app autenticador)
+
+Cada pessoa pode ativar em **Meu perfil** (QR code ou chave no Google Authenticator, Microsoft Authenticator,
+1Password…, e o primeiro código de 6 dígitos). Na ficha da pessoa (aba **Acesso**), quem edita o acesso dela liga
+**Exigir verificação em duas etapas**: no próximo acesso ela configura o app antes de entrar. Quem tem o app ativo
+digita o código depois da senha ou do Google. Sem o código, o banco só entrega o que é da própria pessoa: o próprio
+perfil (é assim que a tela sabe que falta o código), as próprias ausências e as próprias preferências (tema), que ela
+também grava. Todo o resto some (`private.liberado()` exige a sessão `aal2`) e as Edge Functions respondem
+`verificacao_pendente`. O banco também confere a sessão do token: encerrada no Auth (Zerar, Sair), o token antigo
+para de valer na hora para todo o resto, sem esperar vencer (até vencer, em no máximo 1 h, ainda lê o próprio
+perfil, as próprias ausências e as próprias preferências).
+
+- **Local:** já vem ligado em `supabase/config.toml` (`[auth.mfa.totp] enroll_enabled = true` e `verify_enabled = true`).
+- **Nuvem:** no painel do Supabase, **Authentication → Multi-Factor (MFA)**: ligue **TOTP (App Authenticator)**
+  para cadastrar e para verificar. SMS e chave física ficam desligados. Junto, a política de senha (veja
+  [Publicar](#publicar-depois), passo 5).
+- **Perdeu o celular:** não há códigos de recuperação. Quem edita o acesso da pessoa abre a ficha → **Acesso** →
+  **Zerar verificação em duas etapas**. O app cadastrado deixa de valer e a pessoa **sai de todos os aparelhos** (as
+  sessões dela são encerradas, inclusive a do celular perdido); se a verificação for exigida, ela configura de novo no
+  próximo acesso, senão passa a entrar só com a senha.
+- **O dono perdeu o celular:** ninguém tem poder sobre o dono no app, então é pelo Supabase. Na nuvem: painel →
+  **Authentication → Users** → a conta do dono → remova o fator do app (MFA) e encerre as sessões dele. Se o painel
+  não mostrar uma das duas opções, o **SQL Editor** faz as duas (troque o e-mail):
+
+  ```sql
+  delete from auth.mfa_factors where user_id = (select id from auth.users where email = 'dono@exemplo.com');
+  select public.encerrar_sessoes_de((select id from auth.users where email = 'dono@exemplo.com'));
+  ```
+
+  No local, o mesmo pelo Studio (`http://127.0.0.1:54523`, SQL Editor). Depois o dono entra só com a senha e ativa
+  de novo em **Meu perfil**.
+- O segredo do app fica no Auth do Supabase; o app nunca guarda.
+
 ## Banco
 
-- Toda mudança de tabela vira uma migração: `npx supabase migration new <nome>` e depois `npm run db:reset`.
+- Toda mudança de tabela vira uma migração: `npx supabase migration new <nome> < /dev/null` e depois
+  `npx supabase migration up` (aplica só o que falta, sem apagar nada). Nunca `npm run db:reset` com dados que importam:
+  ele recria o banco do zero.
 - Toda tabela em `public` precisa de RLS ligado e de políticas.
 - Tabelas novas não aparecem sozinhas na API do Supabase: é preciso dar `GRANT` para `anon`/`authenticated`.
 - No navegador só vai a chave publicável (`sb_publishable_…`). A chave secreta nunca entra no app.
 
-## Integrações (IA, e-mail e Google)
+## Integrações (IA, e-mail, Google, Slack e WhatsApp)
 
 Menu **Integrações** (administrador da consultoria; o dono só olha): cada consultoria conecta a sua IA
-(Claude ou OpenAI), o seu e-mail (SMTP) e a sua conta Google, e todo o sistema usa a mesma conexão
-(`conexaoDa` em `supabase/functions/_shared/integracoes.ts`). Chaves, senhas e tokens ficam cifrados no
-Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. Desenho:
-`docs/superpowers/specs/2026-11-12-integracoes-design.md`.
+(Claude ou OpenAI), o seu e-mail (SMTP), a sua conta Google, o seu Slack e o seu WhatsApp, e todo o sistema usa a
+mesma conexão (`conexaoDa` em `supabase/functions/_shared/integracoes.ts`). Chaves, senhas e tokens ficam cifrados no
+Vault do Supabase e nunca voltam para o navegador. Desenho: `docs/superpowers/specs/2026-11-12-integracoes-design.md`.
+
+- **Testar na janela:** dentro da janela de cada integração (menos o Google, que conecta pelo próprio Google),
+  **Testar** testa o que foi digitado **antes de salvar, sem gravar nada**: a IA responde a uma pergunta curta (confere
+  a chave e o nome do modelo), o e-mail manda uma mensagem de teste para o e-mail de quem testa, o Slack posta uma
+  mensagem no canal do teste e o WhatsApp manda o modelo `hello_world` para o número do teste. Segredo em branco usa o
+  guardado. **Salvar** grava e testa a conexão de novo (a situação da linha vem desse teste, sem mandar mensagem). O
+  **Testar** da linha testa a conexão salva (o Slack também posta no canal salvo).
 
 - **E-mail no local:** dá para testar com o Mailpit do Supabase local: servidor
   `supabase_inbucket_consultoria`, porta `1025`, segurança "Sem cifra", sem usuário. Fora do local, o
@@ -118,8 +179,88 @@ Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. 
      `GOOGLE_OAUTH_REDIRECT_URI` (o endereço acima). Na nuvem:
      `npx supabase secrets set GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... GOOGLE_OAUTH_REDIRECT_URI=...`.
      No local: em `[edge_runtime.secrets]` do `supabase/config.toml` (com `env(...)`), e reinicie com
-     `npx supabase stop && npx supabase start` (os dados ficam).
+     `npx supabase stop && npx supabase start` (os dados ficam; antes, faça a cópia do banco com `pg_dumpall`, como
+     no fim da seção "Google de cada pessoa").
   Sem isso, "Conectar" no Google avisa que falta configurar o app do Google.
+- **Slack** (só a conexão; para onde vão as mensagens fica para depois). Uma vez por consultoria:
+  1. Em [api.slack.com/apps](https://api.slack.com/apps), **Create New App → From scratch**: dê um nome (ex.:
+     "IXC Consult") e escolha o workspace da consultoria.
+  2. Em **OAuth & Permissions → Scopes → Bot Token Scopes**, adicione `chat:write` (mandar mensagens),
+     `chat:write.public` (mandar em canal público sem convidar o bot) e `users:read.email` (para, no futuro, achar a
+     pessoa pelo e-mail e mandar mensagem direta).
+  3. No topo da mesma página, **Install to Workspace** e autorize (em alguns workspaces o administrador do Slack precisa
+     aprovar o app). Mudou os escopos depois? Reinstale o app e, se o token mudar, cole o novo no sistema.
+  4. Copie o **Bot User OAuth Token** (começa com `xoxb-`).
+  5. No sistema, **Integrações → Slack → Conectar**: cole o token e, se quiser, o canal do teste (`#geral` ou o ID do
+     canal, que aparece nos detalhes do canal). Canal privado: convide o bot antes (`/invite @nome-do-app`). **Testar**
+     confere o token e posta "Teste da IXC Consult: conexão funcionando." no canal; a linha mostra o workspace e o canal.
+- **WhatsApp** pela **WhatsApp Business Cloud API** (a API oficial da Meta; só a conexão por enquanto). Uma vez por
+  consultoria:
+  1. Em [developers.facebook.com](https://developers.facebook.com), **Meus apps → Criar app**, do tipo empresa, com o
+     caso de uso do **WhatsApp** (conectar-se com clientes pelo WhatsApp), ligado ao portfólio empresarial (Business
+     Manager) da consultoria.
+  2. Em **WhatsApp → Configuração da API** (API Setup) ficam o **ID do número de telefone** (Phone number ID) e o **ID
+     da conta do WhatsApp Business** (WhatsApp Business Account ID). No começo a Meta dá um número de teste; para usar o
+     número da consultoria, adicione e verifique o número nessa página.
+  3. **Token permanente:** em [business.facebook.com](https://business.facebook.com) → **Configurações do negócio →
+     Usuários → Usuários do sistema**, crie um usuário do sistema (administrador), em **Atribuir ativos** dê a ele o app
+     e a conta do WhatsApp (controle total) e clique em **Gerar novo token**: escolha o app, validade **Nunca** e as
+     permissões `whatsapp_business_messaging` e `whatsapp_business_management`. Não use o token temporário da página
+     de Configuração da API: ele vence em 24 horas.
+  4. No sistema, **Integrações → WhatsApp → Conectar**: os dois IDs e o token. Opcional: um número para o teste, no
+     formato internacional (`+5511999998888`), que recebe o modelo `hello_world` (o número não fica guardado). **Testar**
+     confere o token e o número; a linha mostra o número e o nome verificado.
+  5. **Enquanto o app da Meta estiver em modo de desenvolvimento, o `hello_world` só chega a números liberados**: cadastre
+     o número na lista de destinatários (campo "Para" da Configuração da API; até 5 números). Para mandar a qualquer
+     número, o app precisa estar publicado (modo ativo), com a empresa verificada. Mensagem que a empresa começa precisa
+     de um modelo aprovado pela Meta; texto livre só nas 24 horas depois que a pessoa escreve.
+  6. A versão da Graph API fica na constante `VERSAO_DA_GRAPH` (`supabase/functions/_shared/conexoes.ts`, hoje
+     `v26.0`). Cada versão vale cerca de dois anos: quando a Meta avisar que ela vai vencer, suba a constante.
+
+## Google de cada pessoa (Calendário)
+
+No Calendário, cada pessoa conecta **o próprio** Google ("Conectar Google"): a agenda cria os eventos, o Meet e a
+gravação na conta de quem é dono da agenda. É o mesmo app OAuth das Integrações (`GOOGLE_OAUTH_CLIENT_ID` e
+`GOOGLE_OAUTH_CLIENT_SECRET`), com outro endereço de retorno. O token de cada pessoa fica só no Vault; o navegador
+vê apenas "conectado ou não" e o e-mail da conta. Edge Functions: `google-pessoa` (conectar e desconectar) e
+`agenda` (criar, editar, apagar e responder aos eventos: grava no Google do organizador primeiro e depois no banco;
+quem não conectou o Google fica com o evento só no app, sem Meet), com o núcleo em `supabase/functions/_shared/agenda/`.
+
+1. No Google Cloud, no mesmo app: ative também a **Google Meet REST API** (além da Calendar API) e, na tela de
+   consentimento, os escopos `calendar.events`, `meetings.space.settings` e `meetings.space.readonly` (o app pede
+   ainda `openid` e `email`; lista exata em `ESCOPOS_DA_PESSOA`, `supabase/functions/_shared/agenda/google.ts`).
+2. Cadastre um **segundo endereço de retorno** no "ID do cliente OAuth": a tela do Calendário do app,
+   `https://<endereço-da-vercel>/calendario` (no local: `http://localhost:5173/calendario`). O Google volta para a
+   tela, e a tela termina a conexão com o login da pessoa (assim ninguém pendura o Google de outra pessoa na própria
+   conta).
+3. Passe para as Edge Functions `GOOGLE_PESSOA_REDIRECT_URI` com esse endereço (na nuvem:
+   `npx supabase secrets set GOOGLE_PESSOA_REDIRECT_URI=https://<endereço-da-vercel>/calendario`; no local, como as
+   outras, em `[edge_runtime.secrets]`).
+4. **Interno ou externo:** com o app "Interno" no Workspace da IXCSoft, quem é do mesmo domínio conecta sem
+   verificação do Google. Consultores de outro domínio (ex.: STI) exigem o app "Externo", verificado pelo Google (os
+   escopos do Meet pedem verificação). **Gravação e transcrição** só funcionam em contas Google Workspace com esses
+   recursos ligados.
+5. Desconectar apaga o token aqui e revoga a permissão no Google. A revogação vale para o app inteiro naquela conta:
+   se a mesma conta do Google também estiver conectada nas Integrações da consultoria, aquela conexão pode cair junto.
+
+**Depois da reunião** (Edge Function `reunioes-depois`): o `pg_cron` chama a função a cada 10 minutos (pelo `pg_net`)
+para buscar, com o Google do organizador, a gravação e a transcrição das reuniões que terminaram e criar a pasta da
+reunião no cliente. A chamada leva o segredo `reunioes_depois_segredo` do Vault (criado aleatório pela migração, nunca
+no git); o endereço da função fica no Vault como `reunioes_depois_url` (no local, o gateway do Docker). Na nuvem, a
+migração liga o `pg_cron` e o `pg_net` e agenda a rotina; falta só trocar o endereço pelo do projeto, no SQL Editor:
+`select vault.update_secret((select id from vault.secrets where name = 'reunioes_depois_url'),
+'https://<ref-do-projeto>.supabase.co/functions/v1/reunioes-depois');`. Confira em **Integrations → Cron** que o job
+`reunioes-depois` está ativo. Depois do deploy, confira se a rotina chega na função: no SQL Editor,
+`select id, status_code, content, created from net._http_response order by created desc limit 5;` deve mostrar
+`status_code` 200 a cada 10 minutos (401 = segredo do Vault diferente do da função; erro de conexão = endereço errado).
+Decisões e motivos: `docs/superpowers/specs/2026-11-16-calendario-design.md`.
+
+No Supabase local, uma Edge Function **nova** só passa a ser servida depois de recriar o runtime
+(`npx supabase stop && npx supabase start`; os dados ficam). **Antes**, faça a cópia do banco inteiro (como no
+`CLAUDE.md`):
+`docker exec supabase_db_consultoria pg_dumpall -U postgres > supabase/.copias/<data>-antes-de-reiniciar.sql`
+(a pasta `supabase/.copias/` fica fora do git), e nunca rode o `stop` com `--no-backup`. `npm run functions:reiniciar`
+recarrega o código das funções que o runtime já conhece.
 
 ## Publicar (depois)
 
@@ -129,11 +270,23 @@ Vault do Supabase e nunca voltam para o navegador. Salvar já testa a conexão. 
 2. `npx supabase login` e `npx supabase link --project-ref <ref-do-projeto>`.
 3. `npx supabase db push --remote` envia as migrações. No CLI 3, sem `--remote` ele mexe no banco local.
 4. `npx supabase functions deploy` publica as Edge Functions (`criar-acesso`, `criar-consultoria`, `reenviar-convite`,
-   `gerenciar-acesso`, `gerenciar-consultoria`, `integracoes`, `integracoes-google`).
+   `gerenciar-acesso`, `gerenciar-consultoria`, `integracoes`, `integracoes-google`, `google-pessoa`, `agenda`,
+   `reunioes-depois`). Depois, troque o endereço da rotina das reuniões no Vault (veja "Depois da reunião", acima).
 5. Em Authentication: Site URL e redirecionamentos com o endereço da Vercel (`https://.../**`),
-   cadastro aberto desligado, senha mínima 8, os modelos de e-mail de `supabase/templates` e o Google.
-6. Configure um provedor de e-mail (Resend, SendGrid etc.): o e-mail que vem com o Supabase só entrega para o time do projeto.
-7. Crie o dono: `SUPABASE_URL=... SUPABASE_SECRET_KEY=... APP_URL=https://... npm run dono:criar -- seu@email.com "Seu Nome"`.
+   cadastro aberto desligado, a política de senha (**Authentication → Policies → Passwords**, ou no provedor
+   **Email**, conforme a versão do painel: tamanho mínimo **10** e requisitos **"Lowercase, uppercase letters, digits
+   and symbols"**, a mesma regra do app), os modelos de e-mail de `supabase/templates`, o Google e a verificação em
+   duas etapas (Multi-Factor → TOTP, veja acima). A política de senha e o TOTP também podem ir com
+   `npx supabase config push` (projeto ligado), mas ele manda todo o Auth do `supabase/config.toml`, inclusive o
+   Site URL local: rode antes `npx supabase config diff` e só envie se a diferença for a esperada.
+6. Quadro (Kanban): o balde privado `quadros` (anexos e imagens das descrições, até 25 MB por arquivo) vem das
+   migrações. Os quadros dos clientes guardam na pasta `<id do cliente>/`; os pessoais e de time (menu Quadros), na
+   pasta `quadro/<id do quadro>/` do mesmo balde. O quadro ao vivo usa canais privados com RLS em
+   `realtime.messages` e funciona com **"Allow public access"** (**Realtime → Settings**) ligado ou desligado: a opção
+   só vale para canais públicos. Desligá-la (só canais privados) é proteção a mais. Se o Realtime não conectar, a tela
+   cai no plano B (releitura a cada 30 s).
+7. Configure um provedor de e-mail (Resend, SendGrid etc.): o e-mail que vem com o Supabase só entrega para o time do projeto.
+8. Crie o dono: `SUPABASE_URL=... SUPABASE_SECRET_KEY=... APP_URL=https://... npm run dono:criar -- seu@email.com "Seu Nome"`.
 
 **Vercel**
 

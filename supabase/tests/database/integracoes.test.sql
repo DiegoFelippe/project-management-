@@ -1,7 +1,7 @@
 -- Integrações: quem vê, o segredo fica no Vault e só a Edge Function (service_role) grava. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(17);
+select plan(24);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -65,6 +65,8 @@ select testes.perfil('dono', 'dono', null);
 select testes.perfil('admin_a', 'admin', 'A');
 select testes.perfil('gestor_a', 'gestor', 'A');
 select testes.perfil('admin_b', 'admin', 'B');
+select testes.consultoria('C');
+select testes.perfil('admin_c', 'admin', 'C');
 
 -- A Edge Function grava pelas funções (aqui o teste roda como dono do banco, como a service_role faria)
 select ok(public.integracao_salvar(testes.id('A'), 'ia', '{"provedor":"anthropic","modelo":"claude-opus-5-5"}', 'chave-secreta-1', testes.id('admin_a')) is not null, 'salva a integração com o segredo');
@@ -74,6 +76,28 @@ select is(public.integracao_segredo((select id from public.integracoes where con
 select is((select config->>'modelo' from public.integracoes where consultoria_id = testes.id('A') and tipo = 'ia'), 'claude-sonnet-5-5', 'a configuração mudou');
 select is((select count(*) from public.integracoes where consultoria_id = testes.id('A')), 1::bigint, 'uma conexão por tipo por consultoria');
 select public.integracao_salvar(testes.id('B'), 'smtp', '{"host":"smtp.b.test"}', 'senha-b', testes.id('admin_b'));
+
+-- Slack e WhatsApp (só a conexão): tipos aceitos, com o token no Vault como os outros; tipo fora do catálogo não entra.
+select public.integracao_salvar(testes.id('C'), 'slack', '{"canal":"#geral"}', 'xoxb-1-c', testes.id('admin_c'));
+select public.integracao_salvar(testes.id('C'), 'whatsapp', '{"phone_number_id":"1234567890123","waba_id":"9876543210"}', 'EAAG-c', testes.id('admin_c'));
+select is(public.integracao_segredo((select id from public.integracoes where consultoria_id = testes.id('C') and tipo = 'slack')),
+  'xoxb-1-c', 'Slack: conecta e o token de bot fica no Vault');
+select is(public.integracao_segredo((select id from public.integracoes where consultoria_id = testes.id('C') and tipo = 'whatsapp')),
+  'EAAG-c', 'WhatsApp: conecta e o token fica no Vault');
+select throws_ok(format('select public.integracao_salvar(%L, %L, %L, %L, %L)', testes.id('C'), 'fax', '{}', 'x', testes.id('admin_c')),
+  '23514', null, 'tipo fora do catálogo é recusado');
+
+-- Apagar só o segredo (SMTP sem login num servidor novo): a conexão fica, a senha sai do Vault.
+select public.integracao_salvar(testes.id('C'), 'smtp', '{"host":"smtp.c.test","usuario":"c@c.test"}', 'senha-antiga-c', testes.id('admin_c'));
+select public.integracao_apagar_segredo((select id from public.integracoes where consultoria_id = testes.id('C') and tipo = 'smtp'));
+select is(public.integracao_segredo((select id from public.integracoes where consultoria_id = testes.id('C') and tipo = 'smtp')),
+  null, 'apagar o segredo: a integração não tem mais senha');
+select is((select count(*) from vault.secrets where name like 'integracao_smtp_' || testes.id('C')::text || '%'), 0::bigint,
+  'apagar o segredo: a senha saiu do Vault');
+select is((select count(*) from public.integracoes where consultoria_id = testes.id('C') and tipo = 'smtp'), 1::bigint,
+  'apagar o segredo: a conexão continua');
+select ok(not has_function_privilege('authenticated', 'public.integracao_apagar_segredo(uuid)', 'execute'),
+  'o navegador não apaga o segredo');
 
 -- Quem vê
 select testes.como('admin_a');
@@ -88,7 +112,7 @@ select testes.como('gestor_a');
 select is((select count(*) from public.integracoes), 0::bigint, 'o gestor não vê integrações');
 reset role;
 select testes.como('dono');
-select is((select count(*) from public.integracoes), 2::bigint, 'o dono vê as de todas as consultorias');
+select is((select count(*) from public.integracoes where consultoria_id in (testes.id('A'), testes.id('B'))), 2::bigint, 'o dono vê as de todas as consultorias');
 reset role;
 
 -- Desconectar apaga a linha e o segredo
