@@ -1,0 +1,1896 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>POC Modelos de check-in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  Protótipo descartável (POC) para validar com o Diego os MODELOS DE CHECK-IN antes de construir no app:
+  a Central ou o gestor cria um modelo (etapas e tarefas, com prazos e dependências); o modelo é aplicado
+  no cliente; o consultor segue como check-list (lista ou fluxograma) e o que ele marca entra no check-in.
+  Dados de exemplo, tudo em memória: "Restaurar exemplo" (ou recarregar) volta ao começo.
+-->
+<style>
+:root {
+  --moldura: #ffffff; --painel: #eef1f5; --fg: #0f172a; --card: #ffffff;
+  --primary: #2563eb; --primary-fg: #ffffff; --muted: #f1f5f9; --muted-fg: #64748b;
+  --accent: #eff6ff; --accent-fg: #1e3a8a; --destructive: #dc2626; --destructive-soft: #fee2e2;
+  --border: #e2e8f0; --input: #cbd5e1; --ring: #2563eb;
+  --notice: #b45309; --notice-soft: #fef3c7; --positive: #15803d; --positive-soft: #dcfce7;
+  --overlay: rgb(15 23 42 / 0.5);
+  --sombra-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.05);
+  --sombra-janela: 0 24px 60px -12px rgb(15 23 42 / 0.35);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --moldura: #0e1424; --painel: #080c17; --fg: #e5e9f0; --card: #121a2c;
+    --primary: #3b82f6; --muted: #1b2438; --muted-fg: #94a0b8; --accent: #172554; --accent-fg: #bfdbfe;
+    --destructive: #f05252; --destructive-soft: rgb(240 82 82 / 0.14); --border: #222c42; --input: #34405a; --ring: #60a5fa;
+    --notice: #fbbf24; --notice-soft: rgb(251 191 36 / 0.14); --positive: #4ade80; --positive-soft: rgb(74 222 128 / 0.14);
+    --overlay: rgb(0 0 0 / 0.6);
+    --sombra-card: 0 0 0 1px rgb(255 255 255 / 0.03);
+    --sombra-janela: 0 0 0 1px rgb(255 255 255 / 0.06), 0 24px 60px -12px rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font: 13.5px/20px 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--painel); color: var(--fg); -webkit-font-smoothing: antialiased;
+}
+body.com-janela { overflow: hidden; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+svg.i { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.t-titulo { font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.015em; margin: 0; }
+.t-janela { font-size: 15px; line-height: 20px; font-weight: 700; margin: 0; }
+.t-rotulo { font-size: 12.5px; line-height: 18px; }
+.t-legenda { font-size: 11px; line-height: 16px; color: var(--muted-fg); }
+.mudo { color: var(--muted-fg); }
+.m0 { margin: 0; }
+.min0 { min-width: 0; }
+.flex1 { flex: 1; }
+.bloco { display: block; }
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.section-label { font-size: 10.5px; line-height: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-fg); }
+
+/* Faixa do protótipo */
+.faixa { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 16px; background: var(--notice-soft); border-bottom: 1px solid var(--border); }
+.selo-poc { font-weight: 700; color: var(--notice); font-size: 12.5px; }
+.faixa .ver-como { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+
+/* Moldura (trilho + barra de cima) */
+.app { display: grid; grid-template-columns: 76px minmax(0, 1fr); grid-template-rows: 52px 1fr; min-height: calc(100vh - 46px); }
+.trilho { grid-row: 1 / span 2; background: var(--moldura); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; }
+.logo { width: 36px; height: 36px; background: #0b1f4d; color: #fff; display: grid; place-items: center; font-size: 10px; font-weight: 800; letter-spacing: .02em; margin-bottom: 10px; flex: none; }
+.item-trilho { width: 66px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 0; color: var(--muted-fg); font-size: 10.5px; line-height: 13px; text-align: center; background: none; border: 0; cursor: pointer; }
+.item-trilho .ic { width: 36px; height: 30px; display: grid; place-items: center; border-radius: 9px; transition: background-color .15s; }
+.item-trilho:hover .ic { background: var(--muted); }
+.item-trilho.aberto { color: var(--fg); font-weight: 600; }
+.item-trilho.aberto .ic { background: var(--primary); color: var(--primary-fg); }
+.item-trilho .ic svg { width: 18px; height: 18px; }
+@keyframes icone-subir { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-4px); } 70% { transform: translateY(1px); } }
+@keyframes icone-transmitir { 0%, 100% { transform: scale(1); } 20% { transform: scale(1.22); } 40% { transform: scale(1); } 60% { transform: scale(1.22); } 80% { transform: scale(1); } }
+@keyframes icone-abrir { 0%, 100% { transform: none; } 45% { transform: perspective(60px) rotateX(-28deg) translateY(-1px); } }
+@keyframes icone-erguer { 0%, 100% { transform: scaleY(1); } 40% { transform: translateY(-2px) scaleY(1.18); } 70% { transform: scaleY(0.95); } }
+.anim-erguer { transform-origin: bottom center; }
+.group:hover .anim-subir, .group:focus-visible .anim-subir { animation: icone-subir .55s ease-out; }
+.group:hover .anim-transmitir, .group:focus-visible .anim-transmitir { animation: icone-transmitir .7s ease-in-out; }
+.group:hover .anim-abrir, .group:focus-visible .anim-abrir { animation: icone-abrir .55s ease-in-out; }
+.group:hover .anim-erguer, .group:focus-visible .anim-erguer { animation: icone-erguer .55s ease-out; }
+.barra-topo { background: var(--moldura); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; padding: 0 20px; min-width: 0; }
+.barra-topo .caminho { color: var(--muted-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.barra-topo .caminho b { color: var(--fg); font-weight: 600; }
+.barra-topo .quem { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+main { padding: 24px 28px 48px; min-width: 0; }
+
+/* Peças comuns */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--sombra-card); }
+.cabecalho { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.cabecalho-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sub-cabecalho { margin: 2px 0 0; color: var(--muted-fg); max-width: 760px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 12px;
+  border: 1px solid transparent; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  background: var(--primary); color: var(--primary-fg);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .18), 0 4px 12px -4px rgb(37 99 235 / .55);
+  transition: transform .15s, box-shadow .15s, background-color .15s, border-color .15s, color .15s;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 rgb(255 255 255 / .18), 0 8px 18px -6px rgb(37 99 235 / .55); }
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn.contorno { background: var(--card); color: color-mix(in srgb, var(--fg) 82%, transparent); border-color: var(--border); box-shadow: 0 1px 2px rgb(15 23 42 / .05); }
+.btn.contorno:hover { border-color: color-mix(in srgb, var(--primary) 35%, transparent); background: var(--accent); color: var(--accent-fg); }
+.btn.fantasma { background: none; box-shadow: none; color: var(--muted-fg); font-weight: 500; }
+.btn.fantasma:hover { background: var(--accent); color: var(--accent-fg); }
+.btn.pequeno { height: 30px; padding: 0 10px; font-size: 12.5px; border-radius: 10px; }
+.btn.perigo { background: var(--destructive); box-shadow: inset 0 1px 0 rgb(255 255 255 / .18), 0 4px 12px -4px rgb(220 38 38 / .55); }
+.btn.contorno.realce-perigo:hover, .btn.fantasma.realce-perigo:hover { border-color: color-mix(in srgb, var(--destructive) 40%, transparent); background: var(--destructive-soft); color: var(--destructive); }
+.btn:hover svg.i { animation: pulinho .45s ease-out; }
+.btn:hover svg.mais-gira { animation: none; transform: rotate(90deg); }
+.btn svg.mais-gira { transition: transform .2s; }
+@keyframes pulinho { 40% { transform: translateY(-2px) scale(1.08); } }
+.btn-icone { width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 8px; border: 0; background: none; color: var(--muted-fg); cursor: pointer; transition: transform .15s, background-color .15s, color .15s; flex: none; padding: 0; }
+.btn-icone:hover { background: var(--accent); color: var(--accent-fg); transform: translateY(-1px); }
+.btn-icone:active { transform: scale(.97); }
+.btn-icone.perigo:hover { background: var(--destructive-soft); color: var(--destructive); }
+.btn-icone:disabled { opacity: .3; cursor: default; transform: none; background: none; color: var(--muted-fg); }
+.btn-icone svg.i { width: 15px; height: 15px; }
+
+.segmentado { display: inline-flex; max-width: 100%; overflow-x: auto; gap: 2px; padding: 4px; border-radius: 12px; background: var(--muted); font-size: 12.5px; font-weight: 600; scrollbar-width: none; }
+.segmentado button { border: 0; background: none; color: var(--muted-fg); padding: 5px 12px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: transform .15s, color .15s, background-color .15s; }
+.segmentado button:hover { color: var(--fg); transform: translateY(-1px); }
+.segmentado button:active { transform: scale(.97); }
+.segmentado button[aria-pressed="true"], .segmentado button[aria-selected="true"] { background: var(--card); color: var(--primary); box-shadow: 0 1px 3px rgb(15 23 42 / .12); }
+.segmentado svg.i { width: 13px; height: 13px; }
+.segmentado .n { font-size: 10px; font-weight: 700; line-height: 14px; padding: 1px 6px; border-radius: 99px; background: var(--accent); color: var(--accent-fg); }
+.segmentado .n.aviso { background: var(--notice-soft); color: var(--notice); }
+
+.barra-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 12px; margin-bottom: 16px; }
+.fim { margin-left: auto; }
+.busca { position: relative; flex: 1 1 200px; max-width: 320px; min-width: 0; }
+.busca svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted-fg); pointer-events: none; }
+.busca .input { padding-left: 36px; }
+.input {
+  width: 100%; height: 38px; padding: 0 12px; font: inherit; font-size: 13.5px; color: var(--fg); background: var(--card);
+  border: 1px solid var(--border); border-radius: 12px; outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.input:hover { border-color: var(--input); }
+.input:focus { border-color: color-mix(in srgb, var(--primary) 60%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent); }
+textarea.input { height: auto; min-height: 76px; padding: 8px 12px; resize: vertical; line-height: 20px; }
+.input[aria-invalid="true"] { border-color: var(--destructive); }
+.input.fino { height: 32px; font-size: 12.5px; }
+.form-label { display: block; font-size: 12.5px; line-height: 18px; font-weight: 500; color: color-mix(in srgb, var(--fg) 80%, transparent); margin-bottom: 6px; }
+.ajuda { font-size: 11.5px; line-height: 16px; color: var(--muted-fg); margin: 6px 0 0; }
+.erro { color: var(--destructive); font-size: 12.5px; line-height: 18px; margin: 0; }
+
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; line-height: 16px; font-weight: 600; padding: 2px 8px; border-radius: 99px; border: 1px solid transparent; white-space: nowrap; }
+.badge svg.i { width: 12px; height: 12px; }
+.badge.positivo { background: var(--positive-soft); color: var(--positive); }
+.badge.aviso { background: var(--notice-soft); color: var(--notice); }
+.badge.perigo { background: var(--destructive-soft); color: var(--destructive); }
+.badge.azul { background: var(--accent); color: var(--accent-fg); }
+.badge.cinza { background: var(--muted); color: var(--muted-fg); }
+.badge.contorno { border-color: var(--border); color: var(--muted-fg); }
+
+.tabela-card { overflow: hidden; }
+.rolagem { overflow-x: auto; position: relative; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+thead { background: color-mix(in srgb, var(--muted) 55%, transparent); color: var(--muted-fg); font-size: 12.5px; }
+th { font-weight: 500; padding: 10px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 11px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: color-mix(in srgb, var(--muted) 45%, transparent); }
+td.acoes { text-align: right; white-space: nowrap; }
+.nome { font-weight: 600; }
+.sub { color: var(--muted-fg); font-size: 12px; line-height: 17px; }
+.link-nome { background: none; border: 0; padding: 0; font-weight: 600; cursor: pointer; text-align: left; color: var(--fg); }
+.link-nome:hover { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+.vazio { border: 1px dashed var(--input); border-radius: 16px; padding: 32px; text-align: center; color: var(--muted-fg); background: color-mix(in srgb, var(--card) 60%, transparent); }
+.pessoa { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.avatar { width: 28px; height: 28px; border-radius: 99px; display: grid; place-items: center; color: #fff; font-size: 10.5px; font-weight: 700; flex: none; }
+.barra { height: 6px; border-radius: 99px; background: var(--muted); overflow: hidden; }
+.barra > span { display: block; height: 100%; background: var(--primary); border-radius: 99px; transition: width .3s; }
+.barra.grande { height: 8px; }
+.barra.verde > span { background: var(--positive); }
+
+/* Check-in do cliente */
+.grade-topo { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; }
+.cartao { padding: 16px; display: grid; gap: 14px; align-content: start; }
+.cartao-topo { display: flex; align-items: flex-start; gap: 12px; }
+.pct { margin-left: auto; font-size: 28px; line-height: 32px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.numero-card { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--card); min-width: 0; }
+.numero-card .valor { font-size: 20px; line-height: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.numero-card.perigo .valor { color: var(--destructive); }
+.numero-card.aviso .valor { color: var(--notice); }
+.numero-card.positivo .valor { color: var(--positive); }
+.janela-icone { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary); flex: none; }
+.janela-icone svg.i { width: 20px; height: 20px; }
+.sessao-tempo { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.cronometro { font-size: 28px; line-height: 32px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.sessao-lista { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sessao-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.ponto-vivo { width: 7px; height: 7px; border-radius: 99px; background: var(--positive); animation: vivo 1.6s infinite; }
+@keyframes vivo { 0% { box-shadow: 0 0 0 0 rgb(21 128 61 / .5); } 70% { box-shadow: 0 0 0 7px rgb(21 128 61 / 0); } 100% { box-shadow: 0 0 0 0 rgb(21 128 61 / 0); } }
+.faixa-info { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-radius: 12px; background: var(--accent); color: var(--accent-fg); margin-bottom: 16px; font-size: 12.5px; line-height: 18px; }
+.faixa-info svg.i { margin-top: 2px; }
+.lista-etapas { display: grid; gap: 14px; }
+.etapa { overflow: hidden; }
+.etapa-topo { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--muted) 40%, transparent); }
+.etapa-topo h3 { margin: 0; font-size: 13.5px; font-weight: 700; }
+.progresso-mini { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.progresso-mini .barra { width: 80px; }
+.numero { width: 22px; height: 22px; border-radius: 99px; display: grid; place-items: center; background: var(--accent); color: var(--accent-fg); font-size: 11px; font-weight: 700; flex: none; }
+.tarefas { list-style: none; margin: 0; padding: 0; }
+.tarefa { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); align-items: start; transition: background-color .15s; }
+.tarefa:last-child { border-bottom: 0; }
+.tarefa:hover { background: color-mix(in srgb, var(--muted) 35%, transparent); }
+.tarefa.atrasada { box-shadow: inset 3px 0 0 var(--destructive); }
+.tarefa.hoje { box-shadow: inset 3px 0 0 var(--notice); }
+.tarefa.andamento { box-shadow: inset 3px 0 0 var(--primary); }
+.caixa { width: 20px; height: 20px; margin-top: 1px; border-radius: 6px; border: 1.5px solid var(--input); background: var(--card); display: grid; place-items: center; cursor: pointer; color: #fff; padding: 0; transition: transform .15s, background-color .15s, border-color .15s; }
+.caixa:hover { border-color: var(--primary); transform: translateY(-1px); }
+.caixa:active { transform: scale(.9); }
+.caixa[aria-checked="true"] { background: var(--positive); border-color: var(--positive); }
+.caixa[aria-disabled="true"] { cursor: not-allowed; }
+.caixa[aria-disabled="true"]:not([aria-checked="true"]) { background: var(--muted); }
+.caixa.trancada { color: var(--muted-fg); }
+.caixa svg.i { width: 12px; height: 12px; stroke-width: 3; }
+.caixa.trancada svg.i { stroke-width: 2.25; }
+.tarefa-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tarefa-nome { font-weight: 600; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: var(--fg); }
+.tarefa-nome:hover { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+.tarefa.feito .tarefa-nome { color: var(--muted-fg); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted-fg) 60%, transparent); }
+.tarefa-desc { color: var(--muted-fg); font-size: 12.5px; line-height: 18px; margin-top: 1px; }
+.tarefa-meta { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 6px; align-items: center; }
+.nota { display: flex; gap: 8px; align-items: flex-start; background: var(--muted); border-radius: 10px; padding: 6px 10px; margin-top: 8px; font-size: 12.5px; line-height: 18px; }
+.nota svg.i { margin-top: 2px; color: var(--muted-fg); width: 13px; height: 13px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; padding: 2px 4px 2px 8px; border-radius: 99px; background: var(--accent); color: var(--accent-fg); font-size: 11.5px; line-height: 16px; font-weight: 600; }
+.chip.so-texto { padding-right: 8px; }
+.chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.chip svg.i { width: 12px; height: 12px; }
+.chip button { width: 18px; height: 18px; border: 0; border-radius: 99px; background: none; color: inherit; display: grid; place-items: center; cursor: pointer; padding: 0; transition: transform .15s, background-color .15s; }
+.chip button:hover { background: color-mix(in srgb, var(--primary) 18%, transparent); transform: translateY(-1px); }
+.chip button:active { transform: scale(.9); }
+.chip.erro { background: var(--destructive-soft); color: var(--destructive); }
+
+/* Fluxograma */
+.fluxo-card { overflow: hidden; }
+.fluxo-caixa { position: relative; overflow: auto; max-width: 100%; cursor: grab; overscroll-behavior-x: contain; background: var(--card); }
+.fluxo-caixa.arrastando { cursor: grabbing; user-select: none; }
+.fluxo-caixa > svg { display: block; margin: 0 auto; font-family: inherit; }
+.raia { fill: color-mix(in srgb, var(--muted) 75%, transparent); }
+.raia-titulo { font-size: 12px; font-weight: 700; fill: var(--fg); }
+.raia-sub { font-size: 11px; fill: var(--muted-fg); }
+.aresta { fill: none; stroke: var(--input); stroke-width: 1.5; }
+.aresta.feita { stroke: var(--positive); stroke-opacity: .55; }
+.aresta.realce { stroke: var(--primary); stroke-width: 2.25; stroke-opacity: 1; }
+.aresta.invalida { stroke: var(--destructive); stroke-dasharray: 4 3; }
+.seta { fill: var(--input); }
+.seta.feita { fill: var(--positive); fill-opacity: .7; }
+.seta.realce { fill: var(--primary); }
+.seta.invalida { fill: var(--destructive); }
+.no { cursor: pointer; color: var(--muted-fg); outline: none; }
+.no.estatico { cursor: default; }
+.no .fundo-no { fill: var(--card); stroke: var(--input); stroke-width: 1.25; transition: stroke .15s, filter .15s; }
+.no:not(.estatico):hover .fundo-no { stroke: var(--primary); filter: drop-shadow(0 6px 10px rgb(15 23 42 / .14)); }
+.no.feito { color: var(--positive); } .no.feito .fundo-no { fill: var(--positive-soft); stroke: var(--positive); }
+.no.andamento { color: var(--primary); } .no.andamento .fundo-no { fill: var(--accent); stroke: var(--primary); }
+.no.bloqueada .fundo-no { fill: var(--muted); stroke-dasharray: 5 4; }
+.no.hoje { color: var(--notice); } .no.hoje .fundo-no { fill: var(--notice-soft); stroke: var(--notice); }
+.no.atrasada { color: var(--destructive); } .no.atrasada .fundo-no { fill: var(--destructive-soft); stroke: var(--destructive); }
+.no.selecionado .fundo-no { stroke-width: 2.5; }
+.no:focus-visible .fundo-no { stroke: var(--ring); stroke-width: 3; }
+.no.apagado { opacity: .28; }
+.no-titulo { font-size: 12px; font-weight: 600; fill: var(--fg); }
+.no.bloqueada .no-titulo { fill: var(--muted-fg); }
+.no-sub { font-size: 10.5px; fill: currentColor; }
+.bolinha { fill: currentColor; fill-opacity: .14; }
+.no-icone { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted-fg); }
+.legenda .item { display: inline-flex; align-items: center; gap: 6px; }
+.amostra { width: 14px; height: 10px; border-radius: 3px; border: 1.25px solid var(--input); background: var(--card); display: inline-block; }
+.amostra.feito { background: var(--positive-soft); border-color: var(--positive); }
+.amostra.andamento { background: var(--accent); border-color: var(--primary); }
+.amostra.bloqueada { background: var(--muted); border-style: dashed; }
+.amostra.hoje { background: var(--notice-soft); border-color: var(--notice); }
+.amostra.atrasada { background: var(--destructive-soft); border-color: var(--destructive); }
+.legenda .dica { margin-left: auto; }
+
+/* Perguntas do protótipo */
+.perguntas { margin-top: 28px; background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--notice); border-radius: 16px; padding: 14px 18px; }
+.perguntas h2 { font-size: 13.5px; margin: 0 0 6px; display: flex; gap: 8px; align-items: center; }
+.perguntas ol { margin: 0; padding-left: 20px; color: var(--muted-fg); }
+.perguntas li { margin: 5px 0; }
+.perguntas li b { color: var(--fg); font-weight: 600; }
+
+/* Janela (formulário no padrão Hub) */
+.fundo { position: fixed; inset: 0; background: var(--overlay); display: grid; place-items: center; padding: 16px; z-index: 20; animation: aparecer .15s ease-out; }
+.janela { background: var(--card); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 560px; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; box-shadow: var(--sombra-janela); animation: crescer-janela .15s ease-out; outline: none; }
+.janela.media { max-width: 760px; }
+.janela.larga { max-width: 1060px; }
+.janela > header { display: flex; align-items: flex-start; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.janela > header.com-abas { border-bottom: 0; padding-bottom: 12px; }
+.janela > header p { margin: 2px 0 0; font-size: 12.5px; line-height: 18px; color: var(--muted-fg); }
+.janela-abas { padding: 0 24px 12px; border-bottom: 1px solid var(--border); }
+.janela .corpo { padding: 24px; overflow-y: auto; flex: 1; min-height: 0; display: grid; gap: 20px; align-content: start; }
+.janela > footer { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--muted) 40%, transparent); border-radius: 0 0 16px 16px; }
+.janela > footer .erro { margin-right: auto; flex: 1 1 200px; }
+.janela > footer .erro:empty { display: none; }
+@keyframes aparecer { from { opacity: 0; } }
+@keyframes crescer-janela { from { opacity: 0; transform: scale(.97); } }
+.sem-animacao { animation: none !important; }
+.grade-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.caixa-info { background: var(--muted); border-radius: 12px; padding: 12px; display: grid; gap: 6px; font-size: 12.5px; line-height: 18px; }
+.aviso-inline { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--notice-soft); color: var(--notice); font-size: 12.5px; line-height: 18px; }
+.aviso-inline.perigo { background: var(--destructive-soft); color: var(--destructive); }
+.aviso-inline svg.i { margin-top: 2px; }
+.aviso-inline b { color: inherit; }
+.duas-colunas { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 24px; align-items: start; }
+.coluna-apoio { display: grid; gap: 16px; position: sticky; top: 0; }
+.coluna-principal { display: grid; gap: 12px; min-width: 0; }
+.opcoes-cards { display: grid; gap: 8px; }
+.opcao-card { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; background: var(--card); text-align: left; width: 100%; transition: border-color .15s, background-color .15s, transform .15s; }
+.opcao-card:hover { border-color: var(--input); transform: translateY(-1px); }
+.opcao-card:active { transform: scale(.98); }
+.opcao-card[aria-checked="true"] { border-color: var(--primary); background: var(--accent); }
+.opcao-card.fixo { cursor: default; background: var(--muted); }
+.opcao-card.fixo:hover { transform: none; border-color: var(--border); }
+.opcao-card b { font-weight: 600; }
+.radio-bolinha { width: 16px; height: 16px; border-radius: 99px; border: 1.5px solid var(--input); flex: none; margin-top: 2px; display: grid; place-items: center; background: var(--card); }
+[aria-checked="true"] > .radio-bolinha { border-color: var(--primary); }
+[aria-checked="true"] > .radio-bolinha::after { content: ''; width: 8px; height: 8px; border-radius: 99px; background: var(--primary); }
+.seletor { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 10px 0 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); cursor: pointer; min-width: 220px; max-width: 100%; text-align: left; transition: border-color .15s, transform .15s; }
+.seletor:hover { border-color: var(--input); transform: translateY(-1px); }
+.seletor:active { transform: scale(.97); }
+.seletor .valor { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.seletor svg.i { color: var(--muted-fg); }
+.etapa-editor { border: 1px solid var(--border); border-radius: 14px; padding: 12px; display: grid; gap: 10px; background: color-mix(in srgb, var(--muted) 40%, var(--card)); }
+.etapa-editor.com-erro { border-color: var(--destructive); }
+.etapa-editor-topo { display: flex; align-items: center; gap: 6px; }
+.etapa-editor-topo .input { font-weight: 600; }
+.etapa-editor-topo .t-legenda { white-space: nowrap; padding: 0 4px; }
+.confirmacao-inline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--destructive-soft); color: var(--destructive); font-size: 12.5px; }
+.confirmacao-inline span { flex: 1 1 200px; }
+.tarefas-editor { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.tarefa-editor { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px; display: grid; gap: 8px; }
+.tarefa-editor.com-erro { border-color: var(--destructive); }
+.linha-1 { display: flex; align-items: center; gap: 6px; }
+.ordem { min-width: 22px; height: 22px; padding: 0 4px; border-radius: 6px; background: var(--muted); color: var(--muted-fg); font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; flex: none; font-variant-numeric: tabular-nums; }
+.linha-3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.chave { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; padding: 2px 0; cursor: pointer; font-size: 12.5px; transition: transform .15s; }
+.chave:hover { transform: translateY(-1px); }
+.chave:active { transform: scale(.97); }
+.trilho-chave { width: 30px; height: 18px; border-radius: 99px; background: var(--input); position: relative; transition: background-color .15s; flex: none; }
+.trilho-chave::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 99px; background: #fff; transition: transform .15s; box-shadow: 0 1px 2px rgb(0 0 0 / .25); }
+.chave[aria-checked="true"] .trilho-chave { background: var(--primary); }
+.chave[aria-checked="true"] .trilho-chave::after { transform: translateX(12px); }
+.passos { display: inline-flex; align-items: center; gap: 2px; font-size: 12.5px; }
+.passos .input { width: 46px; height: 30px; text-align: center; padding: 0 4px; border-radius: 8px; }
+.passos .t-legenda { margin-right: 4px; }
+.deps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.ver-etapa { display: grid; gap: 8px; }
+.ver-tarefas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ver-tarefas li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; }
+.ver-titulo { font-weight: 600; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.relacoes { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rel { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); cursor: pointer; text-align: left; transition: transform .15s, border-color .15s; }
+.rel:hover { border-color: var(--primary); transform: translateY(-1px); }
+.rel:active { transform: scale(.98); }
+.rel .t-legenda { margin-left: auto; white-space: nowrap; }
+.pinta { width: 10px; height: 10px; border-radius: 99px; flex: none; background: var(--input); }
+.pinta.feito { background: var(--positive); } .pinta.andamento { background: var(--primary); } .pinta.hoje { background: var(--notice); } .pinta.atrasada { background: var(--destructive); } .pinta.livre { background: var(--card); border: 1.5px solid var(--input); }
+
+/* Menu suspenso (popover) */
+.popover { position: fixed; z-index: 40; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 40px -10px rgb(15 23 42 / .35); padding: 6px; width: 340px; max-width: calc(100vw - 24px); max-height: 360px; overflow: auto; animation: aparecer .12s ease-out; }
+.popover-ajuda { margin: 4px 8px 6px; font-size: 11.5px; line-height: 16px; color: var(--muted-fg); }
+.popover-grupo { padding: 8px 8px 4px; }
+.opcao-menu { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; background: none; border-radius: 8px; text-align: left; cursor: pointer; font-size: 13px; transition: background-color .12s, transform .12s; }
+.opcao-menu:hover, .opcao-menu:focus-visible { background: var(--accent); transform: translateY(-1px); }
+.opcao-menu:active { transform: scale(.98); }
+.opcao-menu .marca { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--input); display: grid; place-items: center; flex: none; color: transparent; }
+.opcao-menu .marca svg.i { width: 11px; height: 11px; stroke-width: 3; }
+.opcao-menu[aria-checked="true"] .marca { background: var(--primary); border-color: var(--primary); color: #fff; }
+.opcao-menu.radio .marca { border-radius: 99px; }
+.elipse { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.opcao-menu .lado { margin-left: auto; font-size: 11px; color: var(--muted-fg); white-space: nowrap; }
+
+.aviso-toast { position: fixed; right: 16px; bottom: 16px; z-index: 50; background: var(--fg); color: var(--card); padding: 10px 14px; border-radius: 12px; box-shadow: 0 10px 30px rgb(15 23 42 / .3); font-size: 13px; line-height: 19px; max-width: min(420px, calc(100vw - 32px)); animation: aparecer .2s ease-out; }
+
+@media (max-width: 1100px) { .grade-topo { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1280px) { td.acoes .rotulo-acao { display: none; } }
+@media (max-width: 960px) { .rotulo-acao { display: none; } th, td { padding-left: 10px; padding-right: 10px; } .legenda .dica { margin-left: 0; } }
+@media (max-width: 860px) { .duas-colunas { grid-template-columns: minmax(0, 1fr); } .coluna-apoio { position: static; } }
+@media (max-width: 720px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr; }
+  .trilho { grid-row: auto; flex-direction: row; justify-content: center; border-right: 0; border-bottom: 1px solid var(--border); padding: 6px; }
+  .logo { margin: 0 6px 0 0; }
+  .barra-topo { height: 48px; padding: 0 16px; }
+  main { padding: 18px 16px 40px; }
+  .faixa .ver-como { margin-left: 0; }
+  .numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .busca { max-width: none; }
+  .seletor { min-width: 0; width: 100%; }
+  .cabecalho-acoes { width: 100%; }
+  .grade-2 { grid-template-columns: minmax(0, 1fr); }
+  .etapa-editor-topo .t-legenda { display: none; }
+  .tarefa { padding: 12px; gap: 10px; }
+  .progresso-mini .barra { display: none; }
+}
+@media (max-width: 640px) {
+  .input { font-size: 16px; }
+  .fundo { place-items: end center; padding: 0; }
+  .janela, .janela.media, .janela.larga { max-width: none; border-radius: 16px 16px 0 0; max-height: 95dvh; }
+  .janela > footer { border-radius: 0; }
+  .janela .corpo { padding: 16px; }
+  .janela > header, .janela > footer { padding-left: 16px; padding-right: 16px; }
+  .janela-abas { padding: 0 16px 12px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+</style>
+</head>
+<body>
+<div class="faixa">
+  <span class="selo-poc">POC — protótipo descartável</span>
+  <span class="t-rotulo">Dados de exemplo · nada é salvo</span>
+  <div class="ver-como">
+    <span class="t-rotulo">Ver como</span>
+    <div id="ver-como"></div>
+    <button type="button" class="btn contorno pequeno" data-acao="restaurar" id="b-restaurar"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> Restaurar exemplo</button>
+  </div>
+</div>
+<div class="app">
+  <nav class="trilho" id="trilho" aria-label="Menu"></nav>
+  <div class="barra-topo" id="barra-topo"></div>
+  <main id="pagina"></main>
+</div>
+<div id="janela"></div>
+<div id="popover"></div>
+<div id="toast" aria-live="polite"></div>
+
+<script>
+'use strict'
+// ── Ícones (traço do lucide) ───────────────────────────────────────────────
+const ICONES = {
+  casa: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  antena: '<path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"/><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"/><circle cx="12" cy="9" r="2"/><path d="M16.2 4.8c2 2 2.26 5.11.8 7.47"/><path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1"/><path d="M9.5 18h5"/><path d="m8 22 4-11 4 11"/>',
+  lista: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+  grafico: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  lupa: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  mais: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  menos: '<path d="M5 12h14"/>',
+  lapis: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+  copiar: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  arquivo: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  lixeira: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+  fechar: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  cadeado: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  relogio: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  entrar: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/>',
+  sair: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
+  cima: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  baixo: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+  abrir: '<path d="m6 9 6 6 6-6"/>',
+  direita: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  fluxo: '<rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/>',
+  linhas: '<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>',
+  nota: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  alerta: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  calendario: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+  duvida: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+  desfazer: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  olho: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+  prancheta: '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+  globo: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  predio: '<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>',
+  circulo: '<circle cx="12" cy="12" r="8"/>',
+}
+const icone = (nome, classe = '') => `<svg class="i ${classe}" viewBox="0 0 24 24" aria-hidden="true">${ICONES[nome]}</svg>`
+
+// ── Ajudantes ──────────────────────────────────────────────────────────────
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+const semAcento = (t) => String(t).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+const CORES = ['#2563eb', '#0891b2', '#7c3aed', '#db2777', '#ea580c', '#16a34a', '#ca8a04', '#4f46e5']
+const corDe = (texto) => CORES[[...texto].reduce((a, c) => a + c.charCodeAt(0), 0) % CORES.length]
+const iniciais = (nome) => nome.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
+const avatar = (nome) => `<span class="avatar" style="background:${corDe(nome)}" aria-hidden="true">${esc(iniciais(nome))}</span>`
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`
+const juntar = (itens) => (itens.length <= 1 ? itens.join('') : `${itens.slice(0, -1).join(', ')} e ${itens.at(-1)}`)
+const nomes = (tarefas) => juntar(tarefas.map((t) => `<b>${esc(t.titulo)}</b>`))
+const cortar = (texto, max) => (texto.length > max ? `${texto.slice(0, Math.max(1, max - 1))}…` : texto)
+
+// ── Datas (o "hoje" do protótipo é fixo, para os prazos baterem) ───────────
+const HOJE = new Date(2026, 10, 17)
+const dois = (n) => String(n).padStart(2, '0')
+const dia = (texto) => { const [d, m, a] = texto.split('/').map(Number); return new Date(a, m - 1, d) }
+const somarDias = (data, n) => new Date(data.getFullYear(), data.getMonth(), data.getDate() + n)
+const difDias = (a, b) => Math.round((a - b) / 86400000)
+const fmt = (d) => `${dois(d.getDate())}/${dois(d.getMonth() + 1)}/${d.getFullYear()}`
+const fmtCurto = (d) => `${dois(d.getDate())}/${dois(d.getMonth() + 1)}`
+const hora = (ms) => { const d = new Date(ms); return `${dois(d.getHours())}:${dois(d.getMinutes())}` }
+const minutos = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m }
+const duracao = (min) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${dois(min % 60)}` : ''}`)
+const cronometro = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 3600)}:${dois(Math.floor(s / 60) % 60)}:${dois(s % 60)}` }
+const dataValida = (t) => /^\d{2}\/\d{2}\/\d{4}$/.test(t) && fmt(dia(t)) === t
+
+// ── Quem é quem ────────────────────────────────────────────────────────────
+const CONSULTORIAS = { sti: 'STI Consult', norte: 'Norte Gestão', exemplo: 'Consultoria Exemplo' }
+const CONSULTORES = {
+  ana: { nome: 'Ana Lima', consultoria: 'sti' },
+  carla: { nome: 'Carla Souza', consultoria: 'sti' },
+  lucas: { nome: 'Lucas Prado', consultoria: 'norte' },
+  marina: { nome: 'Marina Costa', consultoria: 'norte' },
+}
+const PAPEIS = {
+  central: { rotulo: 'Central', nome: 'Jaine Capitanio', descricao: 'Central · IXC Consult', consultoria: null },
+  gestor: { rotulo: 'Gestor', nome: 'Gabriel Rocha', descricao: 'Gestor · STI Consult', consultoria: 'sti' },
+  consultor: { rotulo: 'Consultor', nome: 'Ana Lima', descricao: 'Consultora · STI Consult', consultoria: 'sti', id: 'ana' },
+}
+const eu = () => PAPEIS[estado.papel]
+
+// ── Dados de exemplo ───────────────────────────────────────────────────────
+// Ao aplicar um modelo, o cliente recebe uma CÓPIA das etapas e tarefas (editar o modelo depois não mexe nele).
+function copiarParaCliente(modelo, inicio, aplicadoPor, aplicadoEm, progresso = {}) {
+  return {
+    modeloId: modelo.id, modeloNome: modelo.nome, inicio, aplicadoPor, aplicadoEm,
+    etapas: modelo.etapas.map((e) => ({
+      id: e.id, nome: e.nome,
+      tarefas: e.tarefas.map((t) => ({ ...t, deps: [...t.deps], estado: 'afazer', feitoPor: null, feitoEm: null, nota: '', ...(progresso[t.id] ?? {}) })),
+    })),
+  }
+}
+
+function semente() {
+  let n = 0
+  const modelo = (m) => ({
+    arquivado: false, ...m,
+    etapas: m.etapas.map(([nome, tarefas]) => ({
+      id: `e${++n}`, nome,
+      tarefas: tarefas.map(([id, titulo, descricao, obrigatoria, prazo, deps = []]) => ({ id, titulo, descricao, obrigatoria, prazo, deps })),
+    })),
+  })
+  const central = { tipo: 'central', nome: 'Jaine Capitanio', consultoria: null }
+  const modelos = [
+    modelo({ id: 'fin', nome: 'Gestão financeira', criadoPor: central, criadoEm: '02/09/2026', para: 'todas',
+      descricao: 'Diagnóstico das finanças do provedor, plano de ação e rotina de acompanhamento.',
+      etapas: [
+        ['Diagnóstico', [
+          ['f1', 'Reunião de alinhamento', 'Objetivos, escopo e quem participa do lado do cliente.', true, 2],
+          ['f2', 'Coleta dos documentos financeiros', 'DRE, balancetes, extratos e contas a pagar e receber dos últimos 12 meses.', true, 5, ['f1']],
+          ['f3', 'Análise do DRE', 'Receita, custos, margem bruta e EBITDA mês a mês; apontar desvios.', true, 10, ['f2']],
+          ['f4', 'Levantamento do fluxo de caixa', 'Entradas e saídas reais dos últimos 6 meses, por categoria.', true, 10, ['f2']],
+          ['f5', 'Análise de inadimplência', 'Taxa de inadimplência por plano e faixa de atraso.', false, 12, ['f2']],
+        ]],
+        ['Plano de ação', [
+          ['f6', 'Mapa de custos fixos e variáveis', 'Separar os custos e achar cortes e renegociações.', true, 14, ['f3']],
+          ['f7', 'Revisão da precificação dos planos', 'Margem por plano comparada com a concorrência da região.', false, 18, ['f3', 'f6']],
+          ['f8', 'Plano de ação financeiro', 'Metas, responsáveis e prazos das ações do diagnóstico.', true, 20, ['f4', 'f6']],
+          ['f9', 'Apresentação do plano à diretoria', 'Validar o plano e as metas com os sócios.', true, 22, ['f8']],
+        ]],
+        ['Implantação', [
+          ['f10', 'Fluxo de caixa projetado', 'Projeção de 90 dias, atualizada toda semana.', true, 30, ['f4', 'f9']],
+          ['f11', 'Rotina de conciliação bancária', 'Treinar o financeiro e fixar o dia da conciliação.', true, 35, ['f10']],
+          ['f12', 'Política de cobrança', 'Régua de cobrança e regras para negociar débitos.', false, 35, ['f5', 'f9']],
+        ]],
+        ['Acompanhamento', [
+          ['f13', 'Indicadores do mês', 'Margem, caixa, inadimplência e custo por assinante.', true, 45, ['f10', 'f11']],
+          ['f14', 'Reunião de resultados', 'Comparar os indicadores com as metas e ajustar o plano.', true, 60, ['f13']],
+        ]],
+      ] }),
+    modelo({ id: 'suc', nome: 'Sucesso do Cliente — onboarding', criadoPor: central, criadoEm: '15/09/2026', para: 'todas',
+      descricao: 'Organizar a jornada do assinante nos primeiros 90 dias para reduzir cancelamentos.',
+      etapas: [
+        ['Diagnóstico', [
+          ['s1', 'Reunião de kickoff', 'Apresentar a metodologia e combinar a agenda.', true, 1],
+          ['s2', 'Mapa da jornada do assinante', 'Da venda à instalação e ao primeiro boleto: onde o assinante trava.', true, 7, ['s1']],
+          ['s3', 'Análise de NPS e reclamações', 'Últimos 3 meses de NPS, Reclame Aqui e chamados.', true, 5, ['s1']],
+          ['s4', 'Mapa de processos do atendimento', 'Fluxos de suporte, retenção e cancelamento.', true, 10, ['s2']],
+        ]],
+        ['Plano de ação', [
+          ['s5', 'Régua de relacionamento', 'Contatos programados nos primeiros 90 dias.', true, 15, ['s2', 's3']],
+          ['s6', 'Roteiro de boas-vindas', 'Mensagem, ligação e checklist depois da instalação.', false, 15, ['s2']],
+        ]],
+        ['Implantação', [
+          ['s7', 'Treinamento do atendimento', 'Novo roteiro e régua, com simulações.', true, 25, ['s4', 's5']],
+          ['s8', 'Pesquisa de NPS automática', 'Disparo após a instalação e a cada 90 dias.', true, 25, ['s5']],
+        ]],
+        ['Acompanhamento', [
+          ['s9', 'Indicadores do mês', 'NPS, churn, tempo de instalação e chamados por assinante.', true, 35, ['s8']],
+          ['s10', 'Reunião de resultados', 'Resultados do onboarding e próximos passos.', true, 45, ['s7', 's9']],
+        ]],
+      ] }),
+    modelo({ id: 'pes', nome: 'Gestão de Pessoas', criadoPor: { tipo: 'gestor', nome: 'Gabriel Rocha', consultoria: 'sti' }, criadoEm: '20/08/2026', para: 'sti',
+      descricao: 'Estrutura de cargos, clima e rituais de liderança — o jeito da STI de tocar pessoas.',
+      etapas: [
+        ['Diagnóstico', [
+          ['p1', 'Reunião de alinhamento com a diretoria', 'Expectativas e prioridades da diretoria.', true, 2],
+          ['p2', 'Organograma atual', 'Quem responde a quem, por área.', true, 7, ['p1']],
+          ['p3', 'Pesquisa de clima', 'Questionário anônimo com toda a equipe.', true, 15, ['p1']],
+        ]],
+        ['Plano de ação', [
+          ['p4', 'Descrição de cargos', 'Responsabilidades e requisitos de cada cargo.', true, 25, ['p2']],
+          ['p5', 'Plano de cargos e salários', 'Faixas salariais e critérios de promoção.', false, 40, ['p4']],
+          ['p6', 'Plano de treinamento', 'Trilhas por área, a partir da pesquisa de clima.', true, 40, ['p3', 'p4']],
+        ]],
+        ['Implantação', [
+          ['p7', 'Avaliação de desempenho', 'Primeiro ciclo com os líderes.', true, 60, ['p4']],
+          ['p8', 'Rituais de feedback', 'Reuniões 1:1 mensais dos líderes com a equipe.', true, 65, ['p6', 'p7']],
+        ]],
+        ['Acompanhamento', [
+          ['p9', 'Indicadores de pessoas', 'Turnover, absenteísmo e horas de treinamento.', true, 80, ['p8']],
+        ]],
+      ] }),
+    modelo({ id: 'com', nome: 'Expansão comercial', criadoPor: { tipo: 'gestor', nome: 'Paulo Nunes', consultoria: 'norte' }, criadoEm: '01/10/2026', para: 'norte',
+      descricao: 'Funil de vendas, metas por vendedor e campanhas de bairro.',
+      etapas: [
+        ['Diagnóstico', [
+          ['x1', 'Reunião de alinhamento', 'Metas da diretoria para o ano.', true, 2],
+          ['x2', 'Análise do funil de vendas', 'Leads, visitas, propostas e fechamentos.', true, 8, ['x1']],
+          ['x3', 'Mapa de cobertura e concorrência', 'Bairros atendidos, viabilidade e preço da concorrência.', true, 10, ['x1']],
+        ]],
+        ['Plano de ação', [
+          ['x4', 'Metas por vendedor', 'Metas mensais e comissão.', true, 15, ['x2']],
+          ['x5', 'Campanha de bairro', 'Ação nos bairros com rede ociosa.', false, 20, ['x3']],
+        ]],
+        ['Implantação', [
+          ['x6', 'Treinamento do time comercial', 'Abordagem, objeções e fechamento.', true, 25, ['x4']],
+          ['x7', 'CRM com as etapas do funil', 'Configurar o CRM e treinar o uso.', true, 30, ['x4']],
+        ]],
+        ['Acompanhamento', [
+          ['x8', 'Indicadores do mês', 'Conversão por etapa e vendas por vendedor.', true, 40, ['x6', 'x7']],
+        ]],
+      ] }),
+    modelo({ id: 'rap', nome: 'Diagnóstico rápido (2025)', criadoPor: central, criadoEm: '10/03/2025', para: 'todas', arquivado: true,
+      descricao: 'Versão antiga, trocada pelo modelo de Gestão financeira.',
+      etapas: [
+        ['Diagnóstico', [
+          ['d1', 'Reunião de alinhamento', '', true, 2],
+          ['d2', 'Análise do DRE', '', true, 7, ['d1']],
+          ['d3', 'Levantamento do fluxo de caixa', '', true, 7, ['d1']],
+        ]],
+        ['Plano de ação', [['d4', 'Relatório de diagnóstico', '', true, 12, ['d2', 'd3']]]],
+      ] }),
+  ]
+  const m = Object.fromEntries(modelos.map((x) => [x.id, x]))
+  const F = (feitoEm, nota = '', feitoPor = 'Ana Lima') => ({ estado: 'feito', feitoEm, feitoPor, nota })
+  const A = (nota = '') => ({ estado: 'andamento', nota })
+  const clientes = [
+    { id: 'c1', nome: 'Fibra Oeste Telecom', cidade: 'Chapecó/SC', consultor: 'ana',
+      aplicacao: copiarParaCliente(m.fin, '03/11/2026', 'Gabriel Rocha (gestor)', '03/11/2026', {
+        f1: F('04/11/2026', 'Diretoria quer foco em caixa até março.'), f2: F('07/11/2026'),
+        f3: F('12/11/2026', 'Margem EBITDA caiu 4 p.p. no trimestre; o custo de link subiu 18%.'), f5: F('14/11/2026'),
+        f4: A('Faltam os extratos de setembro do Sicredi.') }) },
+    { id: 'c2', nome: 'Conecta Vale Internet', cidade: 'Joaçaba/SC', consultor: 'ana',
+      aplicacao: copiarParaCliente(m.suc, '10/11/2026', 'Gabriel Rocha (gestor)', '10/11/2026', { s1: F('10/11/2026'), s2: A() }) },
+    { id: 'c3', nome: 'RedeSul Net', cidade: 'Pato Branco/PR', consultor: 'ana',
+      aplicacao: copiarParaCliente(m.pes, '10/09/2026', 'Gabriel Rocha (gestor)', '09/09/2026', {
+        p1: F('11/09/2026'), p2: F('16/09/2026'), p3: F('24/09/2026', 'Clima 7,2 de 10; o ponto fraco é a comunicação entre áreas.'),
+        p4: F('03/10/2026'), p6: F('17/10/2026'), p7: F('06/11/2026'), p8: F('13/11/2026') }) },
+    { id: 'c4', nome: 'Alfa Link', cidade: 'Xanxerê/SC', consultor: 'carla', aplicacao: null },
+    { id: 'c5', nome: 'Planalto Net', cidade: 'Lages/SC', consultor: 'lucas',
+      aplicacao: copiarParaCliente(m.fin, '15/10/2026', 'Paulo Nunes (gestor)', '14/10/2026', {
+        f1: F('16/10/2026', '', 'Lucas Prado'), f2: F('21/10/2026', '', 'Lucas Prado'), f3: F('27/10/2026', '', 'Lucas Prado'),
+        f4: F('28/10/2026', '', 'Lucas Prado'), f6: F('30/10/2026', '', 'Lucas Prado'), f8: F('12/11/2026', '', 'Lucas Prado'), f9: A() }) },
+    { id: 'c6', nome: 'Serra Link', cidade: 'Canoinhas/SC', consultor: 'marina',
+      aplicacao: copiarParaCliente(m.com, '05/11/2026', 'Paulo Nunes (gestor)', '05/11/2026', {
+        x1: F('06/11/2026', '', 'Marina Costa'), x2: F('13/11/2026', '', 'Marina Costa'), x3: A() }) },
+  ]
+  const ck = (clienteId, data, inicio, fim, quem, tarefas, descricao) => ({ clienteId, data, inicio, fim, quem, tarefas, descricao })
+  const checkins = [
+    ck('c1', '04/11/2026', '09:00', '11:20', 'Ana Lima', ['Reunião de alinhamento'], 'Reunião com os sócios para alinhar objetivos e escopo.'),
+    ck('c1', '07/11/2026', '14:00', '15:30', 'Ana Lima', ['Coleta dos documentos financeiros'], 'Recebi DRE, balancetes e extratos; organizei a pasta do cliente.'),
+    ck('c1', '12/11/2026', '08:30', '12:10', 'Ana Lima', ['Análise do DRE'], 'DRE analisado mês a mês e apresentado ao financeiro.'),
+    ck('c1', '14/11/2026', '13:30', '15:00', 'Ana Lima', ['Análise de inadimplência'], 'Inadimplência por plano e por faixa de atraso.'),
+    ck('c1', '16/11/2026', '16:00', '16:45', 'Ana Lima', [], 'Ligação com o financeiro sobre os extratos que faltam.'),
+    ck('c2', '10/11/2026', '10:00', '11:00', 'Ana Lima', ['Reunião de kickoff'], 'Kickoff com o time de atendimento.'),
+    ck('c3', '13/11/2026', '09:00', '11:30', 'Ana Lima', ['Rituais de feedback'], 'Primeira rodada de 1:1 com os líderes.'),
+    ck('c5', '12/11/2026', '14:00', '17:00', 'Lucas Prado', ['Plano de ação financeiro'], 'Plano montado com o financeiro.'),
+    ck('c6', '13/11/2026', '09:30', '11:00', 'Marina Costa', ['Análise do funil de vendas'], 'Funil levantado com o gerente comercial.'),
+  ]
+  return { modelos, clientes, checkins, sessao: null, proximo: 100 }
+}
+
+let dados = semente()
+const INICIAL = { papel: 'consultor', area: 'cliente', clienteId: 'c1', visao: 'lista', filtro: 'todas', orientacao: 'horizontal',
+  abaModelos: 'ativos', buscaModelos: '', filtroGestao: 'todos', buscaGestao: '', janela: null, popover: null, selecionado: null }
+const estado = { ...INICIAL }
+const novoId = (prefixo) => `${prefixo}${++dados.proximo}`
+
+// ── Regras (quem vê e quem faz o quê) ──────────────────────────────────────
+const modeloPorId = (id) => dados.modelos.find((m) => m.id === id)
+const clientePorId = (id) => dados.clientes.find((c) => c.id === id)
+const consultoriaDo = (c) => CONSULTORES[c.consultor].consultoria
+function modelosVisiveis() {
+  if (estado.papel === 'central') return dados.modelos
+  return dados.modelos.filter((m) => m.para === 'todas' || m.para === eu().consultoria)
+}
+function clientesVisiveis() {
+  if (estado.papel === 'central') return dados.clientes
+  if (estado.papel === 'gestor') return dados.clientes.filter((c) => consultoriaDo(c) === eu().consultoria)
+  return dados.clientes.filter((c) => c.consultor === eu().id)
+}
+const podeCriarModelo = () => estado.papel !== 'consultor'
+function podeEditarModelo(m) {
+  if (estado.papel === 'central') return true
+  if (estado.papel === 'gestor') return m.criadoPor.tipo === 'gestor' && m.criadoPor.consultoria === eu().consultoria
+  return false
+}
+const podeAplicar = () => estado.papel !== 'consultor'
+const podeMarcar = (c) => estado.papel === 'consultor' && c.consultor === eu().id
+const clientesUsando = (m, todos = false) => (todos ? dados.clientes : clientesVisiveis()).filter((c) => c.aplicacao?.modeloId === m.id)
+const paraTexto = (para) => (para === 'todas' ? 'Todas as consultorias' : CONSULTORIAS[para])
+const badgePara = (para) => (para === 'todas'
+  ? `<span class="badge azul">${icone('globo')} Todas as consultorias</span>`
+  : `<span class="badge contorno">${icone('predio')} ${esc(CONSULTORIAS[para])}</span>`)
+const criadoTexto = (m) => (m.criadoPor.tipo === 'central' ? `Central (${m.criadoPor.nome})` : `gestor da ${CONSULTORIAS[m.criadoPor.consultoria]} (${m.criadoPor.nome})`)
+
+// ── Situação de cada tarefa ────────────────────────────────────────────────
+const tarefasDe = (estrutura) => estrutura.etapas.flatMap((e) => e.tarefas)
+const tarefaPorId = (estrutura, id) => tarefasDe(estrutura).find((t) => t.id === id)
+function situacao(ap, t) {
+  const todas = tarefasDe(ap)
+  const prazo = somarDias(dia(ap.inicio), t.prazo)
+  const faltam = difDias(prazo, HOJE)
+  const feito = t.estado === 'feito'
+  const espera = feito ? [] : t.deps.map((id) => todas.find((x) => x.id === id)).filter((d) => d && d.estado !== 'feito')
+  const bloqueada = espera.length > 0
+  const atrasada = !feito && faltam < 0
+  const hoje = !feito && faltam === 0
+  const cor = feito ? 'feito' : atrasada ? 'atrasada' : hoje ? 'hoje' : t.estado === 'andamento' ? 'andamento' : bloqueada ? 'bloqueada' : 'livre'
+  return { prazo, faltam, feito, espera, bloqueada, atrasada, hoje, cor }
+}
+const rotuloEstado = (t, s) => (s.feito ? 'Feita' : s.bloqueada ? 'Bloqueada' : t.estado === 'andamento' ? 'Em andamento' : 'A fazer')
+function resumo(ap) {
+  const todas = tarefasDe(ap)
+  const sit = todas.map((t) => ({ t, s: situacao(ap, t) }))
+  const feitas = sit.filter((x) => x.s.feito).length
+  const obrig = todas.filter((t) => t.obrigatoria)
+  const proxima = sit.filter((x) => !x.s.feito && !x.s.bloqueada).sort((a, b) => a.s.prazo - b.s.prazo)[0] ?? null
+  return {
+    total: todas.length, feitas, pct: todas.length ? Math.round((feitas / todas.length) * 100) : 0,
+    obrig: obrig.length, obrigFeitas: obrig.filter((t) => t.estado === 'feito').length,
+    proximas: sit.filter((x) => !x.s.feito && x.s.faltam >= 0 && x.s.faltam <= 7).length,
+    atrasadas: sit.filter((x) => x.s.atrasada).length, proxima,
+  }
+}
+function badgesDaTarefa(t, s) {
+  if (s.feito) return `<span class="badge positivo">${icone('check')} Feita</span><span class="t-legenda">por ${esc(t.feitoPor)} em ${esc(t.feitoEm)}</span>`
+  const b = []
+  if (t.estado === 'andamento') b.push(`<span class="badge azul">${icone('play')} Em andamento</span>`)
+  if (s.atrasada) b.push(`<span class="badge perigo">${icone('alerta')} Atrasada · venceu ${fmtCurto(s.prazo)}</span>`)
+  else if (s.hoje) b.push(`<span class="badge aviso">${icone('relogio')} Vence hoje</span>`)
+  else b.push(`<span class="badge contorno">${icone('calendario')} Vence ${fmtCurto(s.prazo)}</span>`)
+  if (s.bloqueada) b.push(`<span class="badge cinza">${icone('cadeado')} Bloqueada</span><span class="t-legenda">espera ${nomes(s.espera)}</span>`)
+  return b.join('')
+}
+function infoDoNo(ap, t) {
+  const s = situacao(ap, t)
+  const f = estado.filtro
+  const sub = s.feito ? `Feita em ${t.feitoEm.slice(0, 5)}`
+    : s.atrasada ? `Atrasada desde ${fmtCurto(s.prazo)}`
+    : s.hoje ? 'Vence hoje'
+    : s.bloqueada ? `Bloqueada · vence ${fmtCurto(s.prazo)}`
+    : t.estado === 'andamento' ? `Em andamento · ${fmtCurto(s.prazo)}`
+    : `${t.obrigatoria ? 'A fazer' : 'Opcional'} · vence ${fmtCurto(s.prazo)}`
+  const ic = { feito: 'check', atrasada: 'alerta', hoje: 'relogio', andamento: 'play', bloqueada: 'cadeado', livre: 'circulo' }[s.cor]
+  return { cor: s.cor, sub, icone: ic, rotulo: `${rotuloEstado(t, s)}${s.atrasada ? ', atrasada' : s.hoje ? ', vence hoje' : ''}`,
+    apagado: (f === 'pendentes' && s.feito) || (f === 'feitas' && !s.feito) }
+}
+const infoDoModelo = (t) => ({ cor: 'livre', sub: `Dia ${t.prazo} · ${t.obrigatoria ? 'obrigatória' : 'opcional'}`, icone: 'circulo', rotulo: `dia ${t.prazo}`, apagado: false })
+
+// ── Fluxograma (SVG, camadas por etapa + dependências) ─────────────────────
+const NO_L = 184
+const NO_A = 62
+function layoutFluxo(etapas, vertical) {
+  const cfg = vertical
+    ? { tamMaior: NO_A, tamMenor: NO_L, gapMaior: 34, gapMenor: 16, gapEtapa: 30, cabecalho: 34, inicioMenor: 22 }
+    : { tamMaior: NO_L, tamMenor: NO_A, gapMaior: 36, gapMenor: 14, gapEtapa: 54, cabecalho: 0, inicioMenor: 58 }
+  const pos = {}
+  const raias = []
+  let maior = 22
+  etapas.forEach((e) => {
+    const inicio = maior
+    maior += cfg.cabecalho
+    const daEtapa = new Set(e.tarefas.map((t) => t.id))
+    const nivel = {}
+    e.tarefas.forEach((t) => {
+      nivel[t.id] = t.deps.reduce((n, d) => (daEtapa.has(d) && nivel[d] !== undefined ? Math.max(n, nivel[d] + 1) : n), 0)
+    })
+    const niveis = Math.max(1, ...e.tarefas.map((t) => nivel[t.id] + 1))
+    for (let lv = 0; lv < niveis; lv++) {
+      // Cada tarefa tenta ficar na altura média das tarefas de que depende (menos cruzamentos de setas).
+      const grupo = e.tarefas.filter((t) => nivel[t.id] === lv).map((t, i) => {
+        const refs = t.deps.filter((d) => pos[d]).map((d) => pos[d].menor)
+        return { t, alvo: refs.length ? refs.reduce((a, b) => a + b, 0) / refs.length : cfg.inicioMenor + i * (cfg.tamMenor + cfg.gapMenor) }
+      }).sort((a, b) => a.alvo - b.alvo)
+      let cursor = cfg.inicioMenor
+      grupo.forEach(({ t, alvo }) => {
+        const menor = Math.max(cursor, alvo)
+        pos[t.id] = { maior: maior + lv * (cfg.tamMaior + cfg.gapMaior), menor }
+        cursor = menor + cfg.tamMenor + cfg.gapMenor
+      })
+    }
+    maior += niveis * cfg.tamMaior + (niveis - 1) * cfg.gapMaior
+    raias.push({ etapa: e, inicio, fim: maior })
+    maior += cfg.gapEtapa
+  })
+  const fimMaior = maior - cfg.gapEtapa + 22
+  const fimMenor = Math.max(cfg.inicioMenor + cfg.tamMenor, ...Object.values(pos).map((p) => p.menor + cfg.tamMenor)) + 22
+  const xy = {}
+  Object.entries(pos).forEach(([id, p]) => { xy[id] = vertical ? { x: p.menor, y: p.maior } : { x: p.maior, y: p.menor } })
+  return { pos: xy, raias, largura: vertical ? Math.max(380, fimMenor) : fimMaior, altura: vertical ? fimMaior : fimMenor }
+}
+function caminho(a, b, vertical) {
+  if (!vertical) {
+    const x1 = a.x + NO_L, y1 = a.y + NO_A / 2, x2 = b.x - 3, y2 = b.y + NO_A / 2
+    const d = Math.max(18, Math.abs(x2 - x1) / 2)
+    return `M${x1} ${y1} C${x1 + d} ${y1} ${x2 - d} ${y2} ${x2} ${y2}`
+  }
+  const x1 = a.x + NO_L / 2, y1 = a.y + NO_A, x2 = b.x + NO_L / 2, y2 = b.y - 3
+  const d = Math.max(16, Math.abs(y2 - y1) / 2)
+  return `M${x1} ${y1} C${x1} ${y1 + d} ${x2} ${y2 - d} ${x2} ${y2}`
+}
+function quebrar(texto, max) {
+  const linhas = []
+  let atual = ''
+  for (const p of texto.split(/\s+/).filter(Boolean)) {
+    if (!atual) atual = p
+    else if (`${atual} ${p}`.length <= max) atual += ` ${p}`
+    else { linhas.push(atual); atual = p }
+  }
+  if (atual) linhas.push(atual)
+  if (linhas.length > 2) { linhas.length = 2; linhas[1] = cortar(`${linhas[1]} …`, max) }
+  return linhas.map((l) => cortar(l, max))
+}
+function desenharFluxo(etapas, { prefixo, vertical, info, interativo = false, selecionado = null, contagem = null, rotulo }) {
+  const L = layoutFluxo(etapas, vertical)
+  const todas = etapas.flatMap((e) => e.tarefas)
+  const ordem = Object.fromEntries(todas.map((t, i) => [t.id, i]))
+  const infos = Object.fromEntries(todas.map((t) => [t.id, info(t)]))
+  const raias = L.raias.map((r, i) => {
+    const titulo = `${i + 1} · ${r.etapa.nome || 'Etapa sem nome'}`
+    const cont = contagem ? contagem(r.etapa) : plural(r.etapa.tarefas.length, 'tarefa', 'tarefas')
+    if (vertical) {
+      return `<rect class="raia" x="8" y="${r.inicio - 10}" width="${L.largura - 16}" height="${r.fim - r.inicio + 24}" rx="14"/>
+        <text class="raia-titulo" x="22" y="${r.inicio + 12}">${esc(cortar(titulo, 34))}</text>
+        <text class="raia-sub" x="${L.largura - 22}" y="${r.inicio + 12}" text-anchor="end">${esc(cont)}</text>`
+    }
+    const larg = r.fim - r.inicio
+    return `<rect class="raia" x="${r.inicio - 14}" y="10" width="${larg + 28}" height="${L.altura - 20}" rx="14"/>
+      <text class="raia-titulo" x="${r.inicio}" y="31">${esc(cortar(titulo, Math.floor((larg + 8) / 7)))}</text>
+      <text class="raia-sub" x="${r.inicio}" y="46">${esc(cont)}</text>`
+  }).join('')
+  const arestas = []
+  todas.forEach((t) => t.deps.forEach((d) => {
+    const a = L.pos[d], b = L.pos[t.id]
+    if (!a || !b) return
+    const tipo = selecionado && (selecionado === d || selecionado === t.id) ? 'realce'
+      : ordem[d] > ordem[t.id] ? 'invalida' : infos[d].cor === 'feito' ? 'feita' : 'normal'
+    arestas.push({ tipo, html: `<path class="aresta ${tipo}" d="${caminho(a, b, vertical)}" marker-end="url(#${prefixo}-seta-${tipo})"/>` })
+  }))
+  arestas.sort((a, b) => (a.tipo === 'realce') - (b.tipo === 'realce'))
+  const nos = todas.map((t) => {
+    const p = L.pos[t.id]
+    const s = infos[t.id]
+    const linhas = quebrar(t.titulo || 'Sem título', 21)
+    const yT = linhas.length === 1 ? 27 : 21
+    const ySub = linhas.length === 1 ? 45 : 52
+    const attrs = interativo
+      ? `tabindex="0" role="button" id="no-${t.id}" data-acao="abrir-tarefa" data-id="${t.id}" aria-label="${esc(`${t.titulo}: ${s.rotulo}`)}"`
+      : 'aria-hidden="true"'
+    return `<g class="no ${s.cor}${s.apagado ? ' apagado' : ''}${selecionado === t.id ? ' selecionado' : ''}${interativo ? '' : ' estatico'}" transform="translate(${p.x} ${p.y})" ${attrs}>
+      <title>${esc(t.titulo)} — ${esc(s.sub)}</title>
+      <rect class="fundo-no" width="${NO_L}" height="${NO_A}" rx="12"/>
+      <circle class="bolinha" cx="19" cy="${yT - 5}" r="10"/>
+      <svg class="no-icone" x="12" y="${yT - 12}" width="14" height="14" viewBox="0 0 24 24">${ICONES[s.icone]}</svg>
+      <text class="no-titulo">${linhas.map((l, i) => `<tspan x="36" y="${yT + i * 15}">${esc(l)}</tspan>`).join('')}</text>
+      <text class="no-sub" x="36" y="${ySub}">${esc(s.sub)}</text>
+    </g>`
+  }).join('')
+  const marcas = ['normal', 'feita', 'realce', 'invalida'].map((m) => `<marker id="${prefixo}-seta-${m}" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 1 L9 5 L0 9 z" class="seta ${m}"/></marker>`).join('')
+  return `<svg width="${L.largura}" height="${L.altura}" viewBox="0 0 ${L.largura} ${L.altura}" role="group" aria-label="${esc(rotulo)}"><defs>${marcas}</defs>${raias}${arestas.map((a) => a.html).join('')}${nos}</svg>`
+}
+
+// ── Pedaços de tela ────────────────────────────────────────────────────────
+function segmentado(acao, opcoes, valor, rotulo, comoAbas = false) {
+  return `<div class="segmentado" role="${comoAbas ? 'tablist' : 'group'}" aria-label="${esc(rotulo)}">${opcoes.map(([id, texto, ic, n, aviso]) =>
+    `<button type="button" id="seg-${acao}-${id}" ${comoAbas ? `role="tab" aria-selected="${valor === id}"` : `aria-pressed="${valor === id}"`} data-acao="${acao}" data-id="${id}">${ic ? icone(ic) : ''}${esc(texto)}${n !== undefined && n !== null ? `<span class="n ${aviso ? 'aviso' : ''}">${n}</span>` : ''}</button>`).join('')}</div>`
+}
+const acaoLinha = (acao, id, ic, rotulo, extra = '') =>
+  `<button type="button" class="btn fantasma pequeno ${extra}" id="a-${acao}-${id}" data-acao="${acao}" data-id="${id}" title="${esc(rotulo)}" aria-label="${esc(rotulo)}">${icone(ic)}<span class="rotulo-acao">${esc(rotulo)}</span></button>`
+const botaoIcone = (acao, id, ic, rotulo, { desabilitado = false, perigo = false, extra = '' } = {}) =>
+  `<button type="button" id="b-${acao}-${id}" class="btn-icone ${perigo ? 'perigo' : ''}" data-acao="${acao}" data-id="${id}" aria-label="${esc(rotulo)}" title="${esc(rotulo)}" ${desabilitado ? 'disabled' : ''} ${extra}>${icone(ic)}</button>`
+const cabecalhoJanela = (ic, titulo, descricao, comAbas = false) =>
+  `<header class="${comAbas ? 'com-abas' : ''}"><span class="janela-icone">${icone(ic)}</span>
+    <div class="min0 flex1"><h2 class="t-janela" id="titulo-janela">${titulo}</h2>${descricao ? `<p>${descricao}</p>` : ''}</div>
+    <button type="button" class="btn-icone" data-acao="fechar" aria-label="Fechar" title="Fechar">${icone('fechar')}</button></header>`
+function tabela(rotulo, colunas, linhas, vazio, larguraMinima = 760) {
+  if (!linhas.length) return `<div class="vazio">${vazio}</div>`
+  return `<div class="card tabela-card"><div class="rolagem"><table aria-label="${esc(rotulo)}" style="min-width:${larguraMinima}px">
+    <thead><tr>${colunas.map((c) => `<th>${c}</th>`).join('')}<th><span class="sr">Ações</span></th></tr></thead>
+    <tbody>${linhas.join('')}</tbody></table></div></div>`
+}
+function avisar(html) {
+  const caixa = document.getElementById('toast')
+  caixa.innerHTML = `<div class="aviso-toast">${html}</div>`
+  clearTimeout(avisar.t)
+  avisar.t = setTimeout(() => { caixa.innerHTML = '' }, 4200)
+}
+
+// ── Moldura ────────────────────────────────────────────────────────────────
+function renderFaixa() {
+  document.getElementById('ver-como').innerHTML = segmentado('ver-como',
+    Object.entries(PAPEIS).map(([id, p]) => [id, p.rotulo]), estado.papel, 'Ver como')
+}
+function renderMoldura() {
+  const p = estado.papel
+  const itens = [
+    { id: 'inicio', rotulo: 'Início', ic: 'casa', anim: 'subir', fora: true },
+    { id: 'cliente', rotulo: p === 'consultor' ? 'Meus clientes' : 'Clientes', ic: 'antena', anim: 'transmitir' },
+    { id: 'modelos', rotulo: 'Modelos', ic: 'lista', anim: 'abrir' },
+    ...(p === 'consultor' ? [] : [{ id: 'gestao', rotulo: 'Visão da gestão', ic: 'grafico', anim: 'erguer' }]),
+  ]
+  document.getElementById('trilho').innerHTML = '<div class="logo" aria-label="IXC Consult">IXC</div>' + itens.map((it) =>
+    `<button type="button" class="item-trilho group ${estado.area === it.id ? 'aberto' : ''}" data-item-trilho data-acao="${it.fora ? 'fora' : 'area'}" data-id="${it.id}" ${estado.area === it.id ? 'aria-current="page"' : ''}>
+      <span class="ic">${icone(it.ic, `anim-${it.anim}`)}</span>${esc(it.rotulo)}</button>`).join('')
+  const org = p === 'central' ? 'IXC Consult' : 'STI Consult'
+  const caminho = estado.area === 'cliente' ? `${org} › Clientes › <b>${esc(clientePorId(estado.clienteId).nome)}</b>`
+    : estado.area === 'modelos' ? `${org} › <b>Modelos de check-in</b>` : `${org} › <b>Visão da gestão</b>`
+  document.getElementById('barra-topo').innerHTML = `<span class="caminho">${caminho}</span>
+    <span class="quem"><span class="badge contorno">${esc(eu().descricao)}</span>${avatar(eu().nome)}</span>`
+}
+
+// ── Página: Modelos de check-in ────────────────────────────────────────────
+function paginaModelos() {
+  const visiveis = modelosVisiveis()
+  const ativos = visiveis.filter((m) => !m.arquivado)
+  const arquivados = visiveis.filter((m) => m.arquivado)
+  const p = estado.papel
+  const sub = p === 'central' ? 'Check-lists que o consultor segue em cada cliente. Você cria para todas as consultorias ou para uma só.'
+    : p === 'gestor' ? 'Os modelos da Central e os da STI Consult. Você cria e edita os da STI; os da Central você duplica e adapta.'
+    : 'Os check-lists que a Central e o gestor da STI Consult preparam. Em cada cliente você segue o modelo que foi aplicado.'
+  return `<div class="cabecalho"><div><h1 class="t-titulo">Modelos de check-in</h1><p class="sub-cabecalho">${sub}</p></div></div>
+    <div class="card barra-filtros">
+      ${segmentado('aba-modelos', [['ativos', 'Ativos', null, ativos.length], ['arquivados', 'Arquivados', null, arquivados.length]], estado.abaModelos, 'Mostrar')}
+      <label class="busca"><span class="sr">Buscar modelos</span>${icone('lupa')}<input class="input" type="search" id="busca-modelos" placeholder="Buscar por nome ou descrição" value="${esc(estado.buscaModelos)}"></label>
+      ${podeCriarModelo() ? `<button type="button" class="btn fim" id="b-novo-modelo" data-acao="novo-modelo">${icone('mais', 'mais-gira')} Novo modelo</button>` : ''}
+    </div>
+    <div id="lista">${listaModelos(estado.abaModelos === 'ativos' ? ativos : arquivados)}</div>`
+}
+function listaModelos(lista) {
+  const termo = semAcento(estado.buscaModelos.trim())
+  const filtrados = termo ? lista.filter((m) => semAcento(`${m.nome} ${m.descricao}`).includes(termo)) : lista
+  const colUsando = estado.papel === 'central' ? 'Clientes usando' : estado.papel === 'gestor' ? 'Clientes da STI usando' : 'Seus clientes usando'
+  const linhas = filtrados.map((m) => {
+    const todas = tarefasDe(m)
+    const usando = clientesUsando(m)
+    const acoes = []
+    if (podeEditarModelo(m)) {
+      if (!m.arquivado) acoes.push(acaoLinha('editar-modelo', m.id, 'lapis', 'Editar'), acaoLinha('duplicar-modelo', m.id, 'copiar', 'Duplicar'), acaoLinha('arquivar-modelo', m.id, 'arquivo', 'Arquivar'))
+      else acoes.push(acaoLinha('reativar-modelo', m.id, 'desfazer', 'Reativar'))
+      acoes.push(acaoLinha('apagar-modelo', m.id, 'lixeira', 'Apagar', 'realce-perigo'))
+    } else {
+      acoes.push(acaoLinha('ver-modelo', m.id, 'olho', 'Ver'))
+      if (estado.papel === 'gestor' && !m.arquivado) acoes.push(acaoLinha('duplicar-modelo', m.id, 'copiar', 'Duplicar'))
+    }
+    return `<tr>
+      <td style="min-width:260px"><button type="button" class="link-nome" id="tn-${m.id}" data-acao="ver-modelo" data-id="${m.id}">${esc(m.nome)}</button><div class="sub">${esc(m.descricao)}</div></td>
+      <td>${badgePara(m.para)}</td>
+      <td style="white-space:nowrap"><div>${esc(m.criadoPor.nome)}</div><div class="sub">${m.criadoPor.tipo === 'central' ? 'Central' : `Gestor · ${esc(CONSULTORIAS[m.criadoPor.consultoria])}`} · ${esc(m.criadoEm)}</div></td>
+      <td class="num">${m.etapas.length}</td>
+      <td class="num">${todas.length} <span class="sub">(${todas.filter((t) => t.obrigatoria).length} obrig.)</span></td>
+      <td class="num" title="${esc(usando.map((c) => c.nome).join(', '))}">${usando.length || '—'}</td>
+      <td class="acoes">${acoes.join('')}</td></tr>`
+  })
+  const vazio = termo ? 'Nenhum modelo com essa busca.' : estado.abaModelos === 'ativos' ? 'Nenhum modelo ainda. Crie em "Novo modelo".' : 'Nenhum modelo arquivado.'
+  return tabela('Modelos de check-in', ['Modelo', 'Para', 'Criado por', 'Etapas', 'Tarefas', colUsando], linhas, vazio, 980)
+}
+
+// ── Página: Cliente → aba Check-in ─────────────────────────────────────────
+function paginaCliente() {
+  const c = clientePorId(estado.clienteId)
+  const cons = CONSULTORES[c.consultor]
+  const acoes = [`<button type="button" class="seletor" id="seletor-cliente" data-acao="abrir-seletor-cliente" data-abre-popover aria-haspopup="menu" aria-expanded="${estado.popover?.tipo === 'cliente'}" aria-label="Trocar de cliente (agora: ${esc(c.nome)})">${icone('antena')}<span class="valor">${esc(c.nome)}</span>${icone('abrir')}</button>`]
+  if (podeAplicar()) {
+    acoes.push(c.aplicacao
+      ? `<button type="button" class="btn contorno" id="b-aplicar" data-acao="aplicar-modelo">${icone('desfazer')} Trocar modelo</button>`
+      : `<button type="button" class="btn" id="b-aplicar" data-acao="aplicar-modelo">${icone('prancheta')} Aplicar modelo</button>`)
+  }
+  const abas = [['geral', 'Geral'], ['agenda', 'Agenda'], ['checkin', 'Check-in'], ['arquivos', 'Arquivos'], ['historico', 'Histórico']]
+  return `<div class="cabecalho">
+      <div class="min0"><h1 class="t-titulo">${esc(c.nome)}</h1>
+        <p class="sub-cabecalho">${esc(c.cidade)} · ${podeMarcar(c) ? 'você atende este cliente' : `${esc(cons.nome)} · ${esc(CONSULTORIAS[cons.consultoria])}`}</p></div>
+      <div class="cabecalho-acoes">${acoes.join('')}</div>
+    </div>
+    <div style="margin-bottom:16px">${segmentado('aba-cliente', abas, 'checkin', 'Seções do cliente', true)}</div>
+    <div role="tabpanel" aria-labelledby="seg-aba-cliente-checkin">${conteudoCheckin(c)}</div>`
+}
+function conteudoCheckin(c) {
+  const ap = c.aplicacao
+  const topo = `<div class="grade-topo">${ap ? cartaoProgresso(c) : cartaoSemModelo(c)}${cartaoSessao(c)}</div>`
+  if (!ap) return topo + historicoCheckins(c)
+  const r = resumo(ap)
+  const aviso = podeMarcar(c) ? '' : `<div class="faixa-info">${icone('olho')}<span>Você acompanha o andamento. Quem marca as tarefas é ${esc(CONSULTORES[c.consultor].nome)}, o consultor do cliente.${c.consultor === 'ana' ? ' Para ver como fica para ela, use <b>Ver como: Consultor</b>, lá em cima.' : ''}</span></div>`
+  const proxima = r.proxima ? `<span class="t-legenda fim">Próxima: <b style="color:var(--fg)">${esc(r.proxima.t.titulo)}</b> · ${r.proxima.s.atrasada ? `venceu ${fmtCurto(r.proxima.s.prazo)}` : r.proxima.s.hoje ? 'vence hoje' : `vence ${fmtCurto(r.proxima.s.prazo)}`}</span>` : ''
+  const barra = `<div class="card barra-filtros">
+    ${segmentado('visao', [['lista', 'Lista', 'linhas'], ['fluxo', 'Fluxograma', 'fluxo']], estado.visao, 'Visualização')}
+    ${segmentado('filtro', [['todas', 'Todas', null, r.total], ['pendentes', 'Pendentes', null, r.total - r.feitas, r.atrasadas > 0], ['feitas', 'Feitas', null, r.feitas]], estado.filtro, 'Filtrar tarefas')}
+    ${estado.visao === 'fluxo' ? segmentado('orientacao', [['horizontal', 'Deitado', 'direita'], ['vertical', 'Em pé', 'baixo']], estado.orientacao, 'Direção do fluxograma') : ''}
+    ${proxima}</div>`
+  return topo + aviso + barra + (estado.visao === 'lista' ? listaCheck(c) : fluxoCliente(c)) + historicoCheckins(c)
+}
+function cartaoProgresso(c) {
+  const ap = c.aplicacao
+  const r = resumo(ap)
+  const numero = (rotulo, valor, classe = '') => `<div class="numero-card ${classe}"><div class="t-legenda">${rotulo}</div><div class="valor">${valor}</div></div>`
+  return `<section class="card cartao" aria-label="Andamento do modelo">
+    <div class="cartao-topo"><span class="janela-icone">${icone('prancheta')}</span>
+      <div class="min0 flex1"><div class="section-label">Modelo aplicado</div><h2 class="t-janela">${esc(ap.modeloNome)}</h2>
+        <p class="t-legenda m0">Aplicado por ${esc(ap.aplicadoPor)} em ${esc(ap.aplicadoEm)} · prazos contam de ${esc(ap.inicio)}</p></div>
+      <div class="pct" aria-label="${r.pct}% feito">${r.pct}%</div></div>
+    <div class="barra grande ${r.pct === 100 ? 'verde' : ''}" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Progresso do check-list"><span style="width:${r.pct}%"></span></div>
+    <div class="numeros">
+      ${numero('Tarefas feitas', `${r.feitas} <span class="t-rotulo mudo">de ${r.total}</span>`, r.feitas === r.total ? 'positivo' : '')}
+      ${numero('Obrigatórias feitas', `${r.obrigFeitas} <span class="t-rotulo mudo">de ${r.obrig}</span>`)}
+      ${numero('Vencem em 7 dias', r.proximas, r.proximas ? 'aviso' : '')}
+      ${numero('Atrasadas', r.atrasadas, r.atrasadas ? 'perigo' : '')}
+    </div></section>`
+}
+function cartaoSemModelo(c) {
+  return `<section class="card cartao" aria-label="Modelo de check-in">
+    <div class="cartao-topo"><span class="janela-icone">${icone('prancheta')}</span>
+      <div class="min0 flex1"><div class="section-label">Modelo de check-in</div><h2 class="t-janela">Este cliente ainda não tem um modelo</h2>
+        <p class="t-rotulo mudo m0">${podeAplicar() ? 'Escolha um modelo para o consultor seguir como check-list. Os prazos contam a partir do início que você escolher.' : 'O gestor da consultoria aplica o modelo. Enquanto isso, o check-in funciona como hoje.'}</p></div></div>
+    ${podeAplicar() ? `<div><button type="button" class="btn" id="b-aplicar-vazio" data-acao="aplicar-modelo">${icone('prancheta')} Aplicar modelo</button></div>` : ''}</section>`
+}
+const checkinsDo = (c) => dados.checkins.filter((x) => x.clienteId === c.id)
+  .sort((a, b) => (dia(b.data) - dia(a.data)) || (minutos(b.inicio) - minutos(a.inicio)))
+function cartaoSessao(c) {
+  const ses = dados.sessao
+  const aqui = ses?.clienteId === c.id
+  const ultimo = checkinsDo(c)[0]
+  const tarefasDaSessao = aqui && c.aplicacao ? ses.tarefas.map((id) => tarefaPorId(c.aplicacao, id)).filter(Boolean) : []
+  const listaSessao = !aqui ? '' : tarefasDaSessao.length
+    ? `<div class="sessao-lista"><span class="t-legenda">Nesta sessão:</span>${tarefasDaSessao.map((t) => `<span class="chip so-texto">${icone('check')}<span>${esc(t.titulo)}</span></span>`).join('')}</div>`
+    : `<p class="t-legenda m0">Nesta sessão: nenhuma tarefa marcada ainda.${c.aplicacao && podeMarcar(c) ? ' Marque no check-list abaixo.' : ''}</p>`
+  const tempo = (quem) => `<div class="sessao-tempo"><span class="cronometro" data-cronometro>${cronometro(Date.now() - ses.inicio)}</span><span class="t-legenda">${quem ? `${esc(quem)} · ` : ''}desde ${hora(ses.inicio)}</span></div>`
+  let corpo
+  if (estado.papel === 'consultor') {
+    if (aqui) corpo = `${tempo()}${listaSessao}<div class="sessao-acoes"><button type="button" class="btn" id="b-checkout" data-acao="fazer-checkout">${icone('sair')} Fazer check-out</button></div>`
+    else if (ses) {
+      const outro = clientePorId(ses.clienteId)
+      corpo = `<p class="t-rotulo m0">Você está em check-in em <b>${esc(outro.nome)}</b> desde ${hora(ses.inicio)}. Faça o check-out lá para começar aqui.</p>
+        <div class="sessao-acoes"><button type="button" class="btn" disabled>${icone('entrar')} Fazer check-in</button><button type="button" class="btn contorno" data-acao="ir-cliente" data-id="${outro.id}">${icone('direita')} Ir para ${esc(outro.nome)}</button></div>`
+    } else corpo = `<p class="t-rotulo mudo m0">Faça o check-in ao começar a trabalhar no cliente. O que você marcar no check-list entra no resumo da sessão.</p>
+        <div class="sessao-acoes"><button type="button" class="btn" id="b-checkin" data-acao="fazer-checkin">${icone('entrar')} Fazer check-in</button></div>`
+  } else corpo = aqui ? `${tempo(CONSULTORES[c.consultor].nome)}${listaSessao}` : '<p class="t-rotulo mudo m0">Nenhum check-in aberto agora.</p>'
+  const status = aqui ? '<span class="badge positivo"><span class="ponto-vivo"></span> Em andamento</span>' : '<span class="badge contorno">Sem check-in aberto</span>'
+  const ultimoTexto = ultimo ? `Último: ${ultimo.data}, ${duracao(minutos(ultimo.fim) - minutos(ultimo.inicio))} (${esc(ultimo.quem)})` : 'Ainda não há check-ins neste cliente.'
+  return `<section class="card cartao" aria-label="Check-in">
+    <div class="cartao-topo"><span class="janela-icone">${icone('relogio')}</span>
+      <div class="min0 flex1"><div class="section-label">Check-in</div><h2 class="t-janela">${aqui ? 'Check-in em andamento' : 'Sessão de trabalho'}</h2></div>${status}</div>
+    ${corpo}<p class="t-legenda m0">${ultimoTexto}</p></section>`
+}
+function listaCheck(c) {
+  const ap = c.aplicacao
+  const f = estado.filtro
+  const blocos = ap.etapas.map((e, ei) => {
+    const tarefas = e.tarefas.filter((t) => f === 'todas' || (f === 'feitas') === (t.estado === 'feito'))
+    if (!tarefas.length) return ''
+    const feitas = e.tarefas.filter((t) => t.estado === 'feito').length
+    return `<section class="card etapa" aria-labelledby="et-${e.id}">
+      <header class="etapa-topo"><span class="numero">${ei + 1}</span><h3 id="et-${e.id}">${esc(e.nome)}</h3>
+        <div class="progresso-mini"><span class="t-legenda num">${feitas} de ${e.tarefas.length}</span><div class="barra ${feitas === e.tarefas.length ? 'verde' : ''}"><span style="width:${Math.round((feitas / e.tarefas.length) * 100)}%"></span></div></div></header>
+      <ul class="tarefas">${tarefas.map((t) => linhaTarefa(c, t)).join('')}</ul></section>`
+  }).join('')
+  return blocos ? `<div class="lista-etapas">${blocos}</div>`
+    : `<div class="vazio">${f === 'feitas' ? 'Nenhuma tarefa feita ainda.' : 'Tudo feito: nenhuma tarefa pendente.'}</div>`
+}
+function linhaTarefa(c, t) {
+  const ap = c.aplicacao
+  const s = situacao(ap, t)
+  const naSessao = dados.sessao?.clienteId === c.id && dados.sessao.tarefas.includes(t.id)
+  const motivo = !podeMarcar(c) ? `Só ${CONSULTORES[c.consultor].nome} marca as tarefas deste cliente` : (!s.feito && s.bloqueada) ? `Bloqueada: espera ${s.espera.map((x) => x.titulo).join(', ')}` : ''
+  return `<li class="tarefa ${s.cor}">
+    <button type="button" class="caixa ${!s.feito && s.bloqueada ? 'trancada' : ''}" id="cx-${t.id}" role="checkbox" aria-checked="${s.feito}" ${motivo ? `aria-disabled="true" title="${esc(motivo)}"` : `title="${s.feito ? 'Desmarcar' : 'Marcar como feita'}"`} aria-label="${esc(t.titulo)}" data-acao="marcar" data-id="${t.id}">${s.feito ? icone('check') : s.bloqueada ? icone('cadeado') : ''}</button>
+    <div class="min0">
+      <div class="tarefa-linha"><button type="button" class="tarefa-nome" id="tn-${t.id}" data-acao="abrir-tarefa" data-id="${t.id}">${esc(t.titulo)}</button>${t.obrigatoria ? '' : '<span class="badge contorno">Opcional</span>'}${naSessao ? `<span class="badge azul">${icone('relogio')} Nesta sessão</span>` : ''}</div>
+      ${t.descricao ? `<div class="tarefa-desc">${esc(t.descricao)}</div>` : ''}
+      <div class="tarefa-meta">${badgesDaTarefa(t, s)}</div>
+      ${t.nota ? `<div class="nota">${icone('nota')}<span>${esc(t.nota)}</span></div>` : ''}
+    </div>
+    <button type="button" class="btn fantasma pequeno" id="a-det-${t.id}" data-acao="abrir-tarefa" data-id="${t.id}" title="Detalhes e nota" aria-label="Detalhes de ${esc(t.titulo)}">${icone('nota')}<span class="rotulo-acao">${podeMarcar(c) ? (t.nota ? 'Nota' : 'Detalhes') : 'Ver'}</span></button>
+  </li>`
+}
+function fluxoCliente(c) {
+  const ap = c.aplicacao
+  const svg = desenharFluxo(ap.etapas, {
+    prefixo: 'cl', vertical: estado.orientacao === 'vertical', interativo: true, selecionado: estado.selecionado,
+    info: (t) => infoDoNo(ap, t), rotulo: `Fluxograma das tarefas de ${c.nome}`,
+    contagem: (e) => `${e.tarefas.filter((t) => t.estado === 'feito').length} de ${e.tarefas.length} feitas`,
+  })
+  const amostra = (classe, texto) => `<span class="item"><i class="amostra ${classe}"></i>${texto}</span>`
+  return `<section class="card fluxo-card" aria-label="Fluxograma">
+    <div class="fluxo-caixa" id="fluxo-caixa">${svg}</div>
+    <div class="legenda">${amostra('feito', 'Feita')}${amostra('andamento', 'Em andamento')}${amostra('', 'A fazer')}${amostra('bloqueada', 'Bloqueada')}${amostra('hoje', 'Vence hoje')}${amostra('atrasada', 'Atrasada')}
+      <span class="item">${icone('direita')} depende de</span>
+      <span class="dica">Clique numa tarefa para ${podeMarcar(c) ? 'ver os detalhes e marcar' : 'ver os detalhes'}. Arraste o quadro para os lados.</span></div></section>`
+}
+function historicoCheckins(c) {
+  const lista = checkinsDo(c)
+  const linhas = lista.map((x) => `<tr>
+    <td class="num">${esc(x.data)}</td><td class="num">${esc(x.inicio)}–${esc(x.fim)}</td>
+    <td class="num">${duracao(Math.max(1, minutos(x.fim) - minutos(x.inicio)))}</td>
+    <td><div class="pessoa">${avatar(x.quem)}<span>${esc(x.quem)}</span></div></td>
+    <td>${x.tarefas.length ? `<div class="sessao-lista">${x.tarefas.map((t) => `<span class="chip so-texto">${icone('check')}<span>${esc(t)}</span></span>`).join('')}</div>` : '<span class="mudo">—</span>'}</td>
+    <td class="sub" style="max-width:340px">${esc(x.descricao)}</td><td></td></tr>`)
+  return `<h2 class="section-label" style="margin:24px 0 10px">Check-ins anteriores</h2>${tabela('Check-ins anteriores', ['Data', 'Horário', 'Duração', 'Quem', 'Tarefas marcadas', 'O que foi feito'], linhas, 'Nenhum check-in feito neste cliente ainda.', 900)}`
+}
+
+// ── Página: Visão da gestão ────────────────────────────────────────────────
+function paginaGestao() {
+  const todos = clientesVisiveis().map((c) => ({ c, r: c.aplicacao ? resumo(c.aplicacao) : null }))
+  const com = todos.filter((x) => x.r)
+  const atrasados = todos.filter((x) => x.r?.atrasadas)
+  const sem = todos.filter((x) => !x.r)
+  const media = com.length ? Math.round(com.reduce((a, x) => a + x.r.pct, 0) / com.length) : 0
+  const somaAtrasadas = com.reduce((a, x) => a + x.r.atrasadas, 0)
+  const somaProximas = com.reduce((a, x) => a + x.r.proximas, 0)
+  const numero = (rotulo, valor, classe = '') => `<div class="numero-card ${classe}"><div class="t-legenda">${rotulo}</div><div class="valor">${valor}</div></div>`
+  return `<div class="cabecalho"><div><h1 class="t-titulo">Visão da gestão</h1>
+      <p class="sub-cabecalho">Como cada cliente anda no modelo de check-in. ${estado.papel === 'central' ? 'Todas as consultorias.' : 'Clientes da STI Consult.'}</p></div></div>
+    <div class="numeros" style="margin-bottom:16px">
+      ${numero('Clientes com modelo', `${com.length} <span class="t-rotulo mudo">de ${todos.length}</span>`)}
+      ${numero('Progresso médio', `${media}%`)}
+      ${numero('Tarefas atrasadas', somaAtrasadas, somaAtrasadas ? 'perigo' : '')}
+      ${numero('Vencem em 7 dias', somaProximas, somaProximas ? 'aviso' : '')}
+    </div>
+    <div class="card barra-filtros">
+      ${segmentado('filtro-gestao', [['todos', 'Todos', null, todos.length], ['atraso', 'Com atraso', null, atrasados.length, atrasados.length > 0], ['sem', 'Sem modelo', null, sem.length]], estado.filtroGestao, 'Mostrar')}
+      <label class="busca"><span class="sr">Buscar clientes</span>${icone('lupa')}<input class="input" type="search" id="busca-gestao" placeholder="Buscar cliente, consultor ou modelo" value="${esc(estado.buscaGestao)}"></label>
+    </div>
+    <div id="lista">${listaGestao(todos)}</div>`
+}
+function listaGestao(todos) {
+  const f = estado.filtroGestao
+  const termo = semAcento(estado.buscaGestao.trim())
+  const filtrados = todos.filter((x) => (f === 'todos' || (f === 'atraso' ? x.r?.atrasadas : !x.r))
+    && (!termo || semAcento(`${x.c.nome} ${CONSULTORES[x.c.consultor].nome} ${x.c.aplicacao?.modeloNome ?? ''}`).includes(termo)))
+  const linhas = filtrados.map(({ c, r }) => {
+    const cons = CONSULTORES[c.consultor]
+    const prox = r?.proxima
+    return `<tr>
+      <td><button type="button" class="link-nome" id="tn-${c.id}" data-acao="abrir-cliente" data-id="${c.id}">${esc(c.nome)}</button><div class="sub">${esc(c.cidade)}</div></td>
+      <td><div class="pessoa">${avatar(cons.nome)}<div><div>${esc(cons.nome)}</div>${estado.papel === 'central' ? `<div class="sub">${esc(CONSULTORIAS[cons.consultoria])}</div>` : ''}</div></div></td>
+      <td>${r ? esc(c.aplicacao.modeloNome) : '<span class="badge aviso">Sem modelo</span>'}</td>
+      <td style="min-width:150px">${r ? `<div class="t-rotulo num">${r.pct}% · ${r.feitas} de ${r.total}</div><div class="barra ${r.pct === 100 ? 'verde' : ''}" style="margin-top:4px"><span style="width:${r.pct}%"></span></div>` : '<span class="mudo">—</span>'}</td>
+      <td>${r ? (r.atrasadas ? `<span class="badge perigo">${icone('alerta')} ${r.atrasadas}</span>` : '<span class="mudo">0</span>') : '<span class="mudo">—</span>'}</td>
+      <td>${prox ? `<div>${esc(prox.t.titulo)}</div><div class="sub">${prox.s.atrasada ? `venceu ${fmtCurto(prox.s.prazo)}` : prox.s.hoje ? 'vence hoje' : `vence ${fmtCurto(prox.s.prazo)}`}</div>` : '<span class="mudo">—</span>'}</td>
+      <td class="acoes">${r ? acaoLinha('abrir-cliente', c.id, 'direita', 'Abrir check-in') : acaoLinha('aplicar-cliente', c.id, 'prancheta', 'Aplicar modelo')}</td></tr>`
+  })
+  return tabela('Andamento dos clientes', ['Cliente', 'Consultor', 'Modelo', 'Progresso', 'Atrasadas', 'Próxima tarefa'], linhas, 'Nenhum cliente com esse filtro.', 940)
+}
+
+function perguntas() {
+  return `<section class="perguntas" aria-label="O que este protótipo quer validar">
+    <h2>${icone('duvida')} O que este protótipo quer validar</h2>
+    <ol>
+      <li><b>As tarefas são do cliente ou de cada check-in?</b> Aqui o check-list é do cliente e dura o projeto todo; cada check-in só registra o que foi marcado nele ("Nesta sessão").</li>
+      <li><b>Precisa de "depende de"?</b> Aqui a tarefa fica bloqueada até as anteriores ficarem feitas, e isso desenha as setas do fluxograma. Sem dependências, o fluxograma vira só colunas por etapa.</li>
+      <li><b>Quem aplica o modelo no cliente?</b> Aqui a Central e o gestor da consultoria; o consultor só segue.</li>
+      <li><b>Mudar o modelo muda quem já usa?</b> Aqui não: ao aplicar, o cliente recebe uma cópia. Editar vale para os próximos clientes.</li>
+      <li><b>O gestor pode mexer num modelo da Central?</b> Aqui não: ele duplica e adapta para a consultoria dele.</li>
+      <li><b>Só o consultor do cliente marca as tarefas?</b> Aqui sim; Central e gestor acompanham.</li>
+      <li><b>Precisa de check-in aberto para marcar?</b> Aqui não; com o check-in aberto, as tarefas marcadas entram no resumo da sessão.</li>
+      <li><b>Prazo em dias corridos a partir de uma data de início</b> que quem aplica escolhe? E trocar o modelo zera o check-list (o feito fica nos check-ins)?</li>
+    </ol></section>`
+}
+
+// ── Janelas ────────────────────────────────────────────────────────────────
+const ordemDe = (estrutura) => Object.fromEntries(tarefasDe(estrutura).map((t, i) => [t.id, i + 1]))
+const etapaDe = (r, id) => r.etapas.find((e) => e.id === id)
+const novaTarefa = (prazo = 7) => ({ id: novoId('t'), titulo: '', descricao: '', obrigatoria: true, prazo, deps: [] })
+
+function janelaEditor() {
+  const j = estado.janela
+  const r = j.rascunho
+  const err = j.erros
+  const aba = j.aba || 'tarefas'
+  const todas = tarefasDe(r)
+  const usando = j.modeloId ? clientesUsando(modeloPorId(j.modeloId), true) : []
+  const ehGestor = estado.papel === 'gestor'
+  const para = ehGestor
+    ? `<div class="opcao-card fixo">${icone('predio')}<span><b>${esc(CONSULTORIAS[eu().consultoria])}</b><span class="t-legenda bloco">O gestor cria modelos só para a própria consultoria.</span></span></div>`
+    : `<div class="opcoes-cards" role="radiogroup" aria-labelledby="rot-para">
+        <button type="button" class="opcao-card" id="b-para-todas" role="radio" aria-checked="${r.para === 'todas'}" data-acao="para-todas"><span class="radio-bolinha"></span><span><b>Todas as consultorias</b><span class="t-legenda bloco">Inclusive as que entrarem depois.</span></span></button>
+        <button type="button" class="opcao-card" id="b-para-uma" role="radio" aria-checked="${r.para !== 'todas'}" data-acao="para-uma"><span class="radio-bolinha"></span><span><b>Uma consultoria</b><span class="t-legenda bloco">Só ela vê e aplica nos clientes dela.</span></span></button>
+      </div>
+      ${r.para !== 'todas' ? `<button type="button" class="seletor" id="seletor-consultoria" style="width:100%;margin-top:8px" data-acao="abrir-consultorias" data-abre-popover aria-haspopup="menu" aria-label="Consultoria: ${esc(CONSULTORIAS[r.para])}">${icone('predio')}<span class="valor">${esc(CONSULTORIAS[r.para])}</span>${icone('abrir')}</button>` : ''}`
+  const maxPrazo = Math.max(0, ...todas.map((t) => Number(t.prazo) || 0))
+  const apoio = `<aside class="coluna-apoio">
+      <div><label class="form-label" for="f-nome">Nome do modelo</label>
+        <input class="input" id="f-nome" data-campo="modelo-nome" value="${esc(r.nome)}" maxlength="80" placeholder="Ex.: Gestão financeira" data-foco-inicial ${err?.nome ? 'aria-invalid="true"' : ''}></div>
+      <div><label class="form-label" for="f-desc">Descrição (opcional)</label>
+        <textarea class="input" id="f-desc" data-campo="modelo-descricao" rows="3" maxlength="400" placeholder="Para que serve e quando aplicar">${esc(r.descricao)}</textarea></div>
+      <div><span class="form-label" id="rot-para">Para quem</span>${para}</div>
+      <div class="caixa-info"><div class="section-label">Resumo</div>
+        <div>${plural(r.etapas.length, 'etapa', 'etapas')} · ${plural(todas.length, 'tarefa', 'tarefas')}</div>
+        <div>${todas.filter((t) => t.obrigatoria).length} obrigatórias · ${todas.filter((t) => !t.obrigatoria).length} opcionais</div>
+        <div>Última tarefa no dia ${maxPrazo} a partir do início</div></div>
+      ${usando.length ? `<div class="aviso-inline">${icone('alerta')}<span>${plural(usando.length, 'cliente usa', 'clientes usam')} este modelo. O que você mudar vale para quem receber o modelo daqui em diante; quem já usa continua com o check-list que recebeu.</span></div>` : ''}
+    </aside>`
+  const principal = aba === 'tarefas' ? editorEtapas(r, err)
+    : `<p class="t-rotulo mudo m0">Prévia de como o consultor vai ver o fluxograma. As setas saem do "Depende de" de cada tarefa.</p>
+       <div class="card fluxo-card"><div class="fluxo-caixa">${desenharFluxo(r.etapas, { prefixo: 'ed', vertical: estado.orientacao === 'vertical', info: infoDoModelo, rotulo: 'Prévia do fluxograma' })}</div></div>`
+  return `<form class="janela larga" id="form-modelo" role="dialog" aria-modal="true" aria-labelledby="titulo-janela" novalidate tabindex="-1">
+    ${cabecalhoJanela('lista', j.modeloId ? 'Editar modelo de check-in' : 'Novo modelo de check-in',
+      j.origem ? `Cópia de "${esc(j.origem)}". Ajuste o que precisar e salve.` : j.modeloId ? 'Ao salvar, o modelo atualizado fica disponível para aplicar.' : 'Ao salvar, o modelo fica disponível para aplicar nos clientes.', true)}
+    <div class="janela-abas">${segmentado('aba-editor', [['tarefas', 'Etapas e tarefas', 'linhas'], ['previa', 'Fluxograma (prévia)', 'fluxo']], aba, 'Partes do formulário')}</div>
+    <div class="corpo" data-rolagem><div class="duas-colunas">${apoio}<div class="coluna-principal">${principal}</div></div></div>
+    <footer><p class="erro" role="alert">${err ? esc(err.msg) : ''}</p>
+      <button type="button" class="btn contorno" data-acao="fechar" ${j.salvando ? 'disabled' : ''}>Cancelar</button>
+      <button type="submit" class="btn" form="form-modelo" ${j.salvando ? 'disabled' : ''}>${j.salvando ? 'Salvando…' : `${icone('check')} Salvar modelo`}</button></footer>
+  </form>`
+}
+function editorEtapas(r, err) {
+  const ordem = ordemDe(r)
+  const todas = tarefasDe(r)
+  const primeira = todas[0]?.id
+  const ultima = todas.at(-1)?.id
+  const armado = estado.janela.armado
+  return `<div class="section-label">Etapas e tarefas, na ordem em que o consultor segue</div>` + r.etapas.map((e, ei) => `
+    <section class="etapa-editor ${err?.etapas.has(e.id) ? 'com-erro' : ''}" aria-label="Etapa ${ei + 1}">
+      <div class="etapa-editor-topo">
+        <span class="numero">${ei + 1}</span>
+        <input class="input" id="en-${e.id}" data-campo="etapa-nome" data-id="${e.id}" value="${esc(e.nome)}" maxlength="60" placeholder="Nome da etapa (ex.: Diagnóstico)" aria-label="Nome da etapa ${ei + 1}" ${err?.etapas.has(e.id) && !e.nome.trim() ? 'aria-invalid="true"' : ''}>
+        <span class="t-legenda">${plural(e.tarefas.length, 'tarefa', 'tarefas')}</span>
+        ${botaoIcone('subir-etapa', e.id, 'cima', 'Subir etapa', { desabilitado: ei === 0 })}
+        ${botaoIcone('descer-etapa', e.id, 'baixo', 'Descer etapa', { desabilitado: ei === r.etapas.length - 1 })}
+        ${botaoIcone('apagar-etapa', e.id, 'lixeira', 'Apagar etapa', { perigo: true })}
+      </div>
+      ${armado === e.id ? `<div class="confirmacao-inline" role="alert"><span>Apagar a etapa "${esc(e.nome || 'sem nome')}" e ${plural(e.tarefas.length, 'tarefa', 'tarefas')} dela? As dependências para essas tarefas também saem.</span>
+        <button type="button" class="btn contorno pequeno" id="b-apagar-etapa-nao" data-acao="apagar-etapa-nao">Manter</button>
+        <button type="button" class="btn perigo pequeno" id="b-apagar-etapa-sim" data-acao="apagar-etapa-sim" data-id="${e.id}">${icone('lixeira')} Apagar etapa</button></div>` : ''}
+      <ol class="tarefas-editor">${e.tarefas.map((t) => {
+        const invalidas = t.deps.filter((d) => ordem[d] > ordem[t.id])
+        return `<li class="tarefa-editor ${err?.tarefas.has(t.id) ? 'com-erro' : ''}">
+          <div class="linha-1"><span class="ordem" title="Tarefa ${ordem[t.id]}">${ordem[t.id]}</span>
+            <input class="input" id="tt-${t.id}" data-campo="tarefa-titulo" data-id="${t.id}" value="${esc(t.titulo)}" maxlength="80" placeholder="Título (ex.: Análise do DRE)" aria-label="Título da tarefa ${ordem[t.id]}" ${err?.tarefas.has(t.id) && !t.titulo.trim() ? 'aria-invalid="true"' : ''}>
+            ${botaoIcone('subir-tarefa', t.id, 'cima', 'Subir tarefa', { desabilitado: t.id === primeira })}
+            ${botaoIcone('descer-tarefa', t.id, 'baixo', 'Descer tarefa', { desabilitado: t.id === ultima })}
+            ${botaoIcone('apagar-tarefa', t.id, 'lixeira', 'Apagar tarefa', { perigo: true })}</div>
+          <input class="input fino" id="td-${t.id}" data-campo="tarefa-descricao" data-id="${t.id}" value="${esc(t.descricao)}" maxlength="160" placeholder="Descrição curta (opcional)" aria-label="Descrição da tarefa ${ordem[t.id]}">
+          <div class="linha-3">
+            <button type="button" class="chave" id="b-obrigatoria-${t.id}" role="switch" aria-checked="${t.obrigatoria}" data-acao="alternar-obrigatoria" data-id="${t.id}"><span class="trilho-chave"></span>Obrigatória</button>
+            <div class="passos" role="group" aria-label="Prazo sugerido da tarefa ${ordem[t.id]}"><span class="t-legenda">Prazo: dia</span>
+              ${botaoIcone('prazo-menos', t.id, 'menos', 'Um dia a menos', { desabilitado: t.prazo <= 0 })}
+              <input class="input" id="pz-${t.id}" data-campo="tarefa-prazo" data-id="${t.id}" value="${esc(t.prazo)}" inputmode="numeric" aria-label="Prazo em dias a partir do início">
+              ${botaoIcone('prazo-mais', t.id, 'mais', 'Um dia a mais')}</div>
+            <div class="deps"><span class="t-legenda">Depende de</span>
+              ${t.deps.map((d) => { const dep = todas.find((x) => x.id === d); if (!dep) return ''; return `<span class="chip ${invalidas.includes(d) ? 'erro' : ''}" title="${invalidas.includes(d) ? 'Esta tarefa vem depois: mova uma das duas ou tire a dependência' : ''}"><span data-chip="${d}">${ordem[d]} · ${esc(dep.titulo || 'Sem título')}</span><button type="button" id="b-tirar-dep-${t.id}-${d}" data-acao="tirar-dep" data-id="${t.id}" data-dep="${d}" aria-label="Tirar a dependência de ${esc(dep.titulo || 'tarefa ' + ordem[d])}">${icone('fechar')}</button></span>` }).join('')}
+              <button type="button" class="btn fantasma pequeno" id="b-deps-${t.id}" data-acao="abrir-deps" data-id="${t.id}" data-abre-popover aria-haspopup="menu">${icone('mais')} ${t.deps.length ? 'Mais' : 'Adicionar'}</button></div>
+          </div>
+          ${invalidas.length ? `<div class="aviso-inline perigo">${icone('alerta')}<span>Depende de uma tarefa que agora vem depois dela. Mova uma das duas ou tire a dependência.</span></div>` : ''}
+        </li>` }).join('')}</ol>
+      <div><button type="button" class="btn fantasma pequeno" id="b-nova-tarefa-${e.id}" data-acao="nova-tarefa" data-id="${e.id}">${icone('mais')} Tarefa nesta etapa</button></div>
+    </section>`).join('') + `<div><button type="button" class="btn contorno" id="b-nova-etapa" data-acao="nova-etapa">${icone('mais', 'mais-gira')} Nova etapa</button></div>`
+}
+
+function janelaVerModelo() {
+  const j = estado.janela
+  const m = modeloPorId(j.modeloId)
+  const aba = j.aba || 'lista'
+  const ordem = ordemDe(m)
+  const corpo = aba === 'lista'
+    ? m.etapas.map((e, ei) => `<section class="ver-etapa"><div class="section-label">${ei + 1} · ${esc(e.nome)}</div>
+        <ol class="ver-tarefas">${e.tarefas.map((t) => `<li><span class="ordem">${ordem[t.id]}</span><div class="min0">
+          <div class="ver-titulo">${esc(t.titulo)}${t.obrigatoria ? '' : '<span class="badge contorno">Opcional</span>'}</div>
+          ${t.descricao ? `<div class="t-legenda">${esc(t.descricao)}</div>` : ''}
+          <div class="t-legenda">Dia ${t.prazo}${t.deps.length ? ` · depois de ${juntar(t.deps.map((d) => String(ordem[d])))}` : ' · pode começar logo'}</div></div></li>`).join('')}</ol></section>`).join('')
+    : `<div class="card fluxo-card"><div class="fluxo-caixa">${desenharFluxo(m.etapas, { prefixo: 'ver', vertical: estado.orientacao === 'vertical', info: infoDoModelo, rotulo: `Fluxograma do modelo ${m.nome}` })}</div></div>`
+  const acoes = []
+  if (podeEditarModelo(m) && !m.arquivado) acoes.push(`<button type="button" class="btn" data-acao="editar-modelo" data-id="${m.id}">${icone('lapis')} Editar</button>`)
+  else if (estado.papel === 'gestor' && !m.arquivado) acoes.push(`<button type="button" class="btn" data-acao="duplicar-modelo" data-id="${m.id}">${icone('copiar')} Duplicar para a STI Consult</button>`)
+  return `<div class="janela media" role="dialog" aria-modal="true" aria-labelledby="titulo-janela" tabindex="-1">
+    ${cabecalhoJanela('lista', esc(m.nome), `${esc(paraTexto(m.para))} · criado por ${esc(criadoTexto(m))} em ${esc(m.criadoEm)}${m.arquivado ? ' · arquivado' : ''}`, true)}
+    <div class="janela-abas">${segmentado('aba-ver', [['lista', 'Lista', 'linhas'], ['fluxo', 'Fluxograma', 'fluxo']], aba, 'Visualização do modelo')}</div>
+    <div class="corpo" data-rolagem>${m.descricao ? `<p class="mudo m0">${esc(m.descricao)}</p>` : ''}${estado.papel === 'consultor' ? `<div class="faixa-info" style="margin:0">${icone('olho')}<span>Só leitura: quem cria e muda modelos é a Central ou o gestor.</span></div>` : ''}${corpo}</div>
+    <footer><button type="button" class="btn contorno" data-acao="fechar">Fechar</button>${acoes.join('')}</footer></div>`
+}
+
+function janelaConfirmar() {
+  const j = estado.janela
+  const m = modeloPorId(j.modeloId)
+  const usando = clientesUsando(m, true)
+  const listaUsando = juntar(usando.map((c) => `<b>${esc(c.nome)}</b>`))
+  let titulo, texto, botoes, ic = 'arquivo'
+  if (j.variante === 'arquivar') {
+    titulo = `Arquivar "${esc(m.nome)}"?`
+    texto = `Ele sai da lista de modelos para aplicar. ${usando.length ? `${usando.length === 1 ? 'O cliente que usa' : `Os ${usando.length} clientes que usam`} (${listaUsando}) ${usando.length === 1 ? 'continua' : 'continuam'} com o check-list.` : 'Nenhum cliente usa este modelo.'} Dá para reativar na aba Arquivados.`
+    botoes = `<button type="button" class="btn" data-acao="confirmar-arquivar">${icone('arquivo')} Arquivar</button>`
+  } else if (usando.length) {
+    ic = 'alerta'
+    titulo = `"${esc(m.nome)}" está em uso`
+    texto = `${usando.length === 1 ? 'Um cliente usa' : `${usando.length} clientes usam`} este modelo: ${listaUsando}. Apagar quebraria o histórico ${usando.length === 1 ? 'dele' : 'deles'}, então ele não pode ser apagado.${m.arquivado ? '' : ' Arquive: arquivado, ele sai da lista de modelos para aplicar, mas os clientes continuam com o check-list.'}`
+    botoes = m.arquivado ? '' : `<button type="button" class="btn" data-acao="confirmar-arquivar">${icone('arquivo')} Arquivar</button>`
+  } else {
+    ic = 'lixeira'
+    const t = tarefasDe(m).length
+    titulo = `Apagar "${esc(m.nome)}"?`
+    texto = `Somem junto ${plural(m.etapas.length, 'etapa', 'etapas')} e ${plural(t, 'tarefa', 'tarefas')} do modelo. Nenhum cliente usa este modelo. Não dá para desfazer.${m.arquivado ? '' : ' Se quiser só tirar da lista, arquive.'}`
+    botoes = `${m.arquivado ? '' : `<button type="button" class="btn contorno" data-acao="confirmar-arquivar">${icone('arquivo')} Arquivar</button>`}<button type="button" class="btn perigo" data-acao="confirmar-apagar">${icone('lixeira')} Apagar</button>`
+  }
+  return `<div class="janela" role="alertdialog" aria-modal="true" aria-labelledby="titulo-janela" aria-describedby="texto-confirmar" tabindex="-1">
+    ${cabecalhoJanela(ic, titulo, '')}
+    <div class="corpo"><p class="m0" id="texto-confirmar">${texto}</p></div>
+    <footer><button type="button" class="btn contorno" data-acao="fechar">${botoes ? 'Cancelar' : 'Entendi'}</button>${botoes}</footer></div>`
+}
+
+function janelaAplicar() {
+  const j = estado.janela
+  const c = clientePorId(j.clienteId)
+  const consultoria = consultoriaDo(c)
+  const opcoes = dados.modelos.filter((m) => !m.arquivado && (m.para === 'todas' || m.para === consultoria))
+  if (!opcoes.some((m) => m.id === j.escolhido)) j.escolhido = opcoes[0]?.id
+  const m = modeloPorId(j.escolhido)
+  const inicioOk = dataValida(j.inicio)
+  const maxPrazo = m ? Math.max(...tarefasDe(m).map((t) => t.prazo)) : 0
+  const previa = m && inicioOk ? `${plural(tarefasDe(m).length, 'tarefa', 'tarefas')} em ${plural(m.etapas.length, 'etapa', 'etapas')} · a última vence em ${fmt(somarDias(dia(j.inicio), maxPrazo))} (dia ${maxPrazo})` : ''
+  const atual = c.aplicacao ? resumo(c.aplicacao) : null
+  return `<form class="janela media" id="form-aplicar" role="dialog" aria-modal="true" aria-labelledby="titulo-janela" novalidate tabindex="-1">
+    ${cabecalhoJanela('prancheta', c.aplicacao ? `Trocar o modelo de ${esc(c.nome)}` : `Aplicar modelo em ${esc(c.nome)}`, `${esc(CONSULTORES[c.consultor].nome)} vai seguir as tarefas como check-list. Modelos para ${esc(CONSULTORIAS[consultoria])} e para todas as consultorias.`)}
+    <div class="corpo" data-rolagem>
+      <div><span class="form-label" id="rot-modelo">Modelo</span>
+        <div class="opcoes-cards" role="radiogroup" aria-labelledby="rot-modelo">${opcoes.map((x) => `<button type="button" class="opcao-card" id="b-escolher-${x.id}" role="radio" aria-checked="${x.id === j.escolhido}" data-acao="escolher-modelo" data-id="${x.id}">
+          <span class="radio-bolinha"></span><span class="min0 flex1"><b>${esc(x.nome)}</b>${x.id === c.aplicacao?.modeloId ? ' <span class="badge contorno">Atual</span>' : ''}
+          <span class="t-legenda bloco">${plural(x.etapas.length, 'etapa', 'etapas')} · ${plural(tarefasDe(x).length, 'tarefa', 'tarefas')} · ${esc(paraTexto(x.para))}</span></span></button>`).join('')}</div></div>
+      <div class="grade-2"><div><label class="form-label" for="f-inicio">Início dos prazos</label>
+        <input class="input" id="f-inicio" data-campo="aplicar-inicio" value="${esc(j.inicio)}" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" data-foco-inicial ${j.erro ? 'aria-invalid="true"' : ''}>
+        <p class="ajuda">O prazo de cada tarefa conta em dias a partir desta data.</p></div>
+        <div class="caixa-info" style="align-self:start"><div class="section-label">Prévia</div><div id="previa-aplicar">${previa || 'Escolha um modelo e uma data válida.'}</div></div></div>
+      ${atual ? `<div class="aviso-inline">${icone('alerta')}<span>O check-list atual (${atual.feitas} de ${atual.total} feitas) é trocado pelo do modelo novo, começando do zero. O que já foi feito continua nos check-ins anteriores.</span></div>` : ''}
+    </div>
+    <footer><p class="erro" role="alert">${esc(j.erro || '')}</p>
+      <button type="button" class="btn contorno" data-acao="fechar" ${j.salvando ? 'disabled' : ''}>Cancelar</button>
+      <button type="submit" class="btn" form="form-aplicar" ${j.salvando || !m ? 'disabled' : ''}>${j.salvando ? 'Aplicando…' : `${icone('prancheta')} ${c.aplicacao ? 'Trocar modelo' : 'Aplicar modelo'}`}</button></footer>
+  </form>`
+}
+
+function janelaTarefa() {
+  const j = estado.janela
+  const c = clientePorId(j.clienteId)
+  const ap = c.aplicacao
+  const t = tarefaPorId(ap, j.tarefaId)
+  const s = situacao(ap, t)
+  const etapaIdx = ap.etapas.findIndex((e) => e.tarefas.includes(t))
+  const todas = tarefasDe(ap)
+  const deps = t.deps.map((id) => todas.find((x) => x.id === id)).filter(Boolean)
+  const libera = todas.filter((x) => x.deps.includes(t.id))
+  const pode = podeMarcar(c)
+  const rel = (x) => { const sx = situacao(ap, x); return `<li><button type="button" class="rel" data-acao="abrir-tarefa" data-id="${x.id}"><span class="pinta ${sx.cor}"></span><span class="elipse">${esc(x.titulo)}</span><span class="t-legenda">${rotuloEstado(x, sx)}</span></button></li>` }
+  const nota = pode
+    ? `<div><label class="form-label" for="f-nota">Nota (opcional)</label><textarea class="input" id="f-nota" data-campo="tarefa-nota" rows="3" maxlength="500" placeholder="Ex.: faltam os extratos de setembro">${esc(j.nota)}</textarea></div>`
+    : `<div><div class="form-label">Nota</div><p class="m0 ${t.nota ? '' : 'mudo'}">${t.nota ? esc(t.nota) : 'Sem nota.'}</p></div>`
+  let botoes = ''
+  if (pode) {
+    if (s.feito) botoes = `<button type="button" class="btn contorno" data-acao="tarefa-reabrir">${icone('desfazer')} Reabrir tarefa</button><button type="button" class="btn" data-acao="tarefa-nota">${icone('check')} Salvar nota</button>`
+    else if (s.bloqueada) botoes = `<button type="button" class="btn" data-acao="tarefa-nota">${icone('check')} Salvar nota</button>`
+    else botoes = `${t.estado === 'andamento' ? `<button type="button" class="btn contorno" data-acao="tarefa-afazer">${icone('desfazer')} Voltar para a fazer</button>` : `<button type="button" class="btn contorno" data-acao="tarefa-comecar">${icone('play')} Começar</button>`}<button type="button" class="btn" data-acao="tarefa-feita">${icone('check')} Marcar como feita</button>`
+  }
+  return `<div class="janela media" role="dialog" aria-modal="true" aria-labelledby="titulo-janela" tabindex="-1">
+    ${cabecalhoJanela('prancheta', esc(t.titulo), `${esc(c.nome)} · etapa ${etapaIdx + 1}, ${esc(ap.etapas[etapaIdx].nome)} · ${t.obrigatoria ? 'obrigatória' : 'opcional'}`)}
+    <div class="corpo" data-rolagem>
+      <div class="tarefa-meta" style="margin:0">${badgesDaTarefa(t, s)}${t.estado === 'andamento' || s.feito ? '' : `<span class="badge contorno">${rotuloEstado(t, s)}</span>`}</div>
+      ${t.descricao ? `<p class="m0">${esc(t.descricao)}</p>` : ''}
+      ${!s.feito && s.bloqueada && pode ? `<div class="aviso-inline">${icone('cadeado')}<span>Ainda não dá para marcar: espera ${nomes(s.espera)}.</span></div>` : ''}
+      <div class="grade-2">
+        <div class="caixa-info"><div class="section-label">Prazo</div><div><b>${fmt(s.prazo)}</b> · dia ${t.prazo} a partir de ${esc(ap.inicio)}</div></div>
+        <div class="caixa-info"><div class="section-label">${s.feito ? 'Feita' : 'Situação'}</div><div>${s.feito ? `por ${esc(t.feitoPor)} em ${esc(t.feitoEm)}` : s.atrasada ? `Atrasada há ${plural(-s.faltam, 'dia', 'dias')}` : s.hoje ? 'Vence hoje' : `Faltam ${plural(s.faltam, 'dia', 'dias')}`}</div></div>
+      </div>
+      <div class="grade-2">
+        <div><div class="form-label">Depende de</div>${deps.length ? `<ul class="relacoes">${deps.map(rel).join('')}</ul>` : '<p class="t-rotulo mudo m0">Nada: pode começar quando quiser.</p>'}</div>
+        <div><div class="form-label">Libera</div>${libera.length ? `<ul class="relacoes">${libera.map(rel).join('')}</ul>` : '<p class="t-rotulo mudo m0">Nenhuma tarefa espera por esta.</p>'}</div>
+      </div>
+      ${nota}
+    </div>
+    <footer><button type="button" class="btn contorno" data-acao="fechar">${pode ? 'Cancelar' : 'Fechar'}</button>${botoes}</footer></div>`
+}
+
+function janelaCheckout() {
+  const j = estado.janela
+  const ses = dados.sessao
+  const c = clientePorId(ses.clienteId)
+  const tarefas = c.aplicacao ? ses.tarefas.map((id) => tarefaPorId(c.aplicacao, id)).filter(Boolean) : []
+  return `<form class="janela" id="form-checkout" role="dialog" aria-modal="true" aria-labelledby="titulo-janela" novalidate tabindex="-1">
+    ${cabecalhoJanela('sair', 'Fazer check-out', `${esc(c.nome)} · desde ${hora(ses.inicio)} · <span data-cronometro>${cronometro(Date.now() - ses.inicio)}</span>`)}
+    <div class="corpo" data-rolagem>
+      <div><div class="form-label">Tarefas marcadas nesta sessão</div>${tarefas.length ? `<div class="sessao-lista">${tarefas.map((t) => `<span class="chip so-texto">${icone('check')}<span>${esc(t.titulo)}</span></span>`).join('')}</div>` : '<p class="t-rotulo mudo m0">Nenhuma tarefa marcada nesta sessão.</p>'}</div>
+      <div><label class="form-label" for="f-feito">O que foi feito</label>
+        <textarea class="input" id="f-feito" data-campo="checkout-descricao" rows="4" maxlength="2000" data-foco-inicial ${j.erro ? 'aria-invalid="true"' : ''}>${esc(j.descricao)}</textarea>
+        <p class="ajuda">Já vem com as tarefas marcadas; complete com o que mais foi feito.</p></div>
+    </div>
+    <footer><p class="erro" role="alert">${esc(j.erro || '')}</p>
+      <button type="button" class="btn contorno" data-acao="fechar" ${j.salvando ? 'disabled' : ''}>Cancelar</button>
+      <button type="submit" class="btn" form="form-checkout" ${j.salvando ? 'disabled' : ''}>${j.salvando ? 'Salvando…' : `${icone('sair')} Fazer check-out`}</button></footer>
+  </form>`
+}
+
+const JANELAS = { editor: janelaEditor, ver: janelaVerModelo, confirmar: janelaConfirmar, aplicar: janelaAplicar, tarefa: janelaTarefa, checkout: janelaCheckout }
+
+function renderJanela() {
+  const alvo = document.getElementById('janela')
+  const j = estado.janela
+  document.body.classList.toggle('com-janela', Boolean(j))
+  if (!j) { alvo.innerHTML = ''; return }
+  const foco = document.activeElement?.id
+  const html = JANELAS[j.tipo]()
+  const fundo = alvo.querySelector('.fundo')
+  if (fundo && fundo.dataset.chave === j.chave) {
+    // Mesma janela (mudou algo dentro): troca só o conteúdo e mantém a rolagem e o foco.
+    const rolagens = [...fundo.querySelectorAll('[data-rolagem]')].map((el) => el.scrollTop)
+    fundo.innerHTML = html
+    fundo.firstElementChild?.classList.add('sem-animacao')
+    fundo.querySelectorAll('[data-rolagem]').forEach((el, i) => { el.scrollTop = rolagens[i] ?? 0 })
+    const alvoFoco = j.focar || foco
+    j.focar = null
+    if (alvoFoco) document.getElementById(alvoFoco)?.focus({ preventScroll: Boolean(foco && !j.focar) })
+    return
+  }
+  alvo.innerHTML = `<div class="fundo" data-acao="fundo" data-chave="${esc(j.chave)}">${html}</div>`
+  const inicial = alvo.querySelector('[data-foco-inicial]') || alvo.querySelector('.janela')
+  inicial?.focus()
+}
+function abrirJanela(j) {
+  const retorno = estado.janela?.retorno ?? document.activeElement?.id
+  fecharPopover()
+  estado.janela = { chave: `${j.tipo}-${j.modeloId ?? j.tarefaId ?? j.clienteId ?? ''}-${Date.now()}`, retorno, ...j }
+  renderJanela()
+}
+function fecharJanela() {
+  const retorno = estado.janela?.retorno
+  estado.janela = null
+  fecharPopover()
+  render()
+  if (retorno) document.getElementById(retorno)?.focus({ preventScroll: true })
+}
+
+// ── Menu suspenso (popover) ────────────────────────────────────────────────
+function conteudoPopover() {
+  const p = estado.popover
+  if (p.tipo === 'cliente') {
+    return `<p class="popover-ajuda">${estado.papel === 'consultor' ? 'Seus clientes' : 'Clientes que você vê'}</p>` + clientesVisiveis().map((c) => {
+      const r = c.aplicacao ? resumo(c.aplicacao) : null
+      return `<button type="button" class="opcao-menu radio" id="op-cli-${c.id}" role="menuitemradio" aria-checked="${c.id === estado.clienteId}" data-acao="escolher-cliente" data-id="${c.id}">
+        <span class="marca">${icone('check')}</span><span class="elipse">${esc(c.nome)}</span><span class="lado">${r ? `${esc(cortar(c.aplicacao.modeloNome, 18))} · ${r.pct}%` : 'sem modelo'}</span></button>`
+    }).join('')
+  }
+  if (p.tipo === 'consultoria') {
+    const r = estado.janela.rascunho
+    return '<p class="popover-ajuda">Para qual consultoria</p>' + Object.entries(CONSULTORIAS).map(([id, nome]) =>
+      `<button type="button" class="opcao-menu radio" id="op-cons-${id}" role="menuitemradio" aria-checked="${r.para === id}" data-acao="escolher-consultoria" data-id="${id}"><span class="marca">${icone('check')}</span><span class="elipse">${esc(nome)}</span></button>`).join('')
+  }
+  // Dependências: só tarefas que vêm antes na ordem (assim nunca há ciclo).
+  const r = estado.janela.rascunho
+  const ordem = ordemDe(r)
+  const t = tarefasDe(r).find((x) => x.id === p.tarefaId)
+  const grupos = r.etapas.map((e) => ({ e, itens: e.tarefas.filter((x) => ordem[x.id] < ordem[t.id]) })).filter((g) => g.itens.length)
+  if (!grupos.length) return '<p class="popover-ajuda">Esta é a primeira tarefa: não há nada antes dela. Só tarefas que vêm antes na lista podem ser dependências.</p>'
+  return `<p class="popover-ajuda">"${esc(t.titulo || 'Esta tarefa')}" só pode ser marcada depois de:</p>` + grupos.map((g) =>
+    `<div class="section-label popover-grupo">${esc(g.e.nome || 'Etapa sem nome')}</div>` + g.itens.map((x) =>
+      `<button type="button" class="opcao-menu" id="op-dep-${x.id}" role="menuitemcheckbox" aria-checked="${t.deps.includes(x.id)}" data-acao="alternar-dep" data-id="${x.id}"><span class="marca">${icone('check')}</span><span class="ordem">${ordem[x.id]}</span><span class="elipse">${esc(x.titulo || 'Sem título')}</span></button>`).join('')).join('')
+}
+function renderPopover() {
+  const alvo = document.getElementById('popover')
+  const p = estado.popover
+  if (!p) { alvo.innerHTML = ''; return }
+  const foco = document.activeElement?.id
+  alvo.innerHTML = `<div class="popover ${p.mostrado ? 'sem-animacao' : ''}" role="menu" aria-label="${p.tipo === 'deps' ? 'Depende de' : p.tipo === 'cliente' ? 'Clientes' : 'Consultorias'}" style="visibility:hidden">${conteudoPopover()}</div>`
+  p.mostrado = true
+  const el = alvo.firstElementChild
+  const r = p.ancora
+  const left = Math.max(12, Math.min(r.left, innerWidth - el.offsetWidth - 12))
+  let top = r.bottom + 6
+  if (top + el.offsetHeight > innerHeight - 12) top = Math.max(12, r.top - el.offsetHeight - 6)
+  Object.assign(el.style, { left: `${left}px`, top: `${top}px`, visibility: '' })
+  const alvoFoco = (foco && document.getElementById(foco)?.closest('#popover')) ? document.getElementById(foco) : el.querySelector('[aria-checked="true"]') || el.querySelector('button')
+  alvoFoco?.focus({ preventScroll: true })
+}
+function abrirPopover(botao, cfg) {
+  if (estado.popover && estado.popover.ancoraId === botao.id) { fecharPopover(); return }
+  estado.popover = { ...cfg, ancora: botao.getBoundingClientRect(), ancoraId: botao.id }
+  renderPopover()
+}
+function fecharPopover(devolverFoco = false) {
+  if (!estado.popover) return
+  const id = estado.popover.ancoraId
+  estado.popover = null
+  renderPopover()
+  if (devolverFoco) document.getElementById(id)?.focus()
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+const PAGINAS = { cliente: paginaCliente, modelos: paginaModelos, gestao: paginaGestao }
+function render() {
+  const foco = document.activeElement?.id
+  const caixa = document.getElementById('fluxo-caixa')
+  const rolagem = caixa ? [caixa.scrollLeft, caixa.scrollTop] : null
+  renderFaixa()
+  renderMoldura()
+  document.getElementById('pagina').innerHTML = PAGINAS[estado.area]() + perguntas()
+  const nova = document.getElementById('fluxo-caixa')
+  if (nova && rolagem) [nova.scrollLeft, nova.scrollTop] = rolagem
+  renderJanela()
+  if (!estado.janela && foco) document.getElementById(foco)?.focus({ preventScroll: true })
+}
+function renderLista() {
+  // Só a tabela muda enquanto a pessoa digita a busca (o campo não perde o foco).
+  const temp = document.createElement('div')
+  temp.innerHTML = PAGINAS[estado.area]()
+  document.getElementById('lista').replaceWith(temp.querySelector('#lista'))
+}
+function ajustarAoPapel() {
+  if (estado.area === 'gestao' && estado.papel === 'consultor') estado.area = 'cliente'
+  const visiveis = clientesVisiveis()
+  if (!visiveis.some((c) => c.id === estado.clienteId)) estado.clienteId = visiveis[0].id
+  estado.selecionado = null
+}
+
+// ── Ações do check-list ────────────────────────────────────────────────────
+function marcar(c, id) {
+  const ap = c.aplicacao
+  const t = tarefaPorId(ap, id)
+  const s = situacao(ap, t)
+  if (!podeMarcar(c)) { avisar(`Só ${esc(CONSULTORES[c.consultor].nome)} marca as tarefas deste cliente. Você acompanha.`); return }
+  if (s.feito) {
+    Object.assign(t, { estado: 'afazer', feitoPor: null, feitoEm: null })
+    if (dados.sessao?.clienteId === c.id) dados.sessao.tarefas = dados.sessao.tarefas.filter((x) => x !== id)
+    render()
+    avisar(`<b>${esc(t.titulo)}</b> voltou para a fazer.`)
+    return
+  }
+  if (s.bloqueada) { avisar(`Ainda não dá para marcar <b>${esc(t.titulo)}</b>: espera ${nomes(s.espera)}.`); return }
+  concluir(c, t)
+}
+function concluir(c, t) {
+  const ap = c.aplicacao
+  const esperavam = tarefasDe(ap).filter((x) => x.deps.includes(t.id) && situacao(ap, x).bloqueada)
+  Object.assign(t, { estado: 'feito', feitoPor: eu().nome, feitoEm: fmt(HOJE) })
+  const liberadas = esperavam.filter((x) => !situacao(ap, x).bloqueada)
+  const naSessao = dados.sessao?.clienteId === c.id
+  if (naSessao && !dados.sessao.tarefas.includes(t.id)) dados.sessao.tarefas.push(t.id)
+  render()
+  avisar(`<b>${esc(t.titulo)}</b> feita.${liberadas.length ? ` Agora dá para fazer: ${nomes(liberadas)}.` : ''}${naSessao ? ' Entrou no resumo deste check-in.' : ' (Sem check-in aberto: fica feita, fora de uma sessão.)'}`)
+}
+function acaoTarefa(acao) {
+  const j = estado.janela
+  const c = clientePorId(j.clienteId)
+  const t = tarefaPorId(c.aplicacao, j.tarefaId)
+  t.nota = (j.nota ?? '').trim()
+  const retorno = j.retorno
+  estado.janela = null
+  if (acao === 'tarefa-feita') { concluir(c, t) } else {
+    if (acao === 'tarefa-reabrir') {
+      Object.assign(t, { estado: 'afazer', feitoPor: null, feitoEm: null })
+      if (dados.sessao?.clienteId === c.id) dados.sessao.tarefas = dados.sessao.tarefas.filter((x) => x !== t.id)
+    }
+    if (acao === 'tarefa-comecar') t.estado = 'andamento'
+    if (acao === 'tarefa-afazer') t.estado = 'afazer'
+    render()
+    avisar({ 'tarefa-reabrir': `<b>${esc(t.titulo)}</b> voltou para a fazer.`, 'tarefa-comecar': `<b>${esc(t.titulo)}</b> em andamento.`,
+      'tarefa-afazer': `<b>${esc(t.titulo)}</b> voltou para a fazer.`, 'tarefa-nota': 'Nota salva.' }[acao])
+  }
+  if (retorno) document.getElementById(retorno)?.focus({ preventScroll: true })
+}
+
+// ── Salvar (com "Salvando…" de mentira, como no app) ───────────────────────
+function validarModelo(r) {
+  const erros = { tarefas: new Set(), etapas: new Set(), nome: false, msg: '' }
+  const ordem = ordemDe(r)
+  const todas = tarefasDe(r)
+  if (r.nome.trim().length < 2) { erros.nome = true; erros.msg ||= 'Dê um nome ao modelo (pelo menos 2 letras).' }
+  if (!todas.length) erros.msg ||= 'O modelo precisa de pelo menos uma tarefa.'
+  r.etapas.forEach((e) => { if (!e.nome.trim()) { erros.etapas.add(e.id); erros.msg ||= 'Dê um nome a todas as etapas.' } })
+  r.etapas.forEach((e) => { if (!e.tarefas.length) { erros.etapas.add(e.id); erros.msg ||= `A etapa "${e.nome || 'sem nome'}" está sem tarefas: inclua uma tarefa ou apague a etapa.` } })
+  todas.forEach((t) => { if (!t.titulo.trim()) { erros.tarefas.add(t.id); erros.msg ||= 'Toda tarefa precisa de um título.' } })
+  todas.forEach((t) => t.deps.forEach((d) => {
+    if (ordem[d] > ordem[t.id]) { erros.tarefas.add(t.id); erros.msg ||= `"${t.titulo}" depende de "${todas.find((x) => x.id === d).titulo}", que vem depois. Mova uma das duas ou tire a dependência.` }
+  }))
+  return erros
+}
+function salvarModelo() {
+  const j = estado.janela
+  const r = j.rascunho
+  const erros = validarModelo(r)
+  if (erros.msg) { j.erros = erros; if (erros.tarefas.size || erros.etapas.size) j.aba = 'tarefas'; renderJanela(); return }
+  j.erros = null
+  j.salvando = true
+  renderJanela()
+  setTimeout(() => {
+    const limpo = {
+      nome: r.nome.trim(), descricao: r.descricao.trim(), para: estado.papel === 'gestor' ? eu().consultoria : r.para,
+      etapas: r.etapas.map((e) => ({ ...e, nome: e.nome.trim(), tarefas: e.tarefas.map((t) => ({ ...t, titulo: t.titulo.trim(), descricao: t.descricao.trim() })) })),
+    }
+    if (j.modeloId) {
+      Object.assign(modeloPorId(j.modeloId), limpo)
+      avisar(`<b>${esc(limpo.nome)}</b> salvo. Quem já usa este modelo continua com o check-list que recebeu.`)
+    } else {
+      const p = estado.papel
+      dados.modelos.unshift({ id: novoId('m'), ...limpo, arquivado: false, criadoEm: fmt(HOJE),
+        criadoPor: { tipo: p === 'central' ? 'central' : 'gestor', nome: eu().nome, consultoria: eu().consultoria } })
+      estado.abaModelos = 'ativos'
+      avisar(`<b>${esc(limpo.nome)}</b> criado. Ele já aparece em "Aplicar modelo" nos clientes${limpo.para === 'todas' ? ' de todas as consultorias' : ` da ${esc(CONSULTORIAS[limpo.para])}`}.`)
+    }
+    fecharJanela()
+  }, 450)
+}
+function salvarAplicacao() {
+  const j = estado.janela
+  if (!dataValida(j.inicio)) { j.erro = 'Informe o início dos prazos no formato dd/mm/aaaa.'; renderJanela(); return }
+  j.erro = ''
+  j.salvando = true
+  renderJanela()
+  setTimeout(() => {
+    const c = clientePorId(j.clienteId)
+    const m = modeloPorId(j.escolhido)
+    const trocou = Boolean(c.aplicacao)
+    c.aplicacao = copiarParaCliente(m, j.inicio, `${eu().nome} (${eu().rotulo.toLowerCase()})`, fmt(HOJE))
+    if (dados.sessao?.clienteId === c.id) dados.sessao.tarefas = []
+    estado.selecionado = null
+    fecharJanela()
+    avisar(`<b>${esc(m.nome)}</b> ${trocou ? 'agora é o modelo' : 'aplicado'} em <b>${esc(c.nome)}</b>. ${esc(CONSULTORES[c.consultor].nome)} já vê o check-list.`)
+  }, 450)
+}
+function salvarCheckout() {
+  const j = estado.janela
+  if (!j.descricao.trim()) { j.erro = 'Conte o que foi feito nesta sessão.'; renderJanela(); return }
+  j.erro = ''
+  j.salvando = true
+  renderJanela()
+  setTimeout(() => {
+    const ses = dados.sessao
+    const c = clientePorId(ses.clienteId)
+    const agora = Date.now()
+    const tarefas = c.aplicacao ? ses.tarefas.map((id) => tarefaPorId(c.aplicacao, id)).filter(Boolean).map((t) => t.titulo) : []
+    const fim = Math.max(agora, ses.inicio + 60000)
+    dados.checkins.push({ clienteId: c.id, data: fmt(HOJE), inicio: hora(ses.inicio), fim: hora(fim), quem: eu().nome, tarefas, descricao: j.descricao.trim() })
+    dados.sessao = null
+    fecharJanela()
+    avisar(`Check-out feito em <b>${esc(c.nome)}</b>${tarefas.length ? ` com ${plural(tarefas.length, 'tarefa marcada', 'tarefas marcadas')}` : ''}. Está em "Check-ins anteriores".`)
+  }, 450)
+}
+
+// ── Editor de modelo: mudanças na estrutura ────────────────────────────────
+function moverTarefa(r, id, dir) {
+  const ei = r.etapas.findIndex((e) => e.tarefas.some((t) => t.id === id))
+  const e = r.etapas[ei]
+  const ti = e.tarefas.findIndex((t) => t.id === id)
+  const [t] = e.tarefas.splice(ti, 1)
+  if (dir < 0) {
+    if (ti > 0) e.tarefas.splice(ti - 1, 0, t)
+    else if (ei > 0) r.etapas[ei - 1].tarefas.push(t)
+    else e.tarefas.unshift(t)
+  } else if (ti < e.tarefas.length) e.tarefas.splice(ti + 1, 0, t)
+  else if (ei < r.etapas.length - 1) r.etapas[ei + 1].tarefas.unshift(t)
+  else e.tarefas.push(t)
+}
+function tirarTarefas(r, ids) {
+  const fora = new Set(ids)
+  r.etapas.forEach((e) => {
+    e.tarefas = e.tarefas.filter((t) => !fora.has(t.id))
+    e.tarefas.forEach((t) => { t.deps = t.deps.filter((d) => !fora.has(d)) })
+  })
+}
+function acaoEditor(acao, el) {
+  const j = estado.janela
+  const r = j.rascunho
+  const id = el.dataset.id
+  const t = id ? tarefasDe(r).find((x) => x.id === id) : null
+  switch (acao) {
+    case 'nova-etapa': { const e = { id: novoId('e'), nome: '', tarefas: [novaTarefa(Math.max(7, ...tarefasDe(r).map((x) => x.prazo)))] }; r.etapas.push(e); j.focar = `en-${e.id}`; break }
+    case 'nova-tarefa': { const e = etapaDe(r, id); const nova = novaTarefa(e.tarefas.at(-1)?.prazo ?? 7); e.tarefas.push(nova); j.focar = `tt-${nova.id}`; break }
+    case 'subir-tarefa': moverTarefa(r, id, -1); break
+    case 'descer-tarefa': moverTarefa(r, id, 1); break
+    case 'apagar-tarefa': {
+      const dependentes = tarefasDe(r).filter((x) => x.deps.includes(id))
+      tirarTarefas(r, [id])
+      if (dependentes.length) avisar(`A tarefa saiu e também deixou de ser dependência de ${nomes(dependentes)}.`)
+      break
+    }
+    case 'subir-etapa': case 'descer-etapa': {
+      const i = r.etapas.findIndex((e) => e.id === id)
+      const k = acao === 'subir-etapa' ? i - 1 : i + 1
+      ;[r.etapas[i], r.etapas[k]] = [r.etapas[k], r.etapas[i]]
+      break
+    }
+    case 'apagar-etapa': {
+      const e = etapaDe(r, id)
+      if (e.tarefas.length) { j.armado = id; j.focar = 'b-apagar-etapa-nao' } else r.etapas = r.etapas.filter((x) => x.id !== id)
+      break
+    }
+    case 'apagar-etapa-sim': { const e = etapaDe(r, id); tirarTarefas(r, e.tarefas.map((x) => x.id)); r.etapas = r.etapas.filter((x) => x.id !== id); j.armado = null; break }
+    case 'apagar-etapa-nao': j.focar = `b-apagar-etapa-${j.armado}`; j.armado = null; break
+    case 'alternar-obrigatoria': t.obrigatoria = !t.obrigatoria; break
+    case 'prazo-menos': t.prazo = Math.max(0, (Number(t.prazo) || 0) - 1); break
+    case 'prazo-mais': t.prazo = Math.min(365, (Number(t.prazo) || 0) + 1); break
+    case 'tirar-dep': t.deps = t.deps.filter((d) => d !== el.dataset.dep); j.focar = `b-deps-${id}`; break
+    case 'para-todas': r.para = 'todas'; break
+    case 'para-uma': if (r.para === 'todas') r.para = 'sti'; break
+    default: return
+  }
+  renderJanela()
+}
+
+// ── Eventos ────────────────────────────────────────────────────────────────
+function executar(acao, el) {
+  const id = el.dataset.id
+  const j = estado.janela
+  switch (acao) {
+    case 'ver-como':
+      estado.papel = id; estado.janela = null; fecharPopover(); ajustarAoPapel(); render()
+      avisar(`Agora você vê como <b>${esc(eu().nome)}</b> (${esc(eu().descricao)}).`)
+      break
+    case 'restaurar':
+      dados = semente(); Object.assign(estado, { ...INICIAL, papel: estado.papel, area: estado.area }); ajustarAoPapel(); render()
+      avisar('Exemplo restaurado: os dados voltaram ao começo.')
+      break
+    case 'area': estado.area = id; estado.janela = null; fecharPopover(); render(); scrollTo(0, 0); break
+    case 'fora': avisar('Fora do protótipo: aqui funcionam Clientes (aba Check-in), Modelos e Visão da gestão.'); break
+    case 'aba-cliente': if (id !== 'checkin') avisar('Fora do protótipo: só a aba Check-in funciona aqui.'); break
+    case 'visao': estado.visao = id; render(); break
+    case 'filtro': estado.filtro = id; render(); break
+    case 'orientacao': estado.orientacao = id; if (j) renderJanela(); else render(); break
+    case 'abrir-seletor-cliente': abrirPopover(el, { tipo: 'cliente' }); break
+    case 'escolher-cliente': estado.clienteId = id; estado.selecionado = null; fecharPopover(); render(); document.getElementById('seletor-cliente')?.focus(); break
+    case 'ir-cliente': estado.clienteId = id; estado.selecionado = null; render(); break
+    case 'marcar': marcar(clientePorId(estado.clienteId), id); break
+    case 'abrir-tarefa': {
+      const c = clientePorId(estado.clienteId)
+      estado.selecionado = id
+      if (el.closest('svg')) render()
+      abrirJanela({ tipo: 'tarefa', clienteId: c.id, tarefaId: id, nota: tarefaPorId(c.aplicacao, id).nota, leitura: !podeMarcar(c) })
+      break
+    }
+    case 'tarefa-feita': case 'tarefa-reabrir': case 'tarefa-comecar': case 'tarefa-afazer': case 'tarefa-nota': acaoTarefa(acao); break
+    case 'fazer-checkin': {
+      const c = clientePorId(estado.clienteId)
+      dados.sessao = { clienteId: c.id, inicio: Date.now(), tarefas: [] }
+      render()
+      avisar(`Check-in feito em <b>${esc(c.nome)}</b>. O que você marcar agora entra no resumo da sessão.`)
+      break
+    }
+    case 'fazer-checkout': {
+      const c = clientePorId(dados.sessao.clienteId)
+      const titulos = c.aplicacao ? dados.sessao.tarefas.map((x) => tarefaPorId(c.aplicacao, x)).filter(Boolean).map((t) => t.titulo) : []
+      abrirJanela({ tipo: 'checkout', descricao: titulos.length ? `Tarefas concluídas: ${titulos.join('; ')}.` : '', erro: '' })
+      break
+    }
+    case 'aplicar-modelo': case 'aplicar-cliente': {
+      const c = clientePorId(acao === 'aplicar-cliente' ? id : estado.clienteId)
+      abrirJanela({ tipo: 'aplicar', clienteId: c.id, escolhido: c.aplicacao?.modeloId, inicio: fmt(HOJE), erro: '' })
+      break
+    }
+    case 'escolher-modelo': j.escolhido = id; j.focar = `b-escolher-${id}`; renderJanela(); break
+    case 'abrir-cliente': estado.area = 'cliente'; estado.clienteId = id; estado.selecionado = null; render(); scrollTo(0, 0); break
+    case 'aba-modelos': estado.abaModelos = id; render(); break
+    case 'filtro-gestao': estado.filtroGestao = id; render(); break
+    case 'novo-modelo':
+      abrirJanela({ tipo: 'editor', aba: 'tarefas', rascunho: { nome: '', descricao: '', para: estado.papel === 'gestor' ? eu().consultoria : 'todas', etapas: [{ id: novoId('e'), nome: 'Diagnóstico', tarefas: [novaTarefa(2)] }] } })
+      break
+    case 'editar-modelo': abrirJanela({ tipo: 'editor', aba: 'tarefas', modeloId: id, rascunho: structuredClone(modeloPorId(id)) }); break
+    case 'duplicar-modelo': {
+      const m = modeloPorId(id)
+      const copia = structuredClone(m)
+      copia.etapas.forEach((e) => { e.id = novoId('e') })
+      abrirJanela({ tipo: 'editor', aba: 'tarefas', origem: m.nome,
+        rascunho: { nome: `${m.nome} (cópia)`, descricao: copia.descricao, para: estado.papel === 'gestor' ? eu().consultoria : m.para, etapas: copia.etapas } })
+      break
+    }
+    case 'ver-modelo': abrirJanela({ tipo: 'ver', modeloId: id, aba: 'lista', leitura: true }); break
+    case 'aba-ver': case 'aba-editor': j.aba = id; renderJanela(); break
+    case 'arquivar-modelo': abrirJanela({ tipo: 'confirmar', variante: 'arquivar', modeloId: id }); break
+    case 'apagar-modelo': abrirJanela({ tipo: 'confirmar', variante: 'apagar', modeloId: id }); break
+    case 'reativar-modelo': { const m = modeloPorId(id); m.arquivado = false; render(); avisar(`<b>${esc(m.nome)}</b> voltou para os ativos.`); break }
+    case 'confirmar-arquivar': { const m = modeloPorId(j.modeloId); m.arquivado = true; fecharJanela(); avisar(`<b>${esc(m.nome)}</b> arquivado. Ele está na aba Arquivados.`); break }
+    case 'confirmar-apagar': { const m = modeloPorId(j.modeloId); dados.modelos = dados.modelos.filter((x) => x !== m); fecharJanela(); avisar(`<b>${esc(m.nome)}</b> apagado.`); break }
+    case 'abrir-deps': abrirPopover(el, { tipo: 'deps', tarefaId: id }); break
+    case 'alternar-dep': {
+      const t = tarefasDe(j.rascunho).find((x) => x.id === estado.popover.tarefaId)
+      t.deps = t.deps.includes(id) ? t.deps.filter((d) => d !== id) : [...t.deps, id]
+      renderJanela(); renderPopover()
+      break
+    }
+    case 'abrir-consultorias': abrirPopover(el, { tipo: 'consultoria' }); break
+    case 'escolher-consultoria': j.rascunho.para = id; fecharPopover(); j.focar = 'seletor-consultoria'; renderJanela(); break
+    case 'fechar': if (!j?.salvando) fecharJanela(); break
+    case 'fundo': if (j?.leitura) fecharJanela(); break
+    default: if (j?.tipo === 'editor') acaoEditor(acao, el)
+  }
+}
+
+document.addEventListener('click', (e) => {
+  // Clique fora do menu suspenso (e fora do botão que o abre) fecha o menu.
+  if (estado.popover && !e.target.closest('#popover') && !e.target.closest('[data-abre-popover]')) fecharPopover()
+  const el = e.target.closest('[data-acao]')
+  if (!el || el.disabled) return
+  if (el.dataset.acao === 'fundo' && e.target !== el) return
+  executar(el.dataset.acao, el)
+})
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (estado.popover) { fecharPopover(true); return }
+    if (estado.janela && !estado.janela.salvando) fecharJanela()
+    return
+  }
+  // Nós do fluxograma são <g role="button">: Enter e espaço abrem a tarefa.
+  const no = e.target.closest?.('g[role="button"]')
+  if (no && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); executar(no.dataset.acao, no) }
+})
+
+document.addEventListener('input', (e) => {
+  const el = e.target
+  if (el.id === 'busca-modelos') { estado.buscaModelos = el.value; renderLista(); return }
+  if (el.id === 'busca-gestao') { estado.buscaGestao = el.value; renderLista(); return }
+  const j = estado.janela
+  if (!j || !el.dataset.campo) return
+  const campo = el.dataset.campo
+  if (campo === 'aplicar-inicio') {
+    j.inicio = el.value.trim()
+    const m = modeloPorId(j.escolhido)
+    const maxPrazo = m ? Math.max(...tarefasDe(m).map((t) => t.prazo)) : 0
+    const caixa = document.getElementById('previa-aplicar')
+    if (caixa) caixa.textContent = m && dataValida(j.inicio) ? `${plural(tarefasDe(m).length, 'tarefa', 'tarefas')} em ${plural(m.etapas.length, 'etapa', 'etapas')} · a última vence em ${fmt(somarDias(dia(j.inicio), maxPrazo))} (dia ${maxPrazo})` : 'Escolha um modelo e uma data válida.'
+    return
+  }
+  if (campo === 'tarefa-nota') { j.nota = el.value; return }
+  if (campo === 'checkout-descricao') { j.descricao = el.value; return }
+  const r = j.rascunho
+  if (!r) return
+  if (campo === 'modelo-nome') r.nome = el.value
+  else if (campo === 'modelo-descricao') r.descricao = el.value
+  else if (campo === 'etapa-nome') etapaDe(r, el.dataset.id).nome = el.value
+  else {
+    const t = tarefasDe(r).find((x) => x.id === el.dataset.id)
+    if (campo === 'tarefa-titulo') {
+      t.titulo = el.value
+      const n = ordemDe(r)[t.id]
+      document.querySelectorAll(`[data-chip="${t.id}"]`).forEach((chip) => { chip.textContent = `${n} · ${el.value || 'Sem título'}` })
+    } else if (campo === 'tarefa-descricao') t.descricao = el.value
+    else if (campo === 'tarefa-prazo') {
+      const limpo = el.value.replace(/\D/g, '').slice(0, 3)
+      if (limpo !== el.value) el.value = limpo
+      t.prazo = Math.min(365, Number(limpo) || 0)
+    }
+  }
+})
+
+document.addEventListener('submit', (e) => {
+  e.preventDefault()
+  const j = estado.janela
+  if (!j || j.salvando) return
+  if (j.tipo === 'editor') salvarModelo()
+  else if (j.tipo === 'aplicar') salvarAplicacao()
+  else if (j.tipo === 'checkout') salvarCheckout()
+})
+
+// Rolar a janela com o menu suspenso aberto fecha o menu (ele ficaria solto na tela).
+document.addEventListener('scroll', (e) => {
+  if (estado.popover && !(e.target instanceof Element && e.target.closest('#popover'))) fecharPopover()
+}, true)
+addEventListener('resize', () => fecharPopover())
+
+// Arrastar o fluxograma com o mouse (no celular o dedo já rola o quadro).
+let arraste = null
+document.addEventListener('pointerdown', (e) => {
+  const caixa = e.target.closest('.fluxo-caixa')
+  if (!caixa || e.pointerType !== 'mouse' || e.button !== 0 || e.target.closest('.no:not(.estatico)')) return
+  arraste = { caixa, x: e.clientX, y: e.clientY, l: caixa.scrollLeft, t: caixa.scrollTop }
+  caixa.classList.add('arrastando')
+})
+document.addEventListener('pointermove', (e) => {
+  if (!arraste) return
+  arraste.caixa.scrollLeft = arraste.l - (e.clientX - arraste.x)
+  arraste.caixa.scrollTop = arraste.t - (e.clientY - arraste.y)
+})
+document.addEventListener('pointerup', () => { if (arraste) { arraste.caixa.classList.remove('arrastando'); arraste = null } })
+
+// Relógio do check-in aberto.
+setInterval(() => {
+  if (!dados.sessao) return
+  const texto = cronometro(Date.now() - dados.sessao.inicio)
+  document.querySelectorAll('[data-cronometro]').forEach((el) => { el.textContent = texto })
+}, 1000)
+
+render()
+</script>
+</body>
+</html>

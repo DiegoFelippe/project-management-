@@ -1,12 +1,26 @@
 // Integrações da consultoria (desenho em docs/superpowers/specs/2026-11-12-integracoes-design.md).
 // Um lugar só: `conexaoDa` dá a configuração e o segredo de uma integração para qualquer função que
-// precise usar IA, e-mail ou Google, e os testes de conexão ficam aqui também.
+// precise usar IA, e-mail, Google, Slack ou WhatsApp, e os testes de conexão ficam aqui também (os que falam só por
+// HTTP, sem Deno, em conexoes.ts).
 import Anthropic from 'npm:@anthropic-ai/sdk@1.3.0'
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
+import {
+  type ConfigSlack,
+  type ConfigWhatsapp,
+  perguntarAIa,
+  testarSlack,
+  testarWhatsapp,
+  validarConfigSlack,
+  validarConfigWhatsapp,
+} from './conexoes.ts'
+import { appDoGoogle, comLimite, emailDoGoogle, tokenDoGoogle } from './google-oauth.ts'
 import { Falha } from './http.ts'
 
-export type Tipo = 'ia' | 'smtp' | 'google'
-export const TIPOS: Tipo[] = ['ia', 'smtp', 'google']
+// O OAuth do Google mora em google-oauth.ts (sem Deno, para os testes); quem já importava daqui continua igual.
+export { appDoGoogle, emailDoGoogle, tokenDoGoogle }
+
+export type Tipo = 'ia' | 'smtp' | 'google' | 'slack' | 'whatsapp'
+export const TIPOS: Tipo[] = ['ia', 'smtp', 'google', 'slack', 'whatsapp']
 
 export const MODELO_PADRAO = { anthropic: 'claude-opus-5-5' } as const
 
@@ -39,7 +53,9 @@ function texto(valor: unknown, campo: string, { min = 1, max = 255, opcional = f
 }
 
 // Confere a configuração (sem segredo) que chega do navegador, por tipo.
-export function validarConfig(tipo: Tipo, bruto: unknown): ConfigIa | ConfigSmtp {
+export function validarConfig(tipo: Tipo, bruto: unknown): ConfigIa | ConfigSmtp | ConfigSlack | ConfigWhatsapp {
+  if (tipo === 'slack') return validarConfigSlack(bruto)
+  if (tipo === 'whatsapp') return validarConfigWhatsapp(bruto)
   const config = (bruto && typeof bruto === 'object' && !Array.isArray(bruto) ? bruto : {}) as Record<string, unknown>
   if (tipo === 'ia') {
     const provedor = config.provedor
@@ -84,21 +100,6 @@ export async function conexaoDa(admin: SupabaseClient, consultoriaId: string, ti
 }
 
 // ---------- Testes de conexão (lançam Error com a mensagem para a tela) ----------
-
-async function comLimite<T>(promessa: Promise<T>, aoEstourar?: () => void): Promise<T> {
-  let relogio: number | undefined
-  const limite = new Promise<never>((_, falhar) => {
-    relogio = setTimeout(() => {
-      aoEstourar?.()
-      falhar(new Error('O serviço demorou demais para responder.'))
-    }, LIMITE_DO_TESTE_MS)
-  })
-  try {
-    return await Promise.race([promessa, limite])
-  } finally {
-    clearTimeout(relogio)
-  }
-}
 
 async function testarIa(config: ConfigIa, chave: string | null) {
   if (!chave) throw new Error('Falta a chave de API.')
@@ -151,7 +152,38 @@ async function conferirDestino(config: ConfigSmtp) {
 
 const base64 = (valor: string) => btoa(String.fromCharCode(...new TextEncoder().encode(valor)))
 
-async function testarSmtp(config: ConfigSmtp, senha: string | null) {
+// Nome no cabeçalho: entre aspas, ou codificado (RFC 2047) quando tem acento. Quebra de linha nunca entra.
+function nomeNoCabecalho(nome: string): string {
+  const limpo = nome.replace(/[\r\n]+/g, ' ')
+  return /^[\x20-\x7e]*$/.test(limpo) ? `"${limpo.replace(/["\\]/g, '\\$&')}"` : `=?UTF-8?B?${base64(limpo)}?=`
+}
+
+// O e-mail do "Testar" na janela (texto simples, em base64 para os acentos).
+function emailDeTeste(config: ConfigSmtp, para: string): string {
+  const de = config.nome_remetente ? `${nomeNoCabecalho(config.nome_remetente)} <${config.remetente}>` : config.remetente
+  const corpo = base64([
+    'Este é um e-mail de teste da IXC Consult.',
+    '',
+    'Ele foi enviado pelo botão Testar da tela Integrações, para conferir o servidor de e-mail da consultoria.',
+    'Se você recebeu, está funcionando.',
+  ].join('\r\n'))
+  return [
+    `From: ${de}`,
+    `To: <${para}>`,
+    'Subject: Teste da IXC Consult',
+    `Date: ${new Date().toUTCString()}`,
+    `Message-ID: <${crypto.randomUUID()}@ixc-consult>`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=utf-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    ...(corpo.match(/.{1,76}/g) ?? []),
+    '.',
+  ].join('\r\n')
+}
+
+// Conecta, faz login quando há usuário e sai. Com `destinatario`, manda antes o e-mail de teste para ele.
+async function testarSmtp(config: ConfigSmtp, senha: string | null, { destinatario }: { destinatario?: string } = {}) {
   await conferirDestino(config)
   let conexao: Deno.Conn | undefined
   const fechar = () => {
@@ -212,6 +244,16 @@ async function testarSmtp(config: ConfigSmtp, senha: string | null) {
       await enviar(base64(senha ?? ''))
       await ler(235)
     }
+    if (destinatario) {
+      await enviar(`MAIL FROM:<${config.remetente}>`)
+      await ler(250)
+      await enviar(`RCPT TO:<${destinatario}>`)
+      await ler(250)
+      await enviar('DATA')
+      await ler(354)
+      await enviar(emailDeTeste(config, destinatario))
+      await ler(250)
+    }
     await enviar('QUIT')
   }
   try {
@@ -221,40 +263,13 @@ async function testarSmtp(config: ConfigSmtp, senha: string | null) {
   }
 }
 
-// Google: troca o token guardado (refresh) por um de acesso e lê o e-mail da conta.
-export function appDoGoogle() {
-  const id = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')
-  const segredo = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')
-  const volta = Deno.env.get('GOOGLE_OAUTH_REDIRECT_URI')
-  return id && segredo && volta ? { id, segredo, volta } : null
-}
-
+// Google: troca o token guardado (refresh) por um de acesso e lê o e-mail da conta (funções em google-oauth.ts).
 export const ESCOPOS_DO_GOOGLE = [
   'openid',
   'email',
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/drive.file',
 ]
-
-export async function tokenDoGoogle(corpo: Record<string, string>) {
-  const resposta = await comLimite(fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(corpo),
-  }))
-  const dados = await resposta.json().catch(() => ({}))
-  if (!resposta.ok) throw new Error(dados.error === 'invalid_grant' ? 'O Google não aceita mais esta conexão. Conecte de novo.' : 'O Google recusou a conexão.')
-  return dados as { access_token: string; refresh_token?: string }
-}
-
-export async function emailDoGoogle(tokenDeAcesso: string): Promise<string> {
-  const resposta = await comLimite(fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-    headers: { authorization: `Bearer ${tokenDeAcesso}` },
-  }))
-  const dados = await resposta.json().catch(() => ({}))
-  if (!resposta.ok || typeof dados.email !== 'string') throw new Error('Não foi possível ler a conta do Google.')
-  return dados.email
-}
 
 async function testarGoogle(tokenGuardado: string | null) {
   const app = appDoGoogle()
@@ -266,25 +281,54 @@ async function testarGoogle(tokenGuardado: string | null) {
   await emailDoGoogle(access_token)
 }
 
+const mensagemDoErro = (erro: unknown) =>
+  (erro instanceof Error ? erro.message : 'Não foi possível testar a conexão.').slice(0, 500)
+
 // Testa a conexão e grava o resultado na tabela. Devolve o estado para a tela.
-export async function testarERegistrar(admin: SupabaseClient, id: string) {
+// `enviar`: o Slack também manda a mensagem de teste no canal da configuração (o Testar da linha; salvar não manda).
+// Slack e WhatsApp guardam na configuração o que o teste leu do serviço (workspace e bot; número e nome verificado).
+export async function testarERegistrar(admin: SupabaseClient, id: string, { enviar = false } = {}) {
   const { data: linha, error } = await admin.from('integracoes').select('id, tipo, config').eq('id', id).single()
   if (error) throw error
   const { data: segredo } = await admin.rpc('integracao_segredo', { p_id: id })
   let ultimoErro: string | null = null
+  let lido: Record<string, string> | undefined
   try {
     if (linha.tipo === 'ia') await testarIa(linha.config, segredo)
     else if (linha.tipo === 'smtp') await testarSmtp(linha.config, segredo)
+    else if (linha.tipo === 'slack') lido = (await testarSlack(linha.config, segredo, { enviar })).dados
+    else if (linha.tipo === 'whatsapp') lido = (await testarWhatsapp(linha.config, segredo)).dados
     else await testarGoogle(segredo)
   } catch (erro) {
-    ultimoErro = (erro instanceof Error ? erro.message : 'Não foi possível testar a conexão.').slice(0, 500)
+    ultimoErro = mensagemDoErro(erro)
   }
   const situacao = ultimoErro ? 'com_erro' : 'conectada'
   const ultimoTesteEm = new Date().toISOString()
   const { error: erroGravar } = await admin
     .from('integracoes')
-    .update({ situacao, ultimo_erro: ultimoErro, ultimo_teste_em: ultimoTesteEm })
+    .update({ situacao, ultimo_erro: ultimoErro, ultimo_teste_em: ultimoTesteEm, ...(lido ? { config: { ...linha.config, ...lido } } : {}) })
     .eq('id', id)
   if (erroGravar) throw erroGravar
   return { id, situacao, ultimo_erro: ultimoErro, ultimo_teste_em: ultimoTesteEm }
+}
+
+// "Testar" dentro da janela: testa o que foi digitado, sem gravar nada (nem o resultado). A IA responde a uma pergunta
+// curta, o SMTP manda um e-mail para quem testa, o Slack manda a mensagem no canal (se houver) e o WhatsApp, o modelo
+// hello_world para o número do teste (se houver). Devolve { funcionou, mensagem } ou { funcionou: false, erro }.
+export async function testarRascunho(tipo: Tipo, config: any, segredo: string | null,
+  { destinatario, numeroDeTeste = null }: { destinatario: string; numeroDeTeste?: string | null }) {
+  try {
+    let mensagem: string
+    if (tipo === 'ia') mensagem = (await perguntarAIa(config, segredo)).mensagem
+    else if (tipo === 'smtp') {
+      await testarSmtp(config, segredo, { destinatario })
+      mensagem = `E-mail de teste enviado para ${destinatario}.`
+    } else if (tipo === 'slack') mensagem = (await testarSlack(config, segredo, { enviar: true })).mensagem
+    else if (tipo === 'whatsapp') mensagem = (await testarWhatsapp(config, segredo, { numeroDeTeste })).mensagem
+    else throw new Falha(400, 'dados_invalidos', { campo: 'tipo' })
+    return { funcionou: true, mensagem }
+  } catch (erro) {
+    if (erro instanceof Falha) throw erro
+    return { funcionou: false, erro: mensagemDoErro(erro) }
+  }
 }

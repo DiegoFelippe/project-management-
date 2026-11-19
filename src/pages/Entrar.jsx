@@ -95,12 +95,12 @@ export default function Entrar() {
             className="h-10" value={senha} onChange={(e) => setSenha(e.target.value)} />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground select-none">
+          <label className="flex cursor-pointer items-center gap-2 text-corpo text-muted-foreground select-none">
             <input type="checkbox" className="size-4 accent-primary" checked={lembrar}
               onChange={(e) => setLembrar(e.target.checked)} />
             Lembrar meu e-mail
           </label>
-          <Link to="/esqueci-senha" className="text-sm font-semibold text-primary hover:underline">
+          <Link to="/esqueci-senha" className="text-corpo font-semibold text-primary hover:underline">
             Esqueci minha senha
           </Link>
         </div>
@@ -108,7 +108,7 @@ export default function Entrar() {
         <Button type="submit" size="lg" disabled={enviando !== null}>Entrar</Button>
       </form>
 
-      <p className="my-5 flex items-center gap-3 text-[13px] text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+      <p className="my-5 flex items-center gap-3 text-corpo text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
         ou
       </p>
 

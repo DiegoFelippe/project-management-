@@ -1,6 +1,8 @@
 // POST /functions/v1/criar-acesso
-// Dono cria administradores de uma consultoria; admin cria gestores e pessoas; gestor cria pessoas
+// Dono cria administradores de uma consultoria e acessos de central; central cria administradores; admin cria gestores e pessoas; gestor cria pessoas
 // nos times dele. O acesso é sempre da consultoria de quem cria (ou da escolhida pelo dono).
+// exige_2fa (opcional): a pessoa nova já entra com a verificação em duas etapas exigida. Só quem vai poder editar o
+// acesso dela depois (dono, central, admin); o gestor não.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0'
 import { clienteAdmin, quemChama, type Perfil } from '../_shared/clientes.ts'
 import { Falha, lerJson, responder, servir } from '../_shared/http.ts'
@@ -21,13 +23,26 @@ async function exigirTimes(
 }
 
 // Confere o que quem chama pode criar e devolve a consultoria do novo acesso.
-async function consultoriaDoPedido(admin: SupabaseClient, quem: Perfil, dados: DadosAcesso): Promise<string> {
+// A central não tem consultoria: devolve null.
+async function consultoriaDoPedido(admin: SupabaseClient, quem: Perfil, dados: DadosAcesso): Promise<string | null> {
   switch (quem.papel) {
-    case 'dono': {
-      if (dados.papel !== 'admin' || dados.times.length) throw new Falha(403, 'sem_permissao')
+    case 'dono':
+    case 'central': {
+      const podeCentral = quem.papel === 'dono' && dados.papel === 'central'
+      if ((dados.papel !== 'admin' && !podeCentral) || dados.times.length) throw new Falha(403, 'sem_permissao')
+      if (podeCentral) {
+        if (dados.consultoria_id) throw new Falha(400, 'dados_invalidos', { campo: 'consultoria_id' })
+        return null
+      }
       if (!dados.consultoria_id) throw new Falha(400, 'dados_invalidos', { campo: 'consultoria_id' })
-      const { data } = await admin.from('consultorias').select('id').eq('id', dados.consultoria_id).maybeSingle()
+      const { data } = await admin
+        .from('consultorias')
+        .select('id, arquivada_em')
+        .eq('id', dados.consultoria_id)
+        .maybeSingle()
       if (!data) throw new Falha(400, 'dados_invalidos', { campo: 'consultoria_id' })
+      // Consultoria arquivada não recebe acesso novo (quem é dela não entra): reative antes.
+      if (data.arquivada_em) throw new Falha(409, 'consultoria_arquivada')
       return data.id
     }
     case 'admin': {
@@ -36,7 +51,7 @@ async function consultoriaDoPedido(admin: SupabaseClient, quem: Perfil, dados: D
       return quem.consultoria_id!
     }
     case 'gestor': {
-      if (dados.papel !== 'pessoa') throw new Falha(403, 'sem_permissao')
+      if (dados.papel !== 'pessoa' || dados.exige_2fa) throw new Falha(403, 'sem_permissao')
       await exigirTimes(admin, dados.times, { consultoriaId: quem.consultoria_id!, gestorId: quem.id })
       return quem.consultoria_id!
     }
@@ -60,6 +75,8 @@ servir(async (req) => {
     consultoriaId,
     criadoPor: quem.id,
     times: dados.times,
+    ficha: dados.ficha,
+    exige2fa: dados.exige_2fa,
   })
   return responder(201, { pessoa_id: pessoaId })
 })

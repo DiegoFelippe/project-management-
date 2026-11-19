@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router'
 import AuthProvider from '@/auth/AuthProvider'
 import { Toaster } from '@/components/ui/sonner'
 import Rotas from '@/rotas'
+import '@fontsource-variable/inter'
 import './index.css'
 
 createRoot(document.getElementById('root')).render(

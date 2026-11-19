@@ -57,3 +57,11 @@ describe('Entrar: lembrar o e-mail', () => {
     expect(screen.getByLabelText('E-mail')).toHaveAttribute('autocomplete', 'username')
   })
 })
+
+describe('Entrar: a arte da esquerda', () => {
+  it('a frase fala do que o app faz, sem Projetos (auditoria, R10)', () => {
+    montar()
+    expect(screen.getByRole('heading', { name: 'Clientes, times e agenda no mesmo lugar.' })).toBeInTheDocument()
+    expect(screen.queryByText(/Projetos/)).toBeNull()
+  })
+})

@@ -1,19 +1,26 @@
 // Integrações da consultoria (desenho em docs/superpowers/specs/2026-11-12-integracoes-design.md):
-// IA, e-mail (SMTP) e Google. Aqui só se conecta; o resto do sistema usa a mesma conexão.
+// IA, e-mail (SMTP), Google, Slack e WhatsApp. Aqui só se conecta; o resto do sistema usa a mesma conexão.
 // O administrador conecta, edita, testa e desconecta; o dono escolhe a consultoria e só olha.
-import { Calendar, Mail, Pencil, PlugZap, RefreshCw, Sparkles, Unplug } from 'lucide-react'
+import {
+  Calendar, CircleAlert, CircleCheck, History, Mail, MessageCircle, MessageSquare, Pencil, Plug, PlugZap, RefreshCw, Sparkles, Unplug,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
+import BarraDeFiltros, { NaGaveta } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
+import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import FiltroConsultoria from '@/components/comum/FiltroConsultoria'
-import { Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
+import { AcaoDaLinha, Celula, CelulaAcoes, Linha, ListaVazia, Tabela } from '@/components/comum/Tabela'
 import FormularioIa from '@/components/integracoes/FormularioIa'
+import FormularioSlack from '@/components/integracoes/FormularioSlack'
 import FormularioSmtp from '@/components/integracoes/FormularioSmtp'
+import FormularioWhatsapp from '@/components/integracoes/FormularioWhatsapp'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,13 +29,29 @@ import {
   listarIntegracoes,
   salvarIntegracao,
   testarIntegracao,
+  testarRascunho,
 } from '@/data/integracoes'
+import { indicadoresDeIntegracoes } from '@/data/indicadores'
+import { veTudo } from '@/lib/papeis'
+import { useLeitura } from '@/lib/useLeitura'
 
 const INTEGRACOES = [
   { tipo: 'ia', nome: 'Inteligência artificial', descricao: 'Claude (Anthropic) ou OpenAI, para os recursos de IA.', icone: Sparkles },
   { tipo: 'smtp', nome: 'E-mail (SMTP)', descricao: 'Servidor que manda as mensagens do sistema.', icone: Mail },
   { tipo: 'google', nome: 'Google', descricao: 'Agenda e Drive da conta da consultoria.', icone: Calendar },
+  { tipo: 'slack', nome: 'Slack', descricao: 'Mensagens num workspace do Slack, pelo app da consultoria.', icone: MessageSquare },
+  { tipo: 'whatsapp', nome: 'WhatsApp', descricao: 'Mensagens pelo WhatsApp Business (API oficial da Meta).', icone: MessageCircle },
 ]
+
+// Filtro da barra: o catálogo tem só cinco integrações fixas, então o recorte é feito aqui, sem ir ao banco.
+const ABAS = [
+  { valor: 'todas', rotulo: 'Todas' },
+  { valor: 'conectadas', rotulo: 'Conectadas' },
+  { valor: 'nao_conectadas', rotulo: 'Não conectadas' },
+]
+
+// Janela de cada integração (o Google não tem: conecta pelo OAuth). Testar na janela testa sem salvar.
+const JANELAS = { ia: FormularioIa, smtp: FormularioSmtp, slack: FormularioSlack, whatsapp: FormularioWhatsapp }
 
 const SITUACAO = {
   conectada: { rotulo: 'Conectada', variante: 'positive' },
@@ -39,11 +62,29 @@ function detalhes(tipo, config) {
   if (!config) return '—'
   if (tipo === 'ia') return `${config.provedor === 'openai' ? 'OpenAI' : 'Anthropic'} · ${config.modelo}`
   if (tipo === 'smtp') return `${config.host}:${config.porta} · ${config.remetente}`
+  // Slack e WhatsApp: o que o último teste que deu certo leu do serviço (workspace; número e nome verificado).
+  if (tipo === 'slack') return [config.workspace && `Workspace ${config.workspace}`, config.canal].filter(Boolean).join(' · ') || '—'
+  if (tipo === 'whatsapp') return [config.numero || `ID ${config.phone_number_id}`, config.nome_verificado].filter(Boolean).join(' · ')
   return config.email ?? '—'
 }
 
 const quando = (data) =>
   data ? new Date(data).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'
+
+// Cartões (contados no banco): a consultoria escolhida (o dono, antes de escolher, vê todas); o filtro
+// Conectadas/Não conectadas não muda os números. "Último teste": o dia/mês do teste mais recente no número e a hora
+// embaixo (a 360 px, data e hora juntas não cabem no número).
+const lerNumeros = ({ consultoriaId }) => indicadoresDeIntegracoes({ consultoriaId })
+const diaDoTeste = (data) => (data ? new Date(data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'Nenhum')
+const horaDoTeste = (data) => (data ? `às ${new Date(data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : null)
+const cartoesDasIntegracoes = (n) => [
+  { chave: 'conectadas', rotulo: 'Conectadas', icone: CircleCheck, tom: 'positivo', valor: n?.conectadas },
+  { chave: 'com_erro', rotulo: 'Com erro', icone: CircleAlert, tom: 'perigo', valor: n?.com_erro,
+    destaque: n?.com_erro > 0 ? 'perigo' : null },
+  { chave: 'nao_configuradas', rotulo: 'Não configuradas', icone: Plug, tom: 'neutro', valor: n?.nao_configuradas },
+  { chave: 'ultimo_teste', rotulo: 'Último teste', icone: History, tom: 'ceu', valor: n ? diaDoTeste(n.ultimo_teste) : null,
+    detalhe: horaDoTeste(n?.ultimo_teste) },
+]
 
 function avisarResultado(resposta, sucesso) {
   if (resposta.erro) return toast.error(resposta.erro)
@@ -53,10 +94,11 @@ function avisarResultado(resposta, sucesso) {
 
 export default function Integracoes() {
   const { perfil } = useAuth()
-  const ehDono = perfil.papel === 'dono'
+  const ehDono = veTudo(perfil)
   const [consultoriaId, setConsultoriaId] = useState(ehDono ? '' : perfil.consultoria_id)
   const [integracoes, setIntegracoes] = useState(null)
   const [erro, setErro] = useState(null)
+  const [situacaoFiltro, setSituacaoFiltro] = useState('todas')
   const [aviso, setAviso] = useState(null)
   const [editando, setEditando] = useState(null)
   const [desconectando, setDesconectando] = useState(null)
@@ -64,6 +106,7 @@ export default function Integracoes() {
   const [versao, setVersao] = useState(0)
   const recarregar = () => setVersao((v) => v + 1)
   const [busca, setBusca] = useSearchParams()
+  const numeros = useLeitura(lerNumeros, { consultoriaId: consultoriaId || undefined, versao }).dados
 
   // volta do "Conectar com Google"
   useEffect(() => {
@@ -124,20 +167,32 @@ export default function Integracoes() {
     return resposta
   }
 
+  const visiveis = INTEGRACOES.filter((item) => {
+    const conectada = Boolean(integracoes?.[item.tipo])
+    return situacaoFiltro === 'todas' || (situacaoFiltro === 'conectadas') === conectada
+  })
   const abrir = (item) => (item.tipo === 'google' ? conectarGoogle() : setEditando(item.tipo))
+  const Janela = JANELAS[editando] ?? null
 
   return (
     <>
       <Cabecalho titulo="Integrações"
-        descricao="Conexões que o sistema usa. Cada consultoria conecta as suas, e todo o sistema usa a mesma conexão." />
-      {ehDono && <FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setIntegracoes(null) }} />}
+        descricao="Conexões que o sistema usa. Cada consultoria conecta as suas; todos da consultoria usam a mesma conexão." />
+      {/* No celular (auditoria, G6), o Mostrar e a Consultoria (só o dono) vão para a gaveta. */}
+      <BarraDeFiltros ativos={[situacaoFiltro !== 'todas', ehDono && Boolean(consultoriaId)].filter(Boolean).length}
+        aoLimpar={() => { setSituacaoFiltro('todas'); if (ehDono) { setConsultoriaId(''); setIntegracoes(null) } }}>
+        <NaGaveta><AbasSegmentadas rotulo="Mostrar" abas={ABAS} valor={situacaoFiltro} aoMudar={setSituacaoFiltro} /></NaGaveta>
+        {ehDono && <NaGaveta><FiltroConsultoria valor={consultoriaId} aoMudar={(id) => { setConsultoriaId(id); setIntegracoes(null) }} /></NaGaveta>}
+      </BarraDeFiltros>
+      <CartoesDeNumeros rotulo="Indicadores das integrações" cartoes={cartoesDasIntegracoes(numeros)} />
       {aviso && <div className="mb-4"><Aviso>{aviso}</Aviso></div>}
-      {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+      {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {ehDono && !consultoriaId && <ListaVazia>Escolha uma consultoria para ver as integrações dela.</ListaVazia>}
       {consultoriaId && !erro && integracoes === null && <GraficoCarregando texto="Carregando as integrações…" className="py-12" />}
-      {consultoriaId && integracoes && (
-        <Tabela rotulo="Integrações" colunas={['Integração', 'Situação', 'Conexão', 'Último teste']} larguraMinima={760}>
-          {INTEGRACOES.map((item) => {
+      {consultoriaId && integracoes && visiveis.length === 0 && <ListaVazia>Nenhuma integração neste filtro.</ListaVazia>}
+      {consultoriaId && integracoes && visiveis.length > 0 && (
+        <Tabela rotulo="Integrações" colunas={['Integração', 'Situação', 'Conexão', 'Último teste']} larguraMinima={760} semAcoes={ehDono}>
+          {visiveis.map((item) => {
             const integracao = integracoes[item.tipo]
             const situacao = integracao ? SITUACAO[integracao.situacao] : { rotulo: 'Não conectada', variante: 'outline' }
             const Icone = item.icone
@@ -150,49 +205,43 @@ export default function Integracoes() {
                     </span>
                     <div className="min-w-0">
                       <p className="font-semibold">{item.nome}</p>
-                      <p className="truncate text-xs text-muted-foreground">{item.descricao}</p>
+                      <p className="truncate text-rotulo text-muted-foreground">{item.descricao}</p>
                     </div>
                   </div>
                 </Celula>
                 <Celula>
                   <Badge variant={situacao.variante}>{situacao.rotulo}</Badge>
-                  {integracao?.ultimo_erro && <p className="mt-1 max-w-64 text-xs text-muted-foreground">{integracao.ultimo_erro}</p>}
+                  {integracao?.ultimo_erro && <p className="mt-1 max-w-64 text-rotulo text-muted-foreground">{integracao.ultimo_erro}</p>}
                 </Celula>
                 <Celula className="text-muted-foreground">{detalhes(item.tipo, integracao?.config)}</Celula>
                 <Celula className="text-muted-foreground tabular-nums">{quando(integracao?.ultimo_teste_em)}</Celula>
-                <CelulaAcoes>
-                  {!ehDono && !integracao && (
-                    <Button variant="outline" size="sm" disabled={ocupado === item.tipo} onClick={() => abrir(item)}>
-                      <PlugZap /> Conectar
-                    </Button>
-                  )}
-                  {!ehDono && integracao && (
-                    <>
-                      <Button variant="ghost" size="sm" onClick={() => abrir(item)}>
-                        <Pencil /> {item.tipo === 'google' ? 'Reconectar' : 'Editar'}
+                {/* Não conectada: uma ação só, a principal, com texto (a exceção do G1); conectada: os ícones, sempre na mesma
+                    ordem. O dono só olha: a tabela fica sem a coluna de ações. */}
+                {!ehDono && (
+                  <CelulaAcoes>
+                    {!integracao ? (
+                      <Button variant="ghost" size="sm" disabled={ocupado === item.tipo} onClick={() => abrir(item)}>
+                        <PlugZap /> Conectar
                       </Button>
-                      <Button variant="ghost" size="sm" disabled={ocupado === integracao.id} onClick={() => testar(integracao)}>
-                        <RefreshCw className={ocupado === integracao.id ? 'animate-spin' : ''} /> Testar
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setDesconectando({ item, integracao })}
-                        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-                        <Unplug /> Desconectar
-                      </Button>
-                    </>
-                  )}
-                </CelulaAcoes>
+                    ) : (
+                      <>
+                        <AcaoDaLinha nome={item.tipo === 'google' ? 'Reconectar' : 'Editar'} icone={Pencil} onClick={() => abrir(item)} />
+                        <AcaoDaLinha nome="Testar" icone={RefreshCw} disabled={ocupado === integracao.id} onClick={() => testar(integracao)}
+                          classeDoIcone={ocupado === integracao.id ? 'animate-spin' : undefined} />
+                        <AcaoDaLinha nome="Desconectar" icone={Unplug} perigo onClick={() => setDesconectando({ item, integracao })} />
+                      </>
+                    )}
+                  </CelulaAcoes>
+                )}
               </Linha>
             )
           })}
         </Tabela>
       )}
-      {editando === 'ia' && (
-        <FormularioIa integracao={integracoes?.ia} aoFechar={() => setEditando(null)}
-          aoSalvar={(config, segredo) => salvar('ia', config, segredo)} />
-      )}
-      {editando === 'smtp' && (
-        <FormularioSmtp integracao={integracoes?.smtp} aoFechar={() => setEditando(null)}
-          aoSalvar={(config, segredo) => salvar('smtp', config, segredo)} />
+      {Janela && (
+        <Janela integracao={integracoes?.[editando]} aoFechar={() => setEditando(null)}
+          aoSalvar={(config, segredo) => salvar(editando, config, segredo)}
+          aoTestar={(config, segredo, extras) => testarRascunho(editando, config, segredo, extras)} />
       )}
       {desconectando && (
         <ConfirmarAcao aberto perigo aoFechar={() => setDesconectando(null)} titulo={`Desconectar ${desconectando.item.nome}?`}

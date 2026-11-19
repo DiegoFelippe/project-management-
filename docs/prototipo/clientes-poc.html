@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>POC Clientes</title>
+<!--
+  Protótipo descartável (POC) para validar com o Diego o fluxo de clientes antes de construir no app:
+  a IXC Consult (Jaine) cadastra o cliente e escolhe o consultor, com sugestão de quem tem menos horas;
+  a consultoria parceira recebe; o consultor lança as horas. Dados de exemplo, nada é salvo.
+-->
+<style>
+:root {
+  --moldura: #ffffff; --painel: #eef1f5; --fg: #0f172a; --card: #ffffff;
+  --primary: #2563eb; --primary-fg: #ffffff; --muted: #f1f5f9; --muted-fg: #64748b;
+  --accent: #eff6ff; --accent-fg: #1e3a8a; --destructive: #dc2626; --border: #e2e8f0; --input: #cbd5e1;
+  --notice: #b45309; --notice-soft: #fef3c7; --positive: #15803d; --positive-soft: #dcfce7;
+  --overlay: rgb(15 23 42 / 0.45);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --moldura: #0e1424; --painel: #080c17; --fg: #e5e9f0; --card: #121a2c;
+    --primary: #3b82f6; --muted: #1b2438; --muted-fg: #94a0b8; --accent: #172554; --accent-fg: #bfdbfe;
+    --destructive: #f05252; --border: #222c42; --input: #34405a;
+    --notice: #fbbf24; --notice-soft: rgb(251 191 36 / 0.14); --positive: #4ade80; --positive-soft: rgb(74 222 128 / 0.14);
+    --overlay: rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--painel); color: var(--fg);
+}
+svg.i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* Faixa do protótipo */
+.faixa {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 8px 16px;
+  background: var(--notice-soft); color: var(--fg); border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.faixa strong { color: var(--notice); }
+.faixa .ver-como { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+
+/* Moldura */
+.app { display: grid; grid-template-columns: 76px minmax(0, 1fr); grid-template-rows: 52px 1fr; min-height: calc(100vh - 41px); }
+.trilho {
+  grid-row: 1 / span 2; background: var(--moldura); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0;
+}
+.logo { width: 36px; height: 36px; background: #0b1f4d; color: #fff; display: grid; place-items: center; font-size: 10px; font-weight: 800; letter-spacing: .02em; margin-bottom: 10px; }
+.item-trilho {
+  width: 66px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 0;
+  color: var(--muted-fg); font: inherit; font-size: 10.5px; line-height: 1.15; text-align: center;
+  background: none; border: 0; cursor: pointer;
+}
+.item-trilho .ic { width: 36px; height: 30px; display: grid; place-items: center; border-radius: 9px; transition: background-color .15s; }
+.item-trilho:hover .ic { background: var(--muted); }
+.item-trilho.aberto { color: var(--fg); font-weight: 600; }
+.item-trilho.aberto .ic { background: var(--primary); color: var(--primary-fg); }
+.item-trilho .ic svg { width: 18px; height: 18px; }
+@keyframes icone-transmitir { 0%,100% { transform: scale(1); } 20% { transform: scale(1.18); } 40% { transform: scale(1); } 60% { transform: scale(1.12); } }
+@keyframes icone-subir { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-3px); } }
+.item-trilho:hover .anim-transmitir, .item-trilho:focus-visible .anim-transmitir { animation: icone-transmitir .7s ease-out; }
+.item-trilho:hover .anim-subir, .item-trilho:focus-visible .anim-subir { animation: icone-subir .55s ease-out; }
+.barra-topo { background: var(--moldura); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; padding: 0 20px; min-width: 0; }
+.barra-topo .caminho { color: var(--muted-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barra-topo .caminho b { color: var(--fg); font-weight: 600; }
+.barra-topo .papel { margin-left: auto; }
+main { padding: 24px 28px 48px; min-width: 0; }
+
+/* Peças */
+.cabecalho { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.cabecalho h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+.cabecalho p { margin: 2px 0 0; color: var(--muted-fg); font-size: 13px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 9px;
+  font: inherit; font-weight: 600; font-size: 13.5px; cursor: pointer; border: 1px solid transparent;
+  transition: transform .12s, box-shadow .12s, background-color .12s, color .12s;
+  background: var(--primary); color: var(--primary-fg);
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgb(37 99 235 / .25); }
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn.contorno { background: var(--card); color: var(--fg); border-color: var(--input); }
+.btn.contorno:hover { box-shadow: 0 3px 10px rgb(15 23 42 / .08); }
+.btn.fantasma { background: none; color: var(--fg); height: 30px; padding: 0 10px; font-weight: 500; }
+.btn.fantasma:hover { background: var(--muted); box-shadow: none; }
+.btn.pequeno { height: 30px; padding: 0 11px; font-size: 13px; }
+.btn:hover svg { animation: pulinho .45s ease-out; }
+@keyframes pulinho { 40% { transform: translateY(-2px) scale(1.08); } }
+
+.filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.segmentado { display: inline-flex; background: var(--muted); border-radius: 9px; padding: 3px; gap: 2px; font-weight: 600; font-size: 13px; }
+.segmentado button { border: 0; background: none; color: var(--muted-fg); font: inherit; padding: 5px 12px; border-radius: 7px; cursor: pointer; transition: transform .12s; display: inline-flex; gap: 6px; align-items: center; }
+.segmentado button:hover { transform: translateY(-1px); }
+.segmentado button[aria-pressed="true"] { background: var(--card); color: var(--fg); box-shadow: 0 1px 2px rgb(15 23 42 / .08); }
+.segmentado .n { font-size: 11px; background: var(--border); color: var(--fg); border-radius: 99px; padding: 0 6px; }
+.segmentado button[aria-pressed="true"] .n { background: var(--accent); color: var(--accent-fg); }
+.busca { position: relative; }
+.busca svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted-fg); }
+.busca input { padding-left: 32px; width: 300px; max-width: 100%; }
+input, select, textarea {
+  font: inherit; color: var(--fg); background: var(--card); border: 1px solid var(--input); border-radius: 8px;
+  height: 36px; padding: 0 10px; outline: none; width: 100%;
+}
+textarea { height: auto; padding: 8px 10px; resize: vertical; }
+input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgb(37 99 235 / .18); }
+
+.tabela-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgb(15 23 42 / .04); }
+.rolagem { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 820px; text-align: left; }
+thead { background: color-mix(in srgb, var(--muted) 60%, transparent); color: var(--muted-fg); font-size: 12px; }
+th { font-weight: 500; padding: 10px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 11px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: color-mix(in srgb, var(--muted) 55%, transparent); }
+td.acoes { text-align: right; white-space: nowrap; }
+.nome { font-weight: 600; }
+.sub { color: var(--muted-fg); font-size: 12px; }
+.vazio { border: 1px dashed var(--input); border-radius: 12px; padding: 32px; text-align: center; color: var(--muted-fg); background: color-mix(in srgb, var(--card) 60%, transparent); }
+
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; border: 1px solid transparent; white-space: nowrap; }
+.badge.positivo { background: var(--positive-soft); color: var(--positive); }
+.badge.aviso { background: var(--notice-soft); color: var(--notice); }
+.badge.contorno { border-color: var(--border); color: var(--muted-fg); }
+.badge.azul { background: var(--accent); color: var(--accent-fg); }
+.badge svg { width: 12px; height: 12px; }
+
+.pessoa { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.avatar { width: 30px; height: 30px; border-radius: 99px; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700; flex: none; }
+.horas { min-width: 150px; }
+.barra { height: 6px; border-radius: 99px; background: var(--muted); overflow: hidden; margin-top: 4px; }
+.barra > span { display: block; height: 100%; background: var(--primary); border-radius: 99px; transition: width .3s; }
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Perguntas do protótipo */
+.perguntas { margin-top: 28px; background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--notice); border-radius: 12px; padding: 14px 18px; }
+.perguntas h2 { font-size: 14px; margin: 0 0 6px; display: flex; gap: 8px; align-items: center; }
+.perguntas ol { margin: 0; padding-left: 20px; color: var(--muted-fg); }
+.perguntas li { margin: 4px 0; }
+.perguntas li b { color: var(--fg); font-weight: 600; }
+
+/* Janela */
+.fundo { position: fixed; inset: 0; background: var(--overlay); display: grid; place-items: center; padding: 16px; z-index: 20; animation: aparecer .15s ease-out; }
+.janela { background: var(--card); border: 1px solid var(--border); border-radius: 14px; width: 100%; max-width: 560px; max-height: calc(100vh - 32px); overflow: auto; box-shadow: 0 20px 50px rgb(15 23 42 / .25); }
+.janela.larga { max-width: 700px; }
+.janela header { padding: 18px 20px 6px; display: flex; gap: 12px; align-items: flex-start; }
+.janela header h2 { margin: 0; font-size: 17px; }
+.janela header p { margin: 3px 0 0; color: var(--muted-fg); font-size: 13px; }
+.janela header .fechar { margin-left: auto; }
+.janela .corpo { padding: 10px 20px; display: grid; gap: 14px; }
+.janela footer { padding: 12px 20px 18px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; border-top: 1px solid var(--border); margin-top: 6px; }
+.janela footer .previa { margin-right: auto; color: var(--muted-fg); font-size: 12.5px; }
+@keyframes aparecer { from { opacity: 0; } }
+.campo { display: grid; gap: 5px; }
+.campo label { font-size: 13px; font-weight: 600; }
+.grade-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grade-3 { display: grid; grid-template-columns: 2fr 80px; gap: 12px; }
+.secao { font-size: 12px; font-weight: 700; color: var(--muted-fg); text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+.erro { color: var(--destructive); font-size: 13px; }
+.ajuda { color: var(--muted-fg); font-size: 12.5px; margin: -4px 0 0; }
+
+.opcoes { display: grid; gap: 6px; }
+.opcao {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) 170px 64px; gap: 12px; align-items: center;
+  border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; cursor: pointer; transition: border-color .12s, background-color .12s;
+}
+.opcao:hover { border-color: var(--input); }
+.opcao.escolhida { border-color: var(--primary); background: var(--accent); }
+.opcao input { position: absolute; opacity: 0; pointer-events: none; }
+.opcao .clientes { text-align: right; color: var(--muted-fg); font-size: 12px; }
+.resumo-cliente { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted-fg); font-size: 13px; background: var(--muted); border-radius: 10px; padding: 9px 12px; }
+.resumo-cliente b { color: var(--fg); }
+
+.aviso-toast { position: fixed; right: 16px; bottom: 16px; z-index: 30; background: var(--fg); color: var(--card); padding: 10px 14px; border-radius: 10px; box-shadow: 0 10px 30px rgb(15 23 42 / .3); font-size: 13.5px; max-width: 360px; animation: aparecer .2s ease-out; }
+
+@media (max-width: 720px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
+  .trilho { grid-row: auto; flex-direction: row; justify-content: center; border-right: 0; border-bottom: 1px solid var(--border); padding: 6px; }
+  .logo { margin: 0 6px 0 0; }
+  main { padding: 18px 16px 40px; }
+  .opcao { grid-template-columns: auto minmax(0, 1fr); }
+  .opcao .horas, .opcao .clientes { grid-column: 2; text-align: left; }
+  .grade-2 { grid-template-columns: 1fr; }
+  .faixa .ver-como { margin-left: 0; }
+}
+@media (max-width: 960px) { .opcional { display: none; } table { min-width: 0; } .acoes .btn.fantasma .rotulo { display: none; } .horas { min-width: 110px; } th, td { padding-left: 10px; padding-right: 10px; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="faixa">
+  <span><strong>Protótipo para validar</strong> · dados de exemplo · nada é salvo (recarregar a página volta tudo)</span>
+  <div class="ver-como">
+    <span>Ver como:</span>
+    <div class="segmentado" role="group" aria-label="Ver como" id="ver-como"></div>
+  </div>
+</div>
+<div class="app">
+  <nav class="trilho" id="trilho" aria-label="Menu"></nav>
+  <div class="barra-topo" id="barra-topo"></div>
+  <main id="pagina"></main>
+</div>
+<div id="janela"></div>
+<div id="toast" aria-live="polite"></div>
+
+<script>
+// ── Ícones (traço do lucide) ───────────────────────────────────────────────
+const ICONES = {
+  casa: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  antena: '<path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"/><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"/><circle cx="12" cy="9" r="2"/><path d="M16.2 4.8c2 2 2.26 5.11.8 7.47"/><path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1"/><path d="M9.5 18h5"/><path d="m8 22 4-11 4 11"/>',
+  pasta: '<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><path d="M8 10v4"/><path d="M12 10v2"/><path d="M16 10v6"/>',
+  pessoas: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  usuario: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
+  lupa: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  mais: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  lapis: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+  enviar: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+  trocar: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+  relogio: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  fechar: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  brilho: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+  duvida: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+}
+const icone = (nome, classe = '') => `<svg class="i ${classe}" viewBox="0 0 24 24" aria-hidden="true">${ICONES[nome]}</svg>`
+
+// ── Dados de exemplo ───────────────────────────────────────────────────────
+const HOJE = '13/11/2026'
+const CONSULTORIAS = {
+  ixc: 'IXC Consult',
+  sti: 'STI Consult',
+  exemplo: 'Consultoria Exemplo',
+  norte: 'Norte Gestão',
+}
+const CONSULTORES = [
+  { id: 'simone', nome: 'Simone Pipper', consultoria: 'sti' },
+  { id: 'carla', nome: 'Carla Souza', consultoria: 'sti' },
+  { id: 'rafael', nome: 'Rafael Melo', consultoria: 'sti' },
+  { id: 'ana', nome: 'Ana Lima', consultoria: 'exemplo' },
+  { id: 'bruno', nome: 'Bruno Reis', consultoria: 'exemplo' },
+  { id: 'gabriel', nome: 'Gabriel Gestor', consultoria: 'exemplo' },
+  { id: 'lucas', nome: 'Lucas Prado', consultoria: 'norte' },
+  { id: 'marina', nome: 'Marina Costa', consultoria: 'norte' },
+]
+const novoCliente = (dados) => ({ razao: '', cnpj: '', cidade: '', uf: 'SC', contato: '', telefone: '', email: '', obs: '', lancadas: 0, consultor: null, recebidoEm: null, novo: false, ...dados })
+let proximoId = 100
+const clientes = [
+  novoCliente({ id: 1, nome: 'Fibra Oeste Telecom', razao: 'Fibra Oeste Telecomunicações Ltda', cnpj: '12.345.678/0001-95', cidade: 'Chapecó', contato: 'Marcos Teixeira', telefone: '(49) 99812-3344', email: 'marcos@fibraoeste.com.br', horas: 40 }),
+  novoCliente({ id: 2, nome: 'Conecta Vale Internet', razao: 'Conecta Vale Provedor de Internet Ltda', cnpj: '23.456.789/0001-10', cidade: 'Joaçaba', contato: 'Paula Rech', horas: 24 }),
+  novoCliente({ id: 3, nome: 'RedeSul Net', razao: 'RedeSul Serviços de Internet Ltda', cnpj: '34.567.890/0001-21', cidade: 'Pato Branco', uf: 'PR', contato: 'Jonas Kirst', horas: 60 }),
+  novoCliente({ id: 4, nome: 'Alfa Link', razao: 'Alfa Link Telecom Ltda', cnpj: '45.678.901/0001-32', cidade: 'Xanxerê', horas: 40, lancadas: 10, consultor: 'carla', recebidoEm: '03/11/2026' }),
+  novoCliente({ id: 5, nome: 'Rio Claro Fibra', razao: 'Rio Claro Fibra Óptica Ltda', cnpj: '56.789.012/0001-43', cidade: 'Concórdia', horas: 32, lancadas: 28, consultor: 'simone', recebidoEm: '14/10/2026' }),
+  novoCliente({ id: 6, nome: 'NetMais', razao: 'NetMais Telecom Ltda', cnpj: '67.890.123/0001-54', cidade: 'Erechim', uf: 'RS', horas: 48, lancadas: 30, consultor: 'rafael', recebidoEm: '20/10/2026' }),
+  novoCliente({ id: 7, nome: 'Sinal Forte', razao: 'Sinal Forte Internet Ltda', cnpj: '78.901.234/0001-65', cidade: 'Passo Fundo', uf: 'RS', horas: 24, lancadas: 12, consultor: 'rafael', recebidoEm: '27/10/2026' }),
+  novoCliente({ id: 8, nome: 'Vale Digital', razao: 'Vale Digital Comunicações Ltda', cnpj: '89.012.345/0001-76', cidade: 'Videira', contato: 'Rita Dalla', telefone: '(49) 99901-2211', horas: 20, lancadas: 9, consultor: 'ana', recebidoEm: '06/11/2026' }),
+  novoCliente({ id: 9, nome: 'Infinita Fibra', razao: 'Infinita Fibra Ltda', cnpj: '90.123.456/0001-87', cidade: 'Francisco Beltrão', uf: 'PR', horas: 40, lancadas: 22, consultor: 'bruno', recebidoEm: '22/10/2026' }),
+  novoCliente({ id: 10, nome: 'Planalto Net', razao: 'Planalto Net Provedor Ltda', cnpj: '01.234.567/0001-98', cidade: 'Lages', horas: 36, lancadas: 18, consultor: 'gabriel', recebidoEm: '29/10/2026' }),
+  novoCliente({ id: 11, nome: 'Ponto Conecta', razao: 'Ponto Conecta Telecom Ltda', cnpj: '11.222.333/0001-81', cidade: 'Caçador', horas: 48, lancadas: 2, consultor: 'lucas', recebidoEm: '10/11/2026' }),
+  novoCliente({ id: 12, nome: 'Serra Link', razao: 'Serra Link Internet Ltda', cnpj: '22.333.444/0001-05', cidade: 'Canoinhas', horas: 30, lancadas: 14, consultor: 'marina', recebidoEm: '17/10/2026' }),
+]
+
+const QUEM = {
+  jaine: { nome: 'Jaine Capitanio', consultoria: 'ixc', papel: 'Central · Administradora', rotulo: 'Jaine · IXC Consult' },
+  simone: { nome: 'Simone Pipper', consultoria: 'sti', papel: 'Administradora', rotulo: 'Simone · STI Consult' },
+  ana: { nome: 'Ana Lima', consultoria: 'exemplo', papel: 'Consultora', rotulo: 'Ana · consultora' },
+}
+
+const METRICAS = {
+  combinadas: { rotulo: 'Combinadas', ajuda: 'Soma das horas combinadas dos clientes que a pessoa já atende.' },
+  lancadas: { rotulo: 'Lançadas no mês', ajuda: 'Horas que a pessoa lançou trabalhando nos clientes neste mês.' },
+  entregar: { rotulo: 'A entregar', ajuda: 'Horas combinadas que ainda faltam ser trabalhadas (combinadas − lançadas).' },
+}
+
+const estado = { quem: 'jaine', aba: 'distribuir', busca: '', metrica: 'combinadas', janela: null }
+
+// ── Ajudantes ──────────────────────────────────────────────────────────────
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+const horas = (n) => `${Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h`
+const soma = (lista) => lista.reduce((a, b) => a + b, 0)
+const consultor = (id) => CONSULTORES.find((c) => c.id === id)
+const CORES = ['#2563eb', '#0891b2', '#7c3aed', '#db2777', '#ea580c', '#16a34a', '#ca8a04', '#4f46e5']
+const corDe = (texto) => CORES[[...texto].reduce((a, c) => a + c.charCodeAt(0), 0) % CORES.length]
+const iniciais = (nome) => nome.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
+const avatar = (nome) => `<span class="avatar" style="background:${corDe(nome)}">${esc(iniciais(nome))}</span>`
+const semAcento = (t) => t.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+const cidadeUf = (c) => (c.cidade ? `${esc(c.cidade)}/${esc(c.uf)}` : '—')
+
+// Carga de cada consultor nas três medidas (ignorando um cliente, quando ele está sendo trocado de mãos).
+function carga(idConsultor, ignorar = null) {
+  const dele = clientes.filter((c) => c.consultor === idConsultor && c.id !== ignorar)
+  const combinadas = soma(dele.map((c) => c.horas))
+  const lancadas = soma(dele.map((c) => c.lancadas))
+  return { clientes: dele.length, combinadas, lancadas, entregar: Math.max(0, combinadas - lancadas) }
+}
+
+function consultoresOrdenados({ consultoria = '', ignorar = null } = {}) {
+  const m = estado.metrica
+  return CONSULTORES
+    .filter((c) => !consultoria || c.consultoria === consultoria)
+    .map((c) => ({ ...c, carga: carga(c.id, ignorar) }))
+    .sort((a, b) => a.carga[m] - b.carga[m] || a.nome.localeCompare(b.nome))
+}
+
+function avisar(texto) {
+  const caixa = document.getElementById('toast')
+  caixa.innerHTML = `<div class="aviso-toast">${texto}</div>`
+  clearTimeout(avisar.t)
+  avisar.t = setTimeout(() => { caixa.innerHTML = '' }, 3800)
+}
+
+// ── Moldura ────────────────────────────────────────────────────────────────
+function renderMoldura() {
+  const q = QUEM[estado.quem]
+  document.getElementById('ver-como').innerHTML = Object.entries(QUEM).map(([id, p]) =>
+    `<button type="button" data-acao="ver-como" data-id="${id}" aria-pressed="${estado.quem === id}">${esc(p.rotulo)}</button>`).join('')
+  const itens = [
+    ['casa', 'Início', 'subir', false],
+    ['antena', 'Clientes', 'transmitir', true],
+    ['pasta', 'Projetos em breve', '', false],
+    ...(estado.quem === 'ana' ? [] : [['pessoas', 'Times', '', false], ['usuario', 'Usuários', '', false]]),
+  ]
+  document.getElementById('trilho').innerHTML = `<div class="logo" aria-label="IXC Consult">IXC</div>` + itens.map(([ic, rotulo, anim, aberto]) =>
+    `<button type="button" class="item-trilho ${aberto ? 'aberto' : ''}" data-acao="${aberto ? '' : 'fora'}">
+      <span class="ic">${icone(ic, anim ? 'anim-' + anim : '')}</span>${esc(rotulo)}</button>`).join('')
+  document.getElementById('barra-topo').innerHTML =
+    `<span class="caminho">${esc(CONSULTORIAS[q.consultoria])} › <b>${estado.quem === 'ana' ? 'Meus clientes' : 'Clientes'}</b></span>
+     <span class="badge contorno papel">${esc(q.papel)}</span>`
+}
+
+// ── Páginas ────────────────────────────────────────────────────────────────
+function filtrarBusca(lista) {
+  const termo = semAcento(estado.busca.trim())
+  if (!termo) return lista
+  return lista.filter((c) => semAcento([c.nome, c.razao, c.cidade, c.cnpj].join(' ')).includes(termo))
+}
+
+function campoBusca() {
+  return `<label class="busca">${icone('lupa')}<input type="search" id="busca" placeholder="Buscar por nome, razão social, cidade ou CNPJ" value="${esc(estado.busca)}" aria-label="Buscar clientes"></label>`
+}
+
+function celulaHoras(c) {
+  const pct = c.horas ? Math.min(100, (c.lancadas / c.horas) * 100) : 0
+  return `<td class="horas"><span class="num">${horas(c.lancadas)} de ${horas(c.horas)}</span>
+    <div class="barra" title="${Math.round(pct)}% lançado"><span style="width:${pct}%"></span></div></td>`
+}
+
+function celulaConsultor(c, comConsultoria = true) {
+  const p = consultor(c.consultor)
+  if (!p) return '<td><span class="badge aviso">Sem consultor</span></td>'
+  return `<td><div class="pessoa">${avatar(p.nome)}<div><div>${esc(p.nome)}</div>${comConsultoria ? `<div class="sub">${esc(CONSULTORIAS[p.consultoria])}</div>` : ''}</div></div></td>`
+}
+
+function tabela(rotulo, colunas, linhas, vazio) {
+  if (!linhas.length) return `<div class="vazio">${vazio}</div>`
+  return `<div class="tabela-card"><div class="rolagem"><table aria-label="${esc(rotulo)}">
+    <thead><tr>${colunas.map((c) => c.startsWith('~') ? `<th class="opcional">${c.slice(1)}</th>` : `<th>${c}</th>`).join('')}<th><span style="position:absolute;left:-9999px">Ações</span></th></tr></thead>
+    <tbody>${linhas.join('')}</tbody></table></div></div>`
+}
+
+function paginaJaine() {
+  const aDistribuir = clientes.filter((c) => !c.consultor)
+  const emAtendimento = clientes.filter((c) => c.consultor)
+  const abas = [['distribuir', 'A distribuir', aDistribuir.length], ['atendimento', 'Em atendimento', emAtendimento.length], ['consultores', 'Consultores', CONSULTORES.length]]
+  let conteudo
+  if (estado.aba === 'distribuir') {
+    const linhas = filtrarBusca(aDistribuir).map((c) => `<tr>
+      <td><div class="nome">${esc(c.nome)}</div><div class="sub">${esc(c.razao) || '—'}</div></td>
+      <td class="num opcional">${esc(c.cnpj) || '—'}</td><td>${cidadeUf(c)}</td>
+      <td class="num">${horas(c.horas)}</td>
+      <td class="acoes"><button class="btn pequeno" data-acao="distribuir" data-id="${c.id}">${icone('enviar')} Distribuir</button>
+        <button class="btn fantasma" data-acao="editar" data-id="${c.id}" aria-label="Editar" title="Editar">${icone('lapis')}<span class="rotulo"> Editar</span></button></td></tr>`)
+    conteudo = tabela('Clientes a distribuir', ['Cliente', '~CNPJ', 'Cidade', 'Horas combinadas'], linhas,
+      estado.busca ? 'Nenhum cliente a distribuir com essa busca.' : 'Nenhum cliente esperando consultor. Cadastre em "Novo cliente".')
+  } else if (estado.aba === 'atendimento') {
+    const linhas = filtrarBusca(emAtendimento).map((c) => `<tr>
+      <td><div class="nome">${esc(c.nome)}</div><div class="sub">${esc(c.razao) || '—'}</div></td>
+      <td>${cidadeUf(c)}</td>${celulaHoras(c)}${celulaConsultor(c)}
+      <td class="sub opcional">${esc(c.recebidoEm)}</td>
+      <td class="acoes"><button class="btn fantasma" data-acao="trocar" data-id="${c.id}" aria-label="Trocar consultor" title="Trocar consultor">${icone('trocar')}<span class="rotulo"> Trocar consultor</span></button>
+        <button class="btn fantasma" data-acao="editar" data-id="${c.id}" aria-label="Editar" title="Editar">${icone('lapis')}<span class="rotulo"> Editar</span></button></td></tr>`)
+    conteudo = tabela('Clientes em atendimento', ['Cliente', 'Cidade', 'Horas lançadas', 'Consultor', '~Desde'], linhas, 'Nenhum cliente em atendimento com essa busca.')
+  } else {
+    const linhas = consultoresOrdenados().map((p) => `<tr>
+      <td><div class="pessoa">${avatar(p.nome)}<span class="nome">${esc(p.nome)}</span></div></td>
+      <td>${esc(CONSULTORIAS[p.consultoria])}</td><td class="num">${p.carga.clientes}</td>
+      ${['combinadas', 'lancadas', 'entregar'].map((m) => `<td class="num" style="${estado.metrica === m ? 'font-weight:700' : ''}">${horas(p.carga[m])}</td>`).join('')}
+      <td></td></tr>`)
+    conteudo = `<p class="ajuda" style="margin:0 0 10px">Em ordem de <b>${METRICAS[estado.metrica].rotulo.toLowerCase()}</b> (menos horas primeiro). ${seletorMetrica()}</p>` +
+      tabela('Carga dos consultores', ['Consultor', 'Consultoria', 'Clientes', 'Combinadas', 'Lançadas no mês', 'A entregar'], linhas, '')
+  }
+  return `<div class="cabecalho"><div><h1>Clientes</h1><p>${clientes.length} clientes · ${aDistribuir.length} esperando consultor</p></div>
+      <button class="btn" data-acao="novo">${icone('mais')} Novo cliente</button></div>
+    <div class="filtros"><div class="segmentado" role="group" aria-label="Mostrar">${abas.map(([id, rotulo, n]) =>
+      `<button type="button" data-acao="aba" data-id="${id}" aria-pressed="${estado.aba === id}">${rotulo} <span class="n">${n}</span></button>`).join('')}</div>
+      ${estado.aba === 'consultores' ? '' : campoBusca()}</div>
+    <div id="lista">${conteudo}</div>`
+}
+
+function paginaSimone() {
+  const meus = clientes.filter((c) => consultor(c.consultor)?.consultoria === 'sti')
+  const linhas = filtrarBusca(meus).map((c) => `<tr>
+    <td><div class="nome">${esc(c.nome)} ${c.novo ? '<span class="badge azul">Novo</span>' : ''}</div><div class="sub">${esc(c.razao) || '—'}</div></td>
+    <td>${cidadeUf(c)}</td>${celulaHoras(c)}${celulaConsultor(c, false)}
+    <td class="sub opcional">${esc(c.recebidoEm)}</td>
+    <td class="acoes"><button class="btn fantasma" data-acao="trocar" data-id="${c.id}" aria-label="Trocar consultor" title="Trocar consultor">${icone('trocar')}<span class="rotulo"> Trocar consultor</span></button></td></tr>`)
+  return `<div class="cabecalho"><div><h1>Clientes</h1><p>${meus.length} clientes que a IXC Consult mandou para a STI Consult</p></div></div>
+    <div class="filtros">${campoBusca()}</div>
+    <div id="lista">${tabela('Clientes da STI Consult', ['Cliente', 'Cidade', 'Horas lançadas', 'Consultor', '~Recebido em'], linhas, 'Nenhum cliente recebido ainda.')}</div>`
+}
+
+function paginaAna() {
+  const meus = clientes.filter((c) => c.consultor === 'ana')
+  const total = soma(meus.map((c) => c.lancadas))
+  const linhas = meus.map((c) => `<tr>
+    <td><div class="nome">${esc(c.nome)} ${c.novo ? '<span class="badge azul">Novo</span>' : ''}</div><div class="sub">${esc(c.razao) || '—'}</div></td>
+    <td>${cidadeUf(c)}</td>
+    <td class="opcional">${c.contato ? `<div>${esc(c.contato)}</div><div class="sub">${esc(c.telefone)}</div>` : '—'}</td>
+    ${celulaHoras(c)}
+    <td class="acoes"><button class="btn pequeno" data-acao="lancar" data-id="${c.id}">${icone('relogio')} Lançar horas</button></td></tr>`)
+  return `<div class="cabecalho"><div><h1>Meus clientes</h1><p>${meus.length} ${meus.length === 1 ? 'cliente' : 'clientes'} · você lançou ${horas(total)} este mês</p></div></div>
+    <div id="lista">${tabela('Meus clientes', ['Cliente', 'Cidade', '~Contato', 'Horas lançadas'], linhas, 'Nenhum cliente com você ainda.')}</div>`
+}
+
+function perguntas() {
+  return `<section class="perguntas" aria-label="O que este protótipo quer validar">
+    <h2>${icone('duvida')} O que este protótipo quer validar</h2>
+    <ol>
+      <li><b>Que horas contam para a sugestão?</b> Combinadas com o cliente, lançadas pelo consultor no mês, ou as que faltam entregar. Dá para trocar no "Distribuir" e ver a ordem mudar.</li>
+      <li><b>A consultoria parceira também cadastra clientes que ela mesma conseguiu?</b> Aqui só a IXC Consult cadastra.</li>
+      <li><b>A parceira pode trocar o consultor dentro da equipe dela?</b> Aqui a Simone pode, só entre os consultores da STI.</li>
+      <li><b>O cliente vai para um consultor (e a consultoria dele) por vez?</b> Aqui sim; trocar o consultor pode mudar a consultoria.</li>
+      <li><b>Os consultores da própria IXC Consult entram na lista?</b> Aqui só os das parceiras.</li>
+    </ol></section>`
+}
+
+function render() {
+  renderMoldura()
+  const pagina = { jaine: paginaJaine, simone: paginaSimone, ana: paginaAna }[estado.quem]()
+  document.getElementById('pagina').innerHTML = pagina + perguntas()
+  renderJanela()
+}
+
+function renderLista() {
+  // Só a tabela muda enquanto a pessoa digita a busca (o campo não perde o foco).
+  const temp = document.createElement('div')
+  temp.innerHTML = { jaine: paginaJaine, simone: paginaSimone, ana: paginaAna }[estado.quem]()
+  document.getElementById('lista').replaceWith(temp.querySelector('#lista'))
+}
+
+// ── Janelas ────────────────────────────────────────────────────────────────
+function seletorMetrica() {
+  return `<span class="segmentado" role="group" aria-label="Contar horas por" style="margin-left:6px;vertical-align:middle">${Object.entries(METRICAS).map(([id, m]) =>
+    `<button type="button" data-acao="metrica" data-id="${id}" aria-pressed="${estado.metrica === id}">${m.rotulo}</button>`).join('')}</span>`
+}
+
+function janelaEscolher() {
+  const j = estado.janela
+  const c = clientes.find((x) => x.id === j.clienteId)
+  const soDaSti = estado.quem === 'simone'
+  const lista = consultoresOrdenados({ consultoria: soDaSti ? 'sti' : j.consultoria })
+  const sugestao = lista.find((p) => p.id !== c.consultor)
+  if (!j.escolhido || !lista.some((p) => p.id === j.escolhido)) j.escolhido = sugestao?.id ?? null
+  const maior = Math.max(1, ...lista.map((p) => p.carga[estado.metrica]))
+  const escolhido = lista.find((p) => p.id === j.escolhido)
+  const titulo = j.tipo === 'distribuir' ? `Distribuir ${esc(c.nome)}` : `Trocar o consultor de ${esc(c.nome)}`
+  const opcoes = lista.map((p) => {
+    const valor = p.carga[estado.metrica]
+    const marcas = [
+      p.id === sugestao?.id ? `<span class="badge azul">${icone('brilho')} Sugestão: menos horas</span>` : '',
+      p.id === c.consultor ? '<span class="badge contorno">Atual</span>' : '',
+    ].join(' ')
+    return `<label class="opcao ${p.id === j.escolhido ? 'escolhida' : ''}">
+      <input type="radio" name="consultor" value="${p.id}" data-acao="escolher" ${p.id === j.escolhido ? 'checked' : ''}>
+      ${avatar(p.nome)}
+      <div style="min-width:0"><div class="nome">${esc(p.nome)} ${marcas}</div><div class="sub">${esc(CONSULTORIAS[p.consultoria])}</div></div>
+      <div class="horas"><span class="num"><b>${horas(valor)}</b> ${METRICAS[estado.metrica].rotulo.toLowerCase()}</span>
+        <div class="barra"><span style="width:${Math.max(2, (valor / maior) * 100)}%"></span></div></div>
+      <div class="clientes num">${p.carga.clientes} ${p.carga.clientes === 1 ? 'cliente' : 'clientes'}</div></label>`
+  }).join('')
+  let previa = ''
+  const primeiro = (p) => esc(p.nome.split(' ')[0])
+  if (escolhido && escolhido.id === c.consultor) {
+    previa = `${primeiro(escolhido)} já atende este cliente.`
+  } else if (escolhido && estado.metrica === 'lancadas') {
+    previa = `As horas lançadas de ${primeiro(escolhido)} só sobem quando ela trabalhar.`
+  } else if (escolhido) {
+    const antes = escolhido.carga[estado.metrica]
+    const depois = antes + (estado.metrica === 'combinadas' ? c.horas : Math.max(0, c.horas - c.lancadas))
+    previa = `${primeiro(escolhido)} passa de ${horas(antes)} para ${horas(depois)}.`
+    const atual = consultor(c.consultor)
+    if (atual) previa += ` ${primeiro(atual)} fica com ${horas(carga(atual.id, c.id)[estado.metrica])}.`
+  }
+  return `<div class="janela larga" role="dialog" aria-modal="true" aria-labelledby="titulo-janela">
+    <header><div><h2 id="titulo-janela">${titulo}</h2>
+      <p>${soDaSti ? 'Consultores da STI Consult, com menos horas primeiro.' : 'Consultores das consultorias parceiras, com menos horas primeiro. A sugestão é só uma ajuda: quem escolhe é você.'}</p></div>
+      <button class="btn fantasma fechar" data-acao="fechar" aria-label="Fechar">${icone('fechar')}</button></header>
+    <div class="corpo">
+      <div class="resumo-cliente"><span><b>${esc(c.nome)}</b></span><span>${cidadeUf(c)}</span><span>${horas(c.horas)} combinadas</span>${c.lancadas ? `<span>${horas(c.lancadas)} lançadas</span>` : ''}</div>
+      <div class="filtros" style="margin:0">
+        <span class="sub">Contar horas por</span>${seletorMetrica()}
+        ${soDaSti ? '' : `<select data-acao="filtrar-consultoria" aria-label="Consultoria" style="width:auto;margin-left:auto">
+          <option value="">Todas as consultorias</option>
+          ${['sti', 'exemplo', 'norte'].map((id) => `<option value="${id}" ${j.consultoria === id ? 'selected' : ''}>${CONSULTORIAS[id]}</option>`).join('')}
+        </select>`}
+      </div>
+      <p class="ajuda">${METRICAS[estado.metrica].ajuda}</p>
+      <div class="opcoes" role="radiogroup" aria-label="Consultor">${opcoes}</div>
+    </div>
+    <footer><span class="previa">${previa}</span>
+      <button class="btn contorno" data-acao="fechar">Cancelar</button>
+      <button class="btn" data-acao="confirmar-consultor" ${escolhido && escolhido.id !== c.consultor ? '' : 'disabled'}>${icone('enviar')} ${escolhido ? `Mandar para ${esc(escolhido.nome.split(' ')[0])}` : 'Escolha um consultor'}</button>
+    </footer></div>`
+}
+
+function janelaCliente() {
+  const j = estado.janela
+  const c = j.clienteId ? clientes.find((x) => x.id === j.clienteId) : novoCliente({ horas: '' })
+  const campo = (id, rotulo, valor, extra = '') => `<div class="campo"><label for="f-${id}">${rotulo}</label><input id="f-${id}" name="${id}" value="${esc(valor)}" ${extra}></div>`
+  const ufs = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO']
+  return `<form class="janela" role="dialog" aria-modal="true" aria-labelledby="titulo-janela" data-form="cliente" novalidate>
+    <header><div><h2 id="titulo-janela">${j.clienteId ? 'Editar cliente' : 'Novo cliente'}</h2><p>Os dados do provedor. O consultor é escolhido em "Distribuir".</p></div>
+      <button type="button" class="btn fantasma fechar" data-acao="fechar" aria-label="Fechar">${icone('fechar')}</button></header>
+    <div class="corpo">
+      ${campo('nome', 'Nome do cliente', c.nome, 'maxlength="120" placeholder="Nome fantasia" autofocus')}
+      ${campo('razao', 'Razão social (opcional)', c.razao, 'maxlength="200"')}
+      <div class="grade-2">${campo('cnpj', 'CNPJ (opcional)', c.cnpj, 'placeholder="00.000.000/0000-00" maxlength="18"')}${campo('horas', 'Horas combinadas', c.horas, 'type="number" min="1" step="1" placeholder="Ex.: 40"')}</div>
+      <div class="grade-3">${campo('cidade', 'Cidade', c.cidade)}
+        <div class="campo"><label for="f-uf">UF</label><select id="f-uf" name="uf">${ufs.map((u) => `<option ${u === c.uf ? 'selected' : ''}>${u}</option>`).join('')}</select></div></div>
+      <div class="secao">Contato principal</div>
+      ${campo('contato', 'Nome', c.contato)}
+      <div class="grade-2">${campo('telefone', 'Telefone', c.telefone)}${campo('email', 'E-mail', c.email, 'type="email"')}</div>
+      <div class="campo"><label for="f-obs">Observações (opcional)</label><textarea id="f-obs" name="obs" rows="2" maxlength="2000">${esc(c.obs)}</textarea></div>
+      <p class="erro" id="erro-form" role="alert"></p>
+    </div>
+    <footer>
+      <button type="button" class="btn contorno" data-acao="fechar">Cancelar</button>
+      ${j.clienteId ? '' : '<button type="submit" class="btn contorno" data-depois="distribuir">Salvar e distribuir</button>'}
+      <button type="submit" class="btn">Salvar</button>
+    </footer></form>`
+}
+
+function janelaLancar() {
+  const c = clientes.find((x) => x.id === estado.janela.clienteId)
+  return `<form class="janela" role="dialog" aria-modal="true" aria-labelledby="titulo-janela" data-form="lancar" novalidate>
+    <header><div><h2 id="titulo-janela">Lançar horas</h2><p>${esc(c.nome)} · ${horas(c.lancadas)} de ${horas(c.horas)} já lançadas</p></div>
+      <button type="button" class="btn fantasma fechar" data-acao="fechar" aria-label="Fechar">${icone('fechar')}</button></header>
+    <div class="corpo">
+      <div class="grade-2"><div class="campo"><label for="f-data">Data</label><input id="f-data" name="data" value="${HOJE}"></div>
+        <div class="campo"><label for="f-qtd">Horas trabalhadas</label><input id="f-qtd" name="qtd" inputmode="decimal" placeholder="Ex.: 2,5" autofocus></div></div>
+      <div class="campo"><label for="f-feito">O que foi feito</label><textarea id="f-feito" name="feito" rows="3" placeholder="Ex.: revisão do fluxo de cobrança com o financeiro"></textarea></div>
+      <p class="erro" id="erro-form" role="alert"></p>
+    </div>
+    <footer><button type="button" class="btn contorno" data-acao="fechar">Cancelar</button><button type="submit" class="btn">${icone('relogio')} Lançar</button></footer></form>`
+}
+
+function renderJanela() {
+  const alvo = document.getElementById('janela')
+  const j = estado.janela
+  if (!j) { alvo.innerHTML = ''; return }
+  const conteudo = { distribuir: janelaEscolher, trocar: janelaEscolher, cliente: janelaCliente, lancar: janelaLancar }[j.tipo]()
+  const fundo = alvo.querySelector('.fundo')
+  // Janela já aberta (trocou a contagem, o filtro ou a escolha): troca só o conteúdo, sem piscar.
+  if (fundo && fundo.dataset.tipo === j.tipo) {
+    const rolagem = fundo.firstElementChild?.scrollTop ?? 0
+    fundo.innerHTML = conteudo
+    fundo.firstElementChild.scrollTop = rolagem
+    return
+  }
+  alvo.innerHTML = `<div class="fundo" data-acao="fundo" data-tipo="${j.tipo}">${conteudo}</div>`
+  alvo.querySelector('[autofocus]')?.focus()
+}
+
+// ── Ações ──────────────────────────────────────────────────────────────────
+document.addEventListener('click', (e) => {
+  const alvo = e.target.closest('[data-acao]')
+  if (!alvo) return
+  const { acao, id } = alvo.dataset
+  if (acao === 'fundo' && e.target !== alvo) return
+  switch (acao) {
+    case 'ver-como': estado.quem = id; estado.busca = ''; estado.janela = null; render(); break
+    case 'aba': estado.aba = id; render(); break
+    case 'fora': avisar('Fora do protótipo: aqui só a tela de clientes funciona.'); break
+    case 'novo': estado.janela = { tipo: 'cliente' }; renderJanela(); break
+    case 'editar': estado.janela = { tipo: 'cliente', clienteId: Number(id) }; renderJanela(); break
+    case 'distribuir': estado.janela = { tipo: 'distribuir', clienteId: Number(id), consultoria: '' }; renderJanela(); break
+    case 'trocar': estado.janela = { tipo: 'trocar', clienteId: Number(id), consultoria: '' }; renderJanela(); break
+    case 'lancar': estado.janela = { tipo: 'lancar', clienteId: Number(id) }; renderJanela(); break
+    case 'metrica': estado.metrica = id; if (estado.janela) { estado.janela.escolhido = null; renderJanela() } else render(); break
+    case 'fechar': case 'fundo': estado.janela = null; renderJanela(); break
+    case 'confirmar-consultor': {
+      const j = estado.janela
+      const c = clientes.find((x) => x.id === j.clienteId)
+      const p = consultor(j.escolhido)
+      c.consultor = p.id
+      c.recebidoEm = HOJE
+      c.novo = true
+      estado.janela = null
+      if (estado.quem === 'jaine' && j.tipo === 'distribuir') estado.aba = clientes.some((x) => !x.consultor) ? 'distribuir' : 'atendimento'
+      render()
+      avisar(`<b>${esc(c.nome)}</b> foi para ${esc(p.nome)}, da ${esc(CONSULTORIAS[p.consultoria])}.` +
+        (estado.quem === 'jaine' ? ' Veja como fica para a parceira e para o consultor em "Ver como", lá em cima.' : ''))
+      break
+    }
+  }
+})
+
+document.addEventListener('change', (e) => {
+  const alvo = e.target.closest('[data-acao]')
+  if (!alvo || !estado.janela) return
+  if (alvo.dataset.acao === 'escolher') { estado.janela.escolhido = alvo.value; renderJanela() }
+  if (alvo.dataset.acao === 'filtrar-consultoria') { estado.janela.consultoria = alvo.value; estado.janela.escolhido = null; renderJanela() }
+})
+
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'busca') return
+  estado.busca = e.target.value
+  renderLista()
+})
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && estado.janela) { estado.janela = null; renderJanela() }
+})
+
+document.addEventListener('submit', (e) => {
+  e.preventDefault()
+  const form = e.target
+  const dados = Object.fromEntries(new FormData(form))
+  const erro = form.querySelector('#erro-form')
+  if (form.dataset.form === 'lancar') {
+    const qtd = Number(String(dados.qtd).replace(',', '.'))
+    if (!(qtd > 0)) { erro.textContent = 'Informe quantas horas você trabalhou.'; return }
+    const c = clientes.find((x) => x.id === estado.janela.clienteId)
+    c.lancadas += qtd
+    c.novo = false
+    estado.janela = null
+    render()
+    avisar(`${horas(qtd)} lançadas em <b>${esc(c.nome)}</b>. Isso entra na conta de "lançadas" que a Jaine vê ao distribuir.`)
+    return
+  }
+  const nome = String(dados.nome ?? '').trim()
+  const horasCombinadas = Number(dados.horas)
+  if (nome.length < 2) { erro.textContent = 'Use pelo menos 2 caracteres no nome.'; return }
+  if (!(horasCombinadas > 0)) { erro.textContent = 'Informe as horas combinadas com o cliente.'; return }
+  const valores = { nome, razao: dados.razao.trim(), cnpj: dados.cnpj.trim(), horas: horasCombinadas, cidade: dados.cidade.trim(), uf: dados.uf,
+    contato: dados.contato.trim(), telefone: dados.telefone.trim(), email: dados.email.trim(), obs: dados.obs.trim() }
+  const editando = estado.janela.clienteId
+  let cliente
+  if (editando) {
+    cliente = Object.assign(clientes.find((x) => x.id === editando), valores)
+  } else {
+    cliente = novoCliente({ id: proximoId++, ...valores })
+    clientes.unshift(cliente)
+  }
+  const depois = e.submitter?.dataset.depois
+  estado.janela = depois === 'distribuir' ? { tipo: 'distribuir', clienteId: cliente.id, consultoria: '' } : null
+  if (!editando) estado.aba = 'distribuir'
+  render()
+  if (!depois) avisar(editando ? `${esc(nome)} atualizado.` : `<b>${esc(nome)}</b> cadastrado. Ele está em "A distribuir".`)
+})
+
+render()
+</script>
+</body>
+</html>

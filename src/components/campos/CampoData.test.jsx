@@ -1,0 +1,151 @@
+import { useState } from 'react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
+import JanelaFormulario from '@/components/comum/JanelaFormulario'
+import { Label } from '@/components/ui/label'
+import CampoData from './CampoData'
+
+function Controlado({ inicial = '', aoMudar = () => {}, ...props }) {
+  const [valor, setValor] = useState(inicial)
+  return <CampoData id="data" valor={valor} aoMudar={(v) => { setValor(v); aoMudar(v) }} {...props} />
+}
+
+describe('CampoData', () => {
+  it('o rótulo fica associado ao campo e mostra a data por extenso', () => {
+    render(<><Label htmlFor="data">Prazo</Label><Controlado inicial="2026-11-16" /></>)
+    const campo = screen.getByLabelText('Prazo')
+    expect(campo).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(campo).toHaveAttribute('aria-expanded', 'false')
+    expect(campo).toHaveTextContent('16 de nov de 2026')
+    expect(campo).toHaveAccessibleName('Prazo')
+    expect(campo).toHaveAccessibleDescription('16 de nov de 2026')
+  })
+
+  it('Mês anterior e Próximo mês levam o foco do teclado junto (o mesmo dia, limitado ao fim do mês)', async () => {
+    render(<Controlado inicial="2026-01-31" />)
+    await userEvent.click(screen.getByRole('button', { name: /31 de jan/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }))
+    const dia = screen.getByRole('button', { name: '28 de fevereiro de 2026' })
+    expect(dia).toHaveAttribute('tabindex', '0')
+    expect(document.querySelectorAll('[data-dia][tabindex="0"]')).toHaveLength(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
+    expect(screen.getByRole('button', { name: '28 de janeiro de 2026' })).toHaveAttribute('tabindex', '0')
+  })
+
+  it('ao mudar de mês o foco respeita min e max', async () => {
+    render(<Controlado inicial="2026-11-16" min="2026-11-10" max="2026-12-05" />)
+    await userEvent.click(screen.getByRole('button', { name: /16 de nov/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }))
+    expect(screen.getByRole('button', { name: '5 de dezembro de 2026' })).toHaveAttribute('tabindex', '0')
+    await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
+    expect(screen.getByRole('button', { name: '10 de novembro de 2026' })).toHaveAttribute('tabindex', '0')
+  })
+
+  it('escolher um dia devolve o texto yyyy-MM-dd e fecha', async () => {
+    const aoMudar = vi.fn()
+    render(<Controlado inicial="2026-11-16" aoMudar={aoMudar} />)
+    await userEvent.click(screen.getByRole('button', { name: /16 de nov/ }))
+    await userEvent.click(screen.getByRole('button', { name: '20 de novembro de 2026' }))
+    expect(aoMudar).toHaveBeenCalledWith('2026-11-20')
+    expect(screen.queryByRole('dialog', { name: 'Escolher data' })).toBeNull()
+  })
+
+  it('min e max apagam os dias de fora', async () => {
+    render(<Controlado inicial="2026-11-16" min="2026-11-10" max="2026-11-20" />)
+    await userEvent.click(screen.getByRole('button', { name: /16 de nov/ }))
+    expect(screen.getByRole('button', { name: '9 de novembro de 2026' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '21 de novembro de 2026' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '15 de novembro de 2026' })).toBeEnabled()
+  })
+
+  it('navega entre meses', async () => {
+    render(<Controlado inicial="2026-11-30" />)
+    await userEvent.click(screen.getByRole('button', { name: /30 de nov/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }))
+    expect(screen.getByRole('button', { name: '15 de dezembro de 2026' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
+    expect(screen.getByRole('button', { name: '15 de novembro de 2026' })).toBeInTheDocument()
+  })
+
+  it('ao abrir o foco vai para o dia escolhido e as setas do teclado movem o dia', async () => {
+    const aoMudar = vi.fn()
+    render(<Controlado inicial="2026-11-30" aoMudar={aoMudar} />)
+    await userEvent.click(screen.getByRole('button', { name: /30 de nov/ }))
+    expect(screen.getByRole('button', { name: '30 de novembro de 2026' })).toHaveFocus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByRole('button', { name: '1 de dezembro de 2026' })).toHaveFocus()
+    await userEvent.keyboard('{Enter}')
+    expect(aoMudar).toHaveBeenCalledWith('2026-12-01')
+  })
+
+  it('data opcional: Limpar volta a vazio', async () => {
+    const aoMudar = vi.fn()
+    render(<Controlado inicial="2026-11-16" aoMudar={aoMudar} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Limpar data' }))
+    expect(aoMudar).toHaveBeenCalledWith('')
+    expect(screen.getByRole('button', { name: /Escolher data/ })).toBeInTheDocument()
+  })
+
+  it('"Limpar data" fica fora do campo (um controle não fica dentro do outro), com 24 px e pelo teclado (auditoria, R13)', async () => {
+    const aoMudar = vi.fn()
+    render(<Controlado inicial="2026-11-16" rotulo="Prazo" aoMudar={aoMudar} />)
+    const campo = screen.getByRole('button', { name: 'Prazo' })
+    const limpar = screen.getByRole('button', { name: 'Limpar data' })
+    expect(limpar.tagName).toBe('BUTTON')
+    expect(campo).not.toContainElement(limpar)
+    expect(limpar).toHaveClass('size-6')
+    campo.focus()
+    await userEvent.tab()
+    expect(limpar).toHaveFocus()
+    await userEvent.keyboard('{Enter}')
+    expect(aoMudar).toHaveBeenCalledWith('')
+    expect(screen.queryByRole('button', { name: 'Limpar data' })).toBeNull()
+    expect(campo).toHaveFocus()
+  })
+
+  it('obrigatória não oferece limpar', async () => {
+    render(<Controlado inicial="2026-11-16" obrigatorio />)
+    expect(screen.queryByRole('button', { name: 'Limpar data' })).toBeNull()
+  })
+
+  it('Hoje e os atalhos preenchem a data', async () => {
+    const aoMudar = vi.fn()
+    render(<Controlado aoMudar={aoMudar} atalhos={[{ rotulo: 'Fim do mês', valor: '2026-11-30' }]} />)
+    await userEvent.click(screen.getByRole('button', { name: /Escolher data/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Fim do mês' }))
+    expect(aoMudar).toHaveBeenCalledWith('2026-11-30')
+  })
+
+  it('com hora, junta data e horário em yyyy-MM-ddTHH:mm', async () => {
+    const aoMudar = vi.fn()
+    render(<Controlado inicial="2026-11-16T09:30" comHora aoMudar={aoMudar} />)
+    await userEvent.click(screen.getByRole('button', { name: /16 de nov/ }))
+    await userEvent.click(screen.getByRole('button', { name: '18 de novembro de 2026' }))
+    expect(aoMudar).toHaveBeenLastCalledWith('2026-11-18T09:30')
+    const dialogo = screen.getByRole('dialog', { name: 'Escolher data' })
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Horário' }))
+    await userEvent.click(screen.getByRole('button', { name: '14', exact: true }))
+    expect(aoMudar).toHaveBeenLastCalledWith('2026-11-18T14:30')
+  })
+
+  it('dentro de uma janela: clique funciona e Esc fecha só a lista', async () => {
+    const aoFechar = vi.fn()
+    const aoMudar = vi.fn()
+    render(
+      <JanelaFormulario aberto aoFechar={aoFechar} titulo="Novo prazo">
+        <Controlado inicial="2026-11-16" aoMudar={aoMudar} />
+      </JanelaFormulario>,
+    )
+    await userEvent.click(screen.getByRole('button', { name: /16 de nov/ }))
+    const lista = screen.getByRole('dialog', { name: 'Escolher data' })
+    expect(screen.getByRole('dialog', { name: 'Novo prazo' })).toContainElement(lista)
+    await userEvent.click(screen.getByRole('button', { name: '22 de novembro de 2026' }))
+    expect(aoMudar).toHaveBeenCalledWith('2026-11-22')
+    await userEvent.click(screen.getByRole('button', { name: /22 de nov/ }))
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Escolher data' })).toBeNull()
+    expect(aoFechar).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Novo prazo' })).toBeInTheDocument()
+  })
+})

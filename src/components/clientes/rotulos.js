@@ -1,0 +1,66 @@
+import { formatarHoras, formatarOcupacao } from '@/lib/horas'
+
+// Valor à direita de cada opção: a ocupação, ou o aviso de que não há capacidade.
+export function rotuloDeOcupacao(item) {
+  return item.ocupacao === null || item.ocupacao === undefined ? 'sem capacidade' : formatarOcupacao(item.ocupacao)
+}
+
+// A sugestão é o primeiro com ocupação conhecida (a lista já vem da menor para a maior), fora o atual.
+export function sugestaoDe(itens, atualId) {
+  return itens?.find((i) => i.id !== atualId && i.ocupacao !== null && i.ocupacao !== undefined) ?? null
+}
+
+export const MAXIMO_DE_HORAS_NO_MES = 744
+
+// Aceita "40", "40,5" e "40.5"; devolve o número ou null quando não é número.
+export function lerHoras(texto) {
+  const limpo = String(texto).trim().replace(',', '.')
+  if (!/^\d+(\.\d+)?$/.test(limpo)) return null
+  return Number(limpo)
+}
+
+// Texto de cada evento do histórico. Nome nulo = o banco escondeu (é de outra consultoria). O nome do modelo de check-in,
+// a tarefa e o motivo do "não se aplica" (e do motivo trocado) só vêm para a Central e para a consultoria do check-list;
+// sem eles, o texto fica só com o fato.
+export function textoDoEvento(e) {
+  const consultoria = (nome) => nome ?? 'outra consultoria'
+  const consultor = (nome) => nome ?? 'outro consultor'
+  switch (e.tipo) {
+    case 'cadastrado': return 'Cadastrado'
+    case 'editado': return 'Dados editados'
+    case 'enviado': return `Mandado para ${consultoria(e.para_consultoria)}`
+    case 'movido': return e.de_consultoria
+      ? `Movido de ${e.de_consultoria} para ${consultoria(e.para_consultoria)}`
+      : `Movido para ${consultoria(e.para_consultoria)}`
+    case 'devolvido': return 'Devolvido à central'
+    case 'consultor_escolhido': return `Consultor: ${consultor(e.para_consultor)}`
+    case 'consultor_trocado': return `Consultor trocado para ${consultor(e.para_consultor)}`
+    case 'consultor_removido': return 'Ficou sem consultor'
+    case 'previsao_ajustada': return `Previsão de ${formatarHoras(e.de_horas)} para ${formatarHoras(e.para_horas)}`
+    case 'arquivado': return 'Arquivado'
+    case 'reativado': return 'Reativado'
+    case 'reuniao_realizada': return 'Reunião realizada'
+    case 'pasta_da_reuniao_criada': return 'Pasta da reunião criada'
+    case 'modelo_aplicado': return e.modelo ? `Modelo de check-in aplicado: ${e.modelo}` : 'Modelo de check-in aplicado'
+    case 'modelo_trocado': return e.modelo ? `Modelo de check-in trocado para ${e.modelo}` : 'Modelo de check-in trocado'
+    case 'modelo_tirado': return e.modelo ? `Modelo de check-in tirado: ${e.modelo}` : 'Modelo de check-in tirado'
+    case 'tarefa_nao_se_aplica': return e.tarefa
+      ? `Tarefa não se aplica: ${e.tarefa}${e.motivo ? ` (${e.motivo})` : ''}`
+      : 'Tarefa do check-list marcada como não se aplica'
+    case 'tarefa_reaberta': return e.tarefa
+      ? `Tarefa reaberta: ${e.tarefa} (desfeito o "não se aplica")`
+      : 'Tarefa do check-list reaberta (desfeito o "não se aplica")'
+    case 'motivo_trocado': return e.tarefa
+      ? `Motivo trocado: ${e.tarefa}${e.motivo ? ` (${e.motivo})` : ''}`
+      : 'Motivo do "não se aplica" trocado numa tarefa do check-list'
+    default: return e.tipo
+  }
+}
+
+// A situação em que o cliente está: define quais ações da linha e da página valem para ele, não importa o filtro escolhido.
+export function abaDoCliente(c, central) {
+  if (c.arquivado) return 'arquivados'
+  if (!c.consultoria_id) return 'distribuir'
+  if (central) return 'nas_consultorias'
+  return c.consultor_id ? 'atendimento' : 'aguardando'
+}

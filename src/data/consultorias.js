@@ -1,13 +1,25 @@
 import { traduzirErroFuncao } from '@/lib/erros'
 import { chamarFuncao, supabase } from '@/lib/supabase'
+import { padraoDeBusca } from '@/lib/busca'
 import { buscarPagina } from './paginar'
 
-// Para o filtro do dono nas telas Times e Usuários.
-export async function listarNomesDeConsultorias() {
-  const { data, error } = await supabase.from('consultorias').select('id, nome').order('nome')
+// Consultorias por nome sem acento (ilike em nome_busca), no máximo `limite` por vez, numa consulta só. Devolve { itens: [{ id, nome }], total }
+// (total = quantas combinam, para o "N de TOTAL" do Seletor). `soAtivas` tira as arquivadas.
+async function buscarPorNome(termo, limite, soAtivas) {
+  let consulta = supabase.from('consultorias').select('id, nome', { count: 'exact' }).order('nome').limit(limite)
+  if (soAtivas) consulta = consulta.is('arquivada_em', null)
+  const padrao = padraoDeBusca(termo)
+  if (padrao) consulta = consulta.ilike('nome_busca', padrao)
+  const { data, error, count } = await consulta
   if (error) throw error
-  return data
+  return { itens: data, total: count ?? 0 }
 }
+
+// Filtro das listas de quem vê tudo: todas as consultorias, inclusive as arquivadas, buscadas no banco pelo nome.
+export const buscarConsultorias = (termo = '', limite = 20) => buscarPorNome(termo, limite, false)
+
+// Seletor de consultoria com busca no banco (acesso novo de administrador): só as ativas.
+export const buscarConsultoriasAtivas = (termo = '', limite = 20) => buscarPorNome(termo, limite, true)
 
 // Tela Consultorias (só o dono enxerga todas): uma página, ativas ou arquivadas. Pessoas e times
 // vêm contados no banco; da administração, só quem é admin.

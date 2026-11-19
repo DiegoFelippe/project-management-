@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import CampoSenha from '@/components/campos/CampoSenha'
+import { avaliarSenha } from '@/lib/senha'
 import { Label } from '@/components/ui/label'
 import { Aviso } from './TelaDeAcesso'
 
@@ -17,7 +19,7 @@ export default function FormularioNovaSenha() {
 
   async function enviar(evento) {
     evento.preventDefault()
-    if (senha.length < 8) return setErro('A senha precisa ter pelo menos 8 caracteres.')
+    if (!avaliarSenha(senha).forte) return setErro('A senha precisa ser forte: confira as regras abaixo do campo.')
     if (senha !== repetida) return setErro('As senhas não são iguais.')
     setErro(null)
     setEnviando(true)
@@ -35,9 +37,7 @@ export default function FormularioNovaSenha() {
     <form noValidate onSubmit={enviar} className="grid gap-4">
       <div className="grid gap-2">
         <Label htmlFor="senha-nova">Senha nova</Label>
-        <Input id="senha-nova" type="password" autoComplete="new-password" autoFocus className="h-10"
-          value={senha} onChange={(e) => setSenha(e.target.value)} />
-        <p className="text-xs text-muted-foreground">Pelo menos 8 caracteres.</p>
+        <CampoSenha id="senha-nova" valor={senha} aoMudar={setSenha} autoFocus />
       </div>
       <div className="grid gap-2">
         <Label htmlFor="senha-repetida">Repita a senha</Label>

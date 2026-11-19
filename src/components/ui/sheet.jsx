@@ -24,6 +24,6 @@ function SheetContent({ className, children, side = "left", ...props }) {
   );
 }
 function SheetTitle({ className, ...props }) { return <SheetPrimitive.Title className={cn("text-foreground font-semibold", className)} {...props} />; }
-function SheetDescription({ className, ...props }) { return <SheetPrimitive.Description className={cn("text-muted-foreground text-sm", className)} {...props} />; }
+function SheetDescription({ className, ...props }) { return <SheetPrimitive.Description className={cn("text-muted-foreground text-corpo", className)} {...props} />; }
 
 export { Sheet, SheetTrigger, SheetClose, SheetContent, SheetTitle, SheetDescription };

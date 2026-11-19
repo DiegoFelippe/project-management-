@@ -14,7 +14,7 @@ export function GraficoCarregando({ texto = 'Carregando…', grande = false, cla
             style={{ height: `${altura * 100}%`, animationDelay: `${i * 0.12}s`, opacity: 0.45 + altura * 0.55 }} />
         ))}
       </div>
-      <span className="text-sm text-muted-foreground">{texto}</span>
+      <span className="text-corpo text-muted-foreground">{texto}</span>
     </div>
   )
 }

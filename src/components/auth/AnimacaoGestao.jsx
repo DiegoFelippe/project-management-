@@ -1,7 +1,9 @@
-// Enfeite do lado esquerdo da tela de entrar: a consultoria no centro de uma rede (times, projetos,
-// metas e empresas), com dados correndo pelas linhas, e cartões de gestão flutuando em volta.
+// Enfeite do lado esquerdo da tela de entrar: a consultoria no centro de uma rede (clientes, times, check-ins e
+// agenda), com dados correndo pelas linhas, e cartões com o que o app faz flutuando em volta (auditoria, R10: nada de
+// funções que o app não tem). Os números e nomes são de exemplo, fixos: a ilustração não lê dados e é aria-hidden.
 // Só transform/opacity (leve para o processador); com "reduzir movimento" fica parado.
 import { useEffect, useState } from 'react'
+import { TAMANHO } from '@/lib/tipografia'
 import { cn } from '@/lib/utils'
 
 // Número que conta de 0 até o valor (com "reduzir movimento", já mostra o valor final).
@@ -25,10 +27,10 @@ function Contador({ ate, prefixo = '', sufixo = '', atraso = 0, duracao = 1400 }
 
 const CENTRO = { x: 250, y: 200 }
 const NOS = [
-  { id: 'times', rotulo: 'Times', x: 95, y: 92, curva: 'M250 200 Q150 175 95 92' },
-  { id: 'projetos', rotulo: 'Projetos', x: 405, y: 88, curva: 'M250 200 Q350 168 405 88' },
-  { id: 'metas', rotulo: 'Metas', x: 90, y: 312, curva: 'M250 200 Q150 242 90 312' },
-  { id: 'empresas', rotulo: 'Empresas', x: 410, y: 316, curva: 'M250 200 Q350 236 410 316' },
+  { id: 'clientes', rotulo: 'Clientes', x: 95, y: 92, curva: 'M250 200 Q150 175 95 92' },
+  { id: 'times', rotulo: 'Times', x: 405, y: 88, curva: 'M250 200 Q350 168 405 88' },
+  { id: 'checkins', rotulo: 'Check-ins', x: 90, y: 312, curva: 'M250 200 Q150 242 90 312' },
+  { id: 'agenda', rotulo: 'Agenda', x: 410, y: 316, curva: 'M250 200 Q350 236 410 316' },
 ]
 
 // Ícones simples desenhados em volta de (0, 0), no traço do lucide.
@@ -44,15 +46,19 @@ function Icone({ id }) {
       </g>
     )
   }
-  if (id === 'projetos') {
-    return <path {...traco} d="M-9 -6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H-7a2 2 0 0 1-2-2z" />
-  }
-  if (id === 'metas') {
+  if (id === 'checkins') {
     return (
       <g {...traco}>
         <circle r="8.5" />
-        <circle r="4.5" />
-        <circle r="1" fill="var(--primary)" />
+        <path d="M0 -4.5V0l3 2" />
+      </g>
+    )
+  }
+  if (id === 'agenda') {
+    return (
+      <g {...traco}>
+        <rect x="-8.5" y="-7" width="17" height="16" rx="2" />
+        <path d="M-8.5 -2h17M-4 -9.5v4M4 -9.5v4" />
       </g>
     )
   }
@@ -91,7 +97,7 @@ function Rede() {
             <circle r="23" fill="var(--card)" stroke="var(--primary)" strokeOpacity="0.3" strokeWidth="1.5"
               style={{ filter: 'drop-shadow(0 6px 14px rgb(15 23 42 / 0.12))' }} />
             <Icone id={no.id} />
-            <text y="40" textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--muted-foreground)">{no.rotulo}</text>
+            <text y="40" textAnchor="middle" fontSize={TAMANHO.rotulo} fontWeight="600" fill="var(--muted-foreground)">{no.rotulo}</text>
           </g>
         </g>
       ))}
@@ -147,7 +153,7 @@ function Cartao({ className, atraso, children }) {
   )
 }
 
-const rotulo = 'text-[11px] font-medium text-muted-foreground'
+const rotulo = 'text-legenda font-medium text-muted-foreground'
 
 export default function AnimacaoGestao({ className }) {
   return (
@@ -178,50 +184,53 @@ export default function AnimacaoGestao({ className }) {
       <Rede />
 
       <Cartao className="top-[1%] left-[31%]" atraso={1.3}>
-        <p className={rotulo}>Projetos no prazo</p>
+        <p className={rotulo}>Clientes em atendimento</p>
         <div className="mt-1.5 flex items-center gap-3">
           <svg viewBox="0 0 44 44" className="size-11 -rotate-90">
             <circle cx="22" cy="22" r="17" fill="none" stroke="var(--muted)" strokeWidth="5" />
             <circle cx="22" cy="22" r="17" fill="none" stroke="var(--primary)" strokeWidth="5" strokeLinecap="round"
-              pathLength="100" strokeDasharray="100" strokeDashoffset="13"
+              pathLength="100" strokeDasharray="100" strokeDashoffset="10"
               style={{ animation: 'anel 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) 1.6s both' }} />
           </svg>
           <div>
-            <p className="text-lg leading-none font-bold tabular-nums"><Contador ate={87} sufixo="%" atraso={1.6} /></p>
-            <p className="mt-1 text-[10px] font-semibold text-positive">+5 esta semana</p>
+            <p className="text-janela leading-none font-bold tabular-nums"><Contador ate={38} atraso={1.6} /></p>
+            <p className="mt-1 text-mini font-semibold text-muted-foreground">4 sem consultor</p>
           </div>
         </div>
       </Cartao>
 
       <Cartao className="top-[36%] -right-[3%]" atraso={1.5}>
         <div className="flex items-center justify-between">
-          <p className={rotulo}>Crescimento</p>
-          <span className="rounded-full bg-positive-soft px-1.5 py-0.5 text-[10px] font-bold text-positive tabular-nums"><Contador ate={24} prefixo="+" sufixo="%" atraso={1.8} /></span>
+          <p className={rotulo}>Check-ins da semana</p>
+          <span className="rounded-full bg-positive-soft px-1.5 py-0.5 text-mini font-bold text-positive tabular-nums"><Contador ate={26} atraso={1.8} /></span>
         </div>
-        <div className="mt-2 flex h-10 items-end gap-1">
-          {[40, 55, 48, 70, 82, 100].map((altura, i) => (
-            <span key={i} className="flex-1 origin-bottom rounded-t-[3px] bg-primary"
-              style={{ height: `${altura}%`, opacity: 0.35 + i * 0.13, animation: `crescer 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) ${1.8 + i * 0.08}s both` }} />
+        <div className="mt-2 grid h-10 grid-cols-5 items-end gap-1">
+          {[55, 80, 62, 100, 70].map((altura, i) => (
+            <span key={i} className="origin-bottom rounded-t-[3px] bg-primary"
+              style={{ height: `${altura}%`, opacity: 0.4 + i * 0.13, animation: `crescer 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) ${1.8 + i * 0.08}s both` }} />
           ))}
+        </div>
+        <div className="mt-1 grid grid-cols-5 gap-1 text-center text-mini text-muted-foreground">
+          {['S', 'T', 'Q', 'Q', 'S'].map((dia, i) => <span key={i}>{dia}</span>)}
         </div>
       </Cartao>
 
       <Cartao className="top-[38%] -left-[3%]" atraso={1.7}>
-        <p className={rotulo}>Sprint atual</p>
+        <p className={rotulo}>Ocupação do time</p>
         <div className="mt-2 grid gap-1.5">
           {[
-            ['Diagnóstico', 100],
-            ['Plano de ação', 72],
-            ['Implantação', 38],
-          ].map(([nome, feito], i) => (
+            ['Ana', 92],
+            ['Bruno', 74],
+            ['Carla', 51],
+          ].map(([nome, ocupacao], i) => (
             <div key={nome}>
-              <div className="flex justify-between text-[10px] text-muted-foreground">
+              <div className="flex justify-between text-mini text-muted-foreground">
                 <span>{nome}</span>
-                <span className="font-semibold text-foreground">{feito}%</span>
+                <span className="font-semibold text-foreground tabular-nums">{ocupacao}%</span>
               </div>
               <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-muted">
                 <div className="h-full origin-left rounded-full bg-primary"
-                  style={{ width: `${feito}%`, animation: `encher 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) ${2 + i * 0.15}s both` }} />
+                  style={{ width: `${ocupacao}%`, animation: `encher 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) ${2 + i * 0.15}s both` }} />
               </div>
             </div>
           ))}
@@ -230,27 +239,24 @@ export default function AnimacaoGestao({ className }) {
 
       <Cartao className="bottom-[0%] left-[31%]" atraso={1.9}>
         <div className="flex items-center justify-between">
-          <p className={rotulo}>Time Implantação</p>
+          <p className={rotulo}>Agenda de hoje</p>
           <span className="relative flex size-2">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-green-400 opacity-75" />
             <span className="relative inline-flex size-2 rounded-full bg-green-500" />
           </span>
         </div>
-        <div className="mt-2 flex items-center">
+        <div className="mt-2 grid gap-1.5">
           {[
-            ['AL', '#2563eb'],
-            ['BR', '#7c3aed'],
-            ['CS', '#db2777'],
-            ['GG', '#0891b2'],
-          ].map(([sigla, cor], i) => (
-            <span key={sigla} className={cn('grid size-6 place-items-center rounded-full text-[9px] font-bold text-white ring-2 ring-card', i && '-ml-1.5')}
-              style={{ backgroundColor: cor }}>
-              {sigla}
-            </span>
+            ['09:00', 'Reunião · Alfa Net', 'bg-primary'],
+            ['14:30', 'Check-in · Rede Sul', 'bg-[#22c55e]'],
+          ].map(([hora, evento, cor]) => (
+            <div key={hora} className="flex min-w-0 items-center gap-2 text-mini">
+              <span className={cn('h-5 w-1 shrink-0 rounded-full', cor)} />
+              <span className="font-semibold tabular-nums">{hora}</span>
+              <span className="truncate text-muted-foreground">{evento}</span>
+            </div>
           ))}
-          <span className="-ml-1.5 grid size-6 place-items-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground ring-2 ring-card">+2</span>
         </div>
-        <p className="mt-1.5 text-[10px] text-muted-foreground">6 pessoas · 2 projetos</p>
       </Cartao>
     </div>
   )

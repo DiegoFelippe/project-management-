@@ -29,6 +29,8 @@ export function useTema({ aoTrocar } = {}) {
     guardarTema(novo)
     aplicarTema(novo)
     setTema(novo)
+    // os outros botões de tema abertos (a barra de cima e o ☰ do celular) acompanham a troca
+    window.dispatchEvent(new CustomEvent(EVENTO_TEMA, { detail: novo }))
     aoTrocar?.(novo)
   }
 

@@ -182,10 +182,10 @@ enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-minimum_password_length = 8
+minimum_password_length = 10
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
-password_requirements = ""
+password_requirements = "lower_upper_letters_digits_symbols"
 
 # Configure passkey sign-ins.
 # [auth.passkey]
@@ -313,8 +313,8 @@ max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
 [auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
+enroll_enabled = true
+verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]
@@ -446,6 +446,20 @@ verify_jwt = false
 
 # Volta do "Conectar com Google": quem chega é o navegador vindo do Google, sem token; vale o estado.
 [functions.integracoes-google]
+verify_jwt = false
+
+# Google de cada pessoa (agenda): a função confere o token de quem chama; cada pessoa mexe só no próprio Google.
+# A volta do Google cai na tela /calendario (GOOGLE_PESSOA_REDIRECT_URI), que manda o código para cá com o login.
+[functions.google-pessoa]
+verify_jwt = false
+
+# Eventos da agenda: a função confere o token de quem chama e grava no Google do organizador antes do banco.
+[functions.agenda]
+verify_jwt = false
+
+# Depois da reunião: o pg_cron chama com o segredo do Vault (x-rotina-segredo), sem token de usuário; "Buscar agora" e
+# "Tentar de novo" vêm da tela, e a função confere o token de quem chama.
+[functions.reunioes-depois]
 verify_jwt = false
 
 [functions.gerenciar-acesso]

@@ -15,6 +15,8 @@ function Toaster(props) {
     <Sonner
       theme={escuro ? 'dark' : 'light'}
       position="bottom-center"
+      // no celular, acima da barra de baixo do menu (e da área segura do iPhone)
+      mobileOffset={{ bottom: 'calc(4.75rem + env(safe-area-inset-bottom))' }}
       className="toaster group"
       style={{
         '--normal-bg': 'var(--popover)',
@@ -22,7 +24,7 @@ function Toaster(props) {
         '--normal-border': 'var(--border)',
         '--border-radius': '14px',
       }}
-      toastOptions={{ classNames: { toast: 'shadow-lg! font-sans!', title: 'font-semibold!' } }}
+      toastOptions={{ classNames: { toast: 'shadow-lg! font-sans! text-corpo!', title: 'font-semibold!', actionButton: 'text-rotulo!', cancelButton: 'text-rotulo!' } }}
       {...props}
     />
   )

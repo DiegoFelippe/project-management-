@@ -3,7 +3,7 @@ import { Falha } from './http.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PAPEIS_CRIAVEIS = ['admin', 'gestor', 'pessoa'] as const
+const PAPEIS_CRIAVEIS = ['central', 'admin', 'gestor', 'pessoa'] as const
 
 export type Forma = 'convite' | 'senha'
 
@@ -16,7 +16,22 @@ export type DadosAcesso = {
   senha?: string
   redirectTo: string
   consultoria_id?: string
+  ficha: Ficha
+  exige_2fa: boolean
 }
+
+export type Ficha = {
+  telefone?: string | null
+  cidade?: string | null
+  uf?: string | null
+  cargo?: string | null
+  data_entrada?: string | null
+  tipos_de_consultoria?: string[]
+}
+
+export const TIPOS_DE_CONSULTORIA = ['gestao', 'sucesso_do_cliente', 'assessoria_juridica', 'gestao_de_pessoas'] as const
+
+const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO']
 
 function invalido(campo: string): never {
   throw new Falha(400, 'dados_invalidos', { campo })
@@ -39,9 +54,22 @@ export function validarForma(valor: unknown, campo = 'forma'): Forma {
   return valor
 }
 
+// Lista exata de símbolos do GoTrue (igual a SIMBOLOS em src/lib/senha.js; src/lib/senha.vetores.json guarda os casos).
+const SIMBOLOS = '!@#$%^&*()_+-=[]{};\'\\:"|<>?,./`~'
+
+// Mesmas regras de src/lib/senha.js (só Forte vale): 10+ caracteres, A-Z, a-z, 0-9 e um símbolo; sem espaço nas pontas.
+export function senhaForte(valor: string): boolean {
+  return valor.length >= 10 && valor === valor.trim() &&
+    /[A-Z]/.test(valor) && /[a-z]/.test(valor) && /[0-9]/.test(valor) &&
+    [...valor].some((c) => SIMBOLOS.includes(c))
+}
+
+// Limite do Auth (bcrypt): 72 bytes em UTF-8 (letra com acento ocupa dois), como TAMANHO_MAXIMO em src/lib/senha.js.
+const passaDoLimite = (valor: string) => new TextEncoder().encode(valor).length > 72
+
 export function validarSenha(forma: Forma, valor: unknown, campo = 'senha'): string | undefined {
   if (forma !== 'senha') return undefined
-  if (typeof valor !== 'string' || valor.length < 8 || valor.length > 72) invalido(campo)
+  if (typeof valor !== 'string' || passaDoLimite(valor) || !senhaForte(valor)) invalido(campo)
   return valor
 }
 
@@ -56,9 +84,63 @@ export function validarRedirect(valor: unknown): string {
   return valor
 }
 
+export function validarSimNao(valor: unknown, campo: string): boolean {
+  if (typeof valor !== 'boolean') invalido(campo)
+  return valor
+}
+
 export function validarUuid(valor: unknown, campo: string): string {
   if (typeof valor !== 'string' || !UUID.test(valor)) invalido(campo)
   return valor
+}
+
+// Texto opcional: ausente ou vazio → null; passou do limite → 400.
+function textoOpcional(valor: unknown, campo: string, max: number): string | null {
+  if (valor == null) return null
+  if (typeof valor !== 'string') invalido(campo)
+  const texto = valor.trim()
+  if (!texto) return null
+  if (texto.length > max) invalido(campo)
+  return texto
+}
+
+export function validarUf(valor: unknown, campo = 'uf'): string | null {
+  const uf = textoOpcional(valor, campo, 2)?.toUpperCase() ?? null
+  if (uf && !UFS.includes(uf)) invalido(campo)
+  return uf
+}
+
+// Data AAAA-MM-DD, real e não futura (hoje em São Paulo).
+export function validarDataEntrada(valor: unknown, campo = 'data_entrada'): string | null {
+  const texto = textoOpcional(valor, campo, 10)
+  if (texto === null) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto)
+  if (!m) invalido(campo)
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]))
+  if (d.getUTCFullYear() !== +m[1] || d.getUTCMonth() !== +m[2] - 1 || d.getUTCDate() !== +m[3]) invalido(campo)
+  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+  if (texto > hoje) invalido(campo)
+  return texto
+}
+
+// Lista de tipos de consultoria: só os quatro valores, sem repetir. [] limpa.
+export function validarTipos(valor: unknown, campo = 'tipos_de_consultoria'): string[] {
+  if (!Array.isArray(valor)) invalido(campo)
+  for (const t of valor) if (typeof t !== 'string' || !(TIPOS_DE_CONSULTORIA as readonly string[]).includes(t)) invalido(campo)
+  if (new Set(valor).size !== valor.length) invalido(campo)
+  return valor as string[]
+}
+
+// Só os campos que vieram no corpo entram (assim "editar" não apaga o que não foi enviado).
+export function validarFicha(corpo: Record<string, unknown>): Ficha {
+  const ficha: Ficha = {}
+  if (corpo.telefone !== undefined) ficha.telefone = textoOpcional(corpo.telefone, 'telefone', 30)
+  if (corpo.cidade !== undefined) ficha.cidade = textoOpcional(corpo.cidade, 'cidade', 120)
+  if (corpo.uf !== undefined) ficha.uf = validarUf(corpo.uf)
+  if (corpo.cargo !== undefined) ficha.cargo = textoOpcional(corpo.cargo, 'cargo', 80)
+  if (corpo.data_entrada !== undefined) ficha.data_entrada = validarDataEntrada(corpo.data_entrada)
+  if (corpo.tipos_de_consultoria !== undefined) ficha.tipos_de_consultoria = validarTipos(corpo.tipos_de_consultoria)
+  return ficha
 }
 
 export function validarAcesso(corpo: Record<string, unknown>): DadosAcesso {
@@ -80,5 +162,7 @@ export function validarAcesso(corpo: Record<string, unknown>): DadosAcesso {
     senha: validarSenha(forma, corpo.senha),
     redirectTo: validarRedirect(corpo.redirectTo),
     consultoria_id: corpo.consultoria_id == null ? undefined : validarUuid(corpo.consultoria_id, 'consultoria_id'),
+    ficha: validarFicha(corpo),
+    exige_2fa: corpo.exige_2fa === undefined ? false : validarSimNao(corpo.exige_2fa, 'exige_2fa'),
   }
 }

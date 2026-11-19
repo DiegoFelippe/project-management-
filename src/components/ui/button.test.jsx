@@ -48,3 +48,12 @@ describe('botões animados', () => {
     expect(semAnimacao).toEqual([])
   })
 })
+
+describe('tipografia do botão', () => {
+  it('usa o tamanho nomeado da escala (text-corpo), não um px avulso', () => {
+    render(<Button>Salvar</Button>)
+    const botao = screen.getByRole('button', { name: 'Salvar' })
+    expect(botao).toHaveClass('text-corpo')
+    expect(botao.className).not.toMatch(/text-\[\d/)
+  })
+})
