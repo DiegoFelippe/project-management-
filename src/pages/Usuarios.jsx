@@ -31,7 +31,7 @@ import { indicadoresDeUsuarios } from '@/data/indicadores'
 import { adicionarMembro, listarOpcoesDeTimes, removerMembro } from '@/data/times'
 import { buscarUsuario, criarAcesso, gerenciarAcesso, listarUsuarios, reenviarConvite } from '@/data/usuarios'
 import { formatarHoras, formatarOcupacao } from '@/lib/horas'
-import { mesAtual, rotuloCurto } from '@/lib/mes'
+import { mesAtual, rotuloCurto, rotuloDoMes } from '@/lib/mes'
 import { ehPapelDeConsultoria, veTudo } from '@/lib/papeis'
 import { situacao } from '@/lib/situacao'
 import { OPCOES_DE_TIPO, rotulosDosTipos } from '@/lib/tiposDeConsultoria'
@@ -39,23 +39,26 @@ import { useLeitura } from '@/lib/useLeitura'
 import { useListaPaginada } from '@/lib/useListaPaginada'
 
 const ABAS = [{ valor: 'ativos', rotulo: 'Ativos' }, { valor: 'desativados', rotulo: 'Desativados' }]
+// A Ocupação da barra (só nos ativos): "Acima de 100%" é o recorte do cartão, no mês da tela (pessoas_acima_de_100).
+const OCUPACOES_DO_FILTRO = [{ valor: 'acima', rotulo: 'Acima de 100%' }]
 // O Tipo da barra, com "Sem tipo" no fim: quem é de consultoria e não tem nenhum (o cartão "Sem tipo de consultoria").
 const TIPOS_DO_FILTRO = [...OPCOES_DE_TIPO, { valor: 'sem', rotulo: 'Sem tipo' }]
 
 // Cartões (contados no banco, no recorte de quem vê): seguem a consultoria do filtro e o mês; as abas e o Tipo, não.
-// "Pessoas ativas" e "Sem tipo de consultoria" levam ao filtro da lista (usabilidade, U5): `ir(tipo)` mostra os ativos
-// com aquele Tipo ('' = todos) e `filtro` diz qual vale agora. "Acima de 100%" fica só número: a lista não sabe filtrar
-// pela ocupação do mês sem uma função nova no banco (pendente, relatório do lote C1); a ocupação média também.
+// "Pessoas ativas", "Acima de 100%" e "Sem tipo de consultoria" levam ao filtro da lista (usabilidade, U5): `ir(tipo,
+// ocupacao)` mostra os ativos com aquele Tipo ('' = todos) e aquela Ocupação ('acima' = quem passa de 100% no mês da
+// tela, pela função do banco com a conta do cartão) e `filtro` diz qual vale agora. A ocupação média fica só número.
 const lerNumeros = ({ consultoriaId, mes }) => indicadoresDeUsuarios({ consultoriaId, mes })
 const cartoesDoMes = (n, passado, mes, { ir, filtro } = {}) => [
   { chave: 'ativas', rotulo: 'Pessoas ativas', icone: Users, valor: n?.pessoas_ativas,
-    ...(ir && { destino: () => ir(''), ativo: filtro === 'ativos:' }) },
+    ...(ir && { destino: () => ir(''), ativo: filtro === 'ativos::' }) },
   { chave: 'ocupacao', rotulo: passado ? 'Utilização média do mês' : 'Ocupação média do mês', icone: Gauge, tom: 'ceu',
     valor: n ? formatarOcupacao(n.ocupacao_media) : null, detalhe: `média por pessoa · ${rotuloCurto(mes)}` },
   { chave: 'acima', rotulo: 'Acima de 100%', icone: TrendingUp, tom: 'perigo', valor: n?.acima_de_100,
-    destaque: n?.acima_de_100 > 0 ? 'perigo' : null },
+    destaque: n?.acima_de_100 > 0 ? 'perigo' : null,
+    ...(ir && { destino: () => ir('', 'acima'), ativo: filtro === 'ativos::acima' }) },
   { chave: 'sem_tipo', rotulo: 'Sem tipo de consultoria', icone: Tags, tom: 'aviso', valor: n?.sem_tipo,
-    ...(ir && { destino: () => ir('sem'), ativo: filtro === 'ativos:sem' }) },
+    ...(ir && { destino: () => ir('sem'), ativo: filtro === 'ativos:sem:' }) },
 ]
 
 // Situação é etiqueta ao lado do nome, só quando não é o estado normal ("Ativo" não aparece).
@@ -114,6 +117,7 @@ export default function Usuarios() {
   const [reenviando, setReenviando] = useState(null)
   const [filtro, setFiltro] = useState('ativos')
   const [tipo, setTipo] = useState('')
+  const [ocupacao, setOcupacao] = useState('')
   const [editando, setEditando] = useState(null)
   const [capacidade, setCapacidade] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
@@ -134,9 +138,11 @@ export default function Usuarios() {
   const cartoes = useLeitura(lerNumeros, { consultoriaId: consultoriaId || undefined, mes, versao, versaoNumeros }).dados
 
   // Uma página por vez, filtrada no banco (regra "Escala" no CLAUDE.md). Ativos e desativados têm colunas diferentes:
-  // trocar de aba mostra o carregando.
+  // trocar de aba mostra o carregando. "Acima de 100%" só vale nos ativos e segue o mês da tela.
+  const acima = filtro === 'ativos' && ocupacao === 'acima'
   const { resultado, erro: falhou, paginacao } = useListaPaginada(listarUsuarios,
-    { consultoriaId: consultoriaId || undefined, ativos: filtro === 'ativos', tipo: tipo || undefined },
+    { consultoriaId: consultoriaId || undefined, ativos: filtro === 'ativos', tipo: tipo || undefined,
+      ...(acima && { acima: true, mes }) },
     { versao, limparAoMudar: ['ativos'] })
   const erro = falhou ? 'Não foi possível carregar as pessoas.' : null
 
@@ -187,18 +193,20 @@ export default function Usuarios() {
   const lista = resultado?.itens ?? []
   const total = resultado?.total ?? 0
   // No celular, os filtros da gaveta (auditoria, G6): quantos estão fora do padrão e o Limpar que os volta.
-  const filtrosAtivos = [filtro !== 'ativos', comNumeros && mes !== mesAtual(), Boolean(tipo), ehDono && Boolean(consultoriaId)]
+  const filtrosAtivos = [filtro !== 'ativos', comNumeros && mes !== mesAtual(), Boolean(tipo), acima, ehDono && Boolean(consultoriaId)]
     .filter(Boolean).length
   function limparFiltros() {
     setFiltro('ativos')
     setMes(mesAtual())
     setTipo('')
+    setOcupacao('')
     if (ehDono) setConsultoriaId('')
   }
-  // Cartão que leva ao filtro (U5): os ativos, com o Tipo do cartão; a lista volta à página 1 (o filtro mudou).
-  function irPara(tipoDoCartao) {
+  // Cartão que leva ao filtro (U5): os ativos, com o Tipo e a Ocupação do cartão; a lista volta à página 1 (o filtro mudou).
+  function irPara(tipoDoCartao, ocupacaoDoCartao = '') {
     setFiltro('ativos')
     setTipo(tipoDoCartao)
+    setOcupacao(ocupacaoDoCartao)
   }
 
   // Quem mexe em quem (as Edge Functions conferem de novo): dono → administradores; administrador →
@@ -360,6 +368,17 @@ export default function Usuarios() {
             </div>
           </div>
         </NaGaveta>
+        {comNumeros && (
+          <NaGaveta>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="filtro-ocupacao" className="shrink-0 text-muted-foreground">Ocupação</Label>
+              <div className="w-44">
+                <Seletor id="filtro-ocupacao" tamanho="sm" valor={ocupacao} aoMudar={setOcupacao}
+                  opcoes={OCUPACOES_DO_FILTRO} rotuloTodos="Todas" />
+              </div>
+            </div>
+          </NaGaveta>
+        )}
         {ehDono && <NaGaveta><FiltroConsultoria valor={consultoriaId} aoMudar={setConsultoriaId} /></NaGaveta>}
         {(!ehDono || ehAdminGeral) && (
           <AcaoPrincipal>
@@ -370,13 +389,17 @@ export default function Usuarios() {
         )}
       </BarraDeFiltros>
       <CartoesDeNumeros rotulo="Indicadores dos usuários"
-        cartoes={cartoesDoMes(cartoes, cartoes ? cartoes.passado : mes < mesAtual(), mes, { ir: irPara, filtro: `${filtro}:${tipo}` })} />
+        cartoes={cartoesDoMes(cartoes, cartoes ? cartoes.passado : mes < mesAtual(), mes,
+          { ir: irPara, filtro: `${filtro}:${tipo}:${acima ? 'acima' : ''}` })} />
       {erro && <p role="alert" className="text-corpo text-destructive">{erro}</p>}
       {aviso && <p role="status" className="mb-3 text-corpo text-muted-foreground">{aviso}</p>}
       {comNumeros && erroNumeros && !erro && <p role="status" className="mb-3 text-corpo text-muted-foreground">Não foi possível carregar a capacidade do mês.</p>}
       {!erro && resultado === null && <GraficoCarregando texto="Carregando as pessoas…" className="py-12" />}
       {resultado && lista.length === 0 && (
-        <ListaVazia>{filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}</ListaVazia>
+        <ListaVazia>
+          {acima ? `Ninguém acima de 100% em ${rotuloDoMes(mes).toLowerCase()}.`
+            : filtro === 'ativos' ? 'Ninguém por aqui ainda.' : 'Ninguém desativado.'}
+        </ListaVazia>
       )}
       {lista.length > 0 && (
         <Tabela rotulo="Usuários" larguraMinima={larguraDaTabela({ comNumeros, ehDono })}

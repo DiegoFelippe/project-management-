@@ -844,11 +844,41 @@ describe('Usuários: cartões que levam ao filtro', () => {
     expect(within(cartoes).getByRole('button', { name: /^Pessoas ativas/ })).toHaveAttribute('aria-current', 'true')
   })
 
-  it('"Acima de 100%" e a ocupação média ficam só número (a lista não filtra pela ocupação do mês)', async () => {
+  it('"Acima de 100%" mostra quem passa de 100% no mês (pela função do banco), na página 1; a ocupação média fica só número', async () => {
+    vi.mocked(listarUsuarios).mockResolvedValue({
+      itens: [{ id: 'p1', nome: 'Ana', email: 'ana@x.test', papel: 'pessoa', ativo: true, times: [], consultoria_id: 'c1' }], total: 40,
+    })
     renderizarTela(<Usuarios />, { perfil: admin })
     const cartoes = await cartoesAbaixoDaBarra('Indicadores dos usuários')
     await waitFor(() => expect(numeroDoCartao(cartoes, 'Acima de 100%')).toBe('1'))
-    expect(within(cartoes).getAllByRole('button').map((b) => b.getAttribute('data-cartao'))).toEqual(['ativas', 'sem_tipo'])
+    expect(within(cartoes).getAllByRole('button').map((b) => b.getAttribute('data-cartao'))).toEqual(['ativas', 'acima', 'sem_tipo'])
+    await escolherNoSeletor(userEvent, 'Tipo', 'Gestão')
+    await userEvent.click(await screen.findByRole('button', { name: 'Próxima' }))
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith(expect.objectContaining({ tipo: 'gestao', pagina: 2 })))
+    await userEvent.click(within(cartoes).getByRole('button', { name: 'Acima de 100%: 1. Mostrar na lista' }))
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith(
+      { consultoriaId: 'c1', ativos: true, pagina: 1, tipo: undefined, acima: true, mes: mesAtual() }))
+    expect(screen.getByLabelText('Ocupação')).toHaveTextContent('Acima de 100%')
+    expect(within(cartoes).getByRole('button', { name: /^Acima de 100%/ })).toHaveAttribute('aria-current', 'true')
+    expect(within(cartoes).getByRole('button', { name: /^Pessoas ativas/ })).not.toHaveAttribute('aria-current')
+    // O filtro segue o mês da tela (o mesmo do cartão).
+    await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith(expect.objectContaining({ acima: true, mes: deslocarMes(mesAtual(), -1) })))
+    await userEvent.click(within(cartoes).getByRole('button', { name: 'Pessoas ativas: 6. Mostrar na lista' }))
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: true, pagina: 1, tipo: undefined }))
+    expect(screen.getByLabelText('Ocupação')).toHaveTextContent('Todas')
+  })
+
+  it('o filtro Ocupação da barra: "Acima de 100%" e Todas; some nos desativados; ninguém acima diz o mês', async () => {
+    renderizarTela(<Usuarios />, { perfil: admin })
+    await screen.findByRole('table', { name: 'Usuários' })
+    vi.mocked(listarUsuarios).mockResolvedValue({ itens: [], total: 0 })
+    await escolherNoSeletor(userEvent, 'Ocupação', 'Acima de 100%')
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith(expect.objectContaining({ acima: true, pagina: 1 })))
+    expect(await screen.findByText(`Ninguém acima de 100% em ${rotuloDoMes(mesAtual()).toLowerCase()}.`)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Desativados' }))
+    await waitFor(() => expect(listarUsuarios).toHaveBeenLastCalledWith({ consultoriaId: 'c1', ativos: false, pagina: 1, tipo: undefined }))
+    expect(screen.queryByLabelText('Ocupação')).toBeNull()
   })
 
   it('o Tipo oferece "Sem tipo" no fim', async () => {

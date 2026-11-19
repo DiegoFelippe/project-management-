@@ -13,10 +13,13 @@ const redirectTo = () => `${window.location.origin}/definir-senha`
 
 // Uma página de pessoas (ativas ou desativadas), filtrada e paginada no banco.
 // Os times que quem olha não enxerga vêm nulos e ficam de fora.
-export async function listarUsuarios({ consultoriaId, ativos = true, pagina = 1, tipo } = {}) {
-  let consulta = supabase
-    .from('perfis')
-    .select(CAMPOS, { count: 'exact' })
+// `acima`: só quem passa de 100% de ocupação no mês `mes` (o cartão "Acima de 100%", usabilidade U5). As linhas vêm de
+// pessoas_acima_de_100, com a conta e o recorte do cartão; colunas, filtros, ordem e página são os mesmos.
+export async function listarUsuarios({ consultoriaId, ativos = true, pagina = 1, tipo, acima = false, mes } = {}) {
+  let consulta = (acima
+    ? supabase.rpc('pessoas_acima_de_100', { p_mes: mes ?? null, p_consultoria: consultoriaId || null }, { count: 'exact' })
+      .select(CAMPOS)
+    : supabase.from('perfis').select(CAMPOS, { count: 'exact' }))
     .neq('papel', 'dono')
     .eq('ativo', ativos)
     .order('nome')

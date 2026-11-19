@@ -52,6 +52,45 @@ describe('listarUsuarios: tipo de consultoria', () => {
   })
 })
 
+// Usabilidade, U5: o cartão "Acima de 100%" leva a este filtro. As linhas vêm de pessoas_acima_de_100 (a conta e o recorte
+// do cartão, no mês da tela); colunas, filtros, ordem e página são os da lista.
+describe('listarUsuarios: acima de 100%', () => {
+  beforeEach(() => {
+    vi.mocked(supabase.rpc).mockImplementation((...argumentos) => {
+      const consulta = banco.from('perfis (pela função)')
+      banco.chamadas.push(['rpc', ...argumentos])
+      return consulta
+    })
+  })
+
+  it('pede ao banco as pessoas acima de 100% no mês, com os mesmos campos, filtros, ordem e página', async () => {
+    banco.resposta = { data: [{ id: 'p1', nome: 'Ana', times: [] }], error: null, count: 16 }
+    const { itens, total } = await listarUsuarios({ pagina: 2, acima: true, mes: '2026-10-01', consultoriaId: 'c1', tipo: 'gestao' })
+    expect(banco.chamou('rpc', 'pessoas_acima_de_100', { p_mes: '2026-10-01', p_consultoria: 'c1' }, { count: 'exact' })).toBe(true)
+    expect(supabase.from).not.toHaveBeenCalledWith('perfis')
+    expect(banco.chamadas.find(([m]) => m === 'select')[1]).toContain('tipos_de_consultoria')
+    expect(banco.chamou('eq', 'ativo', true)).toBe(true)
+    expect(banco.chamou('neq', 'papel', 'dono')).toBe(true)
+    expect(banco.chamou('contains', 'tipos_de_consultoria', ['gestao'])).toBe(true)
+    expect(banco.chamou('order', 'nome')).toBe(true)
+    expect(banco.chamou('range', 15, 29)).toBe(true)
+    expect({ itens, total }).toEqual({ itens: [{ id: 'p1', nome: 'Ana', times: [] }], total: 16 })
+  })
+
+  it('a central sem consultoria escolhida pede todas', async () => {
+    banco.resposta = { data: [], error: null, count: 0 }
+    await listarUsuarios({ pagina: 1, acima: true, mes: '2026-11-01' })
+    expect(banco.chamou('rpc', 'pessoas_acima_de_100', { p_mes: '2026-11-01', p_consultoria: null }, { count: 'exact' })).toBe(true)
+  })
+
+  it('sem o filtro, a lista continua lendo perfis direto', async () => {
+    banco.resposta = { data: [], error: null, count: 0 }
+    await listarUsuarios({ pagina: 1 })
+    expect(supabase.rpc).not.toHaveBeenCalled()
+    expect(banco.chamou('from', 'perfis')).toBe(true)
+  })
+})
+
 describe('buscarUsuario', () => {
   it('carrega uma pessoa por id (o RLS decide se ela aparece) com os times achatados', async () => {
     banco.resposta = { data: { id: 'p1', nome: 'Ana', times: [{ time: { id: 't1', nome: 'X' } }] }, error: null }
