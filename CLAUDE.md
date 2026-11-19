@@ -480,6 +480,9 @@ Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as
   procura no banco em todas as situações (a central também nos arquivados, `aba: 'qualquer'`; a gestão nas da
   consultoria; o consultor continua nos dele), paginada, diz "Buscando em todas as situações" e mostra a situação de
   cada linha. Sem busca, vale a situação escolhida, e a lista vazia diz o próximo passo com "Ver" (17/11, auditoria).
+- **Na lista de Clientes, o nome não tem sublinhado** (um clique abre a página do cliente; no hover só a cor muda) e o
+  **duplo clique na linha edita** (o mesmo Editar do lápis, só para quem edita os dados: central e dono; em cima do nome,
+  de um botão ou de um campo não conta). Pedido do Diego, 18/11. `Linha` aceita `aoDuploClique` para isso.
 - **Ocupação, capacidade, sugestões e o painel do Início vêm do banco**: `consultores_por_ocupacao`, `consultorias_por_ocupacao`,
   `ocupacao_das_pessoas` (a lista de Usuários) e `painel_do_inicio` (os números do Início). Nunca recalcular na tela.
 
