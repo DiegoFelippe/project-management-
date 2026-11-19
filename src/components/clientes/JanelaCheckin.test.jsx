@@ -201,6 +201,18 @@ describe('JanelaCheckin: lançar horas', () => {
         inicio: new Date('2026-11-09T23:00').toISOString(), fim: new Date('2026-11-10T01:00').toISOString(), descricao: 'Virada de sistema',
       })
     })
+
+    // Só uma sessão curta vira o dia: 10:00 → 09:00 é engano de digitação (seriam 23 h), não uma madrugada.
+    it('fim antes do início com mais de 12 h na virada continua sendo erro (10:00 → 09:00)', async () => {
+      const { aoSalvar, janela } = abrir()
+      await escolherHora(userEvent, 'Início', '10:00')
+      await escolherHora(userEvent, 'Fim', '09:00')
+      expect(within(janela).queryByText(/dia seguinte/)).toBeNull()
+      await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Engano')
+      await enviar(janela)
+      expect(aoSalvar).not.toHaveBeenCalled()
+      expect(within(janela).getByLabelText('Fim')).toHaveAccessibleDescription(/O fim precisa ser depois do início\./)
+    })
   })
 
   // Usabilidade, U4.

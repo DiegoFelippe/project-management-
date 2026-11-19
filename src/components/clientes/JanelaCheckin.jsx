@@ -125,8 +125,10 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
   const comDataDoFim = checkout || iniciais.dataFim !== iniciais.data
   // Lançar horas sem Data do fim (revisão do lote F): um fim antes do início é do dia seguinte, como num ponto (Ontem
   // 23:00 → 01:00 = 2 h). Mostrar a Data do fim aqui obrigaria a acertar duas datas a cada "Ontem", e quase todo
-  // atendimento acaba no mesmo dia; a Duração ao lado do Fim diz que passou da meia-noite.
-  const viraODia = lancar && Boolean(data && inicio && fim) && fim < inicio
+  // atendimento acaba no mesmo dia; a Duração ao lado do Fim diz que passou da meia-noite. Só vira o dia uma sessão de até
+  // 12 h na virada: 10:00 → 09:00 (23 h) é engano de digitação e continua com o erro do fim.
+  const minutos = (hora) => Number(hora.slice(0, 2)) * 60 + Number(hora.slice(3, 5))
+  const viraODia = lancar && Boolean(data && inicio && fim) && fim < inicio && minutos(fim) + 24 * 60 - minutos(inicio) <= 12 * 60
   const diaDoFim = comDataDoFim ? dataFim : viraODia ? somarDias(data, 1) : data
   const mudouInicio = data !== iniciais.data || inicio !== iniciais.inicio
   const mudouFim = diaDoFim !== iniciais.dataFim || fim !== iniciais.fim
