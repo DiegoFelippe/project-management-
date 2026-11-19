@@ -101,14 +101,20 @@ relatório lista: sem cor cheia além de botões; ordem das séries; marcas leve
   piso que o relatório justifica para marca com número escrito; estados), ver FALHAR; tokens; regras; `npm test`, lint,
   build; navegador Início e Clientes claro/escuro. Commit `Cores: paleta Tropical (tokens, moldura de volta, ordem das séries e regras)`.
 
-### Task 4: Componentes de volta ao suave e número escrito nos gráficos
+### Task 4: Componentes de volta ao modelo atual (suave), com as cores Tropical
 
-Depende da Task 3. **Files:** os cinco componentes que o relatório da Leve lista (de cheio para suave: ladrilhos dos
-cartões e da faixa Hoje, selos, etiquetas/contadores do quadro, número da etapa, avatares se for o caso), e os gráficos
-que precisam do número ao lado da marca (totais das colunas empilhadas, totais por pessoa/situação na legenda, valores de
-hoje e da projeção na linha), com os testes.
+**Diego (19:35): "Eu quero o modelo atual, com as cores do Tropical."** O app fica com a estrutura de antes da Viva (a
+opção "Atual" do protótipo): nada de número novo ao lado das marcas dos gráficos (a marca clara se apoia no "Ver em
+tabela" e na dica que todo gráfico já tem). Muda só a cor.
 
-- [ ] Testes primeiro (nenhuma classe `bg-*-cheio` com `text-*-sobre` claro sobrando onde agora é suave; número escrito
-  em cada gráfico de marcas leves), ver FALHAR; escrever; `npm test` (guardas), lint, build; navegador como central,
-  gestor e consultor em todas as telas e abas do cliente, 1440/390, claro e escuro, comparando com o protótipo
-  `?cores=tropical`. Commit `Cores: componentes no suave e número escrito nos gráficos (Tropical)`.
+Depende da Task 3. **Files:** os componentes que `a7a0cb6` passou para o cheio (ladrilhos dos cartões e da faixa Hoje,
+selos/badge, etiquetas e contadores do quadro, número da etapa, fluxograma e selos da tarefa, abas, ícone de Filtros,
+tabela), com os testes. Cada um volta ao **visual de antes de `a7a0cb6`** (fundo suave + texto e ícone escuros; o azul
+do ladrilho no suave azul, não no cheio com branco), mas pelos tokens (o quadro não volta às classes `bg-<cor>-50` do
+Tailwind). Nenhuma mudança de estrutura nos gráficos.
+
+- [ ] Testes primeiro (nenhum `bg-primary-cheio`/`bg-<estado>-cheio` com texto branco fora dos botões; ladrilhos, selos,
+  etiquetas, número da etapa e abas no suave com o texto escuro; o quadro só com tokens), ver FALHAR; escrever;
+  `npm test` (guardas), lint, build; navegador como central, gestor e consultor em todas as telas e abas do cliente,
+  1440/390, claro e escuro, comparando com o protótipo `?cores=atual` (estrutura) e `?cores=tropical` (cores). Commit
+  `Cores: componentes de volta ao suave (modelo atual, cores Tropical)`.
