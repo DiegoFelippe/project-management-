@@ -113,13 +113,13 @@ describe('HojeDoCliente', () => {
     }
   })
 
-  it('os selos de estado são sólidos: atenção no âmbar, em dia no verde e atrasadas no vermelho (cheio + sobre)', () => {
+  it('os selos de estado são suaves: atenção no âmbar, em dia no verde e atrasadas no vermelho (fundo suave + texto do estado)', () => {
     tela()
     const selo = (texto) => screen.getByText(texto, { selector: '[data-slot="badge"]' })
-    expect(selo('vai passar: ≈ 34 h')).toHaveClass('bg-notice-cheio', 'text-sobre-notice')
-    expect(selo('em dia')).toHaveClass('bg-positive-cheio', 'text-sobre-positive')
-    expect(selo('3 atrasadas')).toHaveClass('bg-destructive-cheio', 'text-sobre-destructive')
-    expect(selo('3 atrasadas').className).not.toMatch(/bg-destructive\/10/)
+    expect(selo('vai passar: ≈ 34 h')).toHaveClass('bg-notice-soft', 'text-notice')
+    expect(selo('em dia')).toHaveClass('bg-positive-soft', 'text-positive')
+    expect(selo('3 atrasadas')).toHaveClass('bg-destructive-soft', 'text-destructive')
+    for (const t of ['vai passar: ≈ 34 h', 'em dia', '3 atrasadas']) expect(selo(t).className).not.toMatch(/-cheio|text-sobre/)
   })
 
   it('passou da previsão: o número e o medidor ficam vermelhos', () => {

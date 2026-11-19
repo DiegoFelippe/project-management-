@@ -23,6 +23,7 @@ const semanaDe = (dia) => DIAS_DA_SEMANA[diaDaSemana(dia)].toLowerCase()
 const comSemana = (dia) => `${semanaDe(dia)}, ${diaMes(dia)}`
 // Os selos quebram a linha dentro do cartão (a 360 px o cartão tem ~134 px por dentro) em vez de passar da borda.
 const SELO = 'h-auto max-w-full justify-start whitespace-normal rounded-lg text-left'
+const SELO_PERIGO = `${SELO} border-transparent bg-destructive-soft text-destructive`
 // O quadradinho do ícone de cada cartão, num tom da paleta: sólido, o cheio com o ícone no "sobre" (cores vivas, 19/11).
 const TONS = {
   azul: 'bg-cor-azul-cheio text-cor-azul-sobre',
@@ -103,7 +104,7 @@ function Previsao({ previsao, ...dica }) {
 const SELO_DO_CHECKIN = {
   em_dia: <Badge variant="positive" className={SELO}><Check aria-hidden="true" />em dia</Badge>,
   atencao: <Badge variant="notice" className={SELO}><TriangleAlert aria-hidden="true" />atenção</Badge>,
-  em_risco: <Badge variant="destructive" className={SELO}><TriangleAlert aria-hidden="true" />em risco</Badge>,
+  em_risco: <Badge variant="outline" className={SELO_PERIGO}><TriangleAlert aria-hidden="true" />em risco</Badge>,
 }
 
 function UltimoCheckin({ checkin, hoje, ...dica }) {
@@ -229,7 +230,7 @@ function Checklist({ checklist, podeAplicar, className, ...dica }) {
         { valor: andamento, tom: 'andamento' }, { valor: pausadas, tom: 'pausada' }, { valor: aFazer, tom: 'afazer' }, { valor: atrasadas, tom: 'atrasada' }]} />
       <Rodape>
         {atrasadas
-          ? <Badge variant="destructive" className={SELO}><TriangleAlert aria-hidden="true" />{plural(atrasadas, 'atrasada', 'atrasadas')}</Badge>
+          ? <Badge variant="outline" className={SELO_PERIGO}><TriangleAlert aria-hidden="true" />{plural(atrasadas, 'atrasada', 'atrasadas')}</Badge>
           : <Badge variant="positive" className={SELO}><Check aria-hidden="true" />nada atrasado</Badge>}
         {proxima && <span className="tabular-nums">{`próxima ${diaMes(proxima.vence_em)}`}</span>}
         {naoSeAplica > 0 && <span>{naoSeAplicaEmPalavras(naoSeAplica)}</span>}

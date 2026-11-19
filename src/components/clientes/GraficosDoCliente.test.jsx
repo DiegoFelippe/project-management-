@@ -266,20 +266,20 @@ describe('GraficosDoCliente', () => {
     expect(seis.querySelector('[data-referencia-horizontal]')).not.toBeNull()
   })
 
-  it('horas por mês: o mês que passou da previsão em vermelho (com ▲ e o número), o atual em azul, os outros em turquesa', async () => {
+  it('horas por mês: o mês que passou da previsão em vermelho (com ▲ e o número), o atual em azul, os outros em lima', async () => {
     tela()
     const seis = cartao('Últimos 6 meses')
     await waitFor(() => expect(seis.querySelectorAll('[data-coluna]')).toHaveLength(5))
     // jul, ago (32 h > 30 h de previsão), set, out e nov (o mês de hoje).
     expect([...seis.querySelectorAll('[data-coluna]')].map((c) => c.style.fill))
-      .toEqual(['var(--cor-turquesa-forte)', 'var(--grafico-acima)', 'var(--cor-turquesa-forte)', 'var(--cor-turquesa-forte)', ''])
+      .toEqual(['var(--cor-indigo-forte)', 'var(--grafico-acima)', 'var(--cor-indigo-forte)', 'var(--cor-indigo-forte)', ''])
     expect(within(seis).getByRole('img', { name: 'ago/26: 32 h (passou da previsão)' })).toBeInTheDocument()
     expect([...seis.querySelectorAll('svg text')].map((t) => t.textContent)).toContain('▲ 32')
     expect(within(within(seis).getByRole('list', { name: 'Legenda' })).getAllByRole('listitem').map((l) => l.textContent))
       .toEqual(['Meses anteriores', 'Este mês (até hoje)', 'Passou da previsão', 'Previsão atual (30 h)'])
   })
 
-  it('horas por mês num mês passado: o escolhido em azul; num período, os de fora esmaecidos em turquesa (sem vermelho)', async () => {
+  it('horas por mês num mês passado: o escolhido em azul; num período, os de fora esmaecidos em lima (sem vermelho)', async () => {
     const { unmount } = tela({ periodo: OUTUBRO })
     let meses = cartao('Últimos 6 meses · até out/26')
     await waitFor(() => expect(meses.querySelectorAll('[data-coluna]')).toHaveLength(5))
@@ -289,9 +289,9 @@ describe('GraficosDoCliente', () => {
     tela({ periodo: ULTIMOS_30 })
     meses = cartao('Horas por mês · Últimos 30 dias')
     await waitFor(() => expect(meses.querySelectorAll('[data-coluna]')).toHaveLength(5))
-    // ago/26 passou da previsão, mas está fora do período: turquesa esmaecido, sem ▲.
+    // ago/26 passou da previsão, mas está fora do período: lima esmaecido, sem ▲.
     expect([...meses.querySelectorAll('[data-coluna]')].map((c) => c.style.fill))
-      .toEqual(['var(--cor-turquesa-forte)', 'var(--cor-turquesa-forte)', 'var(--cor-turquesa-forte)', 'var(--cor-turquesa-forte)', ''])
+      .toEqual(['var(--cor-indigo-forte)', 'var(--cor-indigo-forte)', 'var(--cor-indigo-forte)', 'var(--cor-indigo-forte)', ''])
     expect([...meses.querySelectorAll('svg text')].map((t) => t.textContent)).not.toContain('▲ 32')
   })
 
@@ -312,7 +312,7 @@ describe('GraficosDoCliente', () => {
     expect([...semanas.querySelectorAll('svg text')].map((t) => t.textContent)).toEqual(expect.arrayContaining(['5', '3']))
   })
 
-  it('dias com check-in: calendário de calor semanas × dias do mês, em turquesa; o que não é do mês e o que não chegou fica em branco', async () => {
+  it('dias com check-in: calendário de calor semanas × dias do mês, em ciano; o que não é do mês e o que não chegou fica em branco', async () => {
     const usuario = userEvent.setup()
     tela()
     const calor = await screen.findByRole('group', { name: 'Dias com check-in · Novembro de 2026' })
@@ -320,7 +320,7 @@ describe('GraficosDoCliente', () => {
     expect(calor.querySelectorAll('[data-celula]')).toHaveLength(19)
     expect([...calor.querySelectorAll('[data-rotulo-y]')].map((t) => t.textContent)).toEqual(['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'])
     expect([...calor.querySelectorAll('[data-rotulo-x]')].map((t) => t.textContent)).toEqual(['26/10', '02/11', '09/11', '16/11', '23/11', '30/11'])
-    expect(calor.querySelector('[data-celula="6-0"]').style.fill).toBe('var(--cor-turquesa-forte)') // dom, 01/11
+    expect(calor.querySelector('[data-celula="6-0"]').style.fill).toBe('var(--grafico-calor-ciano)') // dom, 01/11
     expect(calor.querySelector('[data-celula="0-0"]')).toBeNull() // seg, 26/10: fora do período
     expect(calor.querySelector('[data-celula="4-3"]')).toBeNull() // sex, 20/11: ainda não chegou
     expect(cartao('Dias com check-in')).toHaveTextContent('19 dias com check-in no mês · mais horas no domingo (3 h)')
@@ -363,7 +363,7 @@ describe('GraficosDoCliente', () => {
     expect([...financeiro.querySelectorAll('[data-parte]')].map((p) => [p.dataset.parte, p.style.flexGrow]))
       .toEqual([['feita', '4'], ['nsa', '1'], ['andamento', '2'], ['pausada', '1'], ['afazer', '7'], ['atrasada', '3']])
     expect(financeiro).toHaveTextContent('5 de 18')
-    expect(financeiro.querySelector('[data-icone="atrasada"]')).toHaveClass('text-destructive-cheio')
+    expect(financeiro.querySelector('[data-icone="atrasada"]')).toHaveClass('text-grafico-acima')
     const diagnostico = within(etapas).getByRole('img', { name: 'Diagnóstico: 8 de 10 resolvidas' }).closest('li')
     expect(diagnostico.querySelector('[data-icone]')).toBeNull()
     const legenda = within(within(etapas).getByRole('list', { name: 'Legenda' })).getAllByRole('listitem')

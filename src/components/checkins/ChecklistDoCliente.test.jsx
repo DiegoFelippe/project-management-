@@ -133,8 +133,10 @@ describe('ChecklistDoCliente: com modelo', () => {
     tela(consultor)
     const diagnostico = await screen.findByRole('region', { name: '1 · Diagnóstico' })
     expect(diagnostico).toHaveTextContent('1 de 3')
-    // O número da etapa no azul cheio, com o texto branco (cores vivas, 19/11).
-    expect(within(diagnostico).getByText('1', { selector: 'header > span' })).toHaveClass('bg-primary-cheio', 'text-primary-foreground')
+    // O número da etapa no azul suave, com o texto escuro (modelo atual, 19/11).
+    const numero = within(diagnostico).getByText('1', { selector: 'header > span' })
+    expect(numero).toHaveClass('bg-primary/10', 'text-primary-texto')
+    expect(numero.className).not.toMatch(/-cheio/)
     expect(within(diagnostico).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '33')
     expect(screen.getByRole('region', { name: '2 · Plano' })).toHaveTextContent('0 de 2')
     expect(nomesDasCaixas()).toEqual(['Reunião de alinhamento', 'Análise do DRE', 'Coleta de documentos', 'Mapa de custos', 'Plano de ação'])

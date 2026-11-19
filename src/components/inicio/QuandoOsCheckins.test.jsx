@@ -22,7 +22,7 @@ describe('QuandoOsCheckins', () => {
     // Linha 1 (ter), coluna 3 (10h): o pico, com a cor cheia.
     const pico = grafico.querySelector('[data-celula="1-3"]')
     expect(pico).toHaveAttribute('fill-opacity', '1')
-    expect(pico.style.fill).toBe('var(--cor-violeta-forte)')
+    expect(pico.style.fill).toBe('var(--grafico-calor-lilas)')
     expect(grafico.querySelector('[data-celula="0-0"]')).toHaveClass('fill-muted')
     expect(within(cartao()).getByText(/Mais check-ins/).textContent).toBe('Mais check-ins na terça às 10h (6) · dia mais cheio: segunda (8)')
   })

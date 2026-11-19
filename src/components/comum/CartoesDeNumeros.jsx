@@ -3,11 +3,11 @@ import { cn } from '@/lib/utils'
 
 // Cor do quadradinho do ícone: sólido, o cheio com o ícone no "sobre" (cores vivas, 19/11; ≥ 4,5:1 em contraste.test.js).
 const TONS = {
-  azul: 'bg-primary-cheio text-primary-foreground',
+  azul: 'bg-primary/10 text-primary-texto',
   ceu: 'bg-cor-turquesa-cheio text-cor-turquesa-sobre',
-  aviso: 'bg-notice-cheio text-sobre-notice',
-  positivo: 'bg-positive-cheio text-sobre-positive',
-  perigo: 'bg-destructive-cheio text-sobre-destructive',
+  aviso: 'bg-notice-soft text-notice',
+  positivo: 'bg-positive-soft text-positive',
+  perigo: 'bg-destructive-soft text-destructive',
   neutro: 'bg-cor-grafite-cheio text-cor-grafite-sobre',
   turquesa: 'bg-cor-turquesa-cheio text-cor-turquesa-sobre',
   violeta: 'bg-cor-violeta-cheio text-cor-violeta-sobre',

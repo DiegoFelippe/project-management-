@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import BarrasHorizontais from '@/components/graficos/BarrasHorizontais'
 import CartaoDeGrafico from '@/components/graficos/CartaoDeGrafico'
-import { COR_OUTROS, SITUACOES, corDaPaleta, corDaSerie } from '@/components/graficos/cores'
+import { COR_OUTROS, SITUACOES, corDaPaleta, corDaSerie, corDe } from '@/components/graficos/cores'
 import FaixaDeGrupos from '@/components/graficos/FaixaDeGrupos'
 import GraficoDeColunas from '@/components/graficos/GraficoDeColunas'
 import GraficoDeLinha from '@/components/graficos/GraficoDeLinha'
@@ -31,9 +31,10 @@ const primeiroDoMes = (dia) => `${dia.slice(0, 7)}-01`
 const segundaDe = (dia) => somarDias(dia, -((diaDaSemana(dia) + 6) % 7))
 const MESES_NO_MINIMO = 6
 const MESES_NO_MAXIMO = 24 // o que horas_do_cliente_por_mes aceita
-// Horas por mês: os meses anteriores em turquesa, o de hoje no azul da série, o que passou da previsão em vermelho.
-const TURQUESA = corDaPaleta('turquesa')
-const FORA_DO_PERIODO = `color-mix(in srgb, ${TURQUESA} 42%, var(--card))`
+// Horas por mês: os meses anteriores em lima, o de hoje no azul da série, o que passou da previsão em vermelho.
+const LIMA = corDaPaleta('indigo')
+const CIANO = corDe('calor-ciano')
+const FORA_DO_PERIODO = `color-mix(in srgb, ${LIMA} 42%, var(--card))`
 const NUMERO_EM_CIMA_ATE = 6 // com mais colunas, só o "▲" cabe em cima do mês que passou (a 360 px)
 const DIAS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom']
 const CONSULTORES_NA_ROSCA = 8 // mais que isso: os 8 maiores e "Outros"
@@ -186,8 +187,8 @@ function HorasPorConsultor({ leitura, periodo: periodoDoFiltro, aoTentarDeNovo }
 }
 
 // Horas por mês (horas_do_cliente_por_mes com p_ate e p_meses): no Mês, os 6 meses até ele, com ele em azul; num período,
-// os meses que ele cobre (no mínimo 6, até 24), o de hoje em azul e os de fora esmaecidos (em turquesa). A linha é a
-// previsão atual. O mês do período que passou dela fica vermelho, com "▲" e o número em cima; os outros, em turquesa.
+// os meses que ele cobre (no mínimo 6, até 24), o de hoje em azul e os de fora esmaecidos (em lima). A linha é a
+// previsão atual. O mês do período que passou dela fica vermelho, com "▲" e o número em cima; os outros, em lima.
 function HorasPorMes({ leitura, periodo: periodoDoFiltro, previsao, aoTentarDeNovo }) {
   const periodo = leitura.dados?.periodo ?? periodoDoFiltro
   const doMes = periodo.tipo === 'mes'
@@ -200,9 +201,9 @@ function HorasPorMes({ leitura, periodo: periodoDoFiltro, previsao, aoTentarDeNo
   // No Mês, os 5 de antes são o contexto do escolhido (nada esmaece); num período, o que fica de fora esmaece.
   const fora = (m) => !doMes && (m.mes < de || m.mes > ate)
   const passou = (m) => !fora(m) && previsao > 0 && m.realizado > previsao
-  const cor = (m) => (passou(m) ? 'acima' : m.mes === emAzul ? 'serie' : TURQUESA)
+  const cor = (m) => (passou(m) ? 'acima' : m.mes === emAzul ? 'serie' : LIMA)
   const legenda = [
-    { forma: 'quadrado', cor: TURQUESA, texto: 'Meses anteriores' },
+    { forma: 'quadrado', cor: LIMA, texto: 'Meses anteriores' },
     ...(meses?.some((m) => cor(m) === 'serie') ? [{ forma: 'quadrado', cor: 'serie', texto: emAzul === atual ? 'Este mês (até hoje)' : 'Mês escolhido' }] : []),
     ...(meses?.some(passou) ? [{ forma: 'quadrado', cor: 'acima', texto: 'Passou da previsão' }] : []),
     ...(meses?.some(fora) ? [{ forma: 'quadrado', cor: FORA_DO_PERIODO, texto: 'Fora do período' }] : []),
@@ -239,7 +240,7 @@ function HorasPorMes({ leitura, periodo: periodoDoFiltro, previsao, aoTentarDeNo
   )
 }
 
-// Dias com check-in: calendário de calor (semanas × dias, segunda a domingo) do período, uma cor só (turquesa), mais forte
+// Dias com check-in: calendário de calor (semanas × dias, segunda a domingo) do período, uma cor só (ciano), mais forte
 // com mais horas no dia. Os dias vêm da leitura do burn-up (a mesma chamada); o dia fora do período e o que ainda não
 // chegou ficam em branco. São horas (um check-in de 1 minuto arredonda para 0 h e não pinta o dia), como no burn-up.
 function DiasDoPeriodo({ leitura, periodo: periodoDoFiltro, aoTentarDeNovo }) {
@@ -262,13 +263,13 @@ function DiasDoPeriodo({ leitura, periodo: periodoDoFiltro, aoTentarDeNovo }) {
     const dia = diaDe(i, j)
     const v = valores[i][j]
     const texto = v == null ? (dia > hojeEmSP() ? 'ainda não chegou' : 'fora do período') : v ? formatarHoras(v) : 'sem check-in'
-    return { titulo: `${DIAS[i]}, ${data(dia)}`, linhas: [{ valor: texto, ...(v ? { cor: TURQUESA } : {}) }] }
+    return { titulo: `${DIAS[i]}, ${data(dia)}`, linhas: [{ valor: texto, ...(v ? { cor: CIANO } : {}) }] }
   }
 
   return (
     <CartaoDeGrafico titulo={titulo} subtitulo={subtitulo} leitura={fraseDosDiasComCheckin(dias, periodo)} atualizando={leitura.atualizando}
       tabela={{ rotulo: `Dias com check-in · ${nomeDoPeriodo(periodo)}`, colunas: ['Dia', 'Horas'], linhas: dias.filter((d) => d.horas > 0).map((d) => [`${semana(d.dia)}, ${formatarDia(d.dia)}`, formatarHoras(d.horas)]) }}>
-      <MapaDeCalor key={chaveDo(periodo)} rotulo={titulo} linhas={DIAS} colunas={segundas.map(diaMes)} valores={valores} cor={TURQUESA} dicaDe={dicaDe} />
+      <MapaDeCalor key={chaveDo(periodo)} rotulo={titulo} linhas={DIAS} colunas={segundas.map(diaMes)} valores={valores} cor="calor-ciano" dicaDe={dicaDe} />
     </CartaoDeGrafico>
   )
 }

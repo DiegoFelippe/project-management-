@@ -22,7 +22,7 @@ describe('cores das colunas', () => {
 
   it('o Vermelho fica no vermelho de estado (a paleta não tem vermelho): as 10 cores continuam diferentes', () => {
     const vermelho = CORES_DAS_COLUNAS.find((c) => c.nome === 'Vermelho')
-    expect(vermelho).toMatchObject({ cheio: 'bg-destructive-cheio text-sobre-destructive', corpo: 'bg-destructive-soft/40 border-destructive-soft', ponto: 'bg-destructive-cheio' })
+    expect(vermelho).toMatchObject({ cheio: 'bg-destructive-soft text-destructive', corpo: 'bg-destructive-soft/40 border-destructive-soft', ponto: 'bg-destructive' })
     expect(new Set(CORES_DAS_COLUNAS.map((c) => c.cheio)).size).toBe(10)
   })
 
@@ -49,10 +49,10 @@ describe('prioridade', () => {
     expect(PRIORIDADES.alta.rotulo).toBe('Alta')
   })
 
-  it('o selo é sólido (cheio + sobre): baixa no verde, média no mostarda e alta no vermelho de estado', () => {
+  it('o selo é suave: baixa no verde, média no mostarda e alta no vermelho de estado (nada de cheio com texto branco)', () => {
     expect(PRIORIDADES.baixa.selo).toBe('bg-cor-verde-cheio text-cor-verde-sobre')
     expect(PRIORIDADES.media.selo).toBe('bg-cor-mostarda-cheio text-cor-mostarda-sobre')
-    expect(PRIORIDADES.alta.selo).toBe('bg-destructive-cheio text-sobre-destructive')
+    expect(PRIORIDADES.alta.selo).toBe('bg-destructive-soft text-destructive')
   })
 })
 

@@ -105,7 +105,7 @@ describe('BarrasHorizontais', () => {
         icone: 'atrasada', partes: [{ valor: 4, tom: 'feita' }, { valor: 3, tom: 'atrasada' }, { valor: 5, tom: 'afazer' }] }],
     })
     const icone = linha('Financeiro').querySelector('[data-icone="atrasada"]')
-    expect(icone).toHaveClass('text-destructive-cheio')
+    expect(icone).toHaveClass('text-grafico-acima')
     expect(icone).toHaveAttribute('aria-hidden', 'true')
   })
 

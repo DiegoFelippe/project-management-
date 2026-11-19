@@ -14,6 +14,9 @@ export const COR = {
   'fila-1': 'var(--grafico-fila-1)',
   'fila-2': 'var(--grafico-fila-2)',
   'fila-3': 'var(--grafico-fila-3)',
+  // Pontas das rampas dos mapas de calor: lavanda (Início) e ciano (dias com check-in).
+  'calor-lilas': 'var(--grafico-calor-lilas)',
+  'calor-ciano': 'var(--grafico-calor-ciano)',
   // Situações da rosca e das etapas do check-list (estado em verde/vermelho; o resto, da paleta).
   feita: 'var(--positive-cheio)',
   nsa: 'var(--cor-grafite-forte)',

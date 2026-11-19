@@ -17,7 +17,7 @@ export const CORES_DAS_COLUNAS = [
   { nome: 'Verde', paleta: 'verde', cheio: 'bg-cor-verde-cheio text-cor-verde-sobre', corpo: 'bg-cor-verde-suave/40 border-cor-verde-suave', ponto: 'bg-cor-verde-forte' },
   { nome: 'Amarelo', paleta: 'mostarda', cheio: 'bg-cor-mostarda-cheio text-cor-mostarda-sobre', corpo: 'bg-cor-mostarda-suave/40 border-cor-mostarda-suave', ponto: 'bg-cor-mostarda-forte' },
   { nome: 'Laranja', paleta: 'laranja', cheio: 'bg-cor-laranja-cheio text-cor-laranja-sobre', corpo: 'bg-cor-laranja-suave/40 border-cor-laranja-suave', ponto: 'bg-cor-laranja-forte' },
-  { nome: 'Vermelho', paleta: 'rosa', cheio: 'bg-destructive-cheio text-sobre-destructive', corpo: 'bg-destructive-soft/40 border-destructive-soft', ponto: 'bg-destructive-cheio' },
+  { nome: 'Vermelho', paleta: 'rosa', cheio: 'bg-destructive-soft text-destructive', corpo: 'bg-destructive-soft/40 border-destructive-soft', ponto: 'bg-destructive' },
   { nome: 'Rosa', paleta: 'rosa', cheio: 'bg-cor-rosa-cheio text-cor-rosa-sobre', corpo: 'bg-cor-rosa-suave/40 border-cor-rosa-suave', ponto: 'bg-cor-rosa-forte' },
   { nome: 'Roxo', paleta: 'violeta', cheio: 'bg-cor-violeta-cheio text-cor-violeta-sobre', corpo: 'bg-cor-violeta-suave/40 border-cor-violeta-suave', ponto: 'bg-cor-violeta-forte' },
 ]
@@ -27,11 +27,11 @@ export const CORES_DAS_COLUNAS = [
 const AUTOMATICAS = [0, 1, 4, 5, 7, 9]
 export const corDaColuna = (coluna, posicao) => coluna.cor ?? AUTOMATICAS[(posicao + 1) % AUTOMATICAS.length]
 
-// Selo da prioridade, sólido (cheio + sobre): baixa no verde, média no mostarda e alta no vermelho de estado.
+// Selo da prioridade, suave (fundo suave + texto escuro): baixa no verde, média no mostarda e alta no vermelho de estado.
 export const PRIORIDADES = {
   baixa: { rotulo: 'Baixa', selo: 'bg-cor-verde-cheio text-cor-verde-sobre' },
   media: { rotulo: 'Média', selo: 'bg-cor-mostarda-cheio text-cor-mostarda-sobre' },
-  alta: { rotulo: 'Alta', selo: 'bg-destructive-cheio text-sobre-destructive' },
+  alta: { rotulo: 'Alta', selo: 'bg-destructive-soft text-destructive' },
 }
 export const OPCOES_DE_PRIORIDADE = Object.entries(PRIORIDADES).map(([valor, p]) => ({ valor, rotulo: p.rotulo }))
 

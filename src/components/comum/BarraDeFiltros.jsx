@@ -65,7 +65,7 @@ export default function BarraDeFiltros({ children, className, ativos = 0, aoLimp
     return (
       <BarraDaPagina className={className}>
         <span className="inline-flex items-center gap-1.5 text-rotulo font-semibold text-foreground/80">
-          <SlidersHorizontal className="size-3.5 text-primary-texto" aria-hidden="true" /> Filtros
+          <SlidersHorizontal className="size-3.5" aria-hidden="true" /> Filtros
         </span>
         {children}
       </BarraDaPagina>
@@ -76,7 +76,7 @@ export default function BarraDeFiltros({ children, className, ativos = 0, aoLimp
     <BarraDaPagina className={className}>
       <Button type="button" variant="outline" size="sm" aria-haspopup="dialog" aria-expanded={aberta} onClick={() => setAberta(true)}
         className={cn(ativos > 0 && 'border-primary/40 bg-accent text-accent-foreground')}>
-        <SlidersHorizontal className="text-primary-texto" aria-hidden="true" />
+        <SlidersHorizontal aria-hidden="true" />
         <span>Filtros</span>
         {ativos > 0 && <>{' '}<span className="-ml-0.5 tabular-nums">({plural(ativos)})</span></>}
       </Button>

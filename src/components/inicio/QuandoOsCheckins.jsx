@@ -1,13 +1,12 @@
 import CartaoDeGrafico from '@/components/graficos/CartaoDeGrafico'
 import MapaDeCalor from '@/components/graficos/MapaDeCalor'
-import { corDaPaleta } from '@/components/graficos/cores'
 import { fraseDoCalor, horaDoCalor } from '@/lib/frasesDosGraficos'
 
 const DIAS = [1, 2, 3, 4, 5, 6, 0] // segunda a domingo (domingo = 0, como o banco manda)
 const CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
 const POR_EXTENSO = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
 const HORAS = Array.from({ length: 14 }, (_, i) => i + 7) // 7h a 20h
-const COR = corDaPaleta('violeta')
+const COR = 'calor-lilas'
 const diaMes = (dia) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`
 
 // Quando os check-ins acontecem (Início, todos; pedido do Diego, 19/11): mapa de calor dia da semana × hora de início

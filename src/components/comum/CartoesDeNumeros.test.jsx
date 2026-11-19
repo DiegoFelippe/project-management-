@@ -47,17 +47,18 @@ describe('CartoesDeNumeros', () => {
     expect(within(regiao).getByText('Capacidade 200 h')).toBeInTheDocument()
   })
 
-  it('o ícone vai num quadradinho cheio pelo tom, com o ícone no "sobre" (azul quando não diz; cores vivas, 19/11)', () => {
+  it('o ícone vai num quadradinho suave pelo tom, com o ícone escuro (azul quando não diz; modelo atual, 19/11)', () => {
     render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={CARTOES} />)
     const [ativos, ocupacao, aguardando] = screen.getByRole('region').querySelectorAll('[data-cartao]')
-    expect(ativos.querySelector('svg').parentElement).toHaveClass('bg-primary-cheio', 'text-primary-foreground')
-    expect(ocupacao.querySelector('svg').parentElement).toHaveClass('bg-destructive-cheio', 'text-sobre-destructive')
+    expect(ativos.querySelector('svg').parentElement).toHaveClass('bg-primary/10', 'text-primary-texto')
+    expect(ocupacao.querySelector('svg').parentElement).toHaveClass('bg-destructive-soft', 'text-destructive')
     expect(aguardando.querySelector('svg')).toBeNull()
   })
 
-  it('todo tom é cheio + sobre: estados, céu (turquesa), neutro (grafite) e as cores da paleta', () => {
+  it('todo tom é suave + texto escuro, nunca cheio: azul, estados, céu (turquesa), neutro (grafite) e as cores da paleta', () => {
     const esperado = {
-      aviso: ['bg-notice-cheio', 'text-sobre-notice'], positivo: ['bg-positive-cheio', 'text-sobre-positive'],
+      azul: ['bg-primary/10', 'text-primary-texto'], perigo: ['bg-destructive-soft', 'text-destructive'],
+      aviso: ['bg-notice-soft', 'text-notice'], positivo: ['bg-positive-soft', 'text-positive'],
       ceu: ['bg-cor-turquesa-cheio', 'text-cor-turquesa-sobre'], neutro: ['bg-cor-grafite-cheio', 'text-cor-grafite-sobre'],
       ...Object.fromEntries(['turquesa', 'violeta', 'mostarda', 'rosa', 'verde', 'laranja', 'indigo', 'grafite']
         .map((n) => [n, [`bg-cor-${n}-cheio`, `text-cor-${n}-sobre`]])),
@@ -66,7 +67,7 @@ describe('CartoesDeNumeros', () => {
     for (const [tom, classes] of Object.entries(esperado)) {
       const ladrilho = screen.getByRole('region').querySelector(`[data-cartao="${tom}"] svg`).parentElement
       expect(ladrilho, tom).toHaveClass(...classes)
-      expect(ladrilho.className, tom).not.toMatch(/-suave|-soft|\/10\b|bg-muted/)
+      expect(ladrilho.className, tom).not.toMatch(/bg-(?:primary|positive|notice|destructive)-cheio|text-sobre|text-primary-foreground/)
     }
   })
 

@@ -6,6 +6,9 @@ import { COR, PALETA } from '@/components/graficos/cores'
 import { CORES_DO_AVATAR, TEXTO_ESCURO, corDoTextoSobre } from './cores'
 import { CONTRASTE_MINIMO, contraste, misturar } from './contraste'
 
+// Piso das marcas claras (com a tabela e a dica): abaixo disto a marca some no cartão (a folga âmbar, 1,67, é a menor).
+const PISO_DA_MARCA_CLARA = 1.6
+
 // Guarda do contraste (auditoria de 17/11, pedido do Diego): os pares de cores que a tela usa o dia todo seguram pelo
 // menos 4,5:1 (WCAG AA, texto normal), no claro e no escuro. Os valores vêm do próprio src/index.css.
 // Lê os --tokens de um seletor (#hex ou var(--outro)). O escuro herda o que não redefine, como no CSS (a classe .dark
@@ -92,9 +95,6 @@ describe('contraste dos tokens de src/index.css', () => {
   // (3:1) e a referência (4,5:1) seguram o mínimo nos dois temas. Trilha, grade e a rampa da fila são fundo.
   const MARCAS = ['grafico-serie', 'grafico-acima', 'grafico-folga', 'grafico-ref']
   const TOKENS_DOS_GRAFICOS = [...MARCAS, 'grafico-grade', 'grafico-trilha', 'grafico-neutro', 'grafico-fila-1', 'grafico-fila-2', 'grafico-fila-3']
-  // Piso das marcas claras (com a tabela e a dica): abaixo disto a marca some no cartão (a folga âmbar, 1,67, é a menor).
-  const PISO_DA_MARCA_CLARA = 1.6
-
   it('os tokens dos gráficos existem no claro e no escuro (o escuro redefine cada um)', () => {
     const escuro = tokens(CSS, '.dark')
     for (const nome of TOKENS_DOS_GRAFICOS) {
@@ -111,6 +111,16 @@ describe('contraste dos tokens de src/index.css', () => {
     const fracas = MARCAS.map((nome) => ({ nome, contraste: arredondar(contraste(t[nome], t.card)), minimo: minimo(nome) }))
       .filter((m) => !(m.contraste >= m.minimo))
     expect(fracas).toEqual([])
+  })
+
+  // Pontas das rampas dos mapas de calor (Início: lavanda; dias com check-in: ciano): a célula mais forte é marca, 3:1 nos dois temas.
+  it.each(Object.keys(TEMAS))('no %s, as pontas das rampas do calor seguram 3:1 sobre o cartão', (tema) => {
+    const fracas = ['grafico-calor-lilas', 'grafico-calor-ciano']
+      .map((nome) => ({ nome, contraste: arredondar(contraste(TEMAS[tema][nome], TEMAS[tema].card)) }))
+      .filter((m) => !(m.contraste >= 3))
+    expect(fracas).toEqual([])
+    expect(COR['calor-lilas']).toBe('var(--grafico-calor-lilas)')
+    expect(COR['calor-ciano']).toBe('var(--grafico-calor-ciano)')
   })
 
   it('o lavado (área sob a linha) é a própria série com transparência, nos dois temas', () => {
@@ -172,7 +182,7 @@ describe.each(Object.keys(TEMAS))('paleta e estados no %s', (tema) => {
     const fracos = NOMES_DA_PALETA.flatMap((n) => [
       { onde: `${n} texto/cartão`, c: contraste(t[`cor-${n}-texto`], t.card), minimo: CONTRASTE_MINIMO },
       { onde: `${n} texto/suave`, c: contraste(t[`cor-${n}-texto`], t[`cor-${n}-suave`]), minimo: CONTRASTE_MINIMO },
-      { onde: `${n} forte/cartão`, c: contraste(t[`cor-${n}-forte`], t.card), minimo: tema === 'escuro' ? 3 : 1.6 },
+      { onde: `${n} forte/cartão`, c: contraste(t[`cor-${n}-forte`], t.card), minimo: tema === 'escuro' ? 3 : PISO_DA_MARCA_CLARA },
     ]).filter((m) => !(arredondar(m.c) >= m.minimo)).map((m) => `${m.onde}: ${arredondar(m.c)}`)
     expect(fracos).toEqual([])
   })

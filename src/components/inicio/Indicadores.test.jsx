@@ -63,12 +63,12 @@ describe('Indicadores', () => {
     const { rerender } = render(<Indicadores painel={painel('consultoria')} comparacao={COMP} papel="admin" />)
     const regiao = screen.getByRole('region', { name: 'Indicadores do mês' })
     const icone = (chave) => regiao.querySelector(`[data-cartao="${chave}"] .icone-do-cartao`).parentElement
-    expect(icone('realizado')).toHaveClass('bg-primary-cheio', 'text-primary-foreground')
+    expect(icone('realizado')).toHaveClass('bg-primary/10', 'text-primary-texto')
     expect(icone('ocupacao')).toHaveClass('bg-cor-violeta-cheio', 'text-cor-violeta-sobre')
     expect(icone('clientes')).toHaveClass('bg-cor-turquesa-cheio')
     expect(icone('aguardando')).toHaveClass('bg-cor-mostarda-cheio')
     rerender(<Indicadores painel={painel('consultoria', { indicadores: { ...IND, ocupacao: 1.2 } })} comparacao={COMP} papel="admin" />)
-    expect(icone('ocupacao')).toHaveClass('bg-destructive-cheio', 'text-sobre-destructive')
+    expect(icone('ocupacao')).toHaveClass('bg-destructive-soft', 'text-destructive')
   })
 
   it('os números correm até o valor; a releitura do mesmo período (check-in no Início) mostra o novo direto; outro período conta de novo', () => {

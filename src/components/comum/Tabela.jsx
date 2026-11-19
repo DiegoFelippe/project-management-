@@ -97,7 +97,7 @@ export function Linha({ className, aoDuploClique, marca, children }) {
     onMouseDown: (e) => { if (e.detail > 1 && foraDeControle(e)) e.preventDefault() },
     onDoubleClick: (e) => { if (foraDeControle(e)) aoDuploClique() },
   } : {}
-  return <tr {...duplo} data-brilho={marca} className={cn('group border-b transition-colors last:border-0 hover:bg-accent/50', className)}>{children}</tr>
+  return <tr {...duplo} data-brilho={marca} className={cn('group border-b transition-colors last:border-0 hover:bg-muted/40', className)}>{children}</tr>
 }
 
 export function Celula({ className, children }) {
@@ -106,7 +106,7 @@ export function Celula({ className, children }) {
 
 // No toque (pointer-coarse), 8 px entre uma ação e outra (cada botão de ícone já tem 44 px lá).
 export function CelulaAcoes({ children }) {
-  return <td className="bg-card group-hover:bg-[color-mix(in_oklab,var(--accent)_50%,var(--card))] sticky right-0 max-sm:static border-l px-4 py-3 text-right whitespace-nowrap pointer-coarse:[&>*+*]:ml-2">{children}</td>
+  return <td className="bg-card group-hover:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))] sticky right-0 max-sm:static border-l px-4 py-3 text-right whitespace-nowrap pointer-coarse:[&>*+*]:ml-2">{children}</td>
 }
 
 const PERIGO = 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'

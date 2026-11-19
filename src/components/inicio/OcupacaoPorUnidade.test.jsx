@@ -32,7 +32,7 @@ describe('OcupacaoPorUnidade', () => {
     const zonas = [...linhas[0].querySelectorAll('[data-zona]')].map((z) => z.style.background)
     expect(zonas).toEqual(['var(--notice-soft)', 'var(--cor-azul-suave)', 'var(--destructive-soft)'])
     const barra = (linha) => linha.querySelector('[data-trecho="base"]').style.background
-    expect(barra(linhas[0])).toBe('var(--destructive-cheio)') // 130%
+    expect(barra(linhas[0])).toBe('var(--grafico-acima)') // 130%
     expect(barra(linhas[3])).toBe('var(--cor-azul-forte)') // 95%
     expect(barra(linhas[7])).toBe('var(--grafico-folga)') // 60%, folga
     expect(linhas[0].querySelector('[data-marca-do-valor]')).not.toBeNull()
