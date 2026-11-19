@@ -1157,7 +1157,8 @@ select is(testes.historico_reaberta('central1', 'c_nsa'),
   'cada "não se aplica" desfeito é uma linha "tarefa reaberta" (a Central vê)');
 select is(testes.historico_reaberta('gestor_b', 'c_nsa'), array['— (—)', '— (—)', '— (—)'],
   'outra consultoria também não vê qual tarefa foi reaberta nem quem reabriu');
-select is((select count(*)::int from public.cliente_eventos where tipo = 'tarefa_reaberta' and cliente_id <> testes.id('c_nsa')),
+select is((select count(*)::int from public.cliente_eventos where tipo = 'tarefa_reaberta' and cliente_id <> testes.id('c_nsa')
+    and cliente_id in (select id from testes.fx)),
   0, 'reabrir uma tarefa feita não grava "tarefa reaberta" (só desfazer o "não se aplica")');
 
 -- ── Não se aplica numa bloqueada: a cadeia (pedido do Diego, 18/11) ──────────
