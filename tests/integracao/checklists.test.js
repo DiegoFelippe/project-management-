@@ -177,7 +177,7 @@ describe('check-list do cliente contra o banco de verdade', () => {
 
   it('com o check-in aberto neste cliente, entra na sessão; o check-out e a lista de check-ins mostram as tarefas', async () => {
     entrar('pessoa')
-    expect(await fazerCheckin(clienteId)).toEqual({ erro: null })
+    expect(await fazerCheckin(clienteId)).toMatchObject({ erro: null })
     checkinId = (await meuCheckinAberto(pessoas.pessoa.id)).id
     // O início vai para uma hora atrás, para o check-out caber.
     await admin.from('checkins').update({ inicio: new Date(Date.now() - 3_600_000).toISOString() }).eq('id', checkinId)
@@ -218,7 +218,7 @@ describe('check-list do cliente contra o banco de verdade', () => {
 
     // Um check-in aberto logo depois do anterior (os check-ins da pessoa não se sobrepõem).
     entrar('pessoa')
-    expect(await fazerCheckin(clienteId)).toEqual({ erro: null })
+    expect(await fazerCheckin(clienteId)).toMatchObject({ erro: null })
     const novo = (await meuCheckinAberto(pessoas.pessoa.id)).id
     const { data: anterior } = await admin.from('checkins').select('fim').eq('id', checkinId).single()
     await admin.from('checkins').update({ inicio: new Date(new Date(anterior.fim).getTime() + 1).toISOString() }).eq('id', novo)
@@ -230,9 +230,9 @@ describe('check-list do cliente contra o banco de verdade', () => {
     expect(lido.tarefas[1]).toMatchObject({
       estado: 'nao_se_aplica', motivo: 'Sem custos fixos', feita_por: { nome: expect.any(String) },
     })
-    // De novo com outro motivo: a tela estava velha (trocar o motivo é reabrir e marcar de novo).
+    // De novo com outro motivo: a tela estava velha (trocar o motivo é pelo Editar da tarefa).
     expect(await marcarTarefa(tarefa['Mapa de custos'], 'nao_se_aplica', 'Outro motivo')).toEqual({
-      erro: 'Esta tarefa já está como não se aplica. Para trocar o motivo, reabra e marque de novo.', desatualizado: true,
+      erro: 'Esta tarefa já está como não se aplica. Para trocar o motivo, use o Editar da tarefa.', desatualizado: true,
     })
     expect(lido.resumo).toMatchObject({ tarefas: 3, feitas: 1, nao_se_aplica: 1, resolvidas: 2 })
     expect(lido.sessao.tarefas).toEqual([
@@ -369,7 +369,7 @@ describe('check-list do cliente contra o banco de verdade', () => {
     expect(await marcarTarefa(mapa, 'a_fazer')).toMatchObject({ estado: 'a_fazer', erro: null })
   })
 
-  it('a gestão muda o início, troca e tira o modelo; o antigo vira histórico', async () => {
+  it('a gestão muda o início, troca e tira o modelo; o antigo (tocado) vira histórico e o intocado se apaga', async () => {
     entrar('gestor')
     expect(await mudarInicio(checklistId, somarDias(hoje(), 1))).toEqual({ erro: null })
     expect((await lerChecklist(clienteId)).tarefas[0].vence_em).toBe(somarDias(hoje(), 6))
@@ -387,10 +387,14 @@ describe('check-list do cliente contra o banco de verdade', () => {
     })
 
     entrar('gestor')
-    expect(await tirarModelo(trocado.id)).toEqual({ erro: null })
+    // O novo ninguém tocou: tirar o apaga em vez de encerrar (usabilidade, U6); o Histórico guarda o "tirado", com o nome.
+    expect((await lerChecklist(clienteId)).checklist.intocado).toBe(true)
+    expect(await tirarModelo(trocado.id)).toEqual({ erro: null, apagado: true })
     expect((await lerChecklist(clienteId)).checklist).toBeNull()
     const { data } = await admin.from('cliente_checklists').select('motivo').eq('cliente_id', clienteId).order('aplicado_em')
-    expect(data.map((c) => c.motivo)).toEqual(['trocado', 'tirado'])
+    expect(data.map((c) => c.motivo)).toEqual(['trocado'])
+    const eventos = await listarEventos(clienteId)
+    expect(eventos.itens.filter((e) => e.tipo === 'modelo_tirado').map((e) => e.modelo)).toEqual([`${marca} Modelo outro`])
   })
 
   it('cliente com check-list não se apaga: o app pede para arquivar', async () => {

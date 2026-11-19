@@ -373,14 +373,21 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
             mudou()
           }} />
       )}
+      {/* Intocado, o banco apaga o check-list; tocado, ele vira histórico e segura o cliente (usabilidade, U6). O aviso
+          depois segue o que o banco fez. */}
       {janela?.tipo === 'tirar' && (
         <ConfirmarAcao aberto aoFechar={fechar} titulo={`Tirar "${checklist.modelo_nome}" de ${cliente.nome}?`}
-          descricao={`O check-list sai da aba (${progressoEmPalavras(resumo)}). O que foi feito continua nos check-ins e no Histórico.`}
+          descricao={checklist.intocado
+            ? 'Ninguém mexeu neste check-list ainda: ele é apagado de vez, e o Histórico guarda só que o modelo foi aplicado e tirado.'
+            : `O check-list sai da aba (${progressoEmPalavras(resumo)}). O que foi feito continua nos check-ins e no Histórico, `
+              + 'e o check-list fica guardado: o cliente não poderá mais ser apagado, só arquivado.'}
           rotuloConfirmar="Tirar modelo"
           aoConfirmar={async () => {
             const resposta = await tirarModelo(checklist.id)
             if (!resposta.erro) {
-              toast.success(`"${checklist.modelo_nome}" saiu de ${cliente.nome}. O que foi feito continua nos check-ins e no Histórico.`)
+              toast.success(resposta.apagado
+                ? `"${checklist.modelo_nome}" saiu de ${cliente.nome} e o check-list foi apagado.`
+                : `"${checklist.modelo_nome}" saiu de ${cliente.nome}. O que foi feito continua nos check-ins e no Histórico.`)
               mudou()
             }
             return resposta

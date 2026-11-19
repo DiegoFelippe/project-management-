@@ -88,6 +88,14 @@ describe('JanelaAplicarModelo', () => {
     expect(within(janela).getByRole('button', { name: 'Trocar modelo' })).toBeInTheDocument()
   })
 
+  // Usabilidade, U6: ninguém mexeu no check-list atual, então trocar o apaga (não vira histórico).
+  it('trocar um check-list intocado: o aviso diz que ele é apagado', () => {
+    abrir({ checklist: { id: 'cl1', modelo_id: 'm1', modelo_nome: 'Gestão financeira', tarefas: 14, feitas: 0, intocado: true } })
+    const janela = screen.getByRole('dialog', { name: 'Trocar o modelo de Provedor Alfa' })
+    expect(janela).toHaveTextContent('Ninguém mexeu no check-list atual ainda: ele é apagado e o do modelo novo começa do zero.')
+    expect(janela).not.toHaveTextContent('continua nos check-ins e no Histórico')
+  })
+
   it('enquanto aplica, "Aplicando…"; o erro do banco fica na janela', async () => {
     let responder
     vi.mocked(aplicarModelo).mockImplementation(() => new Promise((r) => { responder = r }))

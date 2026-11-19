@@ -24,10 +24,10 @@ function detalheDoModelo(m, atualId) {
 
 // Aplicar (ou trocar) o modelo de check-in no cliente — da aba Check-ins do cliente e do Andamento. O Modelo vem do banco
 // por busca (os do tipo de consultoria do consultor do cliente primeiro); Início dos prazos começa hoje (São Paulo); a
-// prévia diz quantas tarefas e quando vence a última. Com `checklist` (o ativo: { modelo_id, tarefas, feitas }) é a
-// troca: o aviso diz que o check-list atual é trocado e começa do zero. Grava com aplicarModelo; deu certo, chama
-// `aoAplicar({ id, modelo, inicio })` e fecha. Os erros ficam embaixo de cada campo, de uma vez, e fechar com algo
-// escolhido pergunta antes (usabilidade, U2 e U4).
+// prévia diz quantas tarefas e quando vence a última. Com `checklist` (o ativo: { modelo_id, tarefas, feitas, intocado })
+// é a troca: o aviso diz que o check-list atual é trocado e começa do zero (o intocado o banco apaga: usabilidade, U6).
+// Grava com aplicarModelo; deu certo, chama `aoAplicar({ id, modelo, inicio })` e fecha. Os erros ficam embaixo de cada
+// campo, de uma vez, e fechar com algo escolhido pergunta antes (usabilidade, U2 e U4).
 export default function JanelaAplicarModelo({ cliente, checklist = null, aoFechar, aoAplicar }) {
   const [modelo, setModelo] = useState(null)
   const [inicioPadrao] = useState(() => hoje())
@@ -99,8 +99,10 @@ export default function JanelaAplicarModelo({ cliente, checklist = null, aoFecha
           <p className="bg-notice-soft flex items-start gap-2 rounded-xl px-3 py-2 text-rotulo">
             <TriangleAlert className="text-notice mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span className="min-w-0">
-              O check-list atual ({progressoEmPalavras(checklist)}) é trocado pelo do modelo novo, começando do
-              zero. O que já foi feito continua nos check-ins e no Histórico.
+              {checklist.intocado
+                ? 'Ninguém mexeu no check-list atual ainda: ele é apagado e o do modelo novo começa do zero.'
+                : `O check-list atual (${progressoEmPalavras(checklist)}) é trocado pelo do modelo novo, começando do zero. `
+                  + 'O que já foi feito continua nos check-ins e no Histórico.'}
             </span>
           </p>
         )}

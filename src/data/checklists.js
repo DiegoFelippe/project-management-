@@ -29,7 +29,7 @@ async function escrever(funcao, argumentos) {
 }
 
 // A aba Check-ins do cliente numa leitura: { pode_aplicar, pode_marcar, pode_comentar, consultor, checklist (o ativo, ou
-// null), etapas, tarefas (com depende_de, na_sessao, tempo_segundos, trecho_aberto_desde e comentarios — quantos),
+// null; intocado: ninguém mexeu nele ainda, e tirar ou trocar o apaga), etapas, tarefas (com depende_de, na_sessao, tempo_segundos, trecho_aberto_desde e comentarios — quantos),
 // resumo (os números, contados no banco), sessao (o check-in aberto neste cliente e o que foi marcado nele),
 // ultimo_checkin }. null quando a pessoa não vê o cliente.
 export const lerChecklist = (clienteId) => ler('checklist_do_cliente', { p_cliente: clienteId })
@@ -61,7 +61,8 @@ export async function modelosParaAplicar({ clienteId, busca } = {}) {
   return { itens: data?.itens ?? [], total: data?.total ?? 0 }
 }
 
-// Aplica (ou troca: o ativo é encerrado e o novo começa do zero) o modelo no cliente. inicio: 'aaaa-mm-dd'.
+// Aplica (ou troca: o ativo é encerrado, ou apagado se ninguém o tocou, e o novo começa do zero) o modelo no cliente.
+// inicio: 'aaaa-mm-dd'.
 // { id (do check-list novo), erro }.
 export async function aplicarModelo({ clienteId, modeloId, inicio }) {
   const { data, error } = await supabase.rpc('aplicar_modelo', {
@@ -77,8 +78,12 @@ export async function aplicarModelo({ clienteId, modeloId, inicio }) {
 export const mudarInicio = (checklistId, inicio) =>
   escrever('mudar_inicio_do_checklist', { p_checklist: checklistId, p_inicio: inicio })
 
-// Tira o modelo do cliente: o check-list se encerra e vira histórico. { erro }.
-export const tirarModelo = (checklistId) => escrever('tirar_modelo', { p_checklist: checklistId })
+// Tira o modelo do cliente. Se ninguém tocou o check-list (checklist.intocado da leitura), o banco o apaga; senão, ele se
+// encerra e vira histórico (usabilidade, U6). { erro, apagado }.
+export async function tirarModelo(checklistId) {
+  const { data, error } = await supabase.rpc('tirar_modelo', { p_checklist: checklistId })
+  return error ? recusa(error) : { erro: null, apagado: data === 'apagado' }
+}
 
 // estado: 'a_fazer' | 'andamento' (Iniciar e Retomar: abre um trecho de tempo) | 'pausada' (Pausar: fecha o trecho) |
 // 'feita' | 'nao_se_aplica' (este com o motivo, obrigatório: 1 a 500 letras; o banco tira os espaços das pontas); toda

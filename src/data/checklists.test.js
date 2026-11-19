@@ -109,8 +109,12 @@ describe('escritas do check-list', () => {
     rpcResponde(null)
     expect(await mudarInicio('cl1', '2026-12-01')).toEqual({ erro: null })
     expect(supabase.rpc).toHaveBeenCalledWith('mudar_inicio_do_checklist', { p_checklist: 'cl1', p_inicio: '2026-12-01' })
-    expect(await tirarModelo('cl1')).toEqual({ erro: null })
+    rpcResponde('encerrado')
+    expect(await tirarModelo('cl1')).toEqual({ erro: null, apagado: false })
     expect(supabase.rpc).toHaveBeenLastCalledWith('tirar_modelo', { p_checklist: 'cl1' })
+    // Ninguém tinha tocado o check-list: o banco apagou em vez de encerrar (usabilidade, U6).
+    rpcResponde('apagado')
+    expect(await tirarModelo('cl1')).toEqual({ erro: null, apagado: true })
     rpcResponde(null, { code: 'P0001', message: 'inicio_invalido' })
     expect(await mudarInicio('cl1', '2020-01-01')).toEqual({
       erro: 'O início dos prazos precisa estar entre 2 anos atrás e 1 ano à frente.',

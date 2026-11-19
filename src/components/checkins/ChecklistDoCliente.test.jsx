@@ -343,18 +343,46 @@ describe('ChecklistDoCliente: com modelo', () => {
 
   it('Tirar modelo pede confirmação dizendo o que fica no histórico; confirmado, tira, relê e avisa a página', async () => {
     vi.mocked(lerChecklist).mockResolvedValue(GERENCIA)
-    vi.mocked(tirarModelo).mockResolvedValue({ erro: null })
+    vi.mocked(tirarModelo).mockResolvedValue({ erro: null, apagado: false })
     const { aoMudar } = tela(gestor)
     await userEvent.click(await screen.findByRole('button', { name: 'Tirar modelo' }))
     const confirmar = screen.getByRole('alertdialog')
     expect(confirmar).toHaveTextContent('Tirar "Gestão financeira" de Provedor Alfa?')
-    expect(confirmar).toHaveTextContent('O check-list sai da aba (1 de 5 feitas). O que foi feito continua nos check-ins e no Histórico.')
+    // Tocado (uma feita, uma nota): encerra e vira histórico, e o cliente fica sem poder ser apagado (usabilidade, U6).
+    expect(confirmar).toHaveTextContent('O check-list sai da aba (1 de 5 feitas). O que foi feito continua nos check-ins e no '
+      + 'Histórico, e o check-list fica guardado: o cliente não poderá mais ser apagado, só arquivado.')
     expect(tirarModelo).not.toHaveBeenCalled()
     await userEvent.click(within(confirmar).getByRole('button', { name: 'Tirar modelo' }))
     expect(tirarModelo).toHaveBeenCalledWith('cl1')
     await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
     expect(aoMudar).toHaveBeenCalled()
     expect(toast.success).toHaveBeenCalledWith('"Gestão financeira" saiu de Provedor Alfa. O que foi feito continua nos check-ins e no Histórico.')
+  })
+
+  // Usabilidade, U6: ninguém mexeu no check-list, então tirar o apaga de vez (o cliente volta a poder ser apagado).
+  it('Tirar modelo de um check-list intocado diz que ele é apagado; o aviso segue o que o banco fez', async () => {
+    const intocado = { ...GERENCIA, checklist: { ...GERENCIA.checklist, intocado: true } }
+    vi.mocked(lerChecklist).mockResolvedValue(intocado)
+    vi.mocked(tirarModelo).mockResolvedValue({ erro: null, apagado: true })
+    vi.mocked(modelosParaAplicar).mockResolvedValue({ itens: [], total: 0 })
+    tela(gestor)
+    await userEvent.click(await screen.findByRole('button', { name: 'Tirar modelo' }))
+    const confirmar = screen.getByRole('alertdialog')
+    expect(confirmar).toHaveTextContent('Ninguém mexeu neste check-list ainda: ele é apagado de vez, e o Histórico guarda só '
+      + 'que o modelo foi aplicado e tirado.')
+    expect(confirmar).not.toHaveTextContent('só arquivado')
+    await userEvent.click(within(confirmar).getByRole('button', { name: 'Tirar modelo' }))
+    expect(tirarModelo).toHaveBeenCalledWith('cl1')
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('"Gestão financeira" saiu de Provedor Alfa e o check-list foi apagado.'))
+  })
+
+  it('Trocar modelo de um check-list intocado avisa que ele é apagado', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue({ ...GERENCIA, checklist: { ...GERENCIA.checklist, intocado: true } })
+    vi.mocked(modelosParaAplicar).mockResolvedValue({ itens: [], total: 0 })
+    tela(gestor)
+    await userEvent.click(await screen.findByRole('button', { name: 'Trocar modelo' }))
+    expect(screen.getByRole('dialog', { name: 'Trocar o modelo de Provedor Alfa' }))
+      .toHaveTextContent('Ninguém mexeu no check-list atual ainda: ele é apagado e o do modelo novo começa do zero.')
   })
 
   it('Lista ↔ Fluxograma; Deitado/Em pé só no fluxograma; clicar num nó abre a tarefa', async () => {
