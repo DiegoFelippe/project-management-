@@ -168,6 +168,25 @@ describe('FichaDoConsultor: Novo acesso', () => {
     expect(screen.getByLabelText('E-mail')).toHaveAccessibleDescription(/Digite um e-mail válido/)
   })
 
+  // Revisão do lote F: depois do primeiro Salvar, os erros acompanham a tela (corrigiu, a marca some), como no useEnvio.
+  it('depois do primeiro Salvar, os erros acompanham a tela: digitou o nome, a marca dele some; o ponto da aba sai com o último', async () => {
+    const { aoCriar } = montarNovo()
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }))
+    expect(aoCriar).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Nome')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Nome')).toHaveAccessibleDescription('Use pelo menos 2 caracteres.')
+    await userEvent.type(screen.getByLabelText('Nome'), 'João Pereira')
+    expect(screen.getByLabelText('Nome')).not.toHaveAttribute('aria-invalid')
+    expect(screen.queryByText('Use pelo menos 2 caracteres.')).toBeNull()
+    expect(screen.getByLabelText('E-mail')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('tab', { name: 'Dados pessoais, tem erro' })).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('E-mail'), 'joao@empresa.com.br')
+    expect(screen.getByLabelText('E-mail')).not.toHaveAttribute('aria-invalid')
+    expect(screen.getByRole('tab', { name: 'Dados pessoais' })).toBeInTheDocument()
+    await userEvent.clear(screen.getByLabelText('Nome'))
+    expect(screen.getByLabelText('Nome')).toHaveAttribute('aria-invalid', 'true')
+  })
+
   it('erro só na senha leva para a aba Acesso e foca a senha', async () => {
     const { aoCriar } = montarNovo()
     await userEvent.type(screen.getByLabelText('Nome'), 'João Pereira')

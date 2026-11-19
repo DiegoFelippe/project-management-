@@ -170,6 +170,19 @@ describe('Meu perfil: quando só parte é salva', () => {
     expect(screen.getByRole('tab', { name: 'Acesso, tem erro' })).toBeInTheDocument()
   })
 
+  // Revisão do lote F: o erro que o servidor deu num campo some quando o valor do campo muda; o aviso fica.
+  it('a senha recusada pelo servidor: trocar a senha tira a marca do campo, e o aviso continua', async () => {
+    montar()
+    definirSenha.mockResolvedValueOnce({ erro: MESMA })
+    await digitarSenha('Senha-atual-1!')
+    await salvar()
+    expect(await screen.findAllByText(MESMA)).toHaveLength(2)
+    expect(screen.getByLabelText('Senha nova')).toHaveAttribute('aria-invalid', 'true')
+    await userEvent.type(screen.getByLabelText('Senha nova'), '2')
+    expect(screen.getByLabelText('Senha nova')).not.toHaveAttribute('aria-invalid')
+    expect(screen.getAllByText(MESMA)).toHaveLength(1)
+  })
+
   it('o contato vai e a foto falha: diz o que falta salvar e, de novo, manda só a foto e a senha', async () => {
     montar()
     vi.mocked(trocarFoto).mockResolvedValueOnce({ erro: 'Não foi possível enviar a imagem. Tente de novo.' })
@@ -298,6 +311,24 @@ describe('Meu perfil: conferir e descartar', () => {
     expect(screen.getByLabelText('Telefone')).toHaveFocus()
     expect(atualizarMeuContato).not.toHaveBeenCalled()
     expect(aoFechar).not.toHaveBeenCalled()
+  })
+
+  // Revisão do lote F: depois do primeiro Salvar, os erros acompanham a tela (corrigiu, a marca some).
+  it('depois do Salvar, corrigir o nome e o telefone tira a marca de cada um na hora', async () => {
+    montar()
+    await userEvent.clear(screen.getByLabelText('Nome'))
+    await userEvent.clear(screen.getByLabelText('Telefone'))
+    await userEvent.type(screen.getByLabelText('Telefone'), '49999')
+    await salvar()
+    expect(screen.getByLabelText('Nome')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Telefone')).toHaveAttribute('aria-invalid', 'true')
+    await userEvent.type(screen.getByLabelText('Nome'), 'Diego F.')
+    expect(screen.getByLabelText('Nome')).not.toHaveAttribute('aria-invalid')
+    expect(screen.queryByText('Use pelo menos 2 caracteres.')).toBeNull()
+    expect(screen.getByLabelText('Telefone')).toHaveAttribute('aria-invalid', 'true')
+    await userEvent.type(screen.getByLabelText('Telefone'), '87766')
+    expect(screen.getByLabelText('Telefone')).not.toHaveAttribute('aria-invalid')
+    expect(gerenciarAcesso).not.toHaveBeenCalled()
   })
 
   it('"Repita a senha nova" diz ao digitar se as senhas são iguais (e não acusa enquanto o começo confere)', async () => {

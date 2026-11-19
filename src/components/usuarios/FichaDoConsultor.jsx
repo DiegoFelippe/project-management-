@@ -17,6 +17,7 @@ import CampoImagem from '@/components/comum/CampoImagem'
 import CartoesDeOpcao from '@/components/comum/CartoesDeOpcao'
 import JanelaFormulario, { BotaoCancelar, CartaoDaSecao, SecaoFormulario } from '@/components/comum/JanelaFormulario'
 import { useAlterado } from '@/components/comum/useAlterado'
+import { useEnvio } from '@/components/comum/useEnvio'
 import SeletorDeCor from '@/components/comum/SeletorDeCor'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -198,6 +199,9 @@ function VerificacaoDaPessoa({ exigida, aoMudarExigida, verificacaoDesde, aoZera
 // aoSalvar({ mudancas: { nome? }, contato?: { telefone, cidade, uf }, foto, cor, senha? }): contato só se mudou, inteiro.
 // Em qualquer modo, a resposta pode trazer `erros` ({ campo: motivo }, ex.: a senha recusada pelo servidor): a ficha
 // marca o campo e a aba dele e vai até lá, como na validação.
+// O envio é o comum das janelas (useEnvio, revisão do lote F): depois do primeiro Salvar, os erros acompanham a tela
+// (corrigiu, a marca some) e o campo recusado pelo servidor volta ao normal quando o valor dele muda. A ficha não é um
+// <form> (exceção do CLAUDE.md) e tem o próprio foco: vai até a aba do primeiro erro.
 export default function FichaDoConsultor({
   aberto, aoFechar, perfilDeQuem, pessoa = null, times = [], consultoriaId = '', buscarConsultorias,
   titulo, aoCriar, aoColocarNosTimes, aoSalvar, podeReenviar, podeDesativar, aoReenviar, aoPedirAtivo, aoMudarAusencias,
@@ -226,10 +230,7 @@ export default function FichaDoConsultor({
   const [foto, setFoto] = useState(null)
   const [corEscolhida, setCorEscolhida] = useState(undefined) // undefined = não mexeu; null = automática
   const focar = useRef(null)
-  const [erros, setErros] = useState({})
-  const [erro, setErro] = useState(null)
   const [jaExiste, setJaExiste] = useState(null)
-  const [enviando, setEnviando] = useState(false)
   const [abaEscolhida, setAbaEscolhida] = useState('dados')
   const idBase = `ficha${useId()}`
   const corGuardada = pessoa?.cor ?? null
@@ -237,8 +238,6 @@ export default function FichaDoConsultor({
   const reservaCor = corMarcada ?? corDe(pessoa ? pessoa.id : 'nova-pessoa')
   // Fechar com algo mudado pergunta antes (usabilidade, U4). O sucesso fecha direto, pelo `fechar`.
   const alterado = useAlterado({ dados, marcados, tipos, foto, corEscolhida })
-  // O erro das senhas diferentes some quando elas ficam iguais (a linha de baixo passa a mostrar o ✓).
-  const erroDaRepetida = erros.repetida && dados.senha !== dados.repetida ? erros.repetida : undefined
 
   const mudar = (campo) => (evento) => setDados((d) => ({ ...d, [campo]: evento.target.value }))
   const definir = (campo) => (valor) => setDados((d) => ({ ...d, [campo]: valor }))
@@ -261,6 +260,8 @@ export default function FichaDoConsultor({
   const escolheConsultoria = novo && buscarConsultorias && quemVeTudo && papelAtual === 'admin'
   // Exigir a verificação em duas etapas: quem edita o acesso da pessoa (o gestor só cria e muda o nome).
   const podeExigir2fa = novo ? ['dono', 'central', 'admin'].includes(perfilDeQuem.papel) : !propria && !!podeDesativar
+  // Depois das regras acima, que o `validar` usa (o useEnvio o chama a cada render, depois do primeiro Salvar).
+  const { erro, setErro, erros, conferir, enviando, enviar: enviarComAviso } = useEnvio(fechar, { validar, valores: dados })
 
   const mostraPapel = (opcoesDePapel.length > 0 && (novo || mudaPapel)) || mostraTimes
   const mostraAcesso = novo || propria || (podeReenviar && pessoa.convite_pendente) || podeDesativar
@@ -306,7 +307,6 @@ export default function FichaDoConsultor({
       if (!avaliarSenha(dados.senha).forte) achados.senha = 'A senha precisa ser forte: confira as regras abaixo do campo.'
       else if (dados.senha !== dados.repetida) achados.repetida = 'As senhas não são iguais.'
     }
-    setErros(achados)
     return achados
   }
 
@@ -331,44 +331,48 @@ export default function FichaDoConsultor({
     return corMarcada !== corGuardada ? corMarcada : undefined
   }
 
-  function avisarConsultoria(mensagem) {
-    setErros({ consultoria: true })
-    irParaOCampo('dados', 'ficha-consultoria')
-    setErro(mensagem)
+  // Envia pelo useEnvio (o sucesso fecha, pelo `fechar`); um campo recusado na resposta (`erros`) leva a ficha até a aba
+  // dele, como na validação.
+  async function mandar(acao) {
+    let recusados
+    await enviarComAviso(async () => {
+      const resposta = await acao()
+      recusados = resposta?.erros
+      return resposta
+    })
+    if (recusados && Object.keys(recusados).length) irParaPrimeiraAbaComErro(recusados)
   }
 
-  async function criar() {
+  function criar() {
     const escolheTimes = mostraTimes
     const consultoria = escolheConsultoria ? dados.consultoria : consultoriaId
-    if (papelAtual === 'admin' && !consultoria) {
-      return avisarConsultoria(buscarConsultorias ? 'Escolha uma consultoria para o administrador.' : 'Escolha uma consultoria no filtro da tela para criar o administrador.')
-    }
-    setErro(null)
     setJaExiste(null)
-    setEnviando(true)
-    const pedido = {
-      forma: dados.forma,
-      nome: dados.nome.trim(),
-      email: dados.email.trim(),
-      papel: papelAtual,
-      times: escolheTimes ? marcados : [],
-    }
-    if (dados.forma === 'senha') pedido.senha = dados.senha
-    if (podeExigir2fa && dados.exige_2fa) pedido.exige_2fa = true
-    for (const campo of CAMPOS_DE_TEXTO) if (dados[campo].trim()) pedido[campo] = dados[campo].trim()
-    if (tipos.length) pedido.tipos_de_consultoria = tipos
-    if (papelAtual === 'admin') pedido.consultoria_id = consultoria
-    const resposta = await aoCriar(pedido, { carga: cargaNova(), foto: foto ?? undefined, cor: corNova() })
-    setEnviando(false)
-    if (resposta?.codigo === 'ja_na_consultoria') {
-      setErro(resposta.erro)
-      setJaExiste(resposta.pessoa)
-      // "Colocar nos times marcados" depende das caixas de times: volta para Dados pessoais e foca a primeira.
-      if (mostraTimes) irParaOCampo('dados', 'ficha-times')
-      return
-    }
-    if (resposta?.erro) return setErro(resposta.erro)
-    fechar()
+    return mandar(async () => {
+      // A consultoria pode vir do filtro da tela (sem campo na ficha): o motivo vai no aviso e a aba ganha o ponto.
+      if (papelAtual === 'admin' && !consultoria) {
+        const erro = buscarConsultorias ? 'Escolha uma consultoria para o administrador.' : 'Escolha uma consultoria no filtro da tela para criar o administrador.'
+        return { erro, erros: { consultoria: true } }
+      }
+      const pedido = {
+        forma: dados.forma,
+        nome: dados.nome.trim(),
+        email: dados.email.trim(),
+        papel: papelAtual,
+        times: escolheTimes ? marcados : [],
+      }
+      if (dados.forma === 'senha') pedido.senha = dados.senha
+      if (podeExigir2fa && dados.exige_2fa) pedido.exige_2fa = true
+      for (const campo of CAMPOS_DE_TEXTO) if (dados[campo].trim()) pedido[campo] = dados[campo].trim()
+      if (tipos.length) pedido.tipos_de_consultoria = tipos
+      if (papelAtual === 'admin') pedido.consultoria_id = consultoria
+      const resposta = await aoCriar(pedido, { carga: cargaNova(), foto: foto ?? undefined, cor: corNova() })
+      if (resposta?.codigo === 'ja_na_consultoria') {
+        setJaExiste(resposta.pessoa)
+        // "Colocar nos times marcados" depende das caixas de times: volta para Dados pessoais e foca a primeira.
+        if (mostraTimes) irParaOCampo('dados', 'ficha-times')
+      }
+      return resposta
+    })
   }
 
   // Quem administra: só o que mudou (o nome, o papel, a exigência, os tipos e os campos da ficha), a carga e os times.
@@ -401,24 +405,15 @@ export default function FichaDoConsultor({
     return { mudancas, contato: contatoMudou ? contato : undefined, foto, cor: corNova(), senha: dados.senha || undefined }
   }
 
-  async function editar() {
+  function editar() {
     const pedido = propria ? pedidoProprio() : pedidoDaFicha()
-    setErro(null)
-    setEnviando(true)
-    const resposta = await aoSalvar(pedido)
-    setEnviando(false)
-    if (resposta?.erros) {
-      setErros(resposta.erros)
-      irParaPrimeiraAbaComErro(resposta.erros)
-    }
-    if (resposta?.erro) return setErro(resposta.erro)
-    fechar()
+    return mandar(() => aoSalvar(pedido))
   }
 
-  async function enviar() {
+  function enviar() {
     if (enviando) return
     const achados = validar()
-    if (Object.keys(achados).length > 0) return irParaPrimeiraAbaComErro(achados)
+    if (!conferir(achados)) return irParaPrimeiraAbaComErro(achados)
     return novo ? criar() : editar()
   }
 
@@ -432,12 +427,8 @@ export default function FichaDoConsultor({
     enviar()
   }
 
-  async function colocarNosTimes() {
-    setEnviando(true)
-    const resposta = await aoColocarNosTimes(jaExiste.id, marcados)
-    setEnviando(false)
-    if (resposta?.erro) return setErro(resposta.erro)
-    fechar()
+  function colocarNosTimes() {
+    return enviarComAviso(() => aoColocarNosTimes(jaExiste.id, marcados))
   }
 
   const estado = novo ? null : situacao(pessoa)
@@ -653,10 +644,10 @@ export default function FichaDoConsultor({
                   <CampoSenha id="ficha-senha" valor={dados.senha} aoMudar={definir('senha')}
                     dica="Só senha forte é aceita. Deixe em branco para manter a atual; ela muda quando você salva." />
                 </Campo>
-                <Campo id="ficha-senha-repetida" rotulo="Repita a senha nova" erro={erroDaRepetida}>
+                <Campo id="ficha-senha-repetida" rotulo="Repita a senha nova" erro={erros.repetida}>
                   <Input id="ficha-senha-repetida" type="password" autoComplete="new-password" className="h-10"
                     aria-describedby="ficha-senhas-iguais" value={dados.repetida} onChange={mudar('repetida')} />
-                  <SenhasIguais id="ficha-senhas-iguais" senha={dados.senha} repetida={dados.repetida} calada={Boolean(erroDaRepetida)} />
+                  <SenhasIguais id="ficha-senhas-iguais" senha={dados.senha} repetida={dados.repetida} calada={Boolean(erros.repetida)} />
                 </Campo>
               </CartaoDaSecao>
             </Bloco>
