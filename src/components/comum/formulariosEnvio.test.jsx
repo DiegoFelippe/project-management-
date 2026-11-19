@@ -97,25 +97,47 @@ describe('envio dos formulários em janela', () => {
 
   // Usabilidade, U4 (pedido do Diego, 18/11): toda janela que envia o que a pessoa digitou pergunta antes de descartar.
   // A janela calcula `alterado` (useAlterado) e a JanelaFormulario pergunta no Cancelar, no Esc e no X. Fora: as janelas
-  // de uma escolha só (sem nada digitado) e as confirmações, listadas aqui com o motivo.
+  // de uma escolha só (sem nada digitado) e as confirmações, listadas aqui pelo componente, com o motivo. A exceção vale
+  // para uma janela só do componente (revisão do lote F): outra janela no mesmo arquivo ou componente é conferida.
+  // Sem exceção, porque a guarda não as vê enviando: a Reserva do AbrirCartao (só mostra "Abrindo…" ou o erro) e a
+  // JanelaApagarQuadro (Arquivar e Apagar com onClick próprio).
   const SEM_PERGUNTA = {
-    '/src/components/clientes/EscolhaDeOcupacao.jsx': 'uma escolha só (consultor ou consultoria), sem nada digitado',
-    '/src/components/quadro/ApagarColuna.jsx': 'confirmação de apagar',
-    '/src/components/quadros/JanelaApagarQuadro.jsx': 'confirmação de apagar',
-    '/src/components/quadro/AbrirCartao.jsx': 'a janela do cartão grava campo a campo e pergunta pelo NaoSalvo',
+    EscolhaDeOcupacao: 'uma escolha só (consultor ou consultoria), sem nada digitado',
+    ApagarColuna: 'confirmação de apagar',
   }
+
+  // O componente em que a tag está: a última `function Nome(` antes dela.
+  const componenteDaTag = (codigo, indice) => [...codigo.slice(0, indice).matchAll(/function ([A-Z]\w*)\s*\(/g)].at(-1)?.[1]
+
+  function janelasSemAlterado(nome, codigo) {
+    const problemas = []
+    const isentas = new Set()
+    for (const { index } of codigo.matchAll(/<JanelaFormulario\b/g)) {
+      const tag = tagDeAbertura(codigo, index)
+      const envia = /\srotuloEnviar=/.test(tag) || (/\srodape=/.test(tag) && /type="submit"|onClick=\{enviar\}/.test(tag))
+      if (!envia || /\salterado=/.test(tag)) continue
+      const componente = componenteDaTag(codigo, index)
+      if (SEM_PERGUNTA[componente] && !isentas.has(componente)) isentas.add(componente)
+      else problemas.push(`${nome} (${componente}): JanelaFormulario que envia sem alterado=`)
+    }
+    return problemas
+  }
+
+  it('a exceção vale só para a janela do componente listado: uma janela nova no mesmo arquivo é conferida', () => {
+    const exceto = '<JanelaFormulario titulo="Apagar?" rodape={<Button type="submit" form="f" />}>'
+    const nova = '<JanelaFormulario titulo="Nova" form="g" rotuloEnviar="Salvar">'
+    expect(janelasSemAlterado('ApagarColuna.jsx', `function ApagarColuna() { return ${exceto} }`)).toEqual([])
+    expect(janelasSemAlterado('ApagarColuna.jsx', `function ApagarColuna() { return ${exceto} }\nfunction Outra() { return ${nova} }`))
+      .toEqual(['ApagarColuna.jsx (Outra): JanelaFormulario que envia sem alterado='])
+    expect(janelasSemAlterado('ApagarColuna.jsx', `function ApagarColuna() { return x ? ${exceto} : ${nova} }`))
+      .toEqual(['ApagarColuna.jsx (ApagarColuna): JanelaFormulario que envia sem alterado='])
+  })
 
   it('toda JanelaFormulario que envia (rotuloEnviar= ou um submit no rodape=) passa alterado=', () => {
     const problemas = []
     for (const arquivo of arquivosJsx(join(process.cwd(), 'src'))) {
       const codigo = readFileSync(arquivo, 'utf8')
-      if (!codigo.includes('<JanelaFormulario')) continue
-      const nome = arquivo.replace(process.cwd(), '')
-      if (SEM_PERGUNTA[nome]) continue
-      for (const tag of aberturasDaJanela(codigo)) {
-        const envia = /\srotuloEnviar=/.test(tag) || (/\srodape=/.test(tag) && /type="submit"|onClick=\{enviar\}/.test(tag))
-        if (envia && !/\salterado=/.test(tag)) problemas.push(`${nome}: JanelaFormulario que envia sem alterado=`)
-      }
+      if (codigo.includes('<JanelaFormulario')) problemas.push(...janelasSemAlterado(arquivo.replace(process.cwd(), ''), codigo))
     }
     expect(problemas).toEqual([])
   })
