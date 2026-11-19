@@ -309,6 +309,36 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+/* Movimento dos gráficos (pedido do Diego, 19/11): colunas crescem da base e barras da esquerda em onda (atraso pelo
+   índice, --i), a linha e o arco se desenham (o elemento com pathLength="1") e células e quadradinhos entram em cascata.
+   Só quando o elemento aparece: a releitura com as mesmas chaves não mexe. Keyframes só com "from", e `backwards`: no fim
+   o elemento fica com o próprio valor (fill-opacity, tracejado). "Reduzir movimento": tudo pronto, sem o atraso. */
+@keyframes onda {
+  from { transform: scaleY(0); }
+}
+@keyframes cascata {
+  from { opacity: 0; }
+}
+.grafico-onda, .grafico-onda-deitada {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: onda 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: min(calc(var(--i, 0) * 60ms), 720ms);
+}
+.grafico-onda-deitada { transform-origin: left; animation-name: encher; }
+.grafico-desenha {
+  stroke-dasharray: 1;
+  animation: desenhar 0.9s cubic-bezier(0.65, 0, 0.35, 1) backwards;
+  animation-delay: calc(150ms + min(calc(var(--i, 0) * 90ms), 720ms));
+}
+.grafico-cascata {
+  animation: cascata 0.35s ease-out backwards;
+  animation-delay: min(calc(var(--i, 0) * 12ms), 600ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .grafico-onda, .grafico-onda-deitada, .grafico-desenha, .grafico-cascata { animation: none; }
+}
+
 /* Tela de entrar: rede da consultoria e cartões de gestão. */
 @keyframes entrar {
   from { opacity: 0; transform: translateY(14px) scale(0.96); }

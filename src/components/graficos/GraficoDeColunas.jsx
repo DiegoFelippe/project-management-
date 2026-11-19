@@ -2,23 +2,16 @@ import { useRef } from 'react'
 import { TAMANHO } from '@/lib/tipografia'
 import Dica from './Dica'
 import EixoY from './EixoY'
-import { escalaBonita, formatarEixo, margemDoEixo, passoDosRotulos } from './escala'
+import { caminhoDaColuna, escalaBonita, formatarEixo, margemDoEixo, passoDosRotulos } from './escala'
 import { pontoDoFoco, useDica } from './useDica'
 import { useLargura } from './useLargura'
-
-// Coluna com a ponta de cima arredondada (raio 4) e a base reta.
-function caminhoDaColuna(x, base, largura, altura, raio = 4) {
-  if (altura <= 0.5) return null
-  const r = Math.min(raio, altura, largura / 2)
-  const topo = base - altura
-  return `M${x},${base}V${topo + r}A${r},${r} 0 0 1 ${x + r},${topo}H${x + largura - r}A${r},${r} 0 0 1 ${x + largura},${topo + r}V${base}Z`
-}
 
 // Colunas por categoria (meses, semanas) em SVG desenhado na largura real do contêiner (sem viewBox que estica: o texto
 // fica sempre em 11 px). Colunas de no máximo 24 px, ponta de 4 px; esmaecida = fora do período; rótulos do eixo X com
 // 44 px entre eles (sempre o último). Opcional: a linha de referência por categoria (capacidade de cada mês, com um
 // ponto por item; o último trecho tracejado e o ponto vazado quando o último item é `parcial`) ou uma referência
 // horizontal (previsão), com rótulo. Cada coluna é focável (aria-label) e mostra a dica no mouse, no toque e no foco.
+// As colunas crescem em onda da esquerda para a direita (.grafico-onda), só quando aparecem (chave nova).
 // itens: [{ chave, rotulo, valor, referencia?, esmaecido?, parcial?, rotuloNaColuna?, aria, dica }].
 export default function GraficoDeColunas({
   itens, altura = 210, unidade = 'h', linhaDeReferencia = false, referenciaHorizontal = null, rotuloAria,
@@ -62,8 +55,8 @@ export default function GraficoDeColunas({
               <rect x={centro(i) - banda / 2 + 1} y={m.t} width={Math.max(0, banda - 2)} height={alturaUtil} rx="6"
                 className="fill-transparent group-hover/coluna:fill-muted/70 group-focus-visible/coluna:fill-muted/70 group-focus-visible/coluna:stroke-ring group-focus-visible/coluna:stroke-2" />
               {d && (
-                <path data-coluna="" data-largura={larguraDaColuna} d={d} fillOpacity={item.esmaecido ? 0.42 : undefined}
-                  className="pointer-events-none fill-grafico-serie transition-[filter] group-hover/coluna:brightness-115 group-focus-visible/coluna:brightness-115" />
+                <path data-coluna="" data-largura={larguraDaColuna} d={d} fillOpacity={item.esmaecido ? 0.42 : undefined} style={{ '--i': i }}
+                  className="grafico-onda pointer-events-none fill-grafico-serie transition-[filter] group-hover/coluna:brightness-115 group-focus-visible/coluna:brightness-115" />
               )}
             </g>
           )

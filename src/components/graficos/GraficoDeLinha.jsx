@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { TAMANHO } from '@/lib/tipografia'
+import { cn } from '@/lib/utils'
+import { corDe } from './cores'
 import Dica from './Dica'
 import EixoY from './EixoY'
 import { escalaBonita, formatarEixo, formatarValor, margemDoEixo, passoDosRotulos } from './escala'
@@ -14,7 +16,9 @@ const textoDaDica = (d) => `${d.titulo}: ${d.linhas.map((l) => [l.valor, l.rotul
 // (a do ponto em `dicas`, ou as séries do ponto); o leitor de tela ouve o ponto novo. Série `tracejada` (projeção,
 // semana em andamento) começa no último ponto real da primeira série. Opcional: faixa de fundo [início, fim] (as
 // semanas do período), referência horizontal (previsão) e marcas com rótulo (fim, pico; lado 'acima' | 'abaixo' |
-// 'esquerda'). series: [{ pontos: (número | nulo)[], nome?, area?, tracejada? }].
+// 'esquerda'). series: [{ pontos: (número | nulo)[], nome?, area?, tracejada?, cor? }]; `cor` (nome de COR ou valor de CSS)
+// troca o azul da série no traço e na dica (ex.: a projeção em 'acima' quando passa da previsão). A linha cheia se
+// desenha (.grafico-desenha); a área, a tracejada e as marcas entram depois, pela opacidade.
 export default function GraficoDeLinha({
   rotulos, series, dicas, altura = 200, unidade = '', referenciaHorizontal = null, faixa = null, marcas = [], rotuloAria,
 }) {
@@ -56,7 +60,7 @@ export default function GraficoDeLinha({
   const dicaDe = (i) => dicas?.[i] ?? {
     titulo: rotulos[i],
     linhas: series.filter((s) => s.pontos[i] != null)
-      .map((s) => ({ valor: formatarValor(s.pontos[i], unidade), rotulo: s.nome, cor: 'serie', tracejado: s.tracejada })),
+      .map((s) => ({ valor: formatarValor(s.pontos[i], unidade), rotulo: s.nome, cor: s.cor ?? 'serie', tracejado: s.tracejada })),
   }
   const yDoPonto = (i) => {
     const serie = series.find((s) => s.pontos[i] != null)
@@ -112,11 +116,14 @@ export default function GraficoDeLinha({
           return (
             <g key={s} className="pointer-events-none">
               {serie.area && (
-                <path data-area="" className="fill-grafico-lavado"
+                <path data-area="" className="grafico-cascata fill-grafico-lavado"
                   d={`M${pontos[0][0]},${y(0)}L${pontos.map((p) => p.join(',')).join('L')}L${pontos.at(-1)[0]},${y(0)}Z`} />
               )}
+              {/* pathLength="1" só na cheia: no tracejado ele mudaria o "5 4". A tracejada aparece quando a cheia termina. */}
               <polyline data-serie={s} points={emTexto(pontos)} fill="none" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"
-                strokeDasharray={serie.tracejada ? '5 4' : undefined} className="stroke-grafico-serie" />
+                strokeDasharray={serie.tracejada ? '5 4' : undefined} pathLength={serie.tracejada ? undefined : 1}
+                style={{ stroke: serie.cor ? corDe(serie.cor) : undefined, animationDelay: serie.tracejada ? '0.9s' : undefined }}
+                className={cn('stroke-grafico-serie', serie.tracejada ? 'grafico-cascata' : 'grafico-desenha')} />
             </g>
           )
         })}
@@ -128,7 +135,7 @@ export default function GraficoDeLinha({
           const tx = lado !== 'acima' ? x(marca.i) - 8 : x(marca.i) + (ancora === 'end' ? 4 : ancora === 'start' ? -4 : 0)
           const ty = lado === 'abaixo' ? Math.min(y(valor) + 18, m.t + alturaUtil - 4) : y(valor) - 10
           return (
-            <g key={`${marca.serie}-${marca.i}`} data-marca="" className="pointer-events-none">
+            <g key={`${marca.serie}-${marca.i}`} data-marca="" className="grafico-cascata pointer-events-none" style={{ animationDelay: '0.9s' }}>
               <circle cx={x(marca.i)} cy={y(valor)} r="4" strokeWidth="2" className="fill-grafico-serie stroke-card" />
               <text x={tx} y={ty} textAnchor={ancora} fontSize={TAMANHO.legenda} className="fill-foreground font-semibold tabular-nums">{marca.texto}</text>
             </g>

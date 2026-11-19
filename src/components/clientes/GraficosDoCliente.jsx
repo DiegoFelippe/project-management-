@@ -237,8 +237,8 @@ function Etapas({ etapas }) {
   return (
     <CartaoDeGrafico titulo={titulo} leitura={fraseDasEtapas(etapas)}
       legenda={[
-        { forma: 'quadrado', cor: 'serie', texto: algumaNaoSeAplica ? 'Resolvidas' : 'Feitas' },
-        { forma: 'quadrado', cor: 'acima', texto: 'Atrasadas' },
+        { forma: 'quadrado', cor: 'feita', texto: algumaNaoSeAplica ? 'Resolvidas' : 'Feitas' },
+        { forma: 'quadrado', cor: 'atrasada', texto: 'Atrasadas' },
         { forma: 'quadrado', cor: 'neutro', texto: 'A fazer' },
       ]}
       tabela={{
@@ -258,9 +258,9 @@ function Etapas({ etapas }) {
             dica: {
               titulo: e.nome,
               linhas: [
-                { valor: `${INTEIRO.format(e.feitas)} de ${INTEIRO.format(e.tarefas)}`, rotulo: 'feitas', cor: 'serie' },
+                { valor: `${INTEIRO.format(e.feitas)} de ${INTEIRO.format(e.tarefas)}`, rotulo: 'feitas', cor: 'feita' },
                 ...(e.nao_se_aplica ? [{ valor: INTEIRO.format(e.nao_se_aplica), rotulo: e.nao_se_aplica === 1 ? 'não se aplica' : 'não se aplicam' }] : []),
-                { valor: INTEIRO.format(e.atrasadas), rotulo: e.atrasadas === 1 ? 'atrasada' : 'atrasadas', cor: 'acima' },
+                { valor: INTEIRO.format(e.atrasadas), rotulo: e.atrasadas === 1 ? 'atrasada' : 'atrasadas', cor: 'atrasada' },
                 { valor: INTEIRO.format(aFazer), rotulo: 'a fazer' },
               ],
             },

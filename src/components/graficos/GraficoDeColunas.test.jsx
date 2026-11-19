@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -32,6 +33,23 @@ describe('GraficoDeColunas', () => {
       expect(d).toMatch(/V[\d.]+Z$/) // desce reto até a base
       expect(coluna).toHaveClass('fill-grafico-serie')
     }
+  })
+
+  it('as colunas crescem em onda da esquerda para a direita (grafico-onda com --i); a releitura com as mesmas chaves não recria a coluna (não cresce de novo)', () => {
+    const { rerender } = render(<GraficoDeColunas itens={itens()} rotuloAria="Realizado e capacidade por mês" />)
+    const colunas = grafico().querySelectorAll('[data-coluna]')
+    expect(colunas[0]).toHaveClass('grafico-onda')
+    expect(colunas[4].style.getPropertyValue('--i')).toBe('4')
+    rerender(<GraficoDeColunas itens={itens(6, (i) => ({ valor: 120 + i * 50 }))} rotuloAria="Realizado e capacidade por mês" />)
+    expect(grafico().querySelectorAll('[data-coluna]')[4]).toBe(colunas[4])
+  })
+
+  it('as classes de movimento estão em src/index.css e "reduzir movimento" as desliga (tudo pronto, sem esperar o atraso)', () => {
+    const css = readFileSync('src/index.css', 'utf8')
+    for (const classe of ['grafico-onda', 'grafico-onda-deitada', 'grafico-desenha', 'grafico-cascata']) {
+      expect(css, classe).toMatch(new RegExp(`\\.${classe}[\\s,{]`))
+    }
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.grafico-onda, \.grafico-onda-deitada, \.grafico-desenha, \.grafico-cascata \{ animation: none; \}/)
   })
 
   it('coluna esmaecida (fora do período) mais clara', () => {

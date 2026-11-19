@@ -1,3 +1,4 @@
+import { useContagem } from '@/lib/useContagem'
 import { cn } from '@/lib/utils'
 
 // Cor do quadradinho do ícone.
@@ -25,6 +26,8 @@ const DESTAQUES = { atencao: 'text-notice', perigo: 'text-destructive' }
 // Cor da seta e do número da variação: verde quando o movimento é bom, vermelho quando é ruim, cinza quando igual.
 const TONS_DA_VARIACAO = { bom: 'text-positive', ruim: 'text-destructive', neutro: 'text-muted-foreground' }
 
+const INTEIRO = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
+
 const texto = (valor) => {
   if (valor === null || valor === undefined) return '—'
   return typeof valor === 'number' ? valor.toLocaleString('pt-BR') : valor
@@ -32,18 +35,20 @@ const texto = (valor) => {
 
 // "▲ 12% vs out." (variação contra o período anterior; src/lib/variacao.js e rotuloDaComparacao). A seta e as cores são
 // só para os olhos; o leitor de tela ouve "subiu 12% vs out.". Só recebe objeto ou nulo: nulo = a comparação ainda
-// carrega ("—"); undefined não chega aqui (o cartão fica sem a linha).
-function Variacao({ variacao }) {
+// carrega ("—"); undefined não chega aqui (o cartão fica sem a linha). `escondida`: o número ainda corre (a linha guarda o
+// lugar, sem pular, e aparece quando ele chega; o leitor de tela já a lê).
+function Variacao({ variacao, escondida }) {
+  const entrada = cn('transition-opacity duration-300', escondida && 'opacity-0')
   if (variacao === null) {
     return (
-      <span data-variacao="" className="mt-1 block text-legenda text-muted-foreground max-sm:col-span-full max-sm:mt-0">
+      <span data-variacao="" className={cn('mt-1 block text-legenda text-muted-foreground max-sm:col-span-full max-sm:mt-0', entrada)}>
         <span aria-hidden="true">—</span><span className="sr-only">Carregando a comparação</span>
       </span>
     )
   }
   const { texto: mostrado, tom, paraLeitor, comparado } = variacao
   return (
-    <span data-variacao="" className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-legenda max-sm:col-span-full max-sm:mt-0">
+    <span data-variacao="" className={cn('mt-1 flex flex-wrap items-baseline gap-x-1.5 text-legenda max-sm:col-span-full max-sm:mt-0', entrada)}>
       <span aria-hidden="true" className={cn('font-semibold whitespace-nowrap tabular-nums', TONS_DA_VARIACAO[tom] ?? TONS_DA_VARIACAO.neutro)}>{mostrado}</span>
       {comparado && <span aria-hidden="true" className="text-muted-foreground">{comparado}</span>}
       <span className="sr-only">{comparado ? `${paraLeitor} ${comparado}` : paraLeitor}</span>
@@ -67,44 +72,56 @@ function Variacao({ variacao }) {
 // tela volta à página 1, porque o filtro mudou). Só o cartão cujo número a lista sabe filtrar no banco tem destino: ele
 // vira um botão ("Aguardando consultor: 16. Mostrar na lista"), com o foco à vista e o afundar dos botões; `ativo` marca o
 // do filtro que está valendo (aria-current). Os outros continuam só número, sem foco.
+// `contagem` (pedido do Diego, 19/11) no lugar de `valor`: { numero (nulo = "—"), formatar (inteiro em pt-BR se não disser),
+// chave (o período) }: o número corre até o valor (useContagem; o vizinho começa 120 ms depois), a linha da variação
+// aparece quando ele chega, e o leitor de tela (e o nome do botão) recebe só o valor final.
 export default function CartoesDeNumeros({ rotulo, cartoes, className }) {
   return (
     <section aria-label={rotulo} className={cn('mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4', className)}>
-      {cartoes.map(({ chave, rotulo: nome, valor, icone: Icone, tom, destaque, detalhe, variacao, destino, ativo }) => {
-        const classes = cn('card cartao-animado grid items-start gap-x-3 px-4 py-3 transition-[translate,box-shadow] duration-200',
-          Icone ? 'grid-cols-[auto_minmax(0,1fr)]' : 'grid-cols-1',
-          'hover:-translate-y-px hover:shadow-md max-sm:grid-rows-[2.25rem] max-sm:gap-x-2 max-sm:gap-y-1.5 max-sm:px-3 max-sm:py-2.5')
-        const conteudo = (
-          <>
-            {Icone && (
-              <span className={cn('grid size-9 shrink-0 place-items-center rounded-xl max-sm:col-start-1 max-sm:row-start-1 max-sm:size-7 max-sm:self-center max-sm:rounded-lg',
-                TONS[tom] ?? TONS.azul)}>
-                <Icone className="icone-do-cartao size-[17px] max-sm:size-[15px]" aria-hidden="true" />
-              </span>
-            )}
-            <span className={cn('flex min-w-0 flex-col max-sm:contents', Icone && 'col-start-2')}>
-              <span data-numero className={cn('block text-destaque leading-none font-bold tabular-nums max-sm:col-span-full max-sm:row-start-2',
-                DESTAQUES[destaque])}>{texto(valor)}</span>
-              <span title={nome} className={cn('mt-1 block text-rotulo text-muted-foreground max-sm:row-start-1 max-sm:mt-0 max-sm:self-center max-sm:line-clamp-2 sm:truncate',
-                Icone && 'max-sm:col-start-2')}>{nome}</span>
-              {detalhe && (
-                <span className="mt-0.5 block text-legenda text-muted-foreground max-sm:col-span-full max-sm:mt-0 max-sm:line-clamp-2 sm:truncate"
-                  title={detalhe}>{detalhe}</span>
-              )}
-              {variacao !== undefined && <Variacao variacao={variacao} />}
-            </span>
-          </>
-        )
-        if (!destino) return <div key={chave} data-cartao={chave} className={classes}>{conteudo}</div>
-        return (
-          <button key={chave} type="button" data-cartao={chave} onClick={destino} aria-current={ativo ? 'true' : undefined}
-            aria-label={`${nome}: ${texto(valor)}. Mostrar na lista`} title="Mostrar na lista"
-            className={cn(classes, 'botao-animado text-left outline-none active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring',
-              ativo && 'ring-2 ring-primary/40')}>
-            {conteudo}
-          </button>
-        )
-      })}
+      {cartoes.map((cartao, i) => <Cartao key={cartao.chave} cartao={cartao} atraso={i * 120} />)}
     </section>
+  )
+}
+
+function Cartao({ cartao, atraso }) {
+  const { chave, rotulo: nome, valor, icone: Icone, tom, destaque, detalhe, variacao, destino, ativo, contagem } = cartao
+  const formatar = contagem?.formatar ?? INTEIRO.format
+  const correndo = useContagem(contagem?.numero ?? null, { chave: contagem?.chave, atraso })
+  const final = !contagem ? texto(valor) : contagem.numero == null ? '—' : formatar(contagem.numero)
+  const mostrado = contagem && correndo != null ? formatar(correndo) : final
+  const contando = contagem != null && correndo !== (contagem.numero ?? null)
+  const classes = cn('card cartao-animado grid items-start gap-x-3 px-4 py-3 transition-[translate,box-shadow] duration-200',
+    Icone ? 'grid-cols-[auto_minmax(0,1fr)]' : 'grid-cols-1',
+    'hover:-translate-y-px hover:shadow-md max-sm:grid-rows-[2.25rem] max-sm:gap-x-2 max-sm:gap-y-1.5 max-sm:px-3 max-sm:py-2.5')
+  const conteudo = (
+    <>
+      {Icone && (
+        <span className={cn('grid size-9 shrink-0 place-items-center rounded-xl max-sm:col-start-1 max-sm:row-start-1 max-sm:size-7 max-sm:self-center max-sm:rounded-lg',
+          TONS[tom] ?? TONS.azul)}>
+          <Icone className="icone-do-cartao size-[17px] max-sm:size-[15px]" aria-hidden="true" />
+        </span>
+      )}
+      <span className={cn('flex min-w-0 flex-col max-sm:contents', Icone && 'col-start-2')}>
+        <span data-numero aria-hidden={contagem ? 'true' : undefined} className={cn('block text-destaque leading-none font-bold tabular-nums max-sm:col-span-full max-sm:row-start-2',
+          DESTAQUES[destaque])}>{mostrado}</span>
+        {contagem && <span className="sr-only">{final}</span>}
+        <span title={nome} className={cn('mt-1 block text-rotulo text-muted-foreground max-sm:row-start-1 max-sm:mt-0 max-sm:self-center max-sm:line-clamp-2 sm:truncate',
+          Icone && 'max-sm:col-start-2')}>{nome}</span>
+        {detalhe && (
+          <span className="mt-0.5 block text-legenda text-muted-foreground max-sm:col-span-full max-sm:mt-0 max-sm:line-clamp-2 sm:truncate"
+            title={detalhe}>{detalhe}</span>
+        )}
+        {variacao !== undefined && <Variacao variacao={variacao} escondida={contando} />}
+      </span>
+    </>
+  )
+  if (!destino) return <div data-cartao={chave} className={classes}>{conteudo}</div>
+  return (
+    <button type="button" data-cartao={chave} onClick={destino} aria-current={ativo ? 'true' : undefined}
+      aria-label={`${nome}: ${final}. Mostrar na lista`} title="Mostrar na lista"
+      className={cn(classes, 'botao-animado text-left outline-none active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring',
+        ativo && 'ring-2 ring-primary/40')}>
+      {conteudo}
+    </button>
   )
 }

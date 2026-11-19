@@ -86,6 +86,33 @@ describe('GraficoDeLinha', () => {
     expect(grafico().querySelector('[data-area]')).toHaveClass('fill-grafico-lavado')
   })
 
+  it('a linha se desenha (pathLength 1); a tracejada e a área entram depois, pela opacidade (o tracejado não muda)', () => {
+    render(
+      <GraficoDeLinha rotulos={ROTULOS} unidade="h" rotuloAria="Check-ins por semana"
+        series={[{ pontos: [10, 20, 30, null, null], area: true }, { pontos: [null, null, null, 40, 50], tracejada: true }]} />,
+    )
+    const real = grafico().querySelector('[data-serie="0"]')
+    const projecao = grafico().querySelector('[data-serie="1"]')
+    expect(real).toHaveAttribute('pathLength', '1')
+    expect(real).toHaveClass('grafico-desenha')
+    expect(projecao).not.toHaveAttribute('pathLength')
+    expect(projecao).not.toHaveClass('grafico-desenha')
+    expect(projecao).toHaveClass('grafico-cascata')
+    expect(grafico().querySelector('[data-area]')).toHaveClass('grafico-cascata')
+  })
+
+  it('cor da série (projeção vermelha quando passa da previsão): no traço e na chave da dica', async () => {
+    render(
+      <GraficoDeLinha rotulos={ROTULOS} unidade="h" rotuloAria="Check-ins por semana"
+        series={[{ nome: 'realizado', pontos: [10, 20, 30, null, null] }, { nome: 'projeção', pontos: [null, null, null, 40, 50], tracejada: true, cor: 'acima' }]} />,
+    )
+    expect(grafico().querySelector('[data-serie="1"]').style.stroke).toBe('var(--grafico-acima)')
+    expect(grafico().querySelector('[data-serie="0"]').style.stroke).toBe('')
+    await userEvent.tab()
+    const chaves = screen.getByRole('tooltip').querySelectorAll('[data-chave]')
+    expect(chaves[0].style.borderTopColor).toBe('var(--grafico-acima)')
+  })
+
   it('faixa de fundo nas posições dadas (meio passo para cada lado, sem passar das margens)', () => {
     render(<GraficoDeLinha rotulos={ROTULOS} rotuloAria="Check-ins por semana" faixa={[2, 4]} series={[{ pontos: [1, 2, 3, 4, 5] }]} />)
     const meioPasso = (640 - margem() - 16) / 4 / 2

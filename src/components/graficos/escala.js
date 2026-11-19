@@ -45,3 +45,11 @@ export function larguraDoTexto(texto) {
 export function margemDoEixo(rotulos) {
   return Math.ceil(Math.max(0, ...rotulos.map(larguraDoTexto))) + 10
 }
+
+// Coluna com a ponta de cima arredondada (`raio`; 0 = reta, para os segmentos de baixo de uma pilha) e a base reta.
+export function caminhoDaColuna(x, base, largura, altura, raio = 4) {
+  if (altura <= 0.5) return null
+  const r = Math.min(raio, altura, largura / 2)
+  const topo = base - altura
+  return `M${x},${base}V${topo + r}A${r},${r} 0 0 1 ${x + r},${topo}H${x + largura - r}A${r},${r} 0 0 1 ${x + largura},${topo + r}V${base}Z`
+}

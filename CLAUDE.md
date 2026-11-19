@@ -337,8 +337,11 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
 
 - **Sem biblioteca de gráfico** (recharts mediu 138 KB gzip): todo gráfico usa os componentes de
   `src/components/graficos/` — `CartaoDeGrafico` (título, leitura, legenda, estados), `GraficoDeColunas`,
-  `GraficoDeLinha`, `BarrasHorizontais`, `MiniBarra`, `Medidor`, `BarraSegmentada`, `DiasComCheckin`, com a `Dica` e a
-  `Legenda` deles. Gráfico novo reaproveita essas peças; peça nova entra lá, com teste.
+  `GraficoDeLinha`, `BarrasHorizontais` (com `cor` por item e `zonas` de fundo), `MiniBarra`, `Medidor`,
+  `BarraSegmentada`, `DiasComCheckin` e, de 19/11, `Rosca`, `MapaDeCalor`, `ColunasEmpilhadas`, `Quadradinhos` e
+  `FaixaDeGrupos` (estas três com a `LegendaComNumeros`), com a `Dica` e a `Legenda` deles. Gráfico novo reaproveita
+  essas peças; peça nova entra lá, com teste. Sem nada para mostrar (total 0), a peça não desenha nada e o cartão mostra
+  o vazio (nunca arco NaN nem 0/0).
 - **Séries pela paleta de 19/11** (`corDaSerie(i)` de `graficos/cores.js`): ordem fixa azul, turquesa, violeta, mostarda,
   rosa, verde, laranja, índigo; mais de 8 itens: os 8 maiores e "Outros" em grafite (`COR_OUTROS`). Estado nunca usa a paleta.
 - **Cores só por `--grafico-*`** (`src/index.css`, claro e escuro; nomes curtos em `graficos/cores.js`): nada de hex
@@ -348,7 +351,14 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
   (11 px) ou maior; rótulos do eixo X com 44 px entre eles (sempre o último); a 360 px nada rola para o lado.
 - **Todo gráfico tem visão em tabela** ("Ver em tabela", com os mesmos números) e **dica no mouse, no toque e no
   teclado** (o SVG é `role="group"` com o nome do gráfico; marca focável com `aria-label`; na linha, um alvo só e as
-  setas ← →; Esc fecha). Texto da dica é texto do React, nunca HTML montado.
+  setas ← →; no mapa de calor, um alvo só e as setas ← → ↑ ↓; Esc fecha). Texto da dica é texto do React, nunca HTML
+  montado. Nos quadradinhos e na faixa os números ficam à vista na legenda (imagem com o resumo, sem dica).
+- **Movimento** (pedido do Diego, 19/11): colunas e barras crescem em onda (`.grafico-onda`, `.grafico-onda-deitada`,
+  atraso pelo índice em `--i`), a linha e o arco se desenham (`.grafico-desenha`, com `pathLength="1"`; nunca no
+  tracejado), células e quadradinhos entram em cascata (`.grafico-cascata`), e os números dos cartões correm até o valor
+  (`contagem` do `CartoesDeNumeros`, `src/lib/useContagem.js`; o leitor de tela recebe só o valor final). Só quando o
+  elemento aparece: a releitura do mesmo período (mesmas chaves, mesma `chave` da contagem) não mexe; trocar o período
+  conta de novo. Só CSS e `requestAnimationFrame`; "reduzir movimento" deixa tudo pronto (regra em `src/index.css`).
 - **A leitura (frase do gráfico) usa só números do banco** ou a lista inteira que o gráfico mostra, nunca uma amostra:
   as regras ficam em `src/lib/frasesDosGraficos.js`, com teste. A variação dos cartões ("▲ 12% vs out.") é
   `src/lib/variacao.js` + `rotuloDaComparacao` (`src/lib/periodo.js`), com o período anterior vindo do banco.

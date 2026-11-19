@@ -94,10 +94,58 @@ describe('BarrasHorizontais', () => {
     const partes = [...linha('Financeiro').querySelectorAll('[data-parte]')]
     expect(partes.map((p) => p.dataset.parte)).toEqual(['feita', 'atrasada', 'neutro'])
     expect(partes.map((p) => p.style.flexGrow)).toEqual(['4', '3', '5'])
-    expect(partes[0]).toHaveClass('bg-grafico-serie')
-    expect(partes[1]).toHaveClass('bg-grafico-acima')
-    expect(partes[2]).toHaveClass('bg-grafico-neutro')
+    // Feita é o verde cheio do sucesso e atrasada o vermelho cheio (estados de 19/11); neutro, o cinza dos gráficos.
+    expect(partes.map((p) => p.style.background)).toEqual(['var(--positive-cheio)', 'var(--destructive-cheio)', 'var(--grafico-neutro)'])
     expect([...linha('Fiscal').querySelectorAll('[data-parte]')].map((p) => p.dataset.parte)).toEqual(['feita', 'neutro'])
+  })
+
+  it('as seis situações do check-list na ordem: feitas, não se aplica, em andamento, pausadas, a fazer, atrasadas', () => {
+    desenhar({
+      itens: [{
+        chave: 'diag', nome: 'Diagnóstico', valorTexto: '5 de 9', aria: 'Diagnóstico: 5 de 9', dica: { titulo: 'Diagnóstico', linhas: [] },
+        partes: [{ valor: 1, tom: 'atrasada' }, { valor: 2, tom: 'afazer' }, { valor: 1, tom: 'pausada' }, { valor: 0, tom: 'andamento' },
+          { valor: 1, tom: 'nsa' }, { valor: 4, tom: 'feita' }],
+      }],
+    })
+    const partes = [...linha('Diagnóstico').querySelectorAll('[data-parte]')]
+    expect(partes.map((p) => p.dataset.parte)).toEqual(['feita', 'nsa', 'pausada', 'afazer', 'atrasada'])
+    expect(partes.map((p) => p.style.background)).toEqual(['var(--positive-cheio)', 'var(--cor-grafite-forte)', 'var(--cor-mostarda-forte)',
+      'var(--input)', 'var(--destructive-cheio)'])
+  })
+
+  it('cor por item (ranking colorido): a barra na cor dada, no lugar do azul da série', () => {
+    desenhar({ escalaMax: 50, itens: [item('Cooperativa', 44, { cor: 'var(--cor-violeta-forte)' }), item('Alfa', 28)] })
+    const base = linha('Cooperativa').querySelector('[data-trecho="base"]')
+    expect(base.style.background).toBe('var(--cor-violeta-forte)')
+    expect(base).not.toHaveClass('bg-grafico-serie')
+    expect(linha('Alfa').querySelector('[data-trecho="base"]')).toHaveClass('bg-grafico-serie')
+  })
+
+  it('zonas de fundo (folga, ideal, acima) com a barra na cor do item e a marca do valor; sem o trecho vermelho', () => {
+    desenhar({
+      escalaMax: 1.3,
+      zonas: [{ ate: 0.7, cor: 'var(--notice-soft)' }, { ate: 1, cor: 'var(--cor-azul-suave)' }, { ate: 1.3, cor: 'var(--destructive-soft)' }],
+      itens: [item('Ana', 1.12, { cor: 'atrasada', icone: 'alerta' }), item('Elisa', 0.585, { cor: 'pausada' })],
+    })
+    const ana = linha('Ana')
+    const zonas = [...ana.querySelectorAll('[data-zona]')]
+    expect(zonas.map((z) => [z.style.left, z.style.width])).toEqual([['0%', '53.846%'], ['53.846%', '23.077%'], ['76.923%', '23.077%']])
+    expect(zonas.map((z) => z.style.background)).toEqual(['var(--notice-soft)', 'var(--cor-azul-suave)', 'var(--destructive-soft)'])
+    const base = ana.querySelector('[data-trecho="base"]')
+    expect(base.style.width).toBe('86.154%')
+    expect(base.style.background).toBe('var(--destructive-cheio)')
+    expect(ana.querySelector('[data-trecho="acima"]')).toBeNull()
+    expect(ana.querySelector('[data-marca-do-valor]').style.left).toBe('86.154%')
+    expect(ana.querySelector('[data-icone="alerta"]')).not.toBeNull()
+    expect(linha('Elisa').querySelector('[data-marca-do-valor]').style.left).toBe('45%')
+  })
+
+  it('as barras crescem da esquerda em onda (grafico-onda-deitada com --i), as marcas não', () => {
+    desenhar({ marca100: { valor: 1, rotulo: '100%' }, itens: [item('Ana', 1.2), item('Bruno', 0.8)] })
+    const onda = linha('Bruno').querySelector('.grafico-onda-deitada')
+    expect(onda).toContainElement(linha('Bruno').querySelector('[data-trecho="base"]'))
+    expect(onda.style.getPropertyValue('--i')).toBe('1')
+    expect(onda).not.toContainElement(linha('Bruno').querySelector('[data-marca-100]'))
   })
 
   it('cada barra é focável com aria-label e mostra a dica no foco', async () => {

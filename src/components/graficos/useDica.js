@@ -55,3 +55,18 @@ export function pontoDoFoco(elemento) {
   const r = elemento.getBoundingClientRect()
   return [r.left + Math.min(r.width / 2, 120), r.top + r.height / 2]
 }
+
+// Props de um alvo da dica (coluna, arco): o mouse e o toque mostram onde está o ponteiro e o foco do teclado no meio do
+// alvo; sair com o mouse e perder o foco escondem (no toque, a dica fica até tocar fora).
+export function alvoDaDica(conteudo, mostrar, esconder) {
+  return {
+    'data-alvo-da-dica': '',
+    onPointerMove: (e) => mostrar(conteudo, e.clientX, e.clientY),
+    onPointerDown: (e) => mostrar(conteudo, e.clientX, e.clientY),
+    onPointerLeave: (e) => {
+      if (e.pointerType !== 'touch') esconder()
+    },
+    onFocus: (e) => mostrar(conteudo, ...pontoDoFoco(e.currentTarget)),
+    onBlur: esconder,
+  }
+}

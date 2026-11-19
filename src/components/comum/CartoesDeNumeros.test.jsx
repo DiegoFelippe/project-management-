@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Gauge, Users } from 'lucide-react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CartoesDeNumeros from './CartoesDeNumeros'
 import { numeroDoCartao } from '@/test/cartoes'
 
@@ -180,5 +180,70 @@ describe('CartoesDeNumeros com destino', () => {
   it('o número ainda carregando diz "—" no nome', () => {
     render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={[{ chave: 'a', rotulo: 'Ativas', valor: null, destino: () => {} }]} />)
     expect(screen.getByRole('button', { name: 'Ativas: —. Mostrar na lista' })).toBeInTheDocument()
+  })
+})
+
+// Pedido do Diego (19/11): os números correm até o valor (useContagem), vizinhos com 120 ms de diferença; a variação
+// aparece quando a contagem termina; o leitor de tela recebe só o valor final.
+describe('CartoesDeNumeros com contagem', () => {
+  const HORAS = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 })
+  const COM_CONTAGEM = (extra = {}) => [
+    { chave: 'horas', rotulo: 'Horas no mês', icone: Gauge, contagem: { numero: 1020.5, formatar: (n) => `${HORAS.format(n)} h`, chave: '2026-11' },
+      variacao: { texto: '▲ 12%', tom: 'bom', paraLeitor: 'subiu 12%', comparado: 'vs out/26' }, ...extra },
+    { chave: 'clientes', rotulo: 'Clientes', icone: Users, contagem: { numero: 42, chave: '2026-11' } },
+  ]
+  const avancar = (ms) => act(() => vi.advanceTimersByTime(ms))
+  const regiao = () => screen.getByRole('region', { name: 'Indicadores de teste' })
+
+  beforeEach(() => vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] }))
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('o número corre de 0 até o valor; o leitor de tela recebe só o valor final; a variação aparece no fim', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_CONTAGEM()} />)
+    expect(numeroDoCartao(regiao(), 'Horas no mês')).toBe('0 h')
+    const cartao = within(regiao()).getByText('Horas no mês').closest('[data-cartao]')
+    expect(cartao.querySelector('[data-numero]')).toHaveAttribute('aria-hidden', 'true')
+    expect(within(cartao).getByText('1.020,5 h')).toHaveClass('sr-only')
+    expect(cartao.querySelector('[data-variacao]')).toHaveClass('opacity-0')
+    avancar(450)
+    expect(numeroDoCartao(regiao(), 'Horas no mês')).not.toBe('0 h')
+    expect(cartao.querySelector('[data-variacao]')).toHaveClass('opacity-0')
+    avancar(600)
+    expect(numeroDoCartao(regiao(), 'Horas no mês')).toBe('1.020,5 h')
+    expect(cartao.querySelector('[data-variacao]')).not.toHaveClass('opacity-0')
+    // Sem formatar, inteiro em pt-BR.
+    avancar(200)
+    expect(numeroDoCartao(regiao(), 'Clientes')).toBe('42')
+  })
+
+  it('o vizinho começa 120 ms depois', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_CONTAGEM()} />)
+    avancar(100)
+    expect(numeroDoCartao(regiao(), 'Horas no mês')).not.toBe('0 h')
+    expect(numeroDoCartao(regiao(), 'Clientes')).toBe('0')
+  })
+
+  it('releitura com a mesma chave mostra o número novo direto; carregando, "—"', () => {
+    const { rerender } = render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_CONTAGEM({ contagem: { numero: null, chave: '2026-11' } })} />)
+    expect(numeroDoCartao(regiao(), 'Horas no mês')).toBe('—')
+    rerender(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_CONTAGEM()} />)
+    avancar(1200)
+    rerender(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_CONTAGEM({ contagem: { numero: 1022, formatar: (n) => `${HORAS.format(n)} h`, chave: '2026-11' } })} />)
+    expect(numeroDoCartao(regiao(), 'Horas no mês')).toBe('1.022 h')
+  })
+
+  it('"reduzir movimento": o valor final direto e a variação à vista', () => {
+    vi.stubGlobal('matchMedia', vi.fn((consulta) => ({ matches: consulta.includes('reduce'), media: consulta, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_CONTAGEM()} />)
+    expect(numeroDoCartao(regiao(), 'Horas no mês')).toBe('1.020,5 h')
+    expect(within(regiao()).getByText('Horas no mês').closest('[data-cartao]').querySelector('[data-variacao]')).not.toHaveClass('opacity-0')
+  })
+
+  it('com destino, o nome do botão diz o valor final (não o que está correndo)', () => {
+    render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={COM_CONTAGEM({ destino: () => {} })} />)
+    expect(screen.getByRole('button', { name: 'Horas no mês: 1.020,5 h. Mostrar na lista' })).toBeInTheDocument()
   })
 })
