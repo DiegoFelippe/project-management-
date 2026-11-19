@@ -3,7 +3,7 @@
 -- 200 ms e a lista da central em até 50 ms (média de 5 execuções, com 50% de folga). Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(7);
+select plan(9);
 
 create schema testes;
 grant usage on schema testes to authenticated;
@@ -115,6 +115,12 @@ select performs_within(format('select * from public.consultores_por_ocupacao(%L)
   'escolher o consultor: consultores_por_ocupacao(<uma consultoria>) em até 200 ms na média (+50%)');
 select performs_within('select * from public.consultores_por_ocupacao(null, null, 15)', 150, 150, 5,
   'Capacidade da central (todas as consultorias): consultores_por_ocupacao(null) em até 200 ms na média (+50%)');
+-- Usuários, cartão "Acima de 100%" (usabilidade, U5): a lista filtrada (uma página, como a tela pede) tem o número do
+-- cartão e responde como as outras leituras de ocupação da central.
+select is((select count(*) from public.pessoas_acima_de_100()),
+  (select (public.indicadores_de_usuarios() ->> 'acima_de_100')::bigint), 'acima de 100%: a lista tem o número do cartão');
+select performs_within('select * from public.pessoas_acima_de_100() order by nome, id limit 15', 150, 150, 5,
+  'Usuários da central filtrados por "Acima de 100%": uma página em até 200 ms na média (+50%)');
 select performs_within($$select id, nome, horas_mes from public.clientes
     where not arquivado and consultoria_id is null order by nome, id limit 15$$, 37.5, 37.5, 5,
   'lista da central (a distribuir) em até 50 ms na média (+50%)');

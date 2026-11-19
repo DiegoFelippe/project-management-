@@ -6,7 +6,7 @@
 -- 1.000 cartões, 500 tarefas e 1.000 eventos) ficam no fim. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(66);
+select plan(71);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -624,6 +624,8 @@ select testes.como('admin_a');
 select diag('hoje_do_cliente, gestão: ' || testes.media_ms_de(format('select public.hoje_do_cliente(%L)', testes.id('grande')))
   || ' ms; horas por dia (mês atual): ' || testes.media_ms_de(format('select public.horas_do_cliente_por_dia(%L)', testes.id('grande')))
   || ' ms; horas por mês (24): ' || testes.media_ms_de(format('select * from public.horas_do_cliente_por_mes(%L, 24, null)', testes.id('grande')))
+  || ' ms; por consultor (mês): ' || testes.media_ms_de(format('select * from public.horas_do_cliente_por_consultor(%L)', testes.id('grande')))
+  || ' ms; por semana (mês): ' || testes.media_ms_de(format('select * from public.checkins_do_cliente_por_semana(%L)', testes.id('grande')))
   || ' ms');
 select performs_within(format('select public.hoje_do_cliente(%L)', testes.id('grande')), 37.5, 37.5, 5,
   'gestão: hoje_do_cliente do cliente grande em até 50 ms na média (+50%)');
@@ -631,10 +633,16 @@ select performs_within(format('select public.horas_do_cliente_por_dia(%L)', test
   'gestão: horas_do_cliente_por_dia do cliente grande em até 30 ms na média (+50%)');
 select performs_within(format('select * from public.horas_do_cliente_por_mes(%L, 24, null)', testes.id('grande')), 37.5, 37.5, 5,
   'gestão: horas_do_cliente_por_mes(24) do cliente grande em até 50 ms na média (+50%)');
+select performs_within(format('select * from public.horas_do_cliente_por_consultor(%L)', testes.id('grande')), 22.5, 22.5, 5,
+  'gestão: horas_do_cliente_por_consultor (mês atual) do cliente grande em até 30 ms na média (+50%)');
+select performs_within(format('select * from public.checkins_do_cliente_por_semana(%L)', testes.id('grande')), 22.5, 22.5, 5,
+  'gestão: checkins_do_cliente_por_semana (mês atual) do cliente grande em até 30 ms na média (+50%)');
 select is(testes.varreduras(format('select public.hoje_do_cliente(%L)', testes.id('grande')))
     + testes.varreduras(format('select public.horas_do_cliente_por_dia(%L)', testes.id('grande')))
-    + testes.varreduras(format('select * from public.horas_do_cliente_por_mes(%L, 24, null)', testes.id('grande'))),
-  0::bigint, 'gestão: nenhuma das três varre a tabela de check-ins (sem Seq Scan)');
+    + testes.varreduras(format('select * from public.horas_do_cliente_por_mes(%L, 24, null)', testes.id('grande')))
+    + testes.varreduras(format('select * from public.horas_do_cliente_por_consultor(%L)', testes.id('grande')))
+    + testes.varreduras(format('select * from public.checkins_do_cliente_por_semana(%L)', testes.id('grande'))),
+  0::bigint, 'gestão: nenhuma das cinco varre a tabela de check-ins (sem Seq Scan)');
 reset role;
 select testes.como('pessoa_v');
 select diag('hoje_do_cliente, consultor: ' || testes.media_ms_de(format('select public.hoje_do_cliente(%L)', testes.id('grande')))
@@ -647,6 +655,13 @@ select performs_within(format('select public.horas_do_cliente_por_dia(%L)', test
   'consultor: horas_do_cliente_por_dia do cliente grande em até 30 ms na média (+50%)');
 select performs_within(format('select * from public.horas_do_cliente_por_mes(%L, 24, null)', testes.id('grande')), 37.5, 37.5, 5,
   'consultor: horas_do_cliente_por_mes(24) do cliente grande em até 50 ms na média (+50%)');
+select performs_within(format('select * from public.horas_do_cliente_por_consultor(%L)', testes.id('grande')), 22.5, 22.5, 5,
+  'consultor: horas_do_cliente_por_consultor (mês atual) do cliente grande em até 30 ms na média (+50%)');
+select performs_within(format('select * from public.checkins_do_cliente_por_semana(%L)', testes.id('grande')), 22.5, 22.5, 5,
+  'consultor: checkins_do_cliente_por_semana (mês atual) do cliente grande em até 30 ms na média (+50%)');
+select is(testes.varreduras(format('select * from public.horas_do_cliente_por_consultor(%L)', testes.id('grande')))
+    + testes.varreduras(format('select * from public.checkins_do_cliente_por_semana(%L)', testes.id('grande'))),
+  0::bigint, 'consultor: horas por consultor e por semana do mês sem varrer a tabela de check-ins');
 reset role;
 select testes.como('central');
 select diag('hoje_do_cliente, central: ' || testes.media_ms_de(format('select public.hoje_do_cliente(%L)', testes.id('grande'))) || ' ms');

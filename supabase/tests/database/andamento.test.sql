@@ -212,8 +212,9 @@ select testes.exigir(testes.aplicar('gestor_a', 'a_completo', 'm_rapido', testes
 select testes.exigir(testes.feita('pessoa_a', 'cl_completo', 'Base'));
 select testes.exigir(testes.feita('pessoa_a', 'cl_completo', 'Rápida'));
 select testes.exigir(testes.feita('pessoa_a', 'cl_completo', 'Livre'));
--- a_encerrado: o modelo foi tirado (o check-list encerrado não conta).
+-- a_encerrado: o modelo foi tirado depois de uma tarefa feita (o check-list encerrado não conta; o intocado se apagaria).
 select testes.exigir(testes.aplicar('gestor_a', 'a_encerrado', 'm_todas', testes.hoje() - 30, 'cl_encerrado'));
+select testes.exigir(testes.feita('pessoa_a', 'cl_encerrado', 'Análise do DRE'));
 select testes.exigir(coalesce(testes.chamar('gestor_a', format('public.tirar_modelo(%L::uuid)', testes.id('cl_encerrado'))) ->> 'erro', 'ok'));
 -- a_arq: com modelo atrasado, mas arquivado.
 select testes.exigir(testes.aplicar('gestor_a', 'a_arq', 'm_todas', testes.hoje() - 30, 'cl_arq'));

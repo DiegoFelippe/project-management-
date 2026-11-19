@@ -1,13 +1,14 @@
 -- Check-list do cliente (desenho em docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md, "Quem faz o quê",
 -- "Aplicar = copiar", "Marcar", "Quando alguém sai" e "O que muda no check-in de hoje"; plano em
 -- docs/superpowers/plans/2026-11-17-modelos-de-checkin.md, Task 2): aplicar copia o modelo (e editar, arquivar ou apagar
--- o modelo depois não muda a cópia); trocar e tirar guardam o antigo; só o consultor do cliente marca; bloqueada até as
+-- o modelo depois não muda a cópia); trocar e tirar guardam o antigo tocado (o intocado se apaga: checklist_intocado.test.sql);
+-- só o consultor do cliente marca; bloqueada até as
 -- dependências; o que ele marca com o check-in aberto neste cliente entra no check-in; quem vê o quê; cliente movido,
 -- arquivado ou com outro consultor; o Histórico com o nome do modelo só para quem pode; cliente com check-list não se
 -- apaga; modelo em uso não se apaga; "clientes usando" nas listas e números dos modelos. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(406);
+select plan(407);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -366,6 +367,9 @@ select is((select (tipo, checklist_id, autor)::text from public.cliente_eventos
   ('modelo_aplicado', testes.id('cl_c1_1'), testes.id('central1'))::text,
   'o histórico registra "modelo aplicado", com o check-list e quem aplicou');
 
+-- Tocado (uma nota): trocar guarda o antigo como histórico. O intocado se apaga (checklist_intocado.test.sql).
+select is(testes.fazer('pessoa_a', format($$public.anotar_tarefa(%L, 'Pedir o DRE')$$,
+    testes.tarefa(testes.id('cl_c1_1'), 'Análise do DRE'))), 'ok', 'o consultor anota uma tarefa do primeiro check-list');
 select is(testes.aplicar('gestor_a', testes.id('c1'), testes.id('m_todas'), testes.hoje() - 7, 'cl_c1_2'), 'ok',
   'o gestor troca o modelo do cliente');
 select is((select (encerrado_em is not null, encerrado_por, motivo)::text from public.cliente_checklists
@@ -505,8 +509,8 @@ select is(testes.ler('pessoa_a', 'c1') - 'checklist' - 'etapas' - 'tarefas' - 'r
   'o consultor do cliente marca e não aplica; sem check-in aberto nem anterior');
 select is((testes.ler('pessoa_a', 'c1') -> 'checklist') - 'aplicado_em',
   jsonb_build_object('id', testes.id('cl_c1_2'), 'modelo_id', testes.id('m_todas'), 'modelo_nome', 'Zqc Central todas',
-    'inicio', testes.hoje() - 7, 'aplicado_por', jsonb_build_object('nome', 'Pessoa gestor_a')),
-  'o check-list ativo: modelo, início e quem aplicou');
+    'inicio', testes.hoje() - 7, 'aplicado_por', jsonb_build_object('nome', 'Pessoa gestor_a'), 'intocado', true),
+  'o check-list ativo: modelo, início, quem aplicou e se ninguém o tocou ainda');
 select is((select jsonb_agg(e - 'id' order by e ->> 'posicao') from jsonb_array_elements(testes.ler('pessoa_a', 'c1') -> 'etapas') e),
   '[{"nome": "Diagnóstico", "posicao": 1, "tarefas": 2, "feitas": 0, "nao_se_aplica": 0}, {"nome": "Plano", "posicao": 2, "tarefas": 1, "feitas": 0, "nao_se_aplica": 0}]'::jsonb,
   'as etapas com quantas tarefas, quantas feitas e quantas não se aplicam');

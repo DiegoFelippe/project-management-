@@ -3,7 +3,7 @@
 -- Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(102);
+select plan(111);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -372,6 +372,34 @@ select is((select v ->> 'mes' from j), date_trunc('month', now() at time zone 'A
 drop table j;
 select throws_ok($$ select testes.ver('inativo_a', 'public.indicadores_de_usuarios()') $$, 'P0001', 'sem_permissao',
   'usuários: pessoa inativa não recebe números');
+
+-- A lista filtrada pelo cartão "Acima de 100%" (usabilidade, U5): pessoas_acima_de_100 devolve as linhas de perfis de
+-- quem passa de 100% no mês, com a conta e o recorte do cartão (a tela pede colunas, ordem e página pela API).
+create function testes.acima(p_nome text, p_args text) returns jsonb language sql as $$
+  select testes.ver(p_nome, format('(select coalesce(jsonb_agg(p.nome order by p.nome), ''[]'') from public.pessoas_acima_de_100(%s) p)', p_args))
+$$;
+select is(testes.acima('admin_a', format('%L', testes.futuro())), '["Pessoa pessoa_c"]'::jsonb,
+  'acima de 100%: o administrador A vê a pessoa_c, a do cartão');
+select is(testes.acima('gestor_a', format('%L', testes.futuro())), '["Pessoa pessoa_c"]'::jsonb,
+  'acima de 100%: o gestor A vê quem ele criou');
+select is(testes.acima('admin_a', format('%L, %L', testes.futuro(), testes.id('B'))), '["Pessoa pessoa_c"]'::jsonb,
+  'acima de 100%: o administrador A pedindo a B continua na A');
+select is(testes.acima('admin_b', format('%L', testes.futuro())), '[]'::jsonb, 'acima de 100%: o administrador B, ninguém');
+select is(testes.acima('central', format('%L, %L', testes.futuro(), testes.id('A'))), '["Pessoa pessoa_c"]'::jsonb,
+  'acima de 100%: central + A');
+select ok((select bool_and((testes.ver(q, format('(select to_jsonb(count(*)) from public.pessoas_acima_de_100(%L))', m)) #>> '{}')::numeric
+      = testes.n(testes.ver(q, format('public.indicadores_de_usuarios(%L)', m)), 'acima_de_100'))
+    from unnest(array['admin_a', 'gestor_a', 'pessoa_a', 'admin_b', 'central']) q
+    cross join unnest(array[testes.futuro(), testes.passado(), null]) m),
+  'acima de 100%: a lista tem o número do cartão, para cada um (mês atual, futuro e passado; a central no banco todo)');
+select throws_ok($$ select testes.ver('inativo_a', '(select to_jsonb(count(*)) from public.pessoas_acima_de_100())') $$,
+  'P0001', 'sem_permissao', 'acima de 100%: pessoa inativa não lista');
+select ok(has_function_privilege('authenticated', 'public.pessoas_acima_de_100(date, uuid)', 'execute')
+    and not has_function_privilege('anon', 'public.pessoas_acima_de_100(date, uuid)', 'execute'),
+  'acima de 100%: logado lista, anônimo não');
+select is((select (p.prosecdef, p.proconfig @> array['search_path=""'], p.proretset, p.prorettype::regtype::text)::text
+    from pg_proc p where p.oid = 'public.pessoas_acima_de_100(date, uuid)'::regprocedure),
+  (true, true, true, 'perfis')::text, 'acima de 100%: security definer, search_path vazio, devolve linhas de perfis');
 
 -- ── Consultorias (só a central e o dono) ────────────────────────────────────
 create temp table j as select testes.ver('central', format('public.indicadores_de_consultorias(%L)', testes.futuro())) as v;
