@@ -87,9 +87,9 @@ describe('LinhaDaTarefa', () => {
     expect(selo).toHaveClass('bg-cor-mostarda-cheio', 'text-cor-mostarda-sobre')
   })
 
-  // Cores vivas (19/11): o selo na cor do estado dos gráficos (COR): em andamento azul e pausada mostarda, sólidos (cheio +
-  // sobre); não se aplica no grafite suave (fechada, discreta); sempre com o ícone e a palavra.
-  it('os selos nas cores de estado dos gráficos: em andamento azul, pausada mostarda (cheios) e não se aplica grafite', () => {
+  // Tropical, modelo atual (19/11): o selo na cor do estado dos gráficos (COR): em andamento azul e pausada mostarda, suaves
+  // (-cheio/-sobre são alias do suave/texto); não se aplica no grafite suave (fechada, discreta); sempre com o ícone e a palavra.
+  it('os selos nas cores de estado dos gráficos: em andamento azul, pausada mostarda (suaves) e não se aplica grafite', () => {
     const familia = (chave) => /^var\(--((?:cor-)?[a-z]+)-/.exec(COR[chave])[1]
     const selo = (campos) => {
       const { item } = linha(t('t1', 'Coleta', campos))

@@ -11,7 +11,7 @@ import { ALTURA_DO_NO, LARGURA_DO_NO, caminhoDaSeta, cortar, layoutDoFluxo, queb
 // Cores só pelos tokens do tema (mudam sozinhas no escuro); texto pela escala (TAMANHO), nunca abaixo de 11 px.
 
 // Cor de cada situação: `tom` pinta o ícone, a bolinha e a linha de baixo (currentColor); `fundo`, a caixa. As mesmas cores
-// de estado dos gráficos (COR de graficos/cores.js; cores vivas, 19/11): feita verde, não se aplica grafite, em andamento
+// de estado dos gráficos (COR de graficos/cores.js; Tropical, modelo atual, 19/11): feita verde, não se aplica grafite, em andamento
 // azul, pausada mostarda, a fazer violeta, atrasada vermelha (o suave na caixa, o forte na borda, o texto na linha de baixo).
 const ESTILO = {
   livre: { tom: 'text-cor-violeta-texto', fundo: 'fill-cor-violeta-suave stroke-cor-violeta-forte' },

@@ -2,17 +2,17 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { atalhosDoPrazo, corDaColuna, CORES_DAS_COLUNAS, CORPO_NEUTRO, OPCOES_DE_PRIORIDADE, PRIORIDADES, seloDoPrazo, TONS_DO_PRAZO } from './cores'
 
-// Classe com cor do Tailwind (bg-indigo-50, text-rose-700…): o quadro usa só os tokens do tema (cores vivas, 19/11).
+// Classe com cor do Tailwind (bg-indigo-50, text-rose-700…): o quadro usa só os tokens do tema (Tropical, modelo atual, 19/11).
 const COR_DO_TAILWIND = /(?:^|[\s:'"])(?:bg|text|border|ring)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d+/
 
 describe('cores das colunas', () => {
   it('10 cores, na ordem que o banco guarda (0 a 9)', () => {
     expect(CORES_DAS_COLUNAS.map((c) => c.nome)).toEqual([
-      'Cinza', 'Índigo', 'Azul', 'Turquesa', 'Verde', 'Amarelo', 'Laranja', 'Vermelho', 'Rosa', 'Roxo',
+      'Cinza', 'Lima', 'Azul', 'Turquesa', 'Verde', 'Amarelo', 'Laranja', 'Vermelho', 'Rosa', 'Roxo',
     ])
   })
 
-  it('cada cor nos tokens da paleta: contador e amostra no cheio + sobre (4,5:1, src/lib/contraste.test.js), fundo no véu do suave, bolinha no forte', () => {
+  it('cada cor nos tokens da paleta: contador no suave + texto escuro (4,5:1, src/lib/contraste.test.js; os tokens -cheio/-sobre são alias do suave/texto), fundo no véu do suave, bolinha no forte', () => {
     for (const c of CORES_DAS_COLUNAS.filter((cor) => cor.nome !== 'Vermelho')) {
       expect(c.cheio, c.nome).toBe(`bg-cor-${c.paleta}-cheio text-cor-${c.paleta}-sobre`)
       expect(c.corpo, c.nome).toBe(`bg-cor-${c.paleta}-suave/40 border-cor-${c.paleta}-suave`)
@@ -35,7 +35,7 @@ describe('cores das colunas', () => {
   it('a cor escolhida vale; sem cor, a automática pela posição', () => {
     expect(corDaColuna({ cor: 7 }, 0)).toBe(7)
     expect(corDaColuna({ cor: 0 }, 3)).toBe(0)
-    expect(corDaColuna({ cor: null }, 0)).toBe(1)
+    expect(corDaColuna({ cor: null }, 0)).toBe(2)
     expect(corDaColuna({ cor: null }, 1)).toBe(4)
     expect(corDaColuna({ cor: null }, 5)).toBe(0)
   })
@@ -55,7 +55,7 @@ describe('prioridade', () => {
     expect(PRIORIDADES.alta.rotulo).toBe('Alta')
   })
 
-  it('o selo é suave: baixa no verde, média no mostarda e alta no vermelho de estado (nada de cheio com texto branco)', () => {
+  it('o selo é suave: baixa no verde, média no mostarda e alta no vermelho de estado (nada de fundo sólido com texto branco)', () => {
     expect(PRIORIDADES.baixa.selo).toBe('bg-cor-verde-cheio text-cor-verde-sobre')
     expect(PRIORIDADES.media.selo).toBe('bg-cor-mostarda-cheio text-cor-mostarda-sobre')
     expect(PRIORIDADES.alta.selo).toBe('bg-destructive-soft text-destructive')

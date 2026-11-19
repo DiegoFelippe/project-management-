@@ -55,7 +55,7 @@ describe('CartoesDeNumeros', () => {
     expect(aguardando.querySelector('svg')).toBeNull()
   })
 
-  it('todo tom é suave + texto escuro, nunca cheio: azul, estados, céu (turquesa), neutro (grafite) e as cores da paleta', () => {
+  it('todo tom é suave + texto escuro (os -cheio/-sobre da paleta são alias do suave/texto): azul, estados, céu (turquesa), neutro (grafite) e as cores da paleta', () => {
     const esperado = {
       azul: ['bg-primary/10', 'text-primary-texto'], perigo: ['bg-destructive-soft', 'text-destructive'],
       aviso: ['bg-notice-soft', 'text-notice'], positivo: ['bg-positive-soft', 'text-positive'],

@@ -14,9 +14,9 @@ import { CORES_DAS_COLUNAS, corDaColuna, CORPO_NEUTRO } from './cores'
 
 const contar = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
 
-// As 10 cores das colunas no SeletorDeCor (o banco guarda o número, 0 a 9; null = a automática pela posição), no cheio
-// com o check no "sobre", como o contador.
-const CORES_DO_SELETOR = CORES_DAS_COLUNAS.map((c, i) => ({ valor: i, nome: c.nome, classe: c.cheio }))
+// As 10 cores das colunas no SeletorDeCor (o banco guarda o número, 0 a 9; null = a automática pela posição), na cor forte (a amostra
+// tem de aparecer no claro e no escuro; a escolhida leva o aro e o check).
+const CORES_DO_SELETOR = CORES_DAS_COLUNAS.map((c, i) => ({ valor: i, nome: c.nome, classe: c.ponto }))
 
 // Painel da cor: as 10 cores e "Automática" (um clique grava na hora, para todos que veem o quadro; as setas só andam,
 // para não gravar a cada tecla) e a chave "Coluna de concluídos" (prazo não conta como atrasado), como no Mochi. Abre

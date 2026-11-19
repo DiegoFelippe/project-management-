@@ -170,14 +170,14 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   `--cor-<azul|turquesa|violeta|mostarda|rosa|verde|laranja|indigo|grafite>-<texto|forte|suave>`): a paleta separa
   **categorias** (pessoas, séries, cidades, etapas), **nunca estado**; estado é verde, âmbar e vermelho, sempre com ícone e
   palavra, em trios (`--positive|--notice|--destructive`, `-cheio`, `-soft`, `--sobre-<estado>`; fundo cheio com texto
-  `bg-<estado>-cheio text-sobre-<estado>` só no botão destrutivo). Do Hub vem só o layout. **Contraste mínimo
+  `bg-<estado>-cheio text-sobre-<estado>` só no botão e no selo destrutivos). Do Hub vem só o layout. **Contraste mínimo
   4,5:1** em todo texto (auditoria, pedido do Diego 17/11): fundo azul com texto branco é `bg-primary-cheio` (no escuro o
   `--primary` é o azul claro, só para texto, foco e barras); texto azul sobre o azul-claro de realce (`bg-primary/10`,
   `bg-accent`: "Hoje", opção escolhida, selos) é `text-primary-texto`; texto sobre a cor da pessoa ou do evento usa
   `corDoTextoSobre` (`src/lib/cores.js`).
-  **Cores Tropical (pedido do Diego, 19/11, Tropical, no modelo atual):** ladrilho de ícone, selo, etiqueta, avatar e
-  contador são `bg-cor-<nome>-suave` com `text-cor-<nome>-texto` (≥ 4,5:1); selo de estado é `bg-<estado>-soft` com
-  `text-<estado>`. Sem fundo sólido de cor fora dos botões (`bg-primary-cheio` e `bg-destructive-cheio` são do `Button`, do selo `default`/`destructive` e de controles marcados, como o dia escolhido). O ícone dos cartões de números é suave com o ícone escuro. No
+  **Cores Tropical (pedido do Diego, 19/11, Tropical, no modelo atual):** ladrilho de ícone, selo, etiqueta e contador
+  são `bg-cor-<nome>-suave` com `text-cor-<nome>-texto` (≥ 4,5:1); selo de estado é `bg-<estado>-soft` com
+  `text-<estado>`. Sem fundo sólido de cor fora dos botões (`bg-primary-cheio` e `bg-destructive-cheio` são do `Button`, do selo `default`/`destructive` e de controles marcados, como o dia escolhido). O ícone dos cartões de números é suave com o ícone escuro. A cor da pessoa (avatar) continua o hex que ela escolheu. No
   código, `-cheio` guarda o valor do suave e `-sobre` o do texto. Os nomes do código ficam: azul = piscina, turquesa =
   ciano, violeta = lavanda, mostarda = sol, rosa = hibisco, verde = esmeralda, laranja = manga, índigo = lima, grafite =
   cinza. Moldura, painel, bordas e o azul dos botões e do trilho são os de antes. Relatório:
@@ -365,8 +365,7 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
   `--cor-*`, os trios de estado (`-cheio`, `-soft`) e as zonas; nada de hex nem `--primary` direto no gráfico. As marcas (série, paleta, situações e folga) são tons frescos validados pelo dataviz
   (`validate_palette.js`, claro e escuro). No escuro seguram 3:1; no claro ficam abaixo de 3:1, o que o dataviz aceita
   porque todo gráfico tem "Ver em tabela" e a dica (pedido do Diego, 19/11, Tropical, no modelo atual). O coral de "passou"
-  segura 3:1 nos dois temas e a referência 4,5:1 (`src/lib/contraste.test.js`); vermelho e âmbar sempre com ícone e o
-  número escrito; texto nunca na cor da série. O ícone de alerta de um gráfico tem a cor da parte que ele marca (o coral `text-grafico-acima` na etapa atrasada e na faixa acima de 100%). Os mapas de calor usam a ponta da rampa de um matiz só: lavanda no Início (`--grafico-calor-lilas`) e ciano nos dias com check-in (`--grafico-calor-ciano`).
+  segura 3:1 nos dois temas e a referência 4,5:1 (`src/lib/contraste.test.js`); vermelho e âmbar sempre com ícone (na folga, a seta em `text-notice`) e a palavra; as marcas e os ícones de "passou/atrasada" ficam no coral `--grafico-acima`, e o texto e os selos em `destructive`; texto nunca na cor da série. O ícone de alerta de um gráfico tem a cor da parte que ele marca (o coral `text-grafico-acima` na etapa atrasada e na faixa acima de 100%). Os mapas de calor usam a ponta da rampa de um matiz só: lavanda no Início (`--grafico-calor-lilas`) e ciano nos dias com check-in (`--grafico-calor-ciano`).
 - **SVG na largura real** (`useLargura`, sem `viewBox` que estica) e texto do SVG só com `fontSize={TAMANHO.legenda}`
   (11 px) ou maior; rótulos do eixo X com 44 px entre eles (sempre o último); a 360 px nada rola para o lado.
 - **Todo gráfico tem visão em tabela** ("Ver em tabela", com os mesmos números) e **dica no mouse, no toque e no

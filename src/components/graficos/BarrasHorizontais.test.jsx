@@ -47,7 +47,7 @@ describe('BarrasHorizontais', () => {
     desenhar({ marca100: { valor: 1, rotulo: '100%' }, itens: [item('Carla', 0.5, { tom: 'folga' })] })
     const carla = linha('Carla')
     expect(carla.querySelector('[data-trecho="base"]')).toHaveClass('bg-grafico-folga')
-    expect(carla.querySelector('[data-icone="folga"]')).toHaveClass('text-grafico-folga')
+    expect(carla.querySelector('[data-icone="folga"]')).toHaveClass('text-notice')
   })
 
   it('separador "… 18 no meio" depois dos 6 primeiros', () => {

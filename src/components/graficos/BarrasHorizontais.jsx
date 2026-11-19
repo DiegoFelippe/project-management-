@@ -18,7 +18,7 @@ const ICONES = {
   alerta: <TriangleAlert data-icone="alerta" aria-hidden="true" className="size-3.5 shrink-0 text-grafico-acima" />,
   // Ao lado das partes do check-list: o vermelho da parte atrasada (COR.atrasada), não o do trecho acima do limite.
   atrasada: <TriangleAlert data-icone="atrasada" aria-hidden="true" className="size-3.5 shrink-0 text-grafico-acima" />,
-  folga: <ArrowDown data-icone="folga" aria-hidden="true" className="size-3.5 shrink-0 text-grafico-folga" />,
+  folga: <ArrowDown data-icone="folga" aria-hidden="true" className="size-3.5 shrink-0 text-notice" />,
 }
 
 const arredondar = (n) => Math.round(n * 1000) / 1000

@@ -1,17 +1,17 @@
 import { diaDaSemana, somarDias } from '@/lib/calendario'
 import { hoje as hojeEmSP } from '@/lib/mes'
 
-// Cores e selos do quadro (como no Kanban do Mochi), só pelos tokens do tema (cores vivas, 19/11; nem classe de cor do
+// Cores e selos do quadro (como no Kanban do Mochi), só pelos tokens do tema (Tropical, modelo atual, 19/11; nem classe de cor do
 // Tailwind nem hex). As classes ficam escritas por inteiro (o Tailwind só gera o que aparece no código).
 
 // As 10 cores das colunas, na ordem que o banco guarda (quadro_colunas.cor, 0 a 9). paleta: a cor da paleta de 19/11 (nos
-// gráficos, a faixa "Quadro do cliente" da aba Geral, e aqui); cheio: o contador e a amostra do seletor (o cheio com o
-// "sobre", ≥ 4,5:1 em src/lib/contraste.test.js); corpo: o fundo da coluna, um véu do suave; ponto: a bolinha da cor
+// gráficos, a faixa "Quadro do cliente" da aba Geral, e aqui); cheio: o contador (no Tropical o -cheio é o suave e o -sobre o
+// texto escuro, ≥ 4,5:1 em src/lib/contraste.test.js); a amostra do seletor é o ponto; corpo: o fundo da coluna, um véu do suave; ponto: a bolinha da cor
 // automática no seletor. A paleta não tem vermelho (é de estado): nos gráficos o Vermelho vai no rosa; no quadro ele fica
 // no vermelho de estado, para as 10 cores continuarem diferentes.
 export const CORES_DAS_COLUNAS = [
   { nome: 'Cinza', paleta: 'grafite', cheio: 'bg-cor-grafite-cheio text-cor-grafite-sobre', corpo: 'bg-cor-grafite-suave/40 border-cor-grafite-suave', ponto: 'bg-cor-grafite-forte' },
-  { nome: 'Índigo', paleta: 'indigo', cheio: 'bg-cor-indigo-cheio text-cor-indigo-sobre', corpo: 'bg-cor-indigo-suave/40 border-cor-indigo-suave', ponto: 'bg-cor-indigo-forte' },
+  { nome: 'Lima', paleta: 'indigo', cheio: 'bg-cor-indigo-cheio text-cor-indigo-sobre', corpo: 'bg-cor-indigo-suave/40 border-cor-indigo-suave', ponto: 'bg-cor-indigo-forte' },
   { nome: 'Azul', paleta: 'azul', cheio: 'bg-cor-azul-cheio text-cor-azul-sobre', corpo: 'bg-cor-azul-suave/40 border-cor-azul-suave', ponto: 'bg-cor-azul-forte' },
   { nome: 'Turquesa', paleta: 'turquesa', cheio: 'bg-cor-turquesa-cheio text-cor-turquesa-sobre', corpo: 'bg-cor-turquesa-suave/40 border-cor-turquesa-suave', ponto: 'bg-cor-turquesa-forte' },
   { nome: 'Verde', paleta: 'verde', cheio: 'bg-cor-verde-cheio text-cor-verde-sobre', corpo: 'bg-cor-verde-suave/40 border-cor-verde-suave', ponto: 'bg-cor-verde-forte' },
@@ -22,9 +22,9 @@ export const CORES_DAS_COLUNAS = [
   { nome: 'Roxo', paleta: 'violeta', cheio: 'bg-cor-violeta-cheio text-cor-violeta-sobre', corpo: 'bg-cor-violeta-suave/40 border-cor-violeta-suave', ponto: 'bg-cor-violeta-forte' },
 ]
 
-// Coluna sem cor escolhida: a cor automática pela posição (cinza, índigo, verde, amarelo, vermelho, roxo, como no Mochi),
+// Coluna sem cor escolhida: a cor automática pela posição (cinza, azul, verde, amarelo, vermelho, roxo; sem dois verdes lado a lado),
 // só no contador (o corpo fica neutro, CORPO_NEUTRO); escolhida, a cor vale também no véu da coluna.
-const AUTOMATICAS = [0, 1, 4, 5, 7, 9]
+const AUTOMATICAS = [0, 2, 4, 5, 7, 9]
 // Fundo de coluna sem cor escolhida (a automática só pinta o contador).
 export const CORPO_NEUTRO = 'bg-muted/60 border-border/70'
 export const corDaColuna = (coluna, posicao) => coluna.cor ?? AUTOMATICAS[(posicao + 1) % AUTOMATICAS.length]

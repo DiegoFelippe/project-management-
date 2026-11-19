@@ -59,10 +59,10 @@ function pares(t) {
     .concat([
       { texto: t.domingo, fundo: fimDeSemana, onde: 'domingo sobre a célula do fim de semana' },
       { texto: t.sabado, fundo: fimDeSemana, onde: 'sábado sobre a célula do fim de semana' },
-      // Linha da tabela com o mouse: véu do --accent (50%) sobre o cartão (Tropical, 19/11). O link da linha fica no
+      // Linha da tabela com o mouse: véu do --muted (40%) sobre o cartão (Tabela: hover:bg-muted/40; Tropical, 19/11). O link da linha fica no
       // primary-texto ao passar o mouse (o --primary do escuro dá 4,1:1 ali).
-      { texto: t['muted-foreground'], fundo: misturar(t.accent, t.card, 0.5), onde: 'texto de apoio na linha da tabela com o mouse' },
-      { texto: t['primary-texto'], fundo: misturar(t.accent, t.card, 0.5), onde: 'link da linha da tabela com o mouse' },
+      { texto: t['muted-foreground'], fundo: misturar(t.muted, t.card, 0.4), onde: 'texto de apoio na linha da tabela com o mouse' },
+      { texto: t['primary-texto'], fundo: misturar(t.muted, t.card, 0.4), onde: 'link da linha da tabela com o mouse' },
       { texto: t.domingo, fundo: t.accent, onde: 'domingo no dia escolhido' },
       { texto: t.sabado, fundo: t.accent, onde: 'sábado no dia escolhido' },
       // Azul-claro de realce (bg-primary/5…/20) sobre o cartão e o painel: "Hoje", opção escolhida, selos, números.
@@ -251,7 +251,7 @@ function arquivos(pasta) {
 const REGRAS = [
   { motivo: 'texto branco sobre bg-primary (use bg-primary-cheio)', fundo: (c) => c === 'bg-primary', texto: (c) => c === 'text-primary-foreground' || c === 'text-white' },
   { motivo: 'text-primary sobre azul-claro (use text-primary-texto)', fundo: (c) => /^bg-primary\/\d+$/.test(c) || c === 'bg-accent', texto: (c) => c === 'text-primary' },
-  // Cores vivas (19/11): sobre o cheio, só o "sobre" (o texto de antes, feito para o suave, some no cheio). Olha cada
+  // Sobre o -cheio de estado e do azul (sólido, o botão), só o "sobre" (o texto de antes, feito para o suave, some no cheio). Olha cada
   // texto entre aspas: o ternário "ligado ? cheio + sobre : suave + texto" é o caso comum e está certo.
   { motivo: 'texto de suave sobre um cheio (use o sobre)', porTexto: true, fundo: (c) => /^bg-[\w-]+-cheio$/.test(c),
     texto: (c) => /^text-[\w-]+-texto$/.test(c) || /^text-(?:primary|positive|notice|destructive)$/.test(c) },

@@ -8,7 +8,7 @@ import { dataPorExtenso, prazoEmPalavras } from './situacao'
 // As cores do prazo: vermelho se venceu, âmbar em 7 dias (hoje também), cinza na resolvida. Nunca só a cor: o ícone e o
 // texto dizem o mesmo.
 const BOTAO = {
-  atrasada: 'border-destructive/30 bg-destructive/10 text-destructive',
+  atrasada: 'border-destructive/30 bg-destructive-soft text-destructive',
   breve: 'border-notice/30 bg-notice-soft text-notice',
   fechado: 'border-transparent bg-muted text-muted-foreground',
   normal: 'bg-card text-foreground',

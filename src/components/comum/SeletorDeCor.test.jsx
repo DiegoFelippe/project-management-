@@ -38,7 +38,7 @@ describe('SeletorDeCor', () => {
     expect(screen.getByText('Cor da coluna')).toHaveClass('sr-only')
   })
 
-  it('a classe que traz o texto vence o branco do check (o mostarda cheio leva tinta escura)', () => {
+  it('a classe que traz o texto vence o branco do check (o mostarda suave leva tinta escura)', () => {
     render(<SeletorDeCor rotulo="Cor" cores={[{ valor: 0, nome: 'Amarelo', classe: 'bg-cor-mostarda-cheio text-cor-mostarda-sobre' }]} valor={0} aoMudar={() => {}} />)
     const amostra = screen.getByRole('radio', { name: 'Amarelo' })
     expect(amostra).toHaveClass('text-cor-mostarda-sobre')

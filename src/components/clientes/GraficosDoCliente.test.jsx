@@ -392,7 +392,7 @@ describe('GraficosDoCliente', () => {
     await waitFor(() => expect(within(quadro).getByRole('group', { name: 'Cartões por coluna' })).toBeInTheDocument())
     const partes = within(within(quadro).getByRole('group', { name: 'Cartões por coluna' })).getAllByRole('img')
     expect(partes.map((p) => p.getAttribute('aria-label'))).toEqual(['A fazer: 4 (29%)', 'Em andamento: 3 (21%)', 'Concluído: 7 (50%)'])
-    expect(partes.map((p) => p.style.background)).toEqual(['var(--cor-indigo-forte)', 'var(--cor-azul-forte)', 'var(--cor-rosa-forte)'])
+    expect(partes.map((p) => p.style.background)).toEqual(['var(--cor-azul-forte)', 'var(--cor-azul-forte)', 'var(--cor-rosa-forte)'])
     expect(quadro).toHaveTextContent('Situação de hoje · 14 cartões por coluna')
     expect(quadro).toHaveTextContent('7 de 14 cartões concluídos · 2 atrasados')
     // A coluna vazia fica na legenda, com 0.

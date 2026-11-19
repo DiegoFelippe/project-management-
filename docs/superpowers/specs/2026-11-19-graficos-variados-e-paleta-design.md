@@ -14,7 +14,7 @@ do celular e os componentes de automação.
 ## 1. Paleta de 9 cores
 
 Para **separar coisas** (pessoas, séries, clientes, cidades, etapas, colunas): nunca para estado. Cada cor em três tons:
-**texto** (≥ 4,5:1 sobre o cartão e sobre o suave), **forte** (barras, ícones, marcas: ≥ 3:1 no escuro; no claro são tons
+**texto** (≥ 4,5:1 sobre o cartão e sobre o suave), **forte** (barras e marcas, não ícones, que usam o texto: ≥ 3:1 no escuro; no claro são tons
 claros, com "Ver em tabela" e a dica, como o dataviz aceita) e **suave** (fundo de selo, chip e ícone). No código,
 `-cheio` guarda o valor do suave e `-sobre` o do texto. Valores "Tropical" (pedido do Diego, 19/11, Tropical, no modelo
 atual; relatório `docs/auditoria-ux/cores/versao-tropical.md`). Conferido no protótipo (aba Paleta).
@@ -33,7 +33,7 @@ atual; relatório `docs/auditoria-ux/cores/versao-tropical.md`). Conferido no pr
 
 - **Ordem das séries** (a mesma em todo gráfico): azul, mostarda, rosa, laranja, turquesa, índigo, violeta, verde
   (piscina, sol, hibisco, manga, ciano, lima, lavanda, esmeralda; validada no dataviz, claro e escuro); grafite fica para
-  "Outros" e para o que é neutro (aguardando, a fazer). Mais de 8 itens: os 8 maiores e "Outros".
+  "Outros" e para o que é neutro (aguardando). Mais de 8 itens: os 8 maiores e "Outros".
 - **Estados**, sempre com ícone e palavra, no trio (texto · cheio · suave · sobre): sucesso (esmeralda) `#065f46`·`#10b981`·
   `#d1fae5`·`#022c22` (escuro `#83d5ad`·`#0bae79`·`#015337`·`#022c22`); atenção (âmbar) `#92400e`·`#fbbf24`·`#fef3c7`·
   `#78350f` (escuro `#f4c26a`·`#fbbf24`·`#5e3e02`·`#451a03`); perigo (coral) `#991b1b`·`#dc2626` (o do botão)·`#fee2e2`·

@@ -192,9 +192,9 @@ describe('aba Quadro: o que cada um vê', () => {
     expect(contador).toHaveClass('bg-cor-verde-cheio', 'text-cor-verde-sobre')
     expect(contador.getAttribute('style') ?? '').not.toMatch(/background/)
     expect(coluna).toHaveClass('bg-cor-verde-suave/40')
-    // Sem cor escolhida: corpo neutro; só o contador leva a cor automática pela posição (A fazer, a 1ª, é índigo).
+    // Sem cor escolhida: corpo neutro; só o contador leva a cor automática pela posição (A fazer, a 1ª, é azul/piscina).
     const automatica = screen.getByRole('region', { name: 'Coluna A fazer' })
-    expect(within(automatica).getByTitle('3 cartões')).toHaveClass('bg-cor-indigo-cheio', 'text-cor-indigo-sobre')
+    expect(within(automatica).getByTitle('3 cartões')).toHaveClass('bg-cor-azul-cheio', 'text-cor-azul-sobre')
     expect(automatica).toHaveClass('bg-muted/60', 'border-border/70')
     expect(automatica.className).not.toMatch(/bg-cor-/)
   })
@@ -813,6 +813,9 @@ describe('colunas', () => {
     const painel = screen.getByRole('dialog', { name: 'Cor da coluna' })
     expect(within(painel).getAllByRole('radio')).toHaveLength(11)
     expect(within(painel).getByRole('radio', { name: 'Verde' })).toHaveAttribute('aria-checked', 'true')
+    // A amostra é a cor forte (visível no claro e no escuro), não o suave pálido.
+    expect(within(painel).getByRole('radio', { name: 'Verde' })).toHaveClass('bg-cor-verde-forte')
+    expect(within(painel).getByRole('radio', { name: 'Lima' })).toHaveClass('bg-cor-indigo-forte')
     // O foco entra no painel, na cor escolhida (o painel fica no fim da página: o Tab não chegaria nele).
     expect(within(painel).getByRole('radio', { name: 'Verde' })).toHaveFocus()
     await user.click(within(painel).getByRole('radio', { name: 'Vermelho' }))

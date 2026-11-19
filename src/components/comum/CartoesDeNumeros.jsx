@@ -1,7 +1,7 @@
 import { useContagem } from '@/lib/useContagem'
 import { cn } from '@/lib/utils'
 
-// Cor do quadradinho do ícone: sólido, o cheio com o ícone no "sobre" (cores vivas, 19/11; ≥ 4,5:1 em contraste.test.js).
+// Cor do quadradinho do ícone: suave com o ícone escuro (Tropical, modelo atual, 19/11; -cheio/-sobre são alias do suave/texto; ≥ 4,5:1 em contraste.test.js).
 const TONS = {
   azul: 'bg-primary/10 text-primary-texto',
   ceu: 'bg-cor-turquesa-cheio text-cor-turquesa-sobre',

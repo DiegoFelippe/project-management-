@@ -209,7 +209,7 @@ describe('Fluxograma', () => {
     }
   })
 
-  // Cores vivas (19/11): a mesma cor de estado em toda tela. A família da cor (positive, cor-azul…) vem do COR dos gráficos.
+  // Tropical, modelo atual (19/11): a mesma cor de estado em toda tela. A família da cor (positive, cor-azul…) vem do COR dos gráficos.
   it('as situações nas mesmas cores de estado dos gráficos: feita verde, não se aplica grafite, em andamento azul, pausada mostarda, a fazer violeta, atrasada vermelha', () => {
     // atrasada: a marca dos gráficos é o coral (--grafico-acima), mas a caixa (texto + borda) usa o estado `destructive`, que segura 4,5:1.
     const familia = (chave) => (chave === 'atrasada' ? 'destructive' : /^var\(--((?:cor-)?[a-z]+)-/.exec(COR[chave])[1])

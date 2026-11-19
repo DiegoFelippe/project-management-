@@ -11,13 +11,13 @@ import PrazoDaTarefa from './PrazoDaTarefa'
 import { mesmaSituacao, textoDaEspera } from './situacao'
 import { minutosFeitos, relogio, segundosDaTarefa, useAgora } from './tempo'
 
-// As cores de estado dos gráficos (COR de graficos/cores.js; cores vivas, 19/11): em andamento azul e pausada mostarda,
-// sólidos (cheio + sobre); não se aplica no grafite suave (fechada, discreta); sempre com o ícone e a palavra.
+// As cores de estado dos gráficos (COR de graficos/cores.js; Tropical, modelo atual, 19/11): em andamento azul e pausada mostarda,
+// suaves (-cheio/-sobre são alias do suave/texto); não se aplica no grafite suave (fechada, discreta); sempre com o ícone e a palavra.
 const SELO_ANDAMENTO = 'border-transparent bg-cor-azul-cheio text-cor-azul-sobre'
 const SELO_PAUSADA = 'border-transparent bg-cor-mostarda-cheio text-cor-mostarda-sobre'
 const SELO_NAO_SE_APLICA = 'border-transparent bg-cor-grafite-suave text-cor-grafite-texto'
 const SELO_CINZA = 'border-transparent bg-muted text-muted-foreground'
-const SELO_SESSAO = 'border-transparent bg-sky-500/10 text-sky-700 dark:text-sky-300'
+const SELO_SESSAO = 'border-transparent bg-cor-turquesa-suave text-cor-turquesa-texto'
 // A feita é o check verde (a Caixa da casa é azul): o texto do check na cor do cartão segura o contraste no claro e no escuro.
 const CHECK_VERDE = '[&_input:checked+span]:border-positive [&_input:checked+span]:bg-positive [&_input:checked+span]:text-card'
 

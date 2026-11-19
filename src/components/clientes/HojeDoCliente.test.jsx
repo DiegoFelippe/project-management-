@@ -61,7 +61,7 @@ describe('HojeDoCliente', () => {
     expect(cartao('Check-list').getByText('próxima 20/11')).toBeInTheDocument()
   })
 
-  it('cada cartão com o ícone num quadradinho cheio de um tom da paleta, o ícone no "sobre" (azul, turquesa, violeta, mostarda, verde)', () => {
+  it('cada cartão com o ícone num quadradinho suave de um tom da paleta, o ícone no texto escuro (azul, turquesa, violeta, mostarda, verde)', () => {
     tela()
     const tons = { 'Previsão do mês': 'azul', 'Último check-in': 'turquesa', 'Próxima reunião': 'violeta', Quadro: 'mostarda', 'Check-list': 'verde' }
     for (const [nome, tom] of Object.entries(tons)) {

@@ -44,6 +44,7 @@
   --cor-azul-texto: #075985;
   --cor-azul-forte: #0ea5e9;
   --cor-azul-suave: #e0f2fe;
+  /* No Tropical, -cheio = suave e -sobre = texto: alias até o refator do design system. */
   --cor-azul-cheio: var(--cor-azul-suave);
   --cor-azul-sobre: var(--cor-azul-texto);
   --cor-turquesa-texto: #155e75;
@@ -105,10 +106,8 @@
   --evento-ausencia-texto: #92400e;
   --evento-feriado: #ffe4e6;
   --evento-feriado-texto: #9f1239;
-  /* Gráficos (design 2026-11-17-graficos-do-inicio-e-do-cliente; validados no dataviz, claro e escuro): série (o azul
-     da consultoria), acima do limite (vermelho), folga (âmbar), referência (capacidade, previsão), grade, trilha das
-     barras, "a fazer" e a rampa da fila (do claro ao escuro). Paleta Tropical (Diego, 19/11): no escuro toda marca segura 3:1; no claro são tons claros com o número
-     escrito ao lado; o coral de acima segura 3:1 e a referência 4,5:1 (src/lib/contraste.test.js); vermelho e âmbar sempre vêm
+  /* Gráficos (design 2026-11-17-graficos-do-inicio-e-do-cliente; validados no dataviz, claro e escuro): série (o piscina), acima do limite (vermelho), folga (âmbar), referência (capacidade, previsão), grade, trilha das
+     barras, "a fazer" e a rampa da fila (do claro ao escuro). Paleta Tropical (Diego, 19/11): no escuro toda marca segura 3:1; no claro são tons claros (todo gráfico tem "Ver em tabela" e a dica); o coral de acima segura 3:1 e a referência 4,5:1 (src/lib/contraste.test.js); vermelho e âmbar sempre vêm
      com ícone. Texto nunca na cor da série. */
   --grafico-serie: #0ea5e9;
   --grafico-lavado: rgb(14 165 233 / 0.14);

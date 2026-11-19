@@ -24,7 +24,7 @@ const comSemana = (dia) => `${semanaDe(dia)}, ${diaMes(dia)}`
 // Os selos quebram a linha dentro do cartão (a 360 px o cartão tem ~134 px por dentro) em vez de passar da borda.
 const SELO = 'h-auto max-w-full justify-start whitespace-normal rounded-lg text-left'
 const SELO_PERIGO = `${SELO} border-transparent bg-destructive-soft text-destructive`
-// O quadradinho do ícone de cada cartão, num tom da paleta: sólido, o cheio com o ícone no "sobre" (cores vivas, 19/11).
+// O quadradinho do ícone de cada cartão, num tom da paleta: suave com o ícone escuro (Tropical, modelo atual, 19/11; -cheio/-sobre são alias do suave/texto).
 const TONS = {
   azul: 'bg-cor-azul-cheio text-cor-azul-sobre',
   turquesa: 'bg-cor-turquesa-cheio text-cor-turquesa-sobre',

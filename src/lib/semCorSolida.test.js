@@ -22,7 +22,7 @@ const PERMITIDOS = {
   'components/comum/BarraDeOcupacao.jsx': 'barra de progresso acima de 100% (marca, não rótulo)',
   'components/comum/AbasSegmentadas.jsx': 'bolinha de erro da aba (marca de 6 px com o aviso ao lado)',
   'components/quadro/ChecklistDoCartao.jsx': 'check do item feito (estado do controle)',
-  'components/modelos/EditorDeEtapas.jsx': 'número da etapa no editor, controle de edição fora de a7a0cb6',
+  'components/modelos/EditorDeEtapas.jsx': 'número da etapa no editor, visual de antes da Viva (modelo atual)',
   'components/calendario/VisaoMes.jsx': 'dia de hoje na grade (estado do dia)',
   'components/calendario/VisaoAgenda.jsx': 'selo "Hoje" da agenda (estado do dia)',
   'components/calendario/JanelaEvento.jsx': 'dia escolhido no seletor de dia (estado do controle)',

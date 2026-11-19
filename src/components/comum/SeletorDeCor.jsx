@@ -1,7 +1,7 @@
 // Seletor de cor, um só para o app (auditoria de 17/11, C6): a cor do avatar (FichaDoConsultor), a do evento (JanelaEvento)
 // e a da coluna do quadro. As amostras de `cores` num radiogroup, como no Hub: a escolhida ganha o check e o anel.
 // - cores: [{ valor, nome, fundo?: '#hex' (pinta pelo style; o check segue o corDoTextoSobre), classe?: 'bg-… text-…' (o check
-//   branco, a não ser que a classe traga o texto, como o cheio + sobre das colunas do quadro) }].
+//   branco, a não ser que a classe traga o texto, como as amostras das colunas do quadro, na cor forte) }].
 // - automatica ({ rotulo, titulo?, classe? }): a opção sem cor (valor null) no fim, com a bolinha da cor que valeria.
 // - mostrarRotulo={false}: o rótulo fica só para o leitor de tela (a seção em volta já diz "Cor").
 // - Setas e Home/End andam entre as opções e só a escolhida entra na ordem do Tab. marcarAoAndar (padrão): a seta já
