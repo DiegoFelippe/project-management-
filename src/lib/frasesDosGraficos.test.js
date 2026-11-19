@@ -322,6 +322,11 @@ describe('fraseDasHorasPorUnidade (colunas empilhadas)', () => {
     expect(fortes(partes)).toEqual(['42 h'])
   })
 
+  it('"Outros" (a soma do resto) nunca é quem mais fez, mesmo maior que todas', () => {
+    const d = { ...dados, series: [{ nome: 'Ana Lima', horas: [10, 24, 8] }, { nome: 'Outros', outros: true, horas: [3, 40, 1] }] }
+    expect(texto(fraseDasHorasPorUnidade(d, MES))).toBe('Semana mais cheia: 02/11, com 64 h · Ana Lima, 24 h')
+  })
+
   it('sem horas', () => {
     expect(texto(fraseDasHorasPorUnidade({ semanas: ['2026-11-02'], series: [] }, PERIODO))).toBe('Nenhuma hora no período')
   })

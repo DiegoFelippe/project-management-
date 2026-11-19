@@ -107,7 +107,7 @@ describe('AbasSegmentadas (ícone e erro)', () => {
       abas={[{ valor: 'a', rotulo: 'Dados', erro: true }, { valor: 'b', rotulo: 'Acesso' }]} />)
     const aba = screen.getByRole('tab', { name: 'Dados, tem erro' })
     expect(aba).toHaveAttribute('data-erro')
-    expect(aba.querySelector('[data-ponto-erro]')).toHaveClass('bg-destructive')
+    expect(aba.querySelector('[data-ponto-erro]')).toHaveClass('bg-destructive-cheio')
     expect(screen.getByRole('tab', { name: 'Acesso' })).not.toHaveAttribute('data-erro')
   })
 })

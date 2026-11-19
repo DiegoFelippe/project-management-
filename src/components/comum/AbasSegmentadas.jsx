@@ -94,7 +94,7 @@ export default function AbasSegmentadas({ rotulo, abas, valor, aoMudar, comoAbas
             {aba.rotulo}
             {aba.erro && (
               <>
-                <span data-ponto-erro aria-hidden="true" className="bg-destructive size-1.5 rounded-full" />
+                <span data-ponto-erro aria-hidden="true" className="bg-destructive-cheio size-1.5 rounded-full" />
                 <span className="sr-only">, tem erro</span>
               </>
             )}

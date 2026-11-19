@@ -84,6 +84,14 @@ describe('HojeDoCliente', () => {
     expect(partes('Quadro')).toEqual([['atrasada', '2', 'var(--destructive-cheio)'], ['serie', '10', 'var(--grafico-serie)']])
   })
 
+  it('a barra do check-list divide em andamento, pausadas e a fazer, como o gráfico por etapa', () => {
+    const etapas = [{ ...ETAPAS[0], andamento: 2, pausadas: 1 }, { ...ETAPAS[1], andamento: 1, pausadas: 0 }]
+    tela({ hoje: { ...HOJE, checklist: { ...HOJE.checklist, etapas } } })
+    const partes = [...screen.getByRole('group', { name: 'Check-list' }).querySelectorAll('[data-parte]')].map((p) => [p.dataset.parte, p.style.flexGrow])
+    // 28 tarefas: 12 feitas, 3 atrasadas, 13 restantes = 3 em andamento + 1 pausada + 9 a fazer.
+    expect(partes).toEqual([['feita', '12'], ['andamento', '3'], ['pausada', '1'], ['afazer', '9'], ['atrasada', '3']])
+  })
+
   it('selos vai passar / abaixo do ritmo / no ritmo / sem selo no começo do mês', () => {
     const com = (previsao) => ({ ...HOJE, previsao: { ...HOJE.previsao, ...previsao } })
     const { rerender } = tela()

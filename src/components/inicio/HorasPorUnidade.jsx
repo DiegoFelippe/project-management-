@@ -20,6 +20,7 @@ function seriesDe(series) {
     nome: s.id == null ? s.nome ?? 'Outros' : s.nome ?? (++semNome > 1 ? `Outro consultor ${semNome}` : 'Outro consultor'),
     cor: s.id == null ? COR_OUTROS : corDaSerie(i),
     horas: s.horas,
+    outros: s.id == null,
   }))
 }
 

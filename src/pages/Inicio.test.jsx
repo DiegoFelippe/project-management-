@@ -167,7 +167,7 @@ describe('Início (gráficos)', () => {
     const alvo = document.getElementById('clientes-em-risco')
     expect(alvo).toBe(document.querySelector('[data-bloco="risco"]'))
     alvo.scrollIntoView = vi.fn()
-    fireEvent.click(screen.getByRole('button', { name: 'Ver os 1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ver o 1' }))
     expect(alvo.scrollIntoView).toHaveBeenCalled()
     expect(alvo).toHaveFocus()
     unmount()

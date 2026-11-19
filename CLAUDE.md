@@ -354,8 +354,8 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
   o vazio (nunca arco NaN nem 0/0).
 - **Séries pela paleta de 19/11** (`corDaSerie(i)` de `graficos/cores.js`): ordem fixa azul, turquesa, violeta, mostarda,
   rosa, verde, laranja, índigo; mais de 8 itens: os 8 maiores e "Outros" em grafite (`COR_OUTROS`) (pedido do Diego, 19/11). Estado nunca usa a paleta.
-- **Cores só por `--grafico-*`** (`src/index.css`, claro e escuro; nomes curtos em `graficos/cores.js`): nada de hex
-  nem `--primary` direto no gráfico. Série, acima, folga e referência seguram 4,5:1 sobre o cartão
+- **Cores só por tokens** (`src/index.css`, claro e escuro; nomes curtos em `graficos/cores.js`): `--grafico-*`, a paleta
+  `--cor-*`, os trios de estado (`-cheio`, `-soft`) e as zonas; nada de hex nem `--primary` direto no gráfico. Série, acima, folga e referência seguram 4,5:1 sobre o cartão
   (`src/lib/contraste.test.js`); vermelho e âmbar sempre com ícone e o número escrito; texto nunca na cor da série.
 - **SVG na largura real** (`useLargura`, sem `viewBox` que estica) e texto do SVG só com `fontSize={TAMANHO.legenda}`
   (11 px) ou maior; rótulos do eixo X com 44 px entre eles (sempre o último); a 360 px nada rola para o lado.

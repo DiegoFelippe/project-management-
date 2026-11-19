@@ -8,7 +8,7 @@ export default function BarraDeOcupacao({ ocupacao, className }) {
   const largura = conhecida ? Math.max(0, Math.min(n, 1)) * 100 : 0
   return (
     <div aria-hidden="true" className={cn('h-1.5 w-full overflow-hidden rounded-full bg-muted', className)}>
-      <div className={cn('h-full rounded-full', conhecida && n > 1 ? 'bg-destructive' : 'bg-primary')} style={{ width: `${largura}%` }} />
+      <div className={cn('h-full rounded-full', conhecida && n > 1 ? 'bg-destructive-cheio' : 'bg-primary')} style={{ width: `${largura}%` }} />
     </div>
   )
 }

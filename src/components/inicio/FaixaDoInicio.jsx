@@ -2,6 +2,7 @@ import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { plural } from '@/lib/nomes'
 
+const INTEIRO = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
 export const ID_DO_RISCO = 'clientes-em-risco'
 
 // A faixa "está tudo bem?" do Início (Névoa, pedido do Diego, 19/11): para a central e a gestão, "N clientes precisam de
@@ -17,7 +18,7 @@ export default function FaixaDoInicio({ total }) {
     <div role="status" data-faixa-do-inicio="" className="flex flex-wrap items-center gap-3 rounded-2xl bg-notice-soft px-4 py-3 text-corpo text-foreground">
       <AlertTriangle aria-hidden="true" className="size-4 shrink-0 text-notice" />
       <p className="min-w-0 flex-1"><b className="font-semibold">{plural(total, 'cliente precisa', 'clientes precisam')} de você.</b></p>
-      <Button type="button" variant="outline" size="sm" onClick={ver}>Ver os {total}</Button>
+      <Button type="button" variant="outline" size="sm" onClick={ver}>{total === 1 ? 'Ver o' : 'Ver os'} {INTEIRO.format(total)}</Button>
     </div>
   )
 }

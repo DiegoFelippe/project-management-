@@ -2,7 +2,7 @@
 // IA, e-mail (SMTP), Google, Slack e WhatsApp. Aqui só se conecta; o resto do sistema usa a mesma conexão.
 // O administrador conecta, edita, testa e desconecta; o dono escolhe a consultoria e só olha.
 import {
-  Calendar, CircleAlert, CircleCheck, History, Mail, MessageCircle, MessageSquare, Pencil, Plug, PlugZap, RefreshCw, Sparkles, Unplug,
+  Calendar, Check, CircleAlert, CircleCheck, History, Mail, MessageCircle, MessageSquare, Pencil, Plug, PlugZap, RefreshCw, Sparkles, Unplug,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/auth/useAuth'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
+import BotaoComResultado from '@/components/comum/BotaoComResultado'
 import BarraDeFiltros, { NaGaveta } from '@/components/comum/BarraDeFiltros'
 import Cabecalho from '@/components/comum/Cabecalho'
 import CartoesDeNumeros from '@/components/comum/CartoesDeNumeros'
@@ -141,12 +142,14 @@ export default function Integracoes() {
     return resposta
   }
 
+  // Devolve { erro } para o BotaoComResultado da linha: só termina em "✓ Testado" se a conexão funcionou.
   async function testar(integracao) {
-    setOcupado(integracao.id)
     const resposta = await testarIntegracao(integracao.id)
-    setOcupado(null)
-    avisarResultado(resposta, 'Conexão funcionando.')
     recarregar()
+    if (resposta.erro) return resposta
+    if (resposta.integracao?.situacao !== 'conectada') return { erro: `A conexão falhou: ${resposta.integracao?.ultimo_erro ?? 'erro desconhecido'}` }
+    toast.success('Conexão funcionando.')
+    return {}
   }
 
   async function conectarGoogle() {
@@ -226,8 +229,9 @@ export default function Integracoes() {
                     ) : (
                       <>
                         <AcaoDaLinha nome={item.tipo === 'google' ? 'Reconectar' : 'Editar'} icone={Pencil} onClick={() => abrir(item)} />
-                        <AcaoDaLinha nome="Testar" icone={RefreshCw} disabled={ocupado === integracao.id} onClick={() => testar(integracao)}
-                          classeDoIcone={ocupado === integracao.id ? 'animate-spin' : undefined} />
+                        <BotaoComResultado variant="ghost" size="icon" title="Testar" className="min-w-0" acao={() => testar(integracao)}
+                          icone={<RefreshCw aria-hidden="true" />} rotulo={<span className="sr-only">Testar</span>}
+                          rotuloFeito={<><Check aria-hidden="true" /><span className="sr-only">Testado</span></>} rotuloIndo="Testando…" />
                         <AcaoDaLinha nome="Desconectar" icone={Unplug} perigo onClick={() => setDesconectando({ item, integracao })} />
                       </>
                     )}

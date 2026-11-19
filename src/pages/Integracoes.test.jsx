@@ -108,6 +108,9 @@ describe('Integrações', () => {
     renderizarTela(<Integracoes />, { perfil: admin })
     await userEvent.click(within(await screen.findByRole('row', { name: /E-mail/ })).getByRole('button', { name: 'Testar' }))
     expect(testarIntegracao).toHaveBeenCalledWith('i1')
+    // O ícone vira o check verde com o nome "Testado" por 2 s, no mesmo lugar (a coluna não muda de largura).
+    const feito = await within(linha('E-mail')).findByRole('button', { name: 'Testado' })
+    expect(feito).toHaveAttribute('data-estado', 'feito')
     await userEvent.click(within(linha('E-mail')).getByRole('button', { name: 'Desconectar' }))
     await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Desconectar' }))
     expect(desconectarIntegracao).toHaveBeenCalledWith('i1')
@@ -143,8 +146,8 @@ describe('Integrações: Testar dentro da janela (antes de salvar)', () => {
   const abrir = async (nomeDaLinha, botao) =>
     userEvent.click(within(await screen.findByRole('row', { name: new RegExp(nomeDaLinha) })).getByRole('button', { name: botao }))
 
-  // O Testar termina em "✓ Conectado" por 2 s (BotaoComResultado) e fica ocupado por 300 ms no mínimo.
-  const testarDe = (janela) => within(janela).findByRole('button', { name: /^(Testar|✓ Conectado)$/ })
+  // O Testar termina em "✓ Testado" por 2 s (BotaoComResultado) e fica ocupado por 300 ms no mínimo.
+  const testarDe = (janela) => within(janela).findByRole('button', { name: /^(Testar|✓ Testado)$/ })
 
   it('rodapé: Cancelar, Testar e Salvar; Testar mostra "Testando…", testa o que foi digitado e não salva', async () => {
     let terminar
@@ -153,7 +156,7 @@ describe('Integrações: Testar dentro da janela (antes de salvar)', () => {
     await abrir('E-mail', 'Editar')
     const janela = screen.getByRole('dialog', { name: /E-mail \(SMTP\)/ })
     const rodape = janela.querySelector('[data-slot="janela-rodape"]')
-    expect(within(rodape).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent.trim().replace(/✓ Conectado$/, ''))).toEqual(['Cancelar', 'Testar', 'Salvar'])
+    expect(within(rodape).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent.trim().replace(/✓ Testado$/, ''))).toEqual(['Cancelar', 'Testar', 'Salvar'])
     await userEvent.clear(within(janela).getByLabelText('Servidor'))
     await userEvent.type(within(janela).getByLabelText('Servidor'), 'smtp.novo.test')
     await userEvent.click(await testarDe(janela))
@@ -162,7 +165,7 @@ describe('Integrações: Testar dentro da janela (antes de salvar)', () => {
     expect(testarRascunho).toHaveBeenCalledWith('smtp', expect.objectContaining({ host: 'smtp.novo.test', porta: 587 }), null, {})
     terminar({ erro: null, mensagem: 'E-mail de teste enviado para a1@acme.test.' })
     expect(await within(janela).findByRole('status')).toHaveTextContent('E-mail de teste enviado para a1@acme.test.')
-    expect(await within(janela).findByRole('button', { name: '✓ Conectado' })).toBeEnabled()
+    expect(await within(janela).findByRole('button', { name: '✓ Testado' })).toBeEnabled()
     expect(salvarIntegracao).not.toHaveBeenCalled()
   })
 

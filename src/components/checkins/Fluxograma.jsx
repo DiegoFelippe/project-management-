@@ -32,7 +32,7 @@ const ICONE = {
 const SETA = {
   normal: { linha: 'stroke-input stroke-[1.5]', ponta: 'fill-input' },
   feita: { linha: 'stroke-positive/55 stroke-[1.5]', ponta: 'fill-positive/70' },
-  invalida: { linha: 'stroke-destructive stroke-[1.5]', ponta: 'fill-destructive', tracejada: true },
+  invalida: { linha: 'stroke-destructive-cheio stroke-[1.5]', ponta: 'fill-destructive-cheio', tracejada: true },
   realce: { linha: 'stroke-primary stroke-[2.25]', ponta: 'fill-primary' },
 }
 

@@ -20,7 +20,7 @@ export default function JanelaIntegracao({
         <>
           <BotaoCancelar />
           {aoTestar && (
-            <BotaoComResultado variant="outline" acao={aoTestar} rotulo="Testar" rotuloFeito="✓ Conectado" rotuloIndo="Testando…"
+            <BotaoComResultado variant="outline" acao={aoTestar} rotulo="Testar" rotuloFeito="✓ Testado" rotuloIndo="Testando…"
               icone={<RefreshCw aria-hidden="true" />} aoErro={() => {}} disabled={enviando} />
           )}
           <Button type="submit" form="form-integracao" disabled={ocupado}>{enviando ? 'Salvando…' : 'Salvar'}</Button>

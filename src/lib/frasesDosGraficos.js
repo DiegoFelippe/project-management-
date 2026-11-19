@@ -210,8 +210,9 @@ export function fraseDasHorasPorUnidade({ semanas, series }, periodo) {
   const totais = semanas.map((_, i) => series.reduce((soma, s) => soma + (s.horas[i] ?? 0), 0))
   const maior = totais.reduce((m, total, i) => (total > totais[m] ? i : m), 0)
   if (!(totais[maior] > 0)) return [`Nenhuma hora ${quando(periodo)}`]
-  const quem = series.reduce((a, b) => ((b.horas[maior] ?? 0) > (a.horas[maior] ?? 0) ? b : a))
-  return [`Semana mais cheia: ${diaMes(semanas[maior])}, com `, { forte: formatarHoras(totais[maior]) }, ` · ${quem.nome}, ${formatarHoras(quem.horas[maior])}`]
+  const nomeadas = series.filter((s) => !s.outros) // "Outros" é a soma do resto: nunca é quem mais fez
+  const quem = nomeadas.length ? nomeadas.reduce((a, b) => ((b.horas[maior] ?? 0) > (a.horas[maior] ?? 0) ? b : a)) : null
+  return [`Semana mais cheia: ${diaMes(semanas[maior])}, com `, { forte: formatarHoras(totais[maior]) }, ...(quem ? [` · ${quem.nome}, ${formatarHoras(quem.horas[maior] ?? 0)}`] : [])]
 }
 
 // Mapa de calor (checkins_por_dia_e_hora): o pico (dia e hora de início) e o dia com mais check-ins. A hora 7 conta o que
