@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { atalhosDoPrazo, corDaColuna, CORES_DAS_COLUNAS, OPCOES_DE_PRIORIDADE, PRIORIDADES, seloDoPrazo, TONS_DO_PRAZO } from './cores'
+import { atalhosDoPrazo, corDaColuna, CORES_DAS_COLUNAS, CORPO_NEUTRO, OPCOES_DE_PRIORIDADE, PRIORIDADES, seloDoPrazo, TONS_DO_PRAZO } from './cores'
 
 // Classe com cor do Tailwind (bg-indigo-50, text-rose-700…): o quadro usa só os tokens do tema (cores vivas, 19/11).
 const COR_DO_TAILWIND = /(?:^|[\s:'"])(?:bg|text|border|ring)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d+/
@@ -38,6 +38,12 @@ describe('cores das colunas', () => {
     expect(corDaColuna({ cor: null }, 0)).toBe(1)
     expect(corDaColuna({ cor: null }, 1)).toBe(4)
     expect(corDaColuna({ cor: null }, 5)).toBe(0)
+  })
+})
+
+describe('corpo neutro', () => {
+  it('a coluna sem cor escolhida usa o corpo neutro, nos tokens', () => {
+    expect(CORPO_NEUTRO).toBe('bg-muted/60 border-border/70')
   })
 })
 

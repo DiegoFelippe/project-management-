@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { CARTOES_POR_PAGINA } from '@/data/quadro'
 import { cn } from '@/lib/utils'
 import CartaoNoQuadro from './CartaoNoQuadro'
-import { CORES_DAS_COLUNAS, corDaColuna } from './cores'
+import { CORES_DAS_COLUNAS, corDaColuna, CORPO_NEUTRO } from './cores'
 
 const contar = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
 
@@ -86,6 +86,7 @@ export default function Coluna({
   }, [renomeando])
   const cor = corDaColuna(coluna, posicao)
   const paleta = CORES_DAS_COLUNAS[cor]
+  const escolhida = coluna.cor != null
   const itens = estado?.itens
   const total = estado?.total ?? coluna.cartoes ?? 0
   const faltam = Math.max(0, total - (itens?.length ?? 0))
@@ -93,7 +94,7 @@ export default function Coluna({
 
   return (
     <section aria-label={`Coluna ${coluna.nome}`}
-      className={cn('flex min-h-0 w-[300px] flex-col gap-2.5 rounded-2xl border p-2.5', paleta.corpo)}>
+      className={cn('flex min-h-0 w-[300px] flex-col gap-2.5 rounded-2xl border p-2.5', escolhida ? paleta.corpo : CORPO_NEUTRO)}>
       <div className="flex min-h-8 shrink-0 items-center justify-between gap-1 px-1 pt-0.5">
         {renomeando ? (
           <NomeNoLugar nome={coluna.nome} aoSalvar={aoRenomear} aoTerminar={() => { voltarAoMenu.current = true; setRenomeando(false) }} />

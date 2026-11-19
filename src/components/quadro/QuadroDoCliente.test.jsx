@@ -184,7 +184,7 @@ describe('aba Quadro: o que cada um vê', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
-  it('o contador e o fundo da coluna nos tokens da paleta: cheio + sobre e o véu do suave (cores vivas, 19/11)', async () => {
+  it('coluna com cor escolhida tem o véu da cor; sem cor, o corpo neutro e só o contador na cor automática (modelo atual, 19/11)', async () => {
     tela()
     await pronto()
     const coluna = screen.getByRole('region', { name: 'Coluna Em andamento' })
@@ -192,10 +192,11 @@ describe('aba Quadro: o que cada um vê', () => {
     expect(contador).toHaveClass('bg-cor-verde-cheio', 'text-cor-verde-sobre')
     expect(contador.getAttribute('style') ?? '').not.toMatch(/background/)
     expect(coluna).toHaveClass('bg-cor-verde-suave/40')
-    // Sem cor escolhida: o contador e o véu da cor automática pela posição (A fazer, a 1ª, é índigo).
+    // Sem cor escolhida: corpo neutro; só o contador leva a cor automática pela posição (A fazer, a 1ª, é índigo).
     const automatica = screen.getByRole('region', { name: 'Coluna A fazer' })
     expect(within(automatica).getByTitle('3 cartões')).toHaveClass('bg-cor-indigo-cheio', 'text-cor-indigo-sobre')
-    expect(automatica).toHaveClass('bg-cor-indigo-suave/40')
+    expect(automatica).toHaveClass('bg-muted/60', 'border-border/70')
+    expect(automatica.className).not.toMatch(/bg-cor-/)
   })
 
   it('a gestão também apaga coluna (Apagar coluna no menu, em vermelho)', async () => {

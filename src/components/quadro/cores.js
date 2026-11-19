@@ -23,8 +23,10 @@ export const CORES_DAS_COLUNAS = [
 ]
 
 // Coluna sem cor escolhida: a cor automática pela posição (cinza, índigo, verde, amarelo, vermelho, roxo, como no Mochi),
-// no contador e no véu da coluna.
+// só no contador (o corpo fica neutro, CORPO_NEUTRO); escolhida, a cor vale também no véu da coluna.
 const AUTOMATICAS = [0, 1, 4, 5, 7, 9]
+// Fundo de coluna sem cor escolhida (a automática só pinta o contador).
+export const CORPO_NEUTRO = 'bg-muted/60 border-border/70'
 export const corDaColuna = (coluna, posicao) => coluna.cor ?? AUTOMATICAS[(posicao + 1) % AUTOMATICAS.length]
 
 // Selo da prioridade, suave (fundo suave + texto escuro): baixa no verde, média no mostarda e alta no vermelho de estado.
