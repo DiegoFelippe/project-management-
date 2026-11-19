@@ -492,3 +492,9 @@
   to { opacity: 1; transform: none; }
 }
 .pop-in { animation: pop-in 0.14s ease-out; }
+
+/* Avisos (sonner) acima da barra de baixo do menu em toda a faixa em que ela aparece (até md): o mobileOffset do sonner
+   só vale abaixo de 600 px; de 600 a 767 px o aviso cobria a barra e o "Desfazer" (revisão do lote C1). */
+@media (min-width: 600px) and (max-width: 47.99rem) {
+  [data-sonner-toaster][data-y-position='bottom'] { --offset-bottom: calc(4.75rem + env(safe-area-inset-bottom)) !important; }
+}

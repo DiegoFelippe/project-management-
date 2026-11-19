@@ -22,6 +22,15 @@ export default function Moldura() {
   const { pathname } = useLocation()
   const checkin = useCheckinAberto(perfil, pathname)
 
+  // A tela que cresce além de md mostra o trilho: o ☰ (só do celular) fecha (revisão do lote C1).
+  useEffect(() => {
+    const larga = window.matchMedia?.('(min-width: 48rem)')
+    if (!larga) return undefined
+    const fechar = (e) => e.matches && setGaveta(false)
+    larga.addEventListener('change', fechar)
+    return () => larga.removeEventListener('change', fechar)
+  }, [])
+
   useEffect(() => {
     document.title = `${tituloDaRota(pathname)} | IXC Consult`
     document.getElementById('conteudo')?.scrollTo?.({ top: 0 })
