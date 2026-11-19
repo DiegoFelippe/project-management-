@@ -181,8 +181,8 @@ reset role;
 
 -- ── Permissões ───────────────────────────────────────────────────────────────
 
-select ok(has_function_privilege('authenticated', 'public.horas_do_cliente_por_mes(uuid,int)', 'execute')
-  and not has_function_privilege('anon', 'public.horas_do_cliente_por_mes(uuid,int)', 'execute')
+select ok(has_function_privilege('authenticated', 'public.horas_do_cliente_por_mes(uuid,int,date)', 'execute')
+  and not has_function_privilege('anon', 'public.horas_do_cliente_por_mes(uuid,int,date)', 'execute')
   and not has_function_privilege('anon', 'public.horas_do_cliente_por_consultor(uuid,date)', 'execute')
   and not has_function_privilege('anon', 'public.checkins_do_cliente_por_semana(uuid,date)', 'execute'),
   'só quem está logado executa as funções');

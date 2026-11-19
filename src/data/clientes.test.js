@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { buscarClientes, contarClientesAtivos, listarClientes, listarEventos } from './clientes'
+import {
+  buscarClientes, contarClientesAtivos, hojeDoCliente, horasPorDia, horasPorMes, listarClientes, listarEventos,
+} from './clientes'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 
@@ -101,5 +103,39 @@ describe('listarEventos (histórico do cliente)', () => {
     vi.mocked(supabase.rpc).mockResolvedValue({ data: linhas, error: null })
     expect(await listarEventos('k1', { pagina: 2 })).toEqual({ itens: linhas, total: 2 })
     expect(supabase.rpc).toHaveBeenCalledWith('historico_do_cliente', { p_cliente: 'k1', p_limite: 15, p_deslocamento: 15 })
+  })
+})
+
+describe('gráficos da aba Geral (nomes dos parâmetros)', () => {
+  it('horasPorMes(id, mês) manda p_ate; sem o mês, p_ate nulo (o atual)', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: [{ mes: '2026-09-01', realizado: '12.5' }], error: null })
+    expect(await horasPorMes('k1', '2026-09-01')).toEqual([{ mes: '2026-09-01', realizado: 12.5 }])
+    expect(supabase.rpc).toHaveBeenLastCalledWith('horas_do_cliente_por_mes', { p_cliente: 'k1', p_meses: 6, p_ate: '2026-09-01' })
+    await horasPorMes('k1')
+    expect(supabase.rpc).toHaveBeenLastCalledWith('horas_do_cliente_por_mes', { p_cliente: 'k1', p_meses: 6, p_ate: null })
+  })
+
+  it('horasPorDia manda p_cliente e p_mes e devolve o JSON do banco', async () => {
+    const mes = { mes: '2026-11-01', dias: [{ dia: '2026-11-01', horas: 2, acumulado: 2 }], realizado: 2, previsao: 30,
+      projecao: null, dias_no_mes: 30 }
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: mes, error: null })
+    expect(await horasPorDia('k1', '2026-11-01')).toEqual(mes)
+    expect(supabase.rpc).toHaveBeenLastCalledWith('horas_do_cliente_por_dia', { p_cliente: 'k1', p_mes: '2026-11-01' })
+  })
+
+  it('hojeDoCliente manda p_cliente e devolve o JSON do banco (nulo quando a pessoa não vê o cliente)', async () => {
+    const hoje = { arquivado_em: null, previsao: { horas_mes: 30, realizado: 18, dia: 17, dias_no_mes: 30, projecao: 31.8,
+      ritmo: 'acima' }, checkin: null, reuniao: null, quadro: null, checklist: null }
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: hoje, error: null })
+    expect(await hojeDoCliente('k1')).toEqual(hoje)
+    expect(supabase.rpc).toHaveBeenLastCalledWith('hoje_do_cliente', { p_cliente: 'k1' })
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: null })
+    expect(await hojeDoCliente('k2')).toBeNull()
+  })
+
+  it('o erro do banco sobe (a tela mostra "Tentar de novo")', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: { code: 'P0001', message: 'sem_permissao' } })
+    await expect(hojeDoCliente('k1')).rejects.toMatchObject({ message: 'sem_permissao' })
+    await expect(horasPorDia('k1', null)).rejects.toMatchObject({ message: 'sem_permissao' })
   })
 })

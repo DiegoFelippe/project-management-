@@ -154,10 +154,23 @@ async function chamar(funcao, argumentos) {
   return data
 }
 
-// Últimos 6 meses, do mais antigo ao atual: [{ mes: '2026-06-01', realizado }].
-export async function horasPorMes(clienteId) {
-  const linhas = await chamar('horas_do_cliente_por_mes', { p_cliente: clienteId, p_meses: 6 })
+// Os 6 meses até o mês de `ate` (qualquer dia dele; nulo ou futuro = o atual), do mais antigo ao mais novo:
+// [{ mes: '2026-06-01', realizado }].
+export async function horasPorMes(clienteId, ate = null) {
+  const linhas = await chamar('horas_do_cliente_por_mes', { p_cliente: clienteId, p_meses: 6, p_ate: ate })
   return linhas.map((l) => ({ mes: l.mes, realizado: Number(l.realizado) }))
+}
+
+// O mês (qualquer dia dele; nulo = o atual) dia a dia, como o banco manda: { mes, dias: [{ dia, horas, acumulado }],
+// realizado, previsao, projecao (só no mês atual, a partir do dia 7), dias_no_mes }.
+export function horasPorDia(clienteId, mes = null) {
+  return chamar('horas_do_cliente_por_dia', { p_cliente: clienteId, p_mes: mes })
+}
+
+// A faixa "Hoje" (a situação de hoje, no recorte de quem vê), como o banco manda: { arquivado_em, previsao, checkin,
+// reuniao, quadro, checklist }. null quando a pessoa não vê o cliente.
+export function hojeDoCliente(clienteId) {
+  return chamar('hoje_do_cliente', { p_cliente: clienteId })
 }
 
 // Horas do mês por consultor (mais horas primeiro): [{ consultorId, nome (null se não visível), horas }].

@@ -5,7 +5,7 @@
 -- consultores). Datas relativas a hoje: o mês anterior (M) e os últimos 30 dias. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(108);
+select plan(115);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -451,7 +451,7 @@ select is(testes.ids(testes.j('painel_k') -> 'ranking'),
     testes.id('pessoa_k10'), testes.id('pessoa_k09'), testes.id('pessoa_k06'), testes.id('pessoa_k05'),
     testes.id('pessoa_k04'), testes.id('pessoa_k03'), testes.id('pessoa_k02'), testes.id('admin_k')]::text[],
   'painel: com 14 consultores, o ranking traz 12 (os 6 mais ocupados e os 6 com mais folga, do mais ao menos ocupado)');
-select is(testes.j('painel_k') -> 'ranking_resumo', '{"total": 14, "acima": 3, "folga": 7, "no_meio": 2}'::jsonb,
+select is(testes.j('painel_k') -> 'ranking_resumo', '{"total": 14, "acima": 3, "folga": 7, "no_meio": 2, "sem_capacidade": 0}'::jsonb,
   'painel: ranking_resumo conta os 14 (3 acima de 100%, 7 abaixo de 70%, 2 no meio fora da lista)');
 select ok((select bool_and(r ? 'realizado' and r ? 'reservado' and r ? 'visivel' and not r ? 'pessoas')
     from jsonb_array_elements(testes.j('painel_k') -> 'ranking') r),
@@ -801,6 +801,55 @@ select private.fechar_checkins(null, testes.id('pessoa_a2'), 'Nota do consultor'
 select is((select array_agg(row(k.fim = now(), k.descricao)::text order by k.descricao) from public.checkins k
     where k.cliente_id in (testes.id('fc1'), testes.id('fc2'))),
   array['(t,Aberto)', '(t,Aberto)'], 'fechar_checkins: fecha o aberto do cliente e o do consultor, sem trocar a descrição que já existe');
+
+-- ── Acréscimos da revisão da T2 ──────────────────────────────────────────────
+-- Z: como K (14 consultores, um cliente cada com 15 x i h), mas a pessoa_z07 de ausência o mês de novembro de 2037
+-- inteiro (sem capacidade, ocupação nula). Ordem: z14 a z09 (os 6 mais ocupados), z08 (no meio), z06 a admin_z (os 6
+-- com mais folga) e z07 (sem capacidade, no fim): ficam de fora o z08 (no meio) e o z07 (sem capacidade).
+select testes.consultoria('Z');
+select testes.perfil('admin_z', 'admin', 'Z');
+select testes.perfil('pessoa_z' || lpad(i::text, 2, '0'), 'pessoa', 'Z') from generate_series(2, 14) i;
+select testes.cliente('z' || lpad(i::text, 2, '0'), 15 * i, 'Z',
+  case when i = 1 then 'admin_z' else 'pessoa_z' || lpad(i::text, 2, '0') end)
+from generate_series(1, 14) i;
+select set_config('request.jwt.claims', '', true);
+insert into public.ausencias (perfil_id, de, ate, motivo) values (testes.id('pessoa_z07'), '2037-11-01', '2037-11-30', 'Licença');
+select testes.guardar('painel_z', 'admin_z', 'public.painel_do_inicio(testes.futuro())');
+select is(testes.ids(testes.j('painel_z') -> 'ranking'),
+  array[testes.id('pessoa_z14'), testes.id('pessoa_z13'), testes.id('pessoa_z12'), testes.id('pessoa_z11'),
+    testes.id('pessoa_z10'), testes.id('pessoa_z09'), testes.id('pessoa_z06'), testes.id('pessoa_z05'),
+    testes.id('pessoa_z04'), testes.id('pessoa_z03'), testes.id('pessoa_z02'), testes.id('admin_z')]::text[],
+  'painel: com 14 e um sem capacidade, o ranking traz os 6 + 6 com capacidade (o sem capacidade fica de fora, no fim)');
+select is(testes.j('painel_z') -> 'ranking_resumo',
+  '{"total": 14, "acima": 3, "folga": 6, "no_meio": 1, "sem_capacidade": 1}'::jsonb,
+  'painel: o sem capacidade que ficou de fora conta em sem_capacidade, não em no_meio (o separador fica certo)');
+
+-- W: as semanas com "hoje" fixo (private.semanas_de_checkins recebe o dia). D = um domingo de 3 semanas atrás; um
+-- check-in na semana de D - 13 e três na de D - 6 (a semana que termina em D).
+select testes.consultoria('W');
+select testes.perfil('admin_w', 'admin', 'W');
+select testes.perfil('pessoa_w', 'pessoa', 'W');
+select testes.cliente('w1', 10, 'W', 'pessoa_w');
+create temp table w_dom as select date_trunc('week', testes.hoje()::timestamp)::date - 22 as d;
+select testes.checkin('pessoa_w', 'w1', ((select d from w_dom) + x)::timestamp at time zone 'America/Sao_Paulo'
+  + interval '10 hours', 60)
+from unnest(array[-13, -6, -3, 0]) x;
+select set_config('request.jwt.claims', '', true);
+select is((select (private.semanas_de_checkins('consultoria', testes.id('W'), null, d - 13, d, d) ->> 'media')::numeric
+    from w_dom), 1.0,
+  'semanas com hoje num domingo: a semana de hoje (inteira dentro do período) não entra na média (1, não 2)');
+select is((select array_agg(e ->> 'semana') from w_dom,
+    jsonb_array_elements(private.semanas_de_checkins('consultoria', testes.id('W'), null, d - 13, d, d) -> 'semanas') e
+    where (e ->> 'parcial')::boolean),
+  (select array[(d - 6)::text] from w_dom), 'semanas com hoje num domingo: a semana que termina hoje é a parcial');
+select is((select (private.semanas_de_checkins('consultoria', testes.id('W'), null, d - 13, d - 3, d - 3) ->> 'media')::numeric
+    from w_dom), 1.0, 'semanas com hoje numa quinta-feira: a semana de hoje também não entra na média');
+select is((select testes.chamar('admin_w', format('public.checkins_por_semana(p_de => %L::date, p_ate => %L::date)', d - 13, d))
+    from w_dom),
+  (select private.semanas_de_checkins('consultoria', testes.id('W'), testes.id('admin_w'), d - 13, d, testes.hoje()) from w_dom),
+  'checkins_por_semana = private.semanas_de_checkins com o dia de hoje de verdade');
+select ok(not has_function_privilege('authenticated', 'private.semanas_de_checkins(text, uuid, uuid, date, date, date)', 'execute'),
+  'private.semanas_de_checkins: nenhum logado executa');
 
 select * from finish();
 rollback;
