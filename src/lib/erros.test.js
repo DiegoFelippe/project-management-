@@ -129,7 +129,7 @@ describe('traduzirErroBanco com contexto', () => {
   it('traduz as mensagens do banco', () => {
     const msg = (message) => traduzirErroBanco({ code: 'P0001', message }, { sobre: 'cliente' })
     expect(msg('consultor_invalido')).toBe('Escolha um consultor ativo desta consultoria.')
-    expect(msg('so_central_muda')).toBe('Só a central muda os dados do cliente.')
+    expect(msg('so_central_muda')).toBe('Só a central manda, move ou arquiva o cliente. Cliente arquivado só a central edita.')
     expect(msg('consultoria_arquivada')).toBe('Essa consultoria está arquivada.')
     expect(msg('checkin_sem_cliente')).toBe('Você não é o consultor deste cliente.')
     expect(msg('checkin_no_futuro')).toBe('O horário não pode estar no futuro.')

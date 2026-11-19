@@ -65,7 +65,7 @@ export const MOTIVO_OBRIGATORIO = 'Conte por que esta tarefa não se aplica.'
 
 // Mensagens levantadas pelo banco (raise exception '<texto>').
 const ERROS_MENSAGEM_BANCO = {
-  so_central_muda: 'Só a central muda os dados do cliente.',
+  so_central_muda: 'Só a central manda, move ou arquiva o cliente. Cliente arquivado só a central edita.',
   consultor_invalido: 'Escolha um consultor ativo desta consultoria.',
   consultoria_arquivada: 'Essa consultoria está arquivada.',
   checkin_sem_cliente: 'Você não é o consultor deste cliente.',
