@@ -537,13 +537,14 @@ describe('arrastar cartões', () => {
     expect(ordem('A fazer')).toEqual(['Revisar contratos', 'Mapear boletos', 'Ligar para o financeiro'])
   })
 
-  it('o cartão movido brilha uma vez; ao carregar, nenhum brilha', async () => {
+  // Pedido do Diego (19/11): o quadro não brilha ao mover (o brilho fica só na linha salva de Clientes).
+  it('o cartão movido não brilha', async () => {
     tela()
     await pronto()
-    expect(document.querySelector('.mudou')).toBeNull()
     await arrastarComTeclado(screen.getByRole('button', { name: 'Cartão Revisar contratos' }), ['direita'])
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Cartão Revisar contratos' })).toHaveClass('mudou'))
-    expect(document.querySelectorAll('.mudou')).toHaveLength(1)
+    await waitFor(() => expect(moverCartao).toHaveBeenCalled())
+    await new Promise((r) => setTimeout(r, 50))
+    expect(document.querySelector('.mudou')).toBeNull()
   })
 
   it('arrastar para outra coluna: o vizinho é o cartão de cima na coluna nova e os contadores mudam', async () => {

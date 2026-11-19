@@ -23,7 +23,7 @@ function CartaoNoQuadro({ cartao, indice, concluidos, hoje, arrastavel, aoAbrir 
   return (
     <Draggable draggableId={cartao.id} index={indice} isDragDisabled={!arrastavel}>
       {(provided, snapshot) => (
-        <div ref={provided.innerRef} {...provided.draggableProps} role="button" tabIndex={0} data-brilho={cartao.id} {...provided.dragHandleProps}
+        <div ref={provided.innerRef} {...provided.draggableProps} role="button" tabIndex={0} {...provided.dragHandleProps}
           aria-label={`Cartão ${cartao.titulo}`} onClick={abrir}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || (e.key === ' ' && !arrastavel)) {

@@ -225,8 +225,8 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   O `.card` se separa do fundo pela **sombra longa** (`--sombra-card`, claro e escuro), não pela borda (a borda fica
   transparente: `border-<cor>` ainda funciona nos cartões de aviso); o que fica dentro do cartão é `.dentro-do-cartao`
   (afundado, raio menor). **O que acabou de mudar brilha uma vez** (`brilhar(elemento)`/`brilharPorMarca(id)` de
-  `src/lib/brilhar.js`: `.mudou` por 1,6 s, nada com "reduzir movimento"): a linha de Clientes salva (`<Linha marca>`), o
-  cartão movido no quadro e a tarefa marcada (`data-brilho`); nunca ao carregar. **Botão que termina em "✓ Salvo"**:
+  `src/lib/brilhar.js`: `.mudou` por 1,6 s, nada com "reduzir movimento"): só a linha de Clientes salva (`<Linha marca>`);
+  nunca ao carregar. O quadro (cartão movido) e o check-list (tarefa marcada) não brilham (pedido do Diego, 19/11). **Botão que termina em "✓ Salvo"**:
   `BotaoComResultado` (`acao` devolve `{ erro }`; gira por 300 ms no mínimo, mostra o rótulo feito sobre `bg-positive-soft`
   por 2 s, a largura não muda; usa o `Button`), hoje no Testar das integrações. **Faixa do Início** (`FaixaDoInicio`,
   central e gestão): "N clientes precisam de você" com "Ver os N", que rola até o bloco Clientes em risco e põe o foco
