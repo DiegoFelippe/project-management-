@@ -84,6 +84,20 @@ describe('useEnvio', () => {
     expect(result.current.erros).toEqual({ nome: 'Já existe.' })
   })
 
+  // Revisão do lote F: o campo recusado pelo servidor volta ao normal quando a pessoa muda o valor dele.
+  it('com valores, o erro que o servidor deu num campo some quando o valor daquele campo muda (o dos outros fica)', async () => {
+    const { result, rerender } = renderHook(({ valores }) => useEnvio(vi.fn(), { valores }),
+      { initialProps: { valores: { nome: 'Alfa', email: 'a@b.co' } } })
+    await act(async () => { await result.current.enviar(async () => ({ erros: { nome: 'Já existe.', email: 'Recusado.' } })) })
+    expect(result.current.erros).toEqual({ nome: 'Já existe.', email: 'Recusado.' })
+    rerender({ valores: { nome: 'Alfa', email: 'a@b.co' } })
+    expect(result.current.erros).toEqual({ nome: 'Já existe.', email: 'Recusado.' })
+    rerender({ valores: { nome: 'Beta', email: 'a@b.co' } })
+    expect(result.current.erros).toEqual({ email: 'Recusado.' })
+    rerender({ valores: { nome: 'Alfa', email: 'a@b.co' } })
+    expect(result.current.erros).toEqual({ nome: 'Já existe.', email: 'Recusado.' })
+  })
+
   it('um envio novo limpa os erros que o servidor deu; { erros: {} } vazio conta como sucesso', async () => {
     const aoConcluir = vi.fn()
     const { result } = renderHook(() => useEnvio(aoConcluir))
