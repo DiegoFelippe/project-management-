@@ -84,7 +84,7 @@ describe('contraste dos tokens de src/index.css', () => {
 
   // Gráficos (design 2026-11-17-graficos-do-inicio-e-do-cliente): cores só por --grafico-*, com valor próprio no escuro.
   // Série, acima, folga e referência são marcas finas (linhas de 2 px, barras de 12 px) ao lado de número e ícone:
-  // seguram 4,5:1 sobre o cartão. Trilha, grade, "a fazer" e a rampa da fila são fundo e têm nome e número ao lado.
+  // a série segura 3:1 (Viva completa, 19/11) e as outras 4,5:1 sobre o cartão. Trilha, grade, "a fazer" e a rampa da fila são fundo e têm nome e número ao lado.
   const MARCAS = ['grafico-serie', 'grafico-acima', 'grafico-folga', 'grafico-ref']
   const TOKENS_DOS_GRAFICOS = [...MARCAS, 'grafico-grade', 'grafico-trilha', 'grafico-neutro', 'grafico-fila-1', 'grafico-fila-2', 'grafico-fila-3']
 
@@ -98,10 +98,10 @@ describe('contraste dos tokens de src/index.css', () => {
     expect(CSS).toMatch(/\.dark \{[^}]*--grafico-lavado:\s*rgb\(/)
   })
 
-  it.each(Object.keys(TEMAS))('no %s, as marcas dos gráficos (série, acima, folga, referência) seguram 4,5:1 sobre o cartão', (tema) => {
+  it.each(Object.keys(TEMAS))('no %s, as marcas dos gráficos seguram o mínimo sobre o cartão (série 3:1; acima, folga e referência 4,5:1)', (tema) => {
     const t = TEMAS[tema]
-    const fracas = MARCAS.map((nome) => ({ nome, contraste: arredondar(contraste(t[nome], t.card)) }))
-      .filter((m) => !(m.contraste >= CONTRASTE_MINIMO))
+    const fracas = MARCAS.map((nome) => ({ nome, contraste: arredondar(contraste(t[nome], t.card)), minimo: nome === 'grafico-serie' ? 3 : CONTRASTE_MINIMO }))
+      .filter((m) => !(m.contraste >= m.minimo))
     expect(fracas).toEqual([])
   })
 
@@ -119,6 +119,10 @@ describe('contraste dos tokens de src/index.css', () => {
       .map((estado) => ({ estado, contraste: arredondar(contraste(t[/^var\(--([\w-]+)\)$/.exec(COR[estado])[1]], t.card)) }))
       .filter((m) => !(m.contraste >= 3))
     expect(fracas).toEqual([])
+  })
+
+  it('a pausada é turquesa (longe do âmbar de atenção)', () => {
+    expect(COR.pausada).toBe('var(--cor-turquesa-forte)')
   })
 
   it.each(Object.keys(TEMAS))('no %s, positivo e destrutivo como texto da variação dos cartões seguram 4,5:1 sobre o cartão', (tema) => {
@@ -152,6 +156,19 @@ describe.each(Object.keys(TEMAS))('paleta e estados no %s', (tema) => {
       { onde: `${n} texto/suave`, c: contraste(t[`cor-${n}-texto`], t[`cor-${n}-suave`]), minimo: CONTRASTE_MINIMO },
       { onde: `${n} forte/cartão`, c: contraste(t[`cor-${n}-forte`], t.card), minimo: 3 },
     ]).filter((m) => !(arredondar(m.c) >= m.minimo)).map((m) => `${m.onde}: ${arredondar(m.c)}`)
+    expect(fracos).toEqual([])
+  })
+
+  it('cheio da paleta: o sobre segura 4,5:1 sobre o cheio (o mostarda leva tinta escura)', () => {
+    const fracos = NOMES_DA_PALETA.map((n) => ({ onde: n, c: contraste(t[`cor-${n}-sobre`], t[`cor-${n}-cheio`]) }))
+      .filter((m) => !(arredondar(m.c) >= CONTRASTE_MINIMO)).map((m) => `${m.onde}: ${arredondar(m.c)}`)
+    expect(fracos).toEqual([])
+  })
+
+  it('o suave de cada cor e de cada estado se separa do cartão (≥ 1,5:1 no escuro; a Viva dá 1,55 a 2,4)', () => {
+    if (tema !== 'escuro') return
+    const suaves = [...NOMES_DA_PALETA.map((n) => `cor-${n}-suave`), 'positive-soft', 'notice-soft', 'destructive-soft']
+    const fracos = suaves.map((n) => ({ n, c: contraste(t[n], t.card) })).filter((m) => !(arredondar(m.c) >= 1.5)).map((m) => `${m.n}: ${arredondar(m.c)}`)
     expect(fracos).toEqual([])
   })
 

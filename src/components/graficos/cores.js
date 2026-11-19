@@ -18,7 +18,7 @@ export const COR = {
   feita: 'var(--positive-cheio)',
   nsa: 'var(--cor-grafite-forte)',
   andamento: 'var(--cor-azul-forte)',
-  pausada: 'var(--cor-mostarda-forte)',
+  pausada: 'var(--cor-turquesa-forte)',
   afazer: 'var(--cor-violeta-forte)', // a fazer no prazo: --input (1,5:1) não segurava 3:1 como marca
   atrasada: 'var(--destructive-cheio)',
 }

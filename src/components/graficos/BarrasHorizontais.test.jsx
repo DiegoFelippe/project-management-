@@ -119,7 +119,7 @@ describe('BarrasHorizontais', () => {
     })
     const partes = [...linha('Diagnóstico').querySelectorAll('[data-parte]')]
     expect(partes.map((p) => p.dataset.parte)).toEqual(['feita', 'nsa', 'pausada', 'afazer', 'atrasada'])
-    expect(partes.map((p) => p.style.background)).toEqual(['var(--positive-cheio)', 'var(--cor-grafite-forte)', 'var(--cor-mostarda-forte)',
+    expect(partes.map((p) => p.style.background)).toEqual(['var(--positive-cheio)', 'var(--cor-grafite-forte)', 'var(--cor-turquesa-forte)',
       'var(--cor-violeta-forte)', 'var(--destructive-cheio)'])
   })
 

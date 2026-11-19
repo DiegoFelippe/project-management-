@@ -174,7 +174,11 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   4,5:1** em todo texto (auditoria, pedido do Diego 17/11): fundo azul com texto branco é `bg-primary-cheio` (no escuro o
   `--primary` é o azul claro, só para texto, foco e barras); texto azul sobre o azul-claro de realce (`bg-primary/10`,
   `bg-accent`: "Hoje", opção escolhida, selos) é `text-primary-texto`; texto sobre a cor da pessoa ou do evento usa
-  `corDoTextoSobre` (`src/lib/cores.js`). `src/lib/contraste.test.js` confere os tokens e varre o código.
+  `corDoTextoSobre` (`src/lib/cores.js`).
+  **Cores vivas (pedido do Diego, 19/11, "Viva completa"):** fundo sólido da paleta (ladrilho de ícone, selo, etiqueta,
+  contador) é `bg-cor-<nome>-cheio` com `text-cor-<nome>-sobre` (≥ 4,5:1); selo de estado sólido é `bg-<estado>-cheio`
+  com `text-sobre-<estado>`. O ícone dos cartões de números é sólido (cheio + sobre). Relatório:
+  `docs/auditoria-ux/cores/revisao-de-cores.md`. `src/lib/contraste.test.js` confere os tokens e varre o código.
 - **Todo formulário é uma `JanelaFormulario`** (`src/components/comum/JanelaFormulario.jsx`), com o corpo em
   `SecaoFormulario`. Rodapé: **Cancelar** (outline) + botão principal, que mostra a ação em andamento enquanto
   grava ("Salvando…", "Criando…", "Testando…"). O botão de enviar fica no rodapé e liga ao formulário por
@@ -355,8 +359,8 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
 - **Séries pela paleta de 19/11** (`corDaSerie(i)` de `graficos/cores.js`): ordem fixa azul, turquesa, violeta, mostarda,
   rosa, verde, laranja, índigo; mais de 8 itens: os 8 maiores e "Outros" em grafite (`COR_OUTROS`) (pedido do Diego, 19/11). Estado nunca usa a paleta.
 - **Cores só por tokens** (`src/index.css`, claro e escuro; nomes curtos em `graficos/cores.js`): `--grafico-*`, a paleta
-  `--cor-*`, os trios de estado (`-cheio`, `-soft`) e as zonas; nada de hex nem `--primary` direto no gráfico. Série, acima, folga e referência seguram 4,5:1 sobre o cartão
-  (`src/lib/contraste.test.js`); vermelho e âmbar sempre com ícone e o número escrito; texto nunca na cor da série.
+  `--cor-*`, os trios de estado (`-cheio`, `-soft`) e as zonas; nada de hex nem `--primary` direto no gráfico. A série (o azul forte) segura 3:1 sobre o cartão, como as marcas da
+  paleta (Viva completa, Diego, 19/11); acima, folga e referência seguram 4,5:1 (`src/lib/contraste.test.js`); vermelho e âmbar sempre com ícone e o número escrito; texto nunca na cor da série.
 - **SVG na largura real** (`useLargura`, sem `viewBox` que estica) e texto do SVG só com `fontSize={TAMANHO.legenda}`
   (11 px) ou maior; rótulos do eixo X com 44 px entre eles (sempre o último); a 360 px nada rola para o lado.
 - **Todo gráfico tem visão em tabela** ("Ver em tabela", com os mesmos números) e **dica no mouse, no toque e no
