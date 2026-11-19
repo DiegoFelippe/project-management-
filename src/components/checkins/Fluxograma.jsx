@@ -12,12 +12,12 @@ import { ALTURA_DO_NO, LARGURA_DO_NO, caminhoDaSeta, cortar, layoutDoFluxo, queb
 
 // Cor de cada situação: `tom` pinta o ícone, a bolinha e a linha de baixo (currentColor); `fundo`, a caixa. As mesmas cores
 // de estado dos gráficos (COR de graficos/cores.js; cores vivas, 19/11): feita verde, não se aplica grafite, em andamento
-// azul, pausada turquesa, a fazer violeta, atrasada vermelha (o suave na caixa, o forte na borda, o texto na linha de baixo).
+// azul, pausada mostarda, a fazer violeta, atrasada vermelha (o suave na caixa, o forte na borda, o texto na linha de baixo).
 const ESTILO = {
   livre: { tom: 'text-cor-violeta-texto', fundo: 'fill-cor-violeta-suave stroke-cor-violeta-forte' },
   feita: { tom: 'text-positive', fundo: 'fill-positive-soft stroke-positive' },
   andamento: { tom: 'text-cor-azul-texto', fundo: 'fill-cor-azul-suave stroke-cor-azul-forte' },
-  pausada: { tom: 'text-cor-turquesa-texto', fundo: 'fill-cor-turquesa-suave stroke-cor-turquesa-forte' },
+  pausada: { tom: 'text-cor-mostarda-texto', fundo: 'fill-cor-mostarda-suave stroke-cor-mostarda-forte' },
   bloqueada: { tom: 'text-muted-foreground', fundo: 'fill-muted stroke-input', tracejada: true, titulo: 'fill-muted-foreground' },
   hoje: { tom: 'text-notice', fundo: 'fill-notice-soft stroke-notice' },
   atrasada: { tom: 'text-destructive', fundo: 'fill-destructive-soft stroke-destructive' },
@@ -273,7 +273,7 @@ export function LegendaDoFluxo({ dica }) {
         {ITENS_DA_LEGENDA.map(([cor, texto]) => (
           <li key={cor} className="inline-flex items-center gap-1.5">
             {cor === 'nao_se_aplica' ? <Ban aria-hidden="true" className="text-cor-grafite-texto size-3.5" />
-              : cor === 'pausada' ? <Pause aria-hidden="true" className="text-cor-turquesa-texto size-3.5" />
+              : cor === 'pausada' ? <Pause aria-hidden="true" className="text-cor-mostarda-texto size-3.5" />
                 : <span aria-hidden="true" className={cn('inline-block h-2.5 w-3.5 rounded-[3px] border', AMOSTRA[cor])} />}
             {texto}
           </li>

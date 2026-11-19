@@ -14,28 +14,31 @@ do celular e os componentes de automação.
 ## 1. Paleta de 9 cores
 
 Para **separar coisas** (pessoas, séries, clientes, cidades, etapas, colunas): nunca para estado. Cada cor em três tons:
-**texto** (≥ 4,5:1 sobre o cartão e sobre o suave), **forte** (barras, ícones, marcas: ≥ 3:1 sobre o cartão) e
-**suave** (fundo de selo, chip e ícone) e **cheio** (fundo sólido, com o **sobre** a ≥ 4,5:1). Valores "Viva" (Diego, 19/11, "Viva completa"). Conferido no protótipo (aba Paleta, cálculo na própria página).
+**texto** (≥ 4,5:1 sobre o cartão e sobre o suave), **forte** (barras, ícones, marcas: ≥ 3:1 no escuro; no claro são tons
+claros, com "Ver em tabela" e a dica, como o dataviz aceita) e **suave** (fundo de selo, chip e ícone). No código,
+`-cheio` guarda o valor do suave e `-sobre` o do texto. Valores "Tropical" (pedido do Diego, 19/11, Tropical, no modelo
+atual; relatório `docs/auditoria-ux/cores/versao-tropical.md`). Conferido no protótipo (aba Paleta).
 
-| Cor | Claro (texto · forte · suave · cheio · sobre) | Escuro (texto · forte · suave · cheio · sobre) |
+| Cor (nome no código) | Claro (texto · forte · suave) | Escuro (texto · forte · suave) |
 |---|---|---|
-| azul | `#1d4ed8` · `#3b82f6` · `#bfdbfe` · `#2563eb` · `#ffffff` | `#93c5fd` · `#60a5fa` · `#224481` · `#2563eb` · `#ffffff` |
-| turquesa | `#155e75` · `#05a0bd` · `#a5f3fc` · `#0a7f99` · `#ffffff` | `#67e8f9` · `#22d3ee` · `#0d5873` · `#0a7f99` · `#ffffff` |
-| violeta | `#6d28d9` · `#8b5cf6` · `#ddd6fe` · `#7c3aed` · `#ffffff` | `#c4b5fd` · `#a78bfa` · `#423481` · `#7c3aed` · `#ffffff` |
-| mostarda | `#854d0e` · `#c58500` · `#fef08a` · `#eab308` · `#1c1300` | `#fde047` · `#facc15` · `#685722` · `#eab308` · `#1c1300` |
-| rosa | `#9d174d` · `#ec4899` · `#fbcfe8` · `#db2777` · `#ffffff` | `#f9a8d4` · `#f472b6` · `#692c5c` · `#db2777` · `#ffffff` |
-| verde | `#166534` · `#08a04a` · `#bbf7d0` · `#15803d` · `#ffffff` | `#86efac` · `#4ade80` · `#185e44` · `#15803d` · `#ffffff` |
-| laranja | `#9a3412` · `#ec6a00` · `#fed7aa` · `#c2410c` · `#ffffff` | `#fdba74` · `#fb923c` · `#6e3e27` · `#c2410c` · `#ffffff` |
-| índigo | `#4338ca` · `#6366f1` · `#c7d2fe` · `#4f46e5` · `#ffffff` | `#a5b4fc` · `#818cf8` · `#32387f` · `#4f46e5` · `#ffffff` |
-| grafite | `#475569` · `#64748b` · `#e2e8f0` · `#64748b` · `#ffffff` | `#cbd5e1` · `#94a3b8` · `#323e56` · `#64748b` · `#ffffff` |
+| azul (piscina) | `#075985` · `#0ea5e9` · `#e0f2fe` | `#7fcbfa` · `#009fe1` · `#004b6c` |
+| turquesa (ciano) | `#155e75` · `#0ec8e4` · `#cffafe` | `#6bd2e6` · `#0da6bc` · `#034e5a` |
+| violeta (lavanda) | `#3730a3` · `#818cf8` · `#e0e7ff` | `#b1bcff` · `#7d87f3` · `#3a3f72` |
+| mostarda (sol) | `#713f12` · `#d7ae05` · `#fef9c3` | `#d8bf73` · `#b29005` · `#544301` |
+| rosa (hibisco) | `#9d174d` · `#f472b6` · `#fce7f3` | `#f3a6ca` · `#df5fa3` · `#66304b` |
+| verde (esmeralda) | `#065f46` · `#10b981` · `#d1fae5` | `#83d5ad` · `#0bae79` · `#015337` |
+| laranja (manga) | `#9a3412` · `#fb923c` · `#ffedd5` | `#f3b081` · `#db750f` · `#67370f` |
+| índigo (lima) | `#3f6212` · `#84cc16` · `#ecfccb` | `#aacf8a` · `#6ba804` · `#344e18` |
+| grafite (cinza) | `#536274` · `#64748b` · `#e1e7ee` | `#adb7c3` · `#616a75` · `#3c4249` |
 
-- **Ordem das séries** (a mesma em todo gráfico): azul, turquesa, violeta, mostarda, rosa, verde, laranja, índigo;
-  grafite fica para "Outros" e para o que é neutro (aguardando, a fazer). Mais de 8 itens: os 8 maiores e "Outros".
-- **Estados continuam verde, âmbar e vermelho**, sempre com ícone e palavra, e ganham o trio que faltava (texto · cheio
-  · suave · cor do que vai sobre o cheio), igual no claro e no escuro: sucesso `#166534`·`#15803d`·`#bbf7d0`·branco
-  (escuro `#4ade80`·`#22c55e`·`#175842`·`#04140a`); atenção `#975a04`·`#d97706`·`#fdea9b`·`#1c1300` (escuro
-  `#fbbf24`·`#f59e0b`·`#634a25`·`#1c1300`); perigo `#b91c1c`·`#dc2626`·`#fecece`·branco (escuro `#fca5a5`·`#dc2626`·
-  `#612939`·branco). A "pausada" dos gráficos é turquesa, longe do âmbar de atenção.
+- **Ordem das séries** (a mesma em todo gráfico): azul, mostarda, rosa, laranja, turquesa, índigo, violeta, verde
+  (piscina, sol, hibisco, manga, ciano, lima, lavanda, esmeralda; validada no dataviz, claro e escuro); grafite fica para
+  "Outros" e para o que é neutro (aguardando, a fazer). Mais de 8 itens: os 8 maiores e "Outros".
+- **Estados**, sempre com ícone e palavra, no trio (texto · cheio · suave · sobre): sucesso (esmeralda) `#065f46`·`#10b981`·
+  `#d1fae5`·`#022c22` (escuro `#83d5ad`·`#0bae79`·`#015337`·`#022c22`); atenção (âmbar) `#92400e`·`#fbbf24`·`#fef3c7`·
+  `#78350f` (escuro `#f4c26a`·`#fbbf24`·`#5e3e02`·`#451a03`); perigo (coral) `#991b1b`·`#dc2626` (o do botão)·`#fee2e2`·
+  branco (escuro `#f6a2a1`·`#dc2626`·`#6b3030`·branco); o coral das marcas é `--grafico-acima` (`#f05252` claro,
+  `#f87171` escuro). A "pausada" dos gráficos é o sol (mostarda), a "a fazer" a lavanda (violeta).
 - **Cor de pessoa** continua a que a pessoa escolheu (`perfis.cor`, avatar e agenda). Nos gráficos, a série segue a
   ordem acima, não a cor da pessoa (algumas cores de pessoa não chegam a 3:1 como marca).
 - Isto **muda a regra das cores do `CLAUDE.md`** ("as cores da consultoria"): passa a ser "as da consultoria e a paleta de

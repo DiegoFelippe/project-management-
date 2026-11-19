@@ -5,7 +5,7 @@ export const CHAVE_TEMA = 'consultoria:tema'
 export const TEMAS = ['sistema', 'claro', 'escuro']
 // Cor da barra da janela do app instalado (e da barra do navegador no celular): a mesma da moldura
 // (--moldura no src/index.css). O index.html usa os mesmos valores antes de a página aparecer.
-export const COR_DA_BARRA = { claro: '#ffffff', escuro: '#0c1430' }
+export const COR_DA_BARRA = { claro: '#ffffff', escuro: '#0e1424' }
 
 export function lerTema() {
   try {

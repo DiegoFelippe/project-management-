@@ -18,14 +18,15 @@ export const COR = {
   feita: 'var(--positive-cheio)',
   nsa: 'var(--cor-grafite-forte)',
   andamento: 'var(--cor-azul-forte)',
-  pausada: 'var(--cor-turquesa-forte)',
+  pausada: 'var(--cor-mostarda-forte)',
   afazer: 'var(--cor-violeta-forte)', // a fazer no prazo: --input (1,5:1) não segurava 3:1 como marca
-  atrasada: 'var(--destructive-cheio)',
+  atrasada: 'var(--grafico-acima)',
 }
 
-// Paleta de 9 cores de 19/11 (pedido do Diego): separa coisas, nunca estado. Ordem fixa das séries em todo gráfico;
+// Paleta Tropical de 19/11 (pedido do Diego): separa coisas, nunca estado. Ordem fixa das séries em todo gráfico (validada no
+// dataviz, claro e escuro: piscina, sol, hibisco, manga, ciano, lima, lavanda, esmeralda);
 // o grafite é do "Outros" e do que é neutro.
-export const PALETA = ['azul', 'turquesa', 'violeta', 'mostarda', 'rosa', 'verde', 'laranja', 'indigo']
+export const PALETA = ['azul', 'mostarda', 'rosa', 'laranja', 'turquesa', 'indigo', 'violeta', 'verde']
 export const corDaPaleta = (nome, tom = 'forte') => `var(--cor-${nome}-${tom})`
 export const corDaSerie = (i) => corDaPaleta(PALETA[i % PALETA.length])
 export const COR_OUTROS = corDaPaleta('grafite')

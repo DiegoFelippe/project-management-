@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { CORES_DO_EVENTO } from '@/components/calendario/cores'
-import { COR } from '@/components/graficos/cores'
+import { COR, PALETA } from '@/components/graficos/cores'
 import { CORES_DO_AVATAR, TEXTO_ESCURO, corDoTextoSobre } from './cores'
 import { CONTRASTE_MINIMO, contraste, misturar } from './contraste'
 
@@ -56,7 +56,7 @@ function pares(t) {
     .concat([
       { texto: t.domingo, fundo: fimDeSemana, onde: 'domingo sobre a célula do fim de semana' },
       { texto: t.sabado, fundo: fimDeSemana, onde: 'sábado sobre a célula do fim de semana' },
-      // Linha da tabela com o mouse: véu do --accent (50%) sobre o cartão (cores vivas, 19/11). O link da linha fica no
+      // Linha da tabela com o mouse: véu do --accent (50%) sobre o cartão (Tropical, 19/11). O link da linha fica no
       // primary-texto ao passar o mouse (o --primary do escuro dá 4,1:1 ali).
       { texto: t['muted-foreground'], fundo: misturar(t.accent, t.card, 0.5), onde: 'texto de apoio na linha da tabela com o mouse' },
       { texto: t['primary-texto'], fundo: misturar(t.accent, t.card, 0.5), onde: 'link da linha da tabela com o mouse' },
@@ -87,10 +87,13 @@ describe('contraste dos tokens de src/index.css', () => {
   })
 
   // Gráficos (design 2026-11-17-graficos-do-inicio-e-do-cliente): cores só por --grafico-*, com valor próprio no escuro.
-  // Série, acima, folga e referência são marcas finas (linhas de 2 px, barras de 12 px) ao lado de número e ícone:
-  // a série segura 3:1 (Viva completa, 19/11) e as outras 4,5:1 sobre o cartão. Trilha, grade, "a fazer" e a rampa da fila são fundo e têm nome e número ao lado.
+  // Tropical (Diego, 19/11): no escuro toda marca segura 3:1; no claro as marcas são tons frescos e claros (1,67 a 2,98:1)
+  // e todo gráfico tem "Ver em tabela" e a dica (o método do dataviz aceita marca abaixo de 3:1 assim). Só o coral de "passou"
+  // (3:1) e a referência (4,5:1) seguram o mínimo nos dois temas. Trilha, grade e a rampa da fila são fundo.
   const MARCAS = ['grafico-serie', 'grafico-acima', 'grafico-folga', 'grafico-ref']
   const TOKENS_DOS_GRAFICOS = [...MARCAS, 'grafico-grade', 'grafico-trilha', 'grafico-neutro', 'grafico-fila-1', 'grafico-fila-2', 'grafico-fila-3']
+  // Piso das marcas claras (com a tabela e a dica): abaixo disto a marca some no cartão (a folga âmbar, 1,67, é a menor).
+  const PISO_DA_MARCA_CLARA = 1.6
 
   it('os tokens dos gráficos existem no claro e no escuro (o escuro redefine cada um)', () => {
     const escuro = tokens(CSS, '.dark')
@@ -102,10 +105,9 @@ describe('contraste dos tokens de src/index.css', () => {
     expect(CSS).toMatch(/\.dark \{[^}]*--grafico-lavado:\s*rgb\(/)
   })
 
-  // Só o claro precisa do piso de 3:1 na série (o azul forte #3b82f6 dá 3,68:1); no escuro o #60a5fa segura 4,5:1.
-  it.each(Object.keys(TEMAS))('no %s, as marcas dos gráficos seguram o mínimo sobre o cartão (série 3:1 só no claro; o resto 4,5:1)', (tema) => {
+  it.each(Object.keys(TEMAS))('no %s, as marcas dos gráficos seguram o mínimo sobre o cartão (escuro 3:1; claro: só acima 3:1 e referência 4,5:1)', (tema) => {
     const t = TEMAS[tema]
-    const minimo = (nome) => (nome === 'grafico-serie' && tema === 'claro' ? 3 : CONTRASTE_MINIMO)
+    const minimo = (nome) => (nome === 'grafico-ref' ? CONTRASTE_MINIMO : nome === 'grafico-acima' || tema === 'escuro' ? 3 : PISO_DA_MARCA_CLARA)
     const fracas = MARCAS.map((nome) => ({ nome, contraste: arredondar(contraste(t[nome], t.card)), minimo: minimo(nome) }))
       .filter((m) => !(m.contraste >= m.minimo))
     expect(fracas).toEqual([])
@@ -119,24 +121,26 @@ describe('contraste dos tokens de src/index.css', () => {
     expect(lavado('.dark')).toEqual(rgb(TEMAS.escuro['grafico-serie']))
   })
 
-  // A barra de folga da Ocupação fica sobre a zona --notice-soft: marca de 3:1 também ali (o --notice-cheio dava 2,86:1).
-  it.each(Object.keys(TEMAS))('no %s, a marca de folga segura 3:1 sobre a zona de folga (--notice-soft)', (tema) => {
+  // As situações das tarefas (rosca e etapas do check-list, faixa Hoje): COR de graficos/cores.js são marcas com nome,
+  // ícone e número ao lado: 3:1 no escuro; no claro o piso das marcas claras (Tropical, 19/11).
+  it.each(Object.keys(TEMAS))('no %s, as marcas de estado dos gráficos (COR) seguram o mínimo sobre o cartão', (tema) => {
     const t = TEMAS[tema]
-    expect(arredondar(contraste(t['grafico-folga'], t['notice-soft']))).toBeGreaterThanOrEqual(3)
-  })
-
-  // As situações das tarefas (rosca e etapas do check-list, faixa Hoje): COR de graficos/cores.js são marcas (arcos,
-  // partes de barra) com nome e ícone ao lado: seguram 3:1 sobre o cartão (pedido do Diego, 19/11).
-  it.each(Object.keys(TEMAS))('no %s, as marcas de estado dos gráficos (COR: feita, não se aplica, andamento, pausada, a fazer, atrasada) seguram 3:1 sobre o cartão', (tema) => {
-    const t = TEMAS[tema]
+    const minimo = tema === 'escuro' ? 3 : PISO_DA_MARCA_CLARA
     const fracas = ['feita', 'nsa', 'andamento', 'pausada', 'afazer', 'atrasada']
       .map((estado) => ({ estado, contraste: arredondar(contraste(t[/^var\(--([\w-]+)\)$/.exec(COR[estado])[1]], t.card)) }))
-      .filter((m) => !(m.contraste >= 3))
+      .filter((m) => !(m.contraste >= minimo))
     expect(fracas).toEqual([])
   })
 
-  it('a pausada é turquesa (longe do âmbar de atenção)', () => {
-    expect(COR.pausada).toBe('var(--cor-turquesa-forte)')
+  it('as situações usam as cores do Tropical: feita verde, atrasada coral, andamento azul, a fazer violeta, não se aplica grafite, pausada mostarda', () => {
+    expect(COR).toMatchObject({
+      feita: 'var(--positive-cheio)', atrasada: 'var(--grafico-acima)', andamento: 'var(--cor-azul-forte)',
+      afazer: 'var(--cor-violeta-forte)', nsa: 'var(--cor-grafite-forte)', pausada: 'var(--cor-mostarda-forte)',
+    })
+  })
+
+  it('a série segue a ordem validada no dataviz (Tropical), com a esmeralda por último', () => {
+    expect(PALETA).toEqual(['azul', 'mostarda', 'rosa', 'laranja', 'turquesa', 'indigo', 'violeta', 'verde'])
   })
 
   it.each(Object.keys(TEMAS))('no %s, positivo e destrutivo como texto da variação dos cartões seguram 4,5:1 sobre o cartão', (tema) => {
@@ -164,25 +168,25 @@ const NOMES_DA_PALETA = ['azul', 'turquesa', 'violeta', 'mostarda', 'rosa', 'ver
 describe.each(Object.keys(TEMAS))('paleta e estados no %s', (tema) => {
   const t = TEMAS[tema]
 
-  it('paleta: texto segura 4,5:1 sobre o cartão e sobre o suave; forte segura 3:1 sobre o cartão', () => {
+  it('paleta: texto segura 4,5:1 sobre o cartão e sobre o suave; forte segura 3:1 sobre o cartão no escuro (no claro, o piso das marcas claras)', () => {
     const fracos = NOMES_DA_PALETA.flatMap((n) => [
       { onde: `${n} texto/cartão`, c: contraste(t[`cor-${n}-texto`], t.card), minimo: CONTRASTE_MINIMO },
       { onde: `${n} texto/suave`, c: contraste(t[`cor-${n}-texto`], t[`cor-${n}-suave`]), minimo: CONTRASTE_MINIMO },
-      { onde: `${n} forte/cartão`, c: contraste(t[`cor-${n}-forte`], t.card), minimo: 3 },
+      { onde: `${n} forte/cartão`, c: contraste(t[`cor-${n}-forte`], t.card), minimo: tema === 'escuro' ? 3 : 1.6 },
     ]).filter((m) => !(arredondar(m.c) >= m.minimo)).map((m) => `${m.onde}: ${arredondar(m.c)}`)
     expect(fracos).toEqual([])
   })
 
-  it('cheio da paleta: o sobre segura 4,5:1 sobre o cheio (o mostarda leva tinta escura)', () => {
+  it('cheio da paleta (no Tropical, o cheio é o suave e o sobre é o texto escuro): o sobre segura 4,5:1 sobre o cheio', () => {
     const fracos = NOMES_DA_PALETA.map((n) => ({ onde: n, c: contraste(t[`cor-${n}-sobre`], t[`cor-${n}-cheio`]) }))
       .filter((m) => !(arredondar(m.c) >= CONTRASTE_MINIMO)).map((m) => `${m.onde}: ${arredondar(m.c)}`)
     expect(fracos).toEqual([])
   })
 
-  it('o suave de cada cor e de cada estado se separa do cartão (≥ 1,5:1 no escuro; a Viva dá 1,55 a 2,4)', () => {
+  it('o suave de cada cor e de cada estado se separa do cartão (≥ 1,7:1 no escuro; o Tropical dá 1,71 a 1,90)', () => {
     if (tema !== 'escuro') return
     const suaves = [...NOMES_DA_PALETA.map((n) => `cor-${n}-suave`), 'positive-soft', 'notice-soft', 'destructive-soft']
-    const fracos = suaves.map((n) => ({ n, c: contraste(t[n], t.card) })).filter((m) => !(arredondar(m.c) >= 1.5)).map((m) => `${m.n}: ${arredondar(m.c)}`)
+    const fracos = suaves.map((n) => ({ n, c: contraste(t[n], t.card) })).filter((m) => !(arredondar(m.c) >= 1.7)).map((m) => `${m.n}: ${arredondar(m.c)}`)
     expect(fracos).toEqual([])
   })
 

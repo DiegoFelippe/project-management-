@@ -78,10 +78,10 @@ describe('HojeDoCliente', () => {
     // 28 tarefas: 12 feitas, 2 não se aplicam, 3 atrasadas e 11 a fazer no prazo (atrasadas por último, como nas etapas).
     expect(partes('Check-list')).toEqual([
       ['feita', '12', 'var(--positive-cheio)'], ['nsa', '2', 'var(--cor-grafite-forte)'], ['afazer', '11', 'var(--cor-violeta-forte)'],
-      ['atrasada', '3', 'var(--destructive-cheio)'],
+      ['atrasada', '3', 'var(--grafico-acima)'],
     ])
     // No quadro, o que está no prazo não é "feito": fica no azul da série.
-    expect(partes('Quadro')).toEqual([['atrasada', '2', 'var(--destructive-cheio)'], ['serie', '10', 'var(--grafico-serie)']])
+    expect(partes('Quadro')).toEqual([['atrasada', '2', 'var(--grafico-acima)'], ['serie', '10', 'var(--grafico-serie)']])
   })
 
   it('a barra do check-list divide em andamento, pausadas e a fazer, como o gráfico por etapa', () => {

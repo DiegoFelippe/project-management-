@@ -225,7 +225,7 @@ describe('GraficosDoCliente', () => {
     expect(within(rosca).getByText('19 h')).toBeInTheDocument()
     expect(within(rosca).getByText('no mês')).toBeInTheDocument()
     // As cores pela ordem da paleta.
-    expect([...rosca.querySelectorAll('[data-arco]')].map((a) => a.style.stroke)).toEqual(['var(--cor-azul-forte)', 'var(--cor-turquesa-forte)'])
+    expect([...rosca.querySelectorAll('[data-arco]')].map((a) => a.style.stroke)).toEqual(['var(--cor-azul-forte)', 'var(--cor-mostarda-forte)'])
     expect(cartao('Horas por consultor')).toHaveTextContent('Ana Lima fez 79% das horas')
   })
 

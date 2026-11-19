@@ -95,7 +95,7 @@ describe('BarrasHorizontais', () => {
     expect(partes.map((p) => p.dataset.parte)).toEqual(['feita', 'atrasada', 'neutro'])
     expect(partes.map((p) => p.style.flexGrow)).toEqual(['4', '3', '5'])
     // Feita é o verde cheio do sucesso e atrasada o vermelho cheio (estados de 19/11); neutro, o cinza dos gráficos.
-    expect(partes.map((p) => p.style.background)).toEqual(['var(--positive-cheio)', 'var(--destructive-cheio)', 'var(--grafico-neutro)'])
+    expect(partes.map((p) => p.style.background)).toEqual(['var(--positive-cheio)', 'var(--grafico-acima)', 'var(--grafico-neutro)'])
     expect([...linha('Fiscal').querySelectorAll('[data-parte]')].map((p) => p.dataset.parte)).toEqual(['feita', 'neutro'])
   })
 
@@ -119,8 +119,8 @@ describe('BarrasHorizontais', () => {
     })
     const partes = [...linha('Diagnóstico').querySelectorAll('[data-parte]')]
     expect(partes.map((p) => p.dataset.parte)).toEqual(['feita', 'nsa', 'pausada', 'afazer', 'atrasada'])
-    expect(partes.map((p) => p.style.background)).toEqual(['var(--positive-cheio)', 'var(--cor-grafite-forte)', 'var(--cor-turquesa-forte)',
-      'var(--cor-violeta-forte)', 'var(--destructive-cheio)'])
+    expect(partes.map((p) => p.style.background)).toEqual(['var(--positive-cheio)', 'var(--cor-grafite-forte)', 'var(--cor-mostarda-forte)',
+      'var(--cor-violeta-forte)', 'var(--grafico-acima)'])
   })
 
   it('cor por item (ranking colorido): a barra na cor dada, no lugar do azul da série', () => {
@@ -143,7 +143,7 @@ describe('BarrasHorizontais', () => {
     expect(zonas.map((z) => z.style.background)).toEqual(['var(--notice-soft)', 'var(--cor-azul-suave)', 'var(--destructive-soft)'])
     const base = ana.querySelector('[data-trecho="base"]')
     expect(base.style.width).toBe('86.154%')
-    expect(base.style.background).toBe('var(--destructive-cheio)')
+    expect(base.style.background).toBe('var(--grafico-acima)')
     expect(ana.querySelector('[data-trecho="acima"]')).toBeNull()
     expect(ana.querySelector('[data-marca-do-valor]').style.left).toBe('86.154%')
     expect(ana.querySelector('[data-icone="alerta"]')).not.toBeNull()

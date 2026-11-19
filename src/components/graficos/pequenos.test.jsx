@@ -53,7 +53,7 @@ describe('BarraSegmentada (quadro, check-list)', () => {
     expect(partes.map((p) => p.dataset.parte)).toEqual(['atrasada', 'feita'])
     expect(partes.map((p) => p.style.flexGrow)).toEqual(['2', '10'])
     // As cores de estado de todo gráfico (COR): atrasada no vermelho cheio, feita no verde (nunca o azul da série).
-    expect(partes.map((p) => p.style.background)).toEqual(['var(--destructive-cheio)', 'var(--positive-cheio)'])
+    expect(partes.map((p) => p.style.background)).toEqual(['var(--grafico-acima)', 'var(--positive-cheio)'])
   })
 
   it('a cor de qualquer nome de COR (não se aplica, série)', () => {

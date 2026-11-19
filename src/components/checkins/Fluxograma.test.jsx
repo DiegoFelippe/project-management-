@@ -210,8 +210,8 @@ describe('Fluxograma', () => {
   })
 
   // Cores vivas (19/11): a mesma cor de estado em toda tela. A família da cor (positive, cor-azul…) vem do COR dos gráficos.
-  it('as situações nas mesmas cores de estado dos gráficos: feita verde, não se aplica grafite, em andamento azul, pausada turquesa, a fazer violeta, atrasada vermelha', () => {
-    const familia = (chave) => /^var\(--((?:cor-)?[a-z]+)-/.exec(COR[chave])[1]
+  it('as situações nas mesmas cores de estado dos gráficos: feita verde, não se aplica grafite, em andamento azul, pausada mostarda, a fazer violeta, atrasada vermelha', () => {
+    const familia = (chave) => (chave === 'atrasada' ? 'destructive' : /^var\(--((?:cor-)?[a-z]+)-/.exec(COR[chave])[1]) // atrasada: o coral é --grafico-acima; a caixa usa o destructive
     const situacoes = { feita: 'feita', nao_se_aplica: 'nsa', andamento: 'andamento', pausada: 'pausada', livre: 'afazer', atrasada: 'atrasada' }
     const tarefas = Object.keys(situacoes).map((cor, i) => ({ id: cor, etapa_id: 'e1', titulo: `Tarefa ${i}`, depende_de: [] }))
     const { container } = render(
@@ -220,15 +220,15 @@ describe('Fluxograma', () => {
         <LegendaDoFluxo />
       </>,
     )
-    expect(familia('pausada')).toBe('cor-turquesa')
+    expect(familia('pausada')).toBe('cor-mostarda')
     for (const [cor, chave] of Object.entries(situacoes)) {
       const no = container.querySelector(`[data-tarefa="${cor}"]`)
       expect(no.querySelector('rect').getAttribute('class'), cor).toMatch(new RegExp(`(?:^| )stroke-${familia(chave)}(?:-|\\s|$)`))
       expect(no.getAttribute('class'), cor).toMatch(new RegExp(`(?:^| )text-${familia(chave)}(?:-|\\s|$)`))
     }
-    // A legenda nas mesmas cores (a pausada continua com o ícone de pausa, agora no turquesa).
+    // A legenda nas mesmas cores (a pausada continua com o ícone de pausa, agora no mostarda).
     const legenda = screen.getByRole('list', { name: 'Legenda do fluxograma' })
-    expect(within(legenda).getByText('Pausada').querySelector('.lucide-pause')).toHaveClass('text-cor-turquesa-texto')
+    expect(within(legenda).getByText('Pausada').querySelector('.lucide-pause')).toHaveClass('text-cor-mostarda-texto')
     expect(within(legenda).getByText('Em andamento').querySelector('span')).toHaveClass('bg-cor-azul-suave', 'border-cor-azul-forte')
     expect(within(legenda).getByText('A fazer').querySelector('span')).toHaveClass('bg-cor-violeta-suave', 'border-cor-violeta-forte')
     expect(within(legenda).getByText('Atrasada').querySelector('span')).toHaveClass('bg-destructive-soft', 'border-destructive')

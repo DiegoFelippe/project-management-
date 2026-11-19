@@ -175,10 +175,13 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   `--primary` é o azul claro, só para texto, foco e barras); texto azul sobre o azul-claro de realce (`bg-primary/10`,
   `bg-accent`: "Hoje", opção escolhida, selos) é `text-primary-texto`; texto sobre a cor da pessoa ou do evento usa
   `corDoTextoSobre` (`src/lib/cores.js`).
-  **Cores vivas (pedido do Diego, 19/11, "Viva completa"):** fundo sólido da paleta (ladrilho de ícone, selo, etiqueta,
-  contador) é `bg-cor-<nome>-cheio` com `text-cor-<nome>-sobre` (≥ 4,5:1); selo de estado sólido é `bg-<estado>-cheio`
-  com `text-sobre-<estado>`. O ícone dos cartões de números é sólido (cheio + sobre). Relatório:
-  `docs/auditoria-ux/cores/revisao-de-cores.md`. `src/lib/contraste.test.js` confere os tokens e varre o código.
+  **Cores Tropical (pedido do Diego, 19/11, Tropical, no modelo atual):** ladrilho de ícone, selo, etiqueta, avatar e
+  contador são `bg-cor-<nome>-suave` com `text-cor-<nome>-texto` (≥ 5:1); selo de estado é `bg-<estado>-soft` com
+  `text-<estado>`. Sem fundo sólido de cor fora dos botões. O ícone dos cartões de números é suave com o ícone escuro. No
+  código, `-cheio` guarda o valor do suave e `-sobre` o do texto. Os nomes do código ficam: azul = piscina, turquesa =
+  ciano, violeta = lavanda, mostarda = sol, rosa = hibisco, verde = esmeralda, laranja = manga, índigo = lima, grafite =
+  cinza. Moldura, painel, bordas e o azul dos botões e do trilho são os de antes. Relatório:
+  `docs/auditoria-ux/cores/versao-tropical.md`. `src/lib/contraste.test.js` confere os tokens e varre o código.
 - **Todo formulário é uma `JanelaFormulario`** (`src/components/comum/JanelaFormulario.jsx`), com o corpo em
   `SecaoFormulario`. Rodapé: **Cancelar** (outline) + botão principal, que mostra a ação em andamento enquanto
   grava ("Salvando…", "Criando…", "Testando…"). O botão de enviar fica no rodapé e liga ao formulário por
@@ -356,11 +359,14 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
   `FaixaDeGrupos` (estas três com a `LegendaComNumeros`), com a `Dica` e a `Legenda` deles. Gráfico novo reaproveita
   essas peças; peça nova entra lá, com teste. Sem nada para mostrar (total 0), a peça não desenha nada e o cartão mostra
   o vazio (nunca arco NaN nem 0/0).
-- **Séries pela paleta de 19/11** (`corDaSerie(i)` de `graficos/cores.js`): ordem fixa azul, turquesa, violeta, mostarda,
-  rosa, verde, laranja, índigo; mais de 8 itens: os 8 maiores e "Outros" em grafite (`COR_OUTROS`) (pedido do Diego, 19/11). Estado nunca usa a paleta.
+- **Séries pela paleta de 19/11** (`corDaSerie(i)` de `graficos/cores.js`): ordem fixa azul, mostarda, rosa, laranja,
+  turquesa, índigo, violeta, verde (piscina, sol, hibisco, manga, ciano, lima, lavanda, esmeralda; validada no dataviz, claro e escuro, com as 3 primeiras passando em todos os pares); mais de 8 itens: os 8 maiores e "Outros" em grafite (`COR_OUTROS`) (pedido do Diego, 19/11). Estado nunca usa a paleta.
 - **Cores só por tokens** (`src/index.css`, claro e escuro; nomes curtos em `graficos/cores.js`): `--grafico-*`, a paleta
-  `--cor-*`, os trios de estado (`-cheio`, `-soft`) e as zonas; nada de hex nem `--primary` direto no gráfico. A série (o azul forte) segura 3:1 sobre o cartão, como as marcas da
-  paleta (Viva completa, Diego, 19/11); acima, folga e referência seguram 4,5:1 (`src/lib/contraste.test.js`); vermelho e âmbar sempre com ícone e o número escrito; texto nunca na cor da série.
+  `--cor-*`, os trios de estado (`-cheio`, `-soft`) e as zonas; nada de hex nem `--primary` direto no gráfico. As marcas (série, paleta, situações e folga) são tons frescos validados pelo dataviz
+  (`validate_palette.js`, claro e escuro). No escuro seguram 3:1; no claro ficam abaixo de 3:1, o que o dataviz aceita
+  porque todo gráfico tem "Ver em tabela" e a dica (pedido do Diego, 19/11, Tropical, no modelo atual). O coral de "passou"
+  segura 3:1 nos dois temas e a referência 4,5:1 (`src/lib/contraste.test.js`); vermelho e âmbar sempre com ícone e o
+  número escrito; texto nunca na cor da série.
 - **SVG na largura real** (`useLargura`, sem `viewBox` que estica) e texto do SVG só com `fontSize={TAMANHO.legenda}`
   (11 px) ou maior; rótulos do eixo X com 44 px entre eles (sempre o último); a 360 px nada rola para o lado.
 - **Todo gráfico tem visão em tabela** ("Ver em tabela", com os mesmos números) e **dica no mouse, no toque e no
@@ -388,8 +394,8 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
   onde foi o tempo, check-ins por semana e o quadro do cliente (faixa na cor de cada coluna, pela `paleta` de
   `CORES_DAS_COLUNAS`; o Vermelho vai no rosa). Os de hoje vêm da leitura da faixa Hoje (`hoje_do_cliente`) e o quadro
   por `quadro_por_id` com o id dela (nunca `quadro_do_cliente`, que cria o quadro de quem mexe). As situações
-  (`SITUACOES`) e as cores de estado (`COR` de `graficos/cores.js`) seguram 3:1 como marca nos dois temas
-  (`contraste.test.js`), e a faixa Hoje usa as mesmas (feita sempre verde, atrasada no vermelho cheio).
+  (`SITUACOES`) e as cores de estado (`COR` de `graficos/cores.js`) seguram 3:1 como marca no escuro; no claro são marcas claras com a tabela e a dica (`contraste.test.js`). Pausada no
+  sol (mostarda), a fazer na lavanda (violeta), atrasada no coral (`--grafico-acima`); a faixa Hoje usa as mesmas (feita sempre verde).
 - **A leitura (frase do gráfico) usa só números do banco** ou a lista inteira que o gráfico mostra, nunca uma amostra:
   as regras ficam em `src/lib/frasesDosGraficos.js`, com teste. A variação dos cartões ("▲ 12% vs out.") é
   `src/lib/variacao.js` + `rotuloDaComparacao` (`src/lib/periodo.js`), com o período anterior vindo do banco.

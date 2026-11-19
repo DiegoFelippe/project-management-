@@ -31,7 +31,7 @@ describe('HorasPorUnidade', () => {
     expect(within(grafico).getByRole('img', { name: '02/11: 31 h (Ana Lima 24 h, Outro consultor 3 h, Outros 4 h)' })).toBeInTheDocument()
     const coluna = within(grafico).getByRole('img', { name: /^02\/11/ })
     expect(coluna.querySelector('[data-segmento="Ana Lima"]').style.fill).toBe('var(--cor-azul-forte)')
-    expect(coluna.querySelector('[data-segmento="Outro consultor"]').style.fill).toBe('var(--cor-turquesa-forte)')
+    expect(coluna.querySelector('[data-segmento="Outro consultor"]').style.fill).toBe('var(--cor-mostarda-forte)')
     expect(coluna.querySelector('[data-segmento="Outros"]').style.fill).toBe('var(--cor-grafite-forte)')
     expect(within(grafico).getByText('16/11')).toHaveClass('font-semibold')
     const legenda = within(within(cartao()).getByRole('list', { name: 'Legenda' })).getAllByRole('listitem').map((li) => li.textContent)

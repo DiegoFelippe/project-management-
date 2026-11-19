@@ -37,8 +37,8 @@ describe('HorasPorCliente', () => {
     const linhas = within(await screen.findByRole('list', { name: 'Horas por cliente (10 maiores)' })).getAllByRole('listitem')
     const cor = (linha) => linha.querySelector('[data-trecho="base"]').style.background
     expect(cor(linhas[0])).toBe('var(--cor-azul-forte)')
-    expect(cor(linhas[1])).toBe('var(--cor-turquesa-forte)')
-    expect(cor(linhas[7])).toBe('var(--cor-indigo-forte)')
+    expect(cor(linhas[1])).toBe('var(--cor-mostarda-forte)')
+    expect(cor(linhas[7])).toBe('var(--cor-verde-forte)')
     const legenda = within(screen.getByRole('list', { name: 'Legenda' })).getAllByRole('listitem').map((li) => li.textContent)
     expect(legenda).toEqual(['Previsão atual', 'Acima da previsão'])
   })

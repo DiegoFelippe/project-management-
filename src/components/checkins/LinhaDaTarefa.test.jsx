@@ -84,12 +84,12 @@ describe('LinhaDaTarefa', () => {
     const selo = item.querySelector('[data-selo="pausada"]')
     expect(selo).toHaveTextContent('Pausada · 12 min')
     expect(selo.querySelector('.lucide-pause')).not.toBeNull()
-    expect(selo).toHaveClass('bg-cor-turquesa-cheio', 'text-cor-turquesa-sobre')
+    expect(selo).toHaveClass('bg-cor-mostarda-cheio', 'text-cor-mostarda-sobre')
   })
 
-  // Cores vivas (19/11): o selo na cor do estado dos gráficos (COR): em andamento azul e pausada turquesa, sólidos (cheio +
+  // Cores vivas (19/11): o selo na cor do estado dos gráficos (COR): em andamento azul e pausada mostarda, sólidos (cheio +
   // sobre); não se aplica no grafite suave (fechada, discreta); sempre com o ícone e a palavra.
-  it('os selos nas cores de estado dos gráficos: em andamento azul, pausada turquesa (cheios) e não se aplica grafite', () => {
+  it('os selos nas cores de estado dos gráficos: em andamento azul, pausada mostarda (cheios) e não se aplica grafite', () => {
     const familia = (chave) => /^var\(--((?:cor-)?[a-z]+)-/.exec(COR[chave])[1]
     const selo = (campos) => {
       const { item } = linha(t('t1', 'Coleta', campos))

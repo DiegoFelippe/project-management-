@@ -18,7 +18,7 @@ describe('Quadradinhos', () => {
     expect(quadradinhos).toHaveLength(41)
     expect(quadradinhos[0].style.background).toBe('var(--cor-azul-forte)')
     expect(quadradinhos[21].style.background).toBe('var(--cor-azul-forte)')
-    expect(quadradinhos[22].style.background).toBe('var(--cor-turquesa-forte)')
+    expect(quadradinhos[22].style.background).toBe('var(--cor-mostarda-forte)')
     expect(quadradinhos[40].style.background).toBe('var(--cor-grafite-forte)')
     // Entram em cascata.
     expect(quadradinhos[5]).toHaveClass('grafico-cascata')
@@ -43,7 +43,7 @@ describe('Quadradinhos', () => {
     const quadradinhos = [...imagem.querySelectorAll('[data-quadradinho]')]
     expect(quadradinhos).toHaveLength(100)
     const contar = (cor) => quadradinhos.filter((q) => q.style.background === cor).length
-    expect(contar('var(--cor-azul-forte)') + contar('var(--cor-turquesa-forte)') + contar('var(--cor-grafite-forte)')).toBe(100)
+    expect(contar('var(--cor-azul-forte)') + contar('var(--cor-mostarda-forte)') + contar('var(--cor-grafite-forte)')).toBe(100)
     expect(contar('var(--cor-azul-forte)')).toBe(50)
     expect(screen.getByText('Cada quadradinho é 1% do total (2.003).')).toBeInTheDocument()
     expect(within(screen.getByRole('list', { name: 'Legenda' })).getAllByRole('listitem')[0]).toHaveTextContent('A1.00150%')
