@@ -89,6 +89,24 @@ describe('Quadradinhos', () => {
     expect(screen.getByRole('img')).toHaveFocus()
   })
 
+  it('releitura que tira o último grupo visitado: o foco volta ao primeiro grupo, sem erro', async () => {
+    const { rerender } = render(<Quadradinhos rotulo="Clientes por cidade" grupos={GRUPOS} />)
+    await userEvent.tab()
+    await userEvent.keyboard('{End}')
+    expect(within(screen.getByRole('tooltip')).getByText('Outras')).toBeInTheDocument()
+    await userEvent.tab()
+    rerender(<Quadradinhos rotulo="Clientes por cidade" grupos={GRUPOS.slice(0, 2)} />)
+    await userEvent.tab({ shift: true })
+    expect(screen.getByRole('img')).toHaveFocus()
+    expect(within(screen.getByRole('tooltip')).getByText('Chapecó/SC')).toBeInTheDocument()
+    // O mesmo com o grupo ainda na lista, mas com zero.
+    await userEvent.keyboard('{End}')
+    await userEvent.tab()
+    rerender(<Quadradinhos rotulo="Clientes por cidade" grupos={[GRUPOS[0], { ...GRUPOS[1], n: 0 }]} />)
+    await userEvent.tab({ shift: true })
+    expect(within(screen.getByRole('tooltip')).getByText('Chapecó/SC')).toBeInTheDocument()
+  })
+
   it('total 0 não desenha nada (o cartão mostra o vazio)', () => {
     const { container } = render(<Quadradinhos rotulo="Clientes por cidade" grupos={GRUPOS.map((g) => ({ ...g, n: 0 }))} />)
     expect(container).toBeEmptyDOMElement()

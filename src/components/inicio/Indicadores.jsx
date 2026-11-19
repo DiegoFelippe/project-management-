@@ -7,7 +7,8 @@ import { variacao } from '@/lib/variacao'
 // Recorte de quem vê pelo papel, enquanto o painel não chega (depois vale o do banco).
 const RECORTE_DO_PAPEL = { central: 'tudo', dono: 'tudo', pessoa: 'pessoa' }
 
-// Os 4 números do mês ou do período (painel_do_inicio), com a variação contra o período anterior (comparacao_do_inicio):
+// Os 4 números do mês ou do período (painel_do_inicio), com os ícones na paleta de 19/11 (azul, violeta, turquesa,
+// mostarda; a ocupação acima de 100% no vermelho do perigo) e a variação contra o período anterior (comparacao_do_inicio):
 // "▲ 12% vs 1–17 de out." (design "Cartões de números"). Central: Realizado, Ocupação, Clientes em atendimento e
 // Aguardando (consultoria ou consultor); gestão: o mesmo com Aguardando consultor; consultor: Realizado, Minha ocupação,
 // Meus clientes e Check-ins. Mês passado e período: "Utilização" (realizado ÷ capacidade). Sem `painel` (carregando),
@@ -37,19 +38,24 @@ export default function Indicadores({ painel, comparacao, papel, passado: passad
   const acima = i?.ocupacao > 1
   const aguardando = i?.aguardando
   const checkins = i?.checkins
+  // Os números correm até o valor quando chega um período novo (a chave é o período dos dados: numa releitura do mesmo
+  // período, depois de um check-in no Início, o número novo aparece direto; ao trocar o período, os de antes ficam a 60%
+  // até chegarem os novos, que correm).
+  const chave = painel ? `${painel.intervalo}|${painel.de}|${painel.ate}` : null
+  const contagem = (numero, formatar) => ({ numero: numero ?? null, formatar, chave })
   const cartoes = [
-    { chave: 'realizado', rotulo: 'Realizado', icone: Timer, tom: 'positivo', valor: i ? formatarHoras(i.realizado) : null,
+    { chave: 'realizado', rotulo: 'Realizado', icone: Timer, tom: 'azul', contagem: contagem(i?.realizado, formatarHoras),
       variacao: linha('realizado', { tipo: 'percentual', unidade: 'h' }) },
     { chave: 'ocupacao', rotulo: `${consultor ? 'Minha ' : ''}${passado ? 'utilização' : 'ocupação'}`.replace(/^./, (c) => c.toUpperCase()),
-      icone: Gauge, tom: acima ? 'perigo' : 'ceu', destaque: acima ? 'perigo' : null, valor: i ? formatarOcupacao(i.ocupacao) : null,
+      icone: Gauge, tom: acima ? 'perigo' : 'violeta', destaque: acima ? 'perigo' : null, contagem: contagem(i?.ocupacao, formatarOcupacao),
       variacao: linha('ocupacao', { tipo: 'pontos', limiteDoBom: 1 }) },
-    { chave: 'clientes', rotulo: consultor ? 'Meus clientes' : 'Clientes em atendimento', icone: Users, valor: i?.clientes_em_atendimento ?? null,
-      variacao: linha('clientes_em_atendimento', { tipo: 'quantidade' }) },
+    { chave: 'clientes', rotulo: consultor ? 'Meus clientes' : 'Clientes em atendimento', icone: Users, tom: 'turquesa',
+      contagem: contagem(i?.clientes_em_atendimento), variacao: linha('clientes_em_atendimento', { tipo: 'quantidade' }) },
     consultor
-      ? { chave: 'checkins', rotulo: 'Check-ins', icone: ListChecks, valor: checkins ?? null,
+      ? { chave: 'checkins', rotulo: 'Check-ins', icone: ListChecks, tom: 'mostarda', contagem: contagem(checkins),
         variacao: linha('checkins', { tipo: 'percentual', unidade: anterior && Math.abs((checkins ?? 0) - (anterior.checkins ?? 0)) === 1 ? 'check-in' : 'check-ins' }) }
       : { chave: 'aguardando', rotulo: recorte === 'tudo' ? 'Aguardando (consultoria ou consultor)' : 'Aguardando consultor', icone: Hourglass,
-        tom: 'aviso', valor: aguardando ?? null, destaque: aguardando > 0 ? 'atencao' : null,
+        tom: 'mostarda', contagem: contagem(aguardando), destaque: aguardando > 0 ? 'atencao' : null,
         variacao: linha('aguardando', { tipo: 'quantidade', subirEhBom: false }) },
   ]
 

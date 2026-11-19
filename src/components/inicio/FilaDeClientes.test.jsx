@@ -16,34 +16,46 @@ const FILA = {
 const GESTAO = { ...FILA, a_distribuir: null, pontos: FILA.pontos.filter((p) => p.situacao === 'sem_consultor'), total_esperando: 23 }
 const MES = { tipo: 'mes', mes: '2026-11-01' }
 const cartao = () => screen.getByRole('region', { name: 'Fila de clientes' })
-const etapas = () => within(cartao()).getByRole('list', { name: 'Etapas da fila hoje' })
 
 describe('FilaDeClientes', () => {
-  it('3 etapas na central e 2 na gestão, com média, "ninguém esperando" e os novos no período', () => {
+  it('uma faixa só com as etapas de hoje (central: 3; gestão: 2), o número de cada uma na legenda e a leitura do período', () => {
     const { unmount } = renderizarTela(<FilaDeClientes fila={FILA} recorte="tudo" periodo={MES} />, { perfil: {} })
-    const grupos = within(etapas()).getAllByRole('group')
-    expect(grupos.map((g) => g.getAttribute('aria-label'))).toEqual([
-      'Aguardando consultoria: 7 clientes, média de 4 dias, maior espera de 9 dias',
-      'Aguardando consultor: 23 clientes, média de 3,5 dias, maior espera de 30 dias',
-      'Em atendimento: 120 clientes',
-    ])
-    expect(within(grupos[1]).getByText('3,5 dias')).toBeInTheDocument()
-    expect(within(grupos[2]).getByText('+12 novos no mês')).toBeInTheDocument()
+    const faixa = within(cartao()).getByRole('group', { name: 'Etapas da fila hoje' })
+    const partes = within(faixa).getAllByRole('img')
+    expect(partes.map((p) => p.getAttribute('aria-label'))).toEqual(['Aguardando consultoria: 7 (5%)', 'Aguardando consultor: 23 (15%)', 'Em atendimento: 120 (80%)'])
+    expect(partes.map((p) => p.style.background)).toEqual(['var(--cor-grafite-forte)', 'var(--cor-mostarda-forte)', 'var(--cor-azul-forte)'])
+    const legenda = within(cartao()).getByRole('list', { name: 'Legenda' })
+    expect(within(legenda).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Aguardando consultoria7', 'Aguardando consultor23', 'Em atendimento120'])
     expect(within(cartao()).getByText(/Até ter consultor/).textContent).toBe('Até ter consultor: 3,5 dias em média no mês')
+    // Os pontos de quem espera ficam na cor da etapa.
+    expect(within(cartao()).getByRole('img', { name: /^Aguardando consultor: 23 clientes/ }).querySelector('[data-ponto]').style.background).toBe('var(--cor-mostarda-forte)')
+    expect(within(cartao()).getByRole('img', { name: /^Aguardando consultoria: 7 clientes/ }).querySelector('[data-ponto]').style.background).toBe('var(--cor-grafite-forte)')
     unmount()
 
     renderizarTela(<FilaDeClientes fila={{ ...GESTAO, sem_consultor: { total: 0, media_dias: null, maior_dias: null }, pontos: [], total_esperando: 0 }}
       recorte="consultoria" periodo={MES} />, { perfil: {} })
-    const daGestao = within(etapas()).getAllByRole('group')
-    expect(daGestao).toHaveLength(2)
-    expect(within(daGestao[0]).getByText('ninguém esperando')).toBeInTheDocument()
+    expect(within(within(cartao()).getByRole('group', { name: 'Etapas da fila hoje' })).getAllByRole('img')).toHaveLength(1)
+    const daGestao = within(within(cartao()).getByRole('list', { name: 'Legenda' })).getAllByRole('listitem').map((li) => li.textContent)
+    expect(daGestao).toEqual(['Aguardando consultor0', 'Em atendimento120'])
     expect(within(cartao()).queryByText('Aguardando consultoria')).toBeNull()
+  })
+
+  it('ninguém na fila: o vazio do cartão (a faixa não desenha nada)', () => {
+    const zero = { total: 0, media_dias: null, maior_dias: null }
+    renderizarTela(<FilaDeClientes fila={{ ...FILA, a_distribuir: zero, sem_consultor: zero, em_atendimento: { total: 0, novos_no_periodo: 0 }, pontos: [], total_esperando: 0, receberam_consultor: 0 }}
+      recorte="tudo" periodo={MES} />, { perfil: {} })
+    expect(within(cartao()).getByText('Nenhum cliente na fila hoje.')).toBeInTheDocument()
+    expect(within(cartao()).queryByRole('group')).toBeNull()
   })
 
   it('tabela com 15 e "Ver os 23 aguardando consultor" para /clientes?situacao=aguardando (na central, também o de situacao=distribuir)', async () => {
     renderizarTela(<FilaDeClientes fila={FILA} recorte="tudo" periodo={MES} />, { perfil: {} })
     expect(within(cartao()).getByRole('link', { name: 'Ver os 23 aguardando consultor' })).toHaveAttribute('href', '/clientes?situacao=aguardando')
     await userEvent.click(within(cartao()).getByRole('button', { name: 'Ver em tabela' }))
+    const etapasNaTabela = within(cartao()).getByRole('table', { name: 'Etapas da fila hoje' })
+    expect([...etapasNaTabela.querySelectorAll('tbody tr')].map((tr) => [...tr.children].map((td) => td.textContent))).toEqual([
+      ['Aguardando consultoria', '7', '4 dias', '9 dias'], ['Aguardando consultor', '23', '3,5 dias', '30 dias'], ['Em atendimento', '120', '—', '—'],
+    ])
     const tabela = within(cartao()).getByRole('table', { name: 'Clientes esperando' })
     expect(tabela.querySelectorAll('tbody tr')).toHaveLength(15)
     expect(within(tabela).getByRole('link', { name: 'Cliente 0' })).toHaveAttribute('href', '/clientes/c0')

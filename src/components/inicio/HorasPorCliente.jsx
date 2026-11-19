@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import BotaoCheckin from '@/components/clientes/BotaoCheckin'
 import BarrasHorizontais from '@/components/graficos/BarrasHorizontais'
 import CartaoDeGrafico from '@/components/graficos/CartaoDeGrafico'
+import { corDaSerie } from '@/components/graficos/cores'
 import { CelulaAcoes, Celula, Linha, Tabela } from '@/components/comum/Tabela'
 import { horasPorCliente } from '@/data/painel'
 import { fraseDasHorasPorCliente } from '@/lib/frasesDosGraficos'
@@ -43,8 +44,9 @@ function TabelaDeHoras({ periodo, versao, sub, total, previsaoNo, comCheckin }) 
 }
 
 // Horas por cliente (central e gestão: os 10 com mais horas no período) ou Horas nos meus clientes (consultor: todos
-// os dele, com 0 h inclusive) (design "5."): barras com o traço da previsão atual proporcional ao período; o que passa
-// dela segue em vermelho. Rodapé com o resto ("+ 238 outros clientes · 1.204 h"). G2: o consultor faz check-in de cada
+// os dele, com 0 h inclusive) (design "5."): barras com o traço da previsão atual proporcional ao período, uma cor por
+// cliente na ordem da paleta (pedido do Diego, 19/11; com mais de 8, as cores se repetem: o nome está ao lado); o que
+// passa da previsão segue em vermelho. Rodapé com o resto ("+ 238 outros clientes · 1.204 h"). G2: o consultor faz check-in de cada
 // barra (o BotaoCheckin compacto; desabilitado com check-in aberto em outro cliente, ligado ao aviso) e na tabela, com
 // o botão completo. Lê horas_por_cliente sozinho (chave = período e `versao`, que muda depois de um check-in).
 export default function HorasPorCliente({ periodo, recorte, aberto = null, aoMudar, versao = 0 }) {
@@ -56,7 +58,6 @@ export default function HorasPorCliente({ periodo, recorte, aberto = null, aoMud
   const noMes = periodo.tipo === 'mes'
   const previsaoNo = noMes ? 'Previsão no mês' : 'Previsão no período'
   const legenda = [
-    { forma: 'quadrado', cor: 'serie', texto: 'Realizado' },
     { forma: 'marca', texto: noMes ? 'Previsão atual' : 'Previsão atual, proporcional ao período' },
     { forma: 'quadrado', cor: 'acima', texto: 'Acima da previsão' },
   ]
@@ -89,7 +90,7 @@ export default function HorasPorCliente({ periodo, recorte, aberto = null, aoMud
         </p>
       )}
       <BarrasHorizontais rotulo={titulo} rodape={resto}
-        itens={dados.itens.map((c) => {
+        itens={dados.itens.map((c, i) => {
           const previsto = c.previsto > 0 ? c.previsto : null
           return {
             chave: c.id,
@@ -97,6 +98,7 @@ export default function HorasPorCliente({ periodo, recorte, aberto = null, aoMud
             href: `/clientes/${c.id}`,
             sub: c.sub ?? undefined,
             valor: c.horas,
+            cor: corDaSerie(i),
             limite: previsto ?? undefined,
             marca: previsto ?? undefined,
             valorTexto: formatarHoras(c.horas),
@@ -104,7 +106,7 @@ export default function HorasPorCliente({ periodo, recorte, aberto = null, aoMud
             dica: {
               titulo: c.nome,
               linhas: [
-                { valor: formatarHoras(c.horas), rotulo: 'realizado', cor: previsto && c.horas > previsto ? 'acima' : 'serie' },
+                { valor: formatarHoras(c.horas), rotulo: 'realizado', cor: previsto && c.horas > previsto ? 'acima' : corDaSerie(i) },
                 { valor: formatarHoras(c.previsto), rotulo: previsaoNo.toLowerCase() },
                 ...(dados.total_horas ? [{ valor: formatarOcupacao(c.horas / dados.total_horas), rotulo: 'das horas' }] : []),
               ],

@@ -137,7 +137,9 @@ export default function GraficoDeLinha({
           const ty = lado === 'abaixo' ? Math.min(y(valor) + 18, m.t + alturaUtil - 4) : y(valor) - 10
           return (
             <g key={`${marca.serie}-${marca.i}`} data-marca="" className="grafico-cascata pointer-events-none" style={{ animationDelay: '0.9s' }}>
-              <circle cx={x(marca.i)} cy={y(valor)} r="4" strokeWidth="2" className="fill-grafico-serie stroke-card" />
+              {/* O ponto na cor da série dele (a projeção vermelha termina num ponto vermelho). */}
+              <circle cx={x(marca.i)} cy={y(valor)} r="4" strokeWidth="2" className="fill-grafico-serie stroke-card"
+                style={series[marca.serie].cor ? { fill: corDe(series[marca.serie].cor) } : undefined} />
               <text x={tx} y={ty} textAnchor={ancora} fontSize={TAMANHO.legenda} className="fill-foreground font-semibold tabular-nums">{marca.texto}</text>
             </g>
           )

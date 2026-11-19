@@ -126,6 +126,24 @@ describe('CartaoDeGrafico', () => {
     expect(screen.getByRole('button', { name: 'Ver em tabela' })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('subtítulo (o recorte do bloco) embaixo do título, também enquanto carrega', () => {
+    const { rerender } = render(<Cartao subtitulo="Situação de hoje · 31 check-lists ativos" />)
+    const sub = screen.getByText('Situação de hoje · 31 check-lists ativos')
+    expect(sub).toHaveClass('text-legenda', 'text-muted-foreground')
+    expect(sub.previousElementSibling.tagName).toBe('H2')
+    rerender(<Cartao subtitulo="Situação de hoje" estado="carregando" />)
+    expect(screen.getByText('Situação de hoje')).toBeInTheDocument()
+  })
+
+  it('legenda: nome longo corta com reticências e vai inteiro no title (séries de consultores e consultorias)', () => {
+    const nome = 'Consultoria Regional de Atendimento aos Provedores do Extremo Oeste Catarinense'
+    render(<Cartao legenda={[{ forma: 'quadrado', cor: 'serie', texto: nome }, { forma: 'quadrado', cor: 'ref', texto: 'Outros' }]} />)
+    const texto = screen.getByText(nome)
+    expect(texto).toHaveClass('truncate')
+    expect(texto).toHaveAttribute('title', nome)
+    expect(texto.closest('li')).toHaveClass('min-w-0', 'max-w-full')
+  })
+
   it('atualizando (trocou o período): o gráfico fica a 60% até chegar o novo', () => {
     render(<Cartao atualizando />)
     expect(screen.getByRole('group', { name: 'Gráfico de teste' }).parentElement).toHaveClass('opacity-60')

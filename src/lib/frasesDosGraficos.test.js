@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  fraseDaFila, fraseDaOcupacao, fraseDasEtapas, fraseDasHorasPorCliente, fraseDasSemanas, fraseDasSemanasDoCliente,
-  fraseDoMesDoCliente, fraseDoPeriodoDoCliente, fraseDoRisco, fraseDosConsultores, fraseDosMeses, fraseDosSeisMeses,
+  burnupDoPainel, fraseDaFila, fraseDaOcupacao, fraseDasCidades, fraseDasEtapas, fraseDasHorasPorCliente, fraseDasHorasPorUnidade,
+  fraseDasSemanas, fraseDasSemanasDoCliente, fraseDasTarefas, fraseDoBurnupDoPainel, fraseDoCalor, fraseDoMesDoCliente,
+  fraseDoPeriodoDoCliente, fraseDoRisco, fraseDosConsultores, fraseDosMeses, fraseDosSeisMeses, nomeDaCidade, porcentoResolvido,
 } from './frasesDosGraficos'
 
 // As frases viram <Leitura partes>: texto corrido e { forte } (o número que importa, em negrito).
@@ -221,5 +222,123 @@ describe('fraseDasEtapas (check-list)', () => {
 
   it('nenhuma atrasada', () => {
     expect(texto(fraseDasEtapas([{ nome: 'Fiscal', tarefas: 4, feitas: 2, atrasadas: 0 }]))).toBe('Nenhuma tarefa atrasada · situação de hoje')
+  })
+})
+
+// Início, gráficos variados (pedido do Diego, 19/11).
+describe('burnupDoPainel e fraseDoBurnupDoPainel (horas no período × capacidade)', () => {
+  // 30 dias de novembro, 10 h em cada dia útil já passado; hoje = dia 19.
+  const dias = (n, horas, ate = n) => Array.from({ length: n }, (_, i) => ({ dia: `2026-11-${String(i + 1).padStart(2, '0')}`, horas: i < ate ? horas : 0 }))
+  const NOV = (extra = {}) => ({ dias: dias(30, 10, 19), capacidade: 400, hoje: '2026-11-19', ...extra })
+
+  it('acumula dia a dia; hoje é o último ponto do realizado e a projeção é o ritmo de hoje até o fim', () => {
+    const { acumulado, ultimo, realizado, projecao } = burnupDoPainel(NOV())
+    expect(acumulado.slice(0, 3)).toEqual([10, 20, 30])
+    expect(ultimo).toBe(18)
+    expect(realizado).toBe(190)
+    expect(projecao).toBe(300) // 190 h ÷ 19 dias × 30 dias
+  })
+
+  it('soma sem perder centavos (0,1 + 0,2)', () => {
+    const { acumulado } = burnupDoPainel({ dias: [{ dia: '2026-11-01', horas: 0.1 }, { dia: '2026-11-02', horas: 0.2 }], capacidade: 0, hoje: '2026-11-02' })
+    expect(acumulado).toEqual([0.1, 0.3])
+  })
+
+  it('sem projeção: período que já acabou, antes do 7º dia, sem horas ou período futuro', () => {
+    expect(burnupDoPainel(NOV({ hoje: '2026-12-02' }))).toMatchObject({ ultimo: 29, realizado: 190, projecao: null })
+    expect(burnupDoPainel(NOV({ dias: dias(30, 10, 6), hoje: '2026-11-06' })).projecao).toBeNull()
+    expect(burnupDoPainel(NOV({ dias: dias(30, 10, 7), hoje: '2026-11-07' })).projecao).toBe(300)
+    expect(burnupDoPainel(NOV({ dias: dias(30, 0) })).projecao).toBeNull()
+    expect(burnupDoPainel(NOV({ dias: dias(30, 0), hoje: '2026-10-20' }))).toMatchObject({ ultimo: -1, realizado: 0, projecao: null })
+  })
+
+  it('no ritmo de hoje: "No ritmo de hoje, o mês fecha com ≈ 300 h: 75% da capacidade (400 h)"', () => {
+    const partes = fraseDoBurnupDoPainel(NOV(), MES)
+    expect(texto(partes)).toBe('No ritmo de hoje, o mês fecha com ≈ 300 h: 75% da capacidade (400 h)')
+    expect(fortes(partes)).toEqual(['≈ 300 h'])
+    expect(texto(fraseDoBurnupDoPainel(NOV({ capacidade: 0 }), { tipo: 'personalizado' }))).toBe('No ritmo de hoje, o período fecha com ≈ 300 h')
+  })
+
+  it('sem projeção: o realizado e a parte da capacidade ("até agora" se o período não acabou)', () => {
+    expect(texto(fraseDoBurnupDoPainel(NOV({ hoje: '2026-12-02' }), MES))).toBe('No mês: 190 h · 48% da capacidade (400 h)')
+    expect(texto(fraseDoBurnupDoPainel(NOV({ dias: dias(30, 10, 3), hoje: '2026-11-03' }), MES))).toBe('No mês, até agora: 30 h · 8% da capacidade (400 h)')
+    expect(texto(fraseDoBurnupDoPainel({ ...NOV({ hoje: '2026-11-30' }), capacidade: 0 }, ANO))).toBe('No ano: 190 h')
+  })
+})
+
+describe('fraseDasHorasPorUnidade (colunas empilhadas)', () => {
+  const dados = {
+    semanas: ['2026-10-26', '2026-11-02', '2026-11-09'],
+    series: [{ nome: 'Ana Lima', horas: [10, 24, 8] }, { nome: 'Beto Silva', horas: [12, 14, 9] }, { nome: 'Outros', horas: [3, 4, 1] }],
+  }
+
+  it('a semana mais cheia (soma de todas as séries) e quem mais fez nela', () => {
+    const partes = fraseDasHorasPorUnidade(dados, MES)
+    expect(texto(partes)).toBe('Semana mais cheia: 02/11, com 42 h · Ana Lima, 24 h')
+    expect(fortes(partes)).toEqual(['42 h'])
+  })
+
+  it('sem horas', () => {
+    expect(texto(fraseDasHorasPorUnidade({ semanas: ['2026-11-02'], series: [] }, PERIODO))).toBe('Nenhuma hora no período')
+  })
+})
+
+describe('fraseDoCalor (quando os check-ins acontecem)', () => {
+  const celula = (dia_semana, hora, checkins) => ({ dia_semana, hora, checkins })
+
+  it('o pico (dia e hora) e o dia mais cheio', () => {
+    const partes = fraseDoCalor({ celulas: [celula(1, 9, 4), celula(1, 14, 4), celula(2, 10, 6), celula(3, 15, 1)] })
+    expect(texto(partes)).toBe('Mais check-ins na terça às 10h (6) · dia mais cheio: segunda (8)')
+    expect(fortes(partes)).toEqual(['terça às 10h'])
+  })
+
+  it('as pontas: 7h conta o que começou antes e 20h o que começou depois', () => {
+    expect(texto(fraseDoCalor({ celulas: [celula(0, 20, 3)] }))).toBe('Mais check-ins no domingo às 20h ou depois (3) · dia mais cheio: domingo (3)')
+    expect(texto(fraseDoCalor({ celulas: [celula(6, 7, 1)] }))).toBe('Mais check-ins no sábado às 7h ou antes (1) · dia mais cheio: sábado (1)')
+  })
+
+  it('sem check-ins', () => {
+    expect(texto(fraseDoCalor({ celulas: [celula(1, 9, 0)] }))).toBe('Nenhum check-in nessas semanas')
+  })
+})
+
+describe('fraseDasTarefas e porcentoResolvido (rosca dos check-lists)', () => {
+  const T = { feitas: 128, nao_se_aplica: 14, andamento: 9, pausadas: 4, a_fazer: 61, atrasadas: 17, checklists: 31 }
+
+  it('% resolvido (feitas + não se aplica) e as atrasadas', () => {
+    const partes = fraseDasTarefas(T)
+    expect(texto(partes)).toBe('61% resolvidas · 17 atrasadas')
+    expect(fortes(partes)).toEqual(['61%', '17'])
+    expect(texto(fraseDasTarefas({ ...T, a_fazer: 77, atrasadas: 1 }))).toBe('61% resolvidas · 1 atrasada')
+    expect(texto(fraseDasTarefas({ ...T, a_fazer: 78, atrasadas: 0 }))).toBe('61% resolvidas · nenhuma atrasada')
+  })
+
+  it('nunca "100%" com tarefa pendente; o a fazer negativo (contador velho) conta 0; nada para dividir', () => {
+    expect(porcentoResolvido({ feitas: 999, nao_se_aplica: 0, andamento: 0, pausadas: 0, a_fazer: 1, atrasadas: 0 })).toBe('99%')
+    expect(porcentoResolvido({ feitas: 3, nao_se_aplica: 1, andamento: 0, pausadas: 0, a_fazer: -2, atrasadas: 0 })).toBe('100%')
+    expect(porcentoResolvido({ feitas: 1, nao_se_aplica: 0, andamento: 0, pausadas: 0, a_fazer: 999, atrasadas: 0 })).toBe('1%')
+    expect(texto(fraseDasTarefas({ feitas: 0, nao_se_aplica: 0, andamento: 0, pausadas: 0, a_fazer: 0, atrasadas: 0, checklists: 2 })))
+      .toBe('Nenhuma tarefa nos check-lists ativos')
+  })
+})
+
+describe('fraseDasCidades e nomeDaCidade (quadradinhos)', () => {
+  const dados = { cidades: [{ cidade: 'Chapecó', uf: 'SC', clientes: 22 }, { cidade: 'Xanxerê', uf: 'SC', clientes: 12 }, { cidade: null, uf: null, clientes: 4 }], outras: 30, total: 68 }
+
+  it('a cidade com mais clientes, com a parte do total', () => {
+    const partes = fraseDasCidades(dados)
+    expect(texto(partes)).toBe('Chapecó/SC tem 32% dos clientes (22 de 68)')
+    expect(fortes(partes)).toEqual(['Chapecó/SC'])
+  })
+
+  it('só "Sem cidade", ou nenhum cliente', () => {
+    expect(texto(fraseDasCidades({ cidades: [{ cidade: null, uf: null, clientes: 3 }], outras: 0, total: 3 }))).toBe('Nenhum cliente com cidade')
+    expect(texto(fraseDasCidades({ cidades: [], outras: 0, total: 0 }))).toBe('Nenhum cliente ainda')
+  })
+
+  it('o nome: "Cidade/UF", sem UF só a cidade, sem cidade "Sem cidade"', () => {
+    expect(nomeDaCidade({ cidade: 'Chapecó', uf: 'SC' })).toBe('Chapecó/SC')
+    expect(nomeDaCidade({ cidade: 'Chapecó', uf: null })).toBe('Chapecó')
+    expect(nomeDaCidade({ cidade: null, uf: null })).toBe('Sem cidade')
   })
 })

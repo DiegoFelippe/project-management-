@@ -15,15 +15,16 @@ function Amostra({ forma, cor }) {
   )
 }
 
-// Legenda de um gráfico: itens [{ forma: 'quadrado' | 'linha' | 'tracejado' | 'faixa' | 'marca', cor, texto }].
+// Legenda de um gráfico: itens [{ forma: 'quadrado' | 'linha' | 'tracejado' | 'faixa' | 'marca', cor, texto }]. Texto
+// maior que o cartão (nome de consultoria) corta com reticências e vai inteiro no title.
 export default function Legenda({ itens }) {
   if (!itens?.length) return null
   return (
     <ul role="list" aria-label="Legenda" className="flex flex-wrap gap-x-3.5 gap-y-1 text-legenda text-muted-foreground">
-      {itens.map((item) => (
-        <li key={item.texto} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+      {itens.map((item, i) => (
+        <li key={`${item.texto}-${i}`} className="inline-flex min-w-0 max-w-full items-center gap-1.5">
           <Amostra forma={item.forma} cor={item.cor} />
-          {item.texto}
+          <span title={item.texto} className="truncate">{item.texto}</span>
         </li>
       ))}
     </ul>

@@ -18,11 +18,13 @@ import TabelaDoGrafico from './TabelaDoGrafico'
 // cartão passa a mesma que dá ao gráfico (padrões: GraficoDeColunas 210, GraficoDeLinha 200; barras em HTML, uma
 // estimativa). `acoes`: botões ou links extras no topo (ex.: "Ver todos"). `atualizando`: trocou o período e o novo
 // ainda não chegou; o gráfico de antes fica a 60%.
+// `subtitulo`: o recorte do bloco, embaixo do título (ex.: "Situação de hoje", a janela do mapa de calor); fica também
+// enquanto carrega.
 // `tabela`: { rotulo, colunas, linhas } (a TabelaDoGrafico) ou um elemento pronto, quando a visão em tabela é uma lista
 // de clientes paginada no banco (risco, horas por cliente) ou com colunas que somem no celular (fila). `emTabela` e
 // `aoMudarTabela(bool)`: a visão controlada de fora (ex.: "Ver todos os 9" abre a tabela); sem eles, o cartão guarda.
 export default function CartaoDeGrafico({
-  titulo, leitura, legenda, tabela, estado = 'pronto', vazio, erro, aoTentarDeNovo, acoes, altura = 210, atualizando = false,
+  titulo, subtitulo, leitura, legenda, tabela, estado = 'pronto', vazio, erro, aoTentarDeNovo, acoes, altura = 210, atualizando = false,
   emTabela: emTabelaDeFora, aoMudarTabela, className, children,
 }) {
   const idDoTitulo = useId()
@@ -38,6 +40,7 @@ export default function CartaoDeGrafico({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id={idDoTitulo} className="text-subtitulo font-semibold">{titulo}</h2>
+          {subtitulo && <p className="text-legenda text-muted-foreground">{subtitulo}</p>}
           {estado === 'carregando' && leitura !== null && (
             <span data-reserva="leitura" aria-hidden="true" className="mt-0.5 flex h-[18px] items-center">
               <span className="h-2.5 w-48 max-w-full rounded-full bg-muted" />

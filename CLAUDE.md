@@ -360,6 +360,12 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
   (`contagem` do `CartoesDeNumeros`, `src/lib/useContagem.js`; o leitor de tela recebe só o valor final). Só quando o
   elemento aparece: a releitura do mesmo período (mesmas chaves, mesma `chave` da contagem) não mexe; trocar o período
   conta de novo. Só CSS e `requestAnimationFrame`; "reduzir movimento" deixa tudo pronto (regra em `src/index.css`).
+- **Grade do Início** (pedido do Diego, 19/11): 12 colunas, pares 8 + 4 e 6 + 6; nenhum bloco sozinho numa linha (o
+  que fica sem par ocupa a largura toda: `semSozinho` em `src/pages/Inicio.jsx`). Bloco que não segue o período da barra
+  (check-lists, cidades) diz "Situação de hoje" no `subtitulo` do `CartaoDeGrafico`; o mapa de calor diz ali a janela
+  que o banco usou. Quem vê cada bloco: a tabela da seção 2 de
+  `docs/superpowers/specs/2026-11-19-graficos-variados-e-paleta-design.md` (consultor sem fila, ocupação, horas por
+  unidade e cidades).
 - **A leitura (frase do gráfico) usa só números do banco** ou a lista inteira que o gráfico mostra, nunca uma amostra:
   as regras ficam em `src/lib/frasesDosGraficos.js`, com teste. A variação dos cartões ("▲ 12% vs out.") é
   `src/lib/variacao.js` + `rotuloDaComparacao` (`src/lib/periodo.js`), com o período anterior vindo do banco.

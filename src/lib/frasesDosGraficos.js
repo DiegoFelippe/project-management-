@@ -136,3 +136,87 @@ export function fraseDasEtapas(etapas) {
   if (!pior) return ['Nenhuma tarefa atrasada · situação de hoje']
   return [{ forte: pior.nome }, ` tem ${plural(pior.atrasadas, 'tarefa atrasada', 'tarefas atrasadas')} · situação de hoje`]
 }
+
+// ── Início, gráficos variados (pedido do Diego, 19/11) ──
+
+// "o mês", "o ano" ou "o período" (a projeção do burn-up).
+const oPeriodo = (periodo) => (periodo?.tipo === 'mes' ? 'o mês' : periodo?.tipo === 'ano' ? 'o ano' : 'o período')
+const centesimos = (n) => Math.round(n * 100) / 100
+// Antes do 7º dia o ritmo de poucos dias engana (como a projeção do burn-up do cliente, nula até o dia 6).
+const DIAS_PARA_PROJETAR = 7
+
+// Burn-up do Início (horas_do_painel_por_dia: todos os dias do período, a capacidade do período inteiro e hoje): o
+// acumulado de cada dia, `ultimo` (o índice de hoje; o último dia num período que já acabou; -1 num futuro), o realizado
+// até hoje e a projeção no ritmo de hoje (realizado ÷ dias decorridos × dias do período), só com o período em andamento.
+export function burnupDoPainel({ dias, hoje }) {
+  let soma = 0
+  const acumulado = dias.map((d) => (soma = centesimos(soma + d.horas)))
+  const ultimo = dias.findLastIndex((d) => d.dia <= hoje)
+  const realizado = ultimo >= 0 ? acumulado[ultimo] : 0
+  const emAndamento = ultimo >= 0 && ultimo < dias.length - 1
+  const projecao = emAndamento && ultimo + 1 >= DIAS_PARA_PROJETAR && realizado > 0 ? (realizado / (ultimo + 1)) * dias.length : null
+  return { acumulado, ultimo, realizado, projecao, emAndamento }
+}
+
+// "No ritmo de hoje, o mês fecha com ≈ 1.020 h: 69% da capacidade (1.480 h)"; sem projeção, "No mês: 1.020 h · 69% da
+// capacidade (1.480 h)" ("No mês, até agora:" enquanto o período não acabou).
+export function fraseDoBurnupDoPainel(dados, periodo) {
+  const { realizado, projecao, emAndamento } = burnupDoPainel(dados)
+  const { capacidade } = dados
+  const daCapacidade = (horas) => `${formatarOcupacao(horas / capacidade)} da capacidade (${formatarHoras(capacidade)})`
+  if (projecao != null) {
+    return [`No ritmo de hoje, ${oPeriodo(periodo)} fecha com `, { forte: `≈ ${formatarHoras(projecao)}` }, capacidade ? `: ${daCapacidade(projecao)}` : '']
+  }
+  const inicio = [`${maiuscula(quando(periodo))}${emAndamento ? ', até agora' : ''}: `, { forte: formatarHoras(realizado) }]
+  return capacidade ? [...inicio, ` · ${daCapacidade(realizado)}`] : inicio
+}
+
+// Colunas empilhadas (horas por consultor ou consultoria por semana; os nomes já resolvidos): a semana com mais horas
+// (soma de todas as séries, "Outros" junto) e quem mais fez nela.
+export function fraseDasHorasPorUnidade({ semanas, series }, periodo) {
+  const totais = semanas.map((_, i) => series.reduce((soma, s) => soma + (s.horas[i] ?? 0), 0))
+  const maior = totais.reduce((m, total, i) => (total > totais[m] ? i : m), 0)
+  if (!(totais[maior] > 0)) return [`Nenhuma hora ${quando(periodo)}`]
+  const quem = series.reduce((a, b) => ((b.horas[maior] ?? 0) > (a.horas[maior] ?? 0) ? b : a))
+  return [`Semana mais cheia: ${diaMes(semanas[maior])}, com `, { forte: formatarHoras(totais[maior]) }, ` · ${quem.nome}, ${formatarHoras(quem.horas[maior])}`]
+}
+
+// Mapa de calor (checkins_por_dia_e_hora): o pico (dia e hora de início) e o dia com mais check-ins. A hora 7 conta o que
+// começou antes e a 20, o que começou depois.
+const DIAS_POR_EXTENSO = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
+const preposicao = (d) => (d === 0 || d === 6 ? 'no' : 'na')
+export const horaDoCalor = (hora) => `${hora}h${hora <= 7 ? ' ou antes' : hora >= 20 ? ' ou depois' : ''}`
+export function fraseDoCalor({ celulas }) {
+  const pico = celulas.reduce((a, c) => (c.checkins > (a?.checkins ?? 0) ? c : a), null)
+  if (!pico) return ['Nenhum check-in nessas semanas']
+  const porDia = celulas.reduce((soma, c) => ({ ...soma, [c.dia_semana]: (soma[c.dia_semana] ?? 0) + c.checkins }), {})
+  const dia = Object.keys(porDia).map(Number).reduce((a, b) => (porDia[b] > porDia[a] ? b : a))
+  return [`Mais check-ins ${preposicao(pico.dia_semana)} `, { forte: `${DIAS_POR_EXTENSO[pico.dia_semana]} às ${horaDoCalor(pico.hora)}` },
+    ` (${INTEIRO.format(pico.checkins)}) · dia mais cheio: ${DIAS_POR_EXTENSO[dia]} (${INTEIRO.format(porDia[dia])})`]
+}
+
+// Rosca dos check-lists (tarefas_por_situacao, hoje). `a_fazer` é o resto dos contadores: negativo (contador velho)
+// conta 0. Resolvida = feita ou não se aplica; o % nunca diz 100% com tarefa pendente nem 0% com alguma resolvida.
+const PARTES_DAS_TAREFAS = ['feitas', 'nao_se_aplica', 'andamento', 'pausadas', 'a_fazer', 'atrasadas']
+const totalDasTarefas = (t) => PARTES_DAS_TAREFAS.reduce((soma, k) => soma + Math.max(0, t[k] ?? 0), 0)
+export function porcentoResolvido(t) {
+  const fracao = (Math.max(0, t.feitas ?? 0) + Math.max(0, t.nao_se_aplica ?? 0)) / totalDasTarefas(t)
+  const p = Math.round(fracao * 100)
+  return `${fracao > 0 && fracao < 1 ? Math.min(99, Math.max(1, p)) : p}%`
+}
+export function fraseDasTarefas(t) {
+  if (!totalDasTarefas(t)) return ['Nenhuma tarefa nos check-lists ativos']
+  const atrasadas = Math.max(0, t.atrasadas ?? 0)
+  return [{ forte: porcentoResolvido(t) }, ' resolvidas · ',
+    ...(atrasadas ? [{ forte: INTEIRO.format(atrasadas) }, atrasadas === 1 ? ' atrasada' : ' atrasadas'] : ['nenhuma atrasada'])]
+}
+
+// Quadradinhos das cidades (clientes_por_cidade): "Chapecó/SC tem 32% dos clientes (22 de 68)". As cidades vêm da maior
+// para a menor, com "Sem cidade" (cidade nula) no fim.
+export const nomeDaCidade = (c) => (!c.cidade ? 'Sem cidade' : c.uf ? `${c.cidade}/${c.uf}` : c.cidade)
+export function fraseDasCidades({ cidades, total }) {
+  if (!total) return ['Nenhum cliente ainda']
+  const maior = cidades.find((c) => c.cidade)
+  if (!maior) return ['Nenhum cliente com cidade']
+  return [{ forte: nomeDaCidade(maior) }, ` tem ${formatarOcupacao(maior.clientes / total)} dos clientes (${INTEIRO.format(maior.clientes)} de ${INTEIRO.format(total)})`]
+}

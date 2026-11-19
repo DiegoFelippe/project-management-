@@ -26,6 +26,20 @@ describe('OcupacaoPorUnidade', () => {
     expect(linhas[7].querySelector('[data-icone="folga"]')).not.toBeNull()
   })
 
+  it('faixas de fundo (folga, 70% a 100%, acima) com a barra fina na cor da faixa do valor e a marca do valor', () => {
+    ver(painel())
+    const linhas = within(screen.getByRole('list', { name: 'Ocupação por consultor' })).getAllByRole('listitem')
+    const zonas = [...linhas[0].querySelectorAll('[data-zona]')].map((z) => z.style.background)
+    expect(zonas).toEqual(['var(--notice-soft)', 'var(--cor-azul-suave)', 'var(--destructive-soft)'])
+    const barra = (linha) => linha.querySelector('[data-trecho="base"]').style.background
+    expect(barra(linhas[0])).toBe('var(--destructive-cheio)') // 130%
+    expect(barra(linhas[3])).toBe('var(--cor-azul-forte)') // 95%
+    expect(barra(linhas[7])).toBe('var(--notice-cheio)') // 60%, folga
+    expect(linhas[0].querySelector('[data-marca-do-valor]')).not.toBeNull()
+    const legenda = within(screen.getByRole('list', { name: 'Legenda' })).getAllByRole('listitem').map((li) => li.textContent)
+    expect(legenda).toEqual(['Acima de 100%', '70% a 100%', 'Folga (abaixo de 70%)'])
+  })
+
   it('as sem capacidade que ficaram de fora aparecem depois da última barra (sem_capacidade); com 0, nada', () => {
     const { unmount } = ver(painel({ ranking_resumo: { total: 16, acima: 2, folga: 7, no_meio: 2, sem_capacidade: 2 } }))
     expect(screen.getByText('+ 2 consultores sem capacidade')).toBeInTheDocument()

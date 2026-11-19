@@ -116,6 +116,18 @@ describe('GraficoDeLinha', () => {
     expect(chaves[0].style.borderTopColor).toBe('var(--grafico-acima)')
   })
 
+  it('a marca (ponto do fim) fica na cor da série dela: a projeção vermelha termina num ponto vermelho', () => {
+    render(
+      <GraficoDeLinha rotulos={ROTULOS} unidade="h" rotuloAria="Check-ins por semana"
+        series={[{ nome: 'realizado', pontos: [10, 20, 30, null, null] }, { nome: 'projeção', pontos: [null, null, 30, 40, 50], tracejada: true, cor: 'acima' }]}
+        marcas={[{ serie: 0, i: 2, texto: '30 h' }, { serie: 1, i: 4, texto: '≈ 50 h' }]} />,
+    )
+    const [doRealizado, daProjecao] = grafico().querySelectorAll('[data-marca] circle')
+    expect(daProjecao.style.fill).toBe('var(--grafico-acima)')
+    expect(doRealizado.style.fill).toBe('')
+    expect(doRealizado).toHaveClass('fill-grafico-serie')
+  })
+
   it('faixa de fundo nas posições dadas (meio passo para cada lado, sem passar das margens)', () => {
     render(<GraficoDeLinha rotulos={ROTULOS} rotuloAria="Check-ins por semana" faixa={[2, 4]} series={[{ pontos: [1, 2, 3, 4, 5] }]} />)
     const meioPasso = (640 - margem() - 16) / 4 / 2

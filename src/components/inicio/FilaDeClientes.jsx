@@ -2,13 +2,14 @@ import { useRef } from 'react'
 import { Link } from 'react-router'
 import CartaoDeGrafico from '@/components/graficos/CartaoDeGrafico'
 import Dica from '@/components/graficos/Dica'
-import { corDe } from '@/components/graficos/cores'
+import FaixaDeGrupos from '@/components/graficos/FaixaDeGrupos'
+import TabelaDoGrafico from '@/components/graficos/TabelaDoGrafico'
+import { COR_OUTROS, corDaPaleta, corDe } from '@/components/graficos/cores'
 import { escalaBonita } from '@/components/graficos/escala'
 import { useDica } from '@/components/graficos/useDica'
 import { Celula, Linha, Tabela } from '@/components/comum/Tabela'
 import { Badge } from '@/components/ui/badge'
 import { fraseDaFila } from '@/lib/frasesDosGraficos'
-import { cn } from '@/lib/utils'
 
 const INTEIRO = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
 const NUMERO = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 })
@@ -17,41 +18,15 @@ const esperando = (n) => (n === 0 ? 'desde hoje' : `há ${dias(n)}`)
 const clientes = (n) => `${INTEIRO.format(n)} ${n === 1 ? 'cliente' : 'clientes'}`
 const NA_TABELA = 15
 
-// As etapas de cada recorte (a rampa de azul vai do claro ao escuro na ordem da fila). `chave`: a situação dos pontos
+// As etapas de cada recorte, com a cor da paleta (pedido do Diego, 19/11: aguardando consultoria é neutro, em grafite;
+// aguardando consultor em mostarda; em atendimento em azul), a mesma na faixa e nos pontos. `chave`: a situação dos pontos
 // e a parte da fila no JSON; `situacao`: o filtro de Clientes (?situacao=).
 function etapasDe(fila, central) {
   return [
-    ...(central ? [{ chave: 'a_distribuir', nome: 'Aguardando consultoria', curto: 'Consultoria', semQuem: 'Sem consultoria', situacao: 'distribuir', dados: fila.a_distribuir }] : []),
-    { chave: 'sem_consultor', nome: 'Aguardando consultor', curto: 'Consultor', semQuem: 'Sem consultor', situacao: 'aguardando', dados: fila.sem_consultor },
-    { chave: 'em_atendimento', nome: 'Em atendimento', dados: fila.em_atendimento },
-  ].map((etapa, i) => ({ ...etapa, cor: `fila-${i + 1}`, espera: etapa.chave !== 'em_atendimento' }))
-}
-
-function quando(periodo) {
-  if (periodo?.tipo === 'mes') return 'no mês'
-  if (periodo?.tipo === 'ano') return 'no ano'
-  return 'no período'
-}
-
-// Um bloco por etapa: o nome, a quantidade de hoje e uma linha (média de espera, "ninguém esperando" ou os novos em
-// atendimento no período). No celular, vira uma linha: nome e linha à esquerda, número à direita.
-function Etapa({ etapa, periodo }) {
-  const { total = 0, media_dias: media, maior_dias: maior, novos_no_periodo: novos } = etapa.dados ?? {}
-  const info = etapa.espera
-    ? (total ? <>média <b className="font-semibold text-foreground">{dias(media)}</b></> : 'ninguém esperando')
-    : `+${INTEIRO.format(novos ?? 0)} ${novos === 1 ? 'novo' : 'novos'} ${quando(periodo)}`
-  const resumo = etapa.espera && total
-    ? `${etapa.nome}: ${clientes(total)}, média de ${dias(media)}, maior espera de ${dias(maior)}`
-    : `${etapa.nome}: ${clientes(total)}`
-  return (
-    <li role="group" aria-label={resumo} data-etapa={etapa.chave}
-      className="relative min-w-0 rounded-xl border px-3 pt-2.5 pb-2 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-baseline max-sm:gap-x-3">
-      <span aria-hidden="true" className="absolute inset-x-3 -top-px h-[3px] rounded-b-[3px]" style={{ background: corDe(etapa.cor) }} />
-      <p className="truncate text-legenda font-semibold text-muted-foreground max-sm:col-start-1" title={etapa.nome}>{etapa.nome}</p>
-      <p className="mt-0.5 text-destaque font-bold tabular-nums max-sm:col-start-2 max-sm:row-span-2 max-sm:row-start-1 max-sm:mt-0">{INTEIRO.format(total)}</p>
-      <p className="mt-0.5 text-legenda text-muted-foreground max-sm:col-start-1">{info}</p>
-    </li>
-  )
+    ...(central ? [{ chave: 'a_distribuir', nome: 'Aguardando consultoria', curto: 'Consultoria', semQuem: 'Sem consultoria', situacao: 'distribuir', dados: fila.a_distribuir, cor: COR_OUTROS }] : []),
+    { chave: 'sem_consultor', nome: 'Aguardando consultor', curto: 'Consultor', semQuem: 'Sem consultor', situacao: 'aguardando', dados: fila.sem_consultor, cor: corDaPaleta('mostarda') },
+    { chave: 'em_atendimento', nome: 'Em atendimento', dados: fila.em_atendimento, cor: corDaPaleta('azul') },
+  ].map((etapa) => ({ ...etapa, espera: etapa.chave !== 'em_atendimento' }))
 }
 
 // "Há quantos dias esperam": uma faixa por etapa de espera, um ponto por cliente na posição dos dias (0 = hoje). Os
@@ -126,10 +101,11 @@ function Links({ etapas }) {
   )
 }
 
-// Fila de clientes (central e gestão; design "2."): as etapas de hoje lado a lado (central: aguardando consultoria →
-// aguardando consultor → em atendimento; gestão, sem a primeira), os pontos de quem espera e a leitura do período
-// (fila_de_clientes). Na visão em tabela, os 15 que esperam há mais tempo (M6: no celular uma coluna só, com a
-// situação e a espera embaixo do nome) e o link de cada etapa para Clientes filtrado.
+// Fila de clientes (central e gestão; design "2." e, de 19/11, a faixa): as etapas de hoje numa faixa só, com o número de
+// cada uma na legenda (central: aguardando consultoria → aguardando consultor → em atendimento; gestão, sem a primeira),
+// os pontos de quem espera e a leitura do período (fila_de_clientes). Na visão em tabela, as etapas com a espera média e a
+// maior, e os 15 que esperam há mais tempo (M6: no celular uma coluna só, com a situação e a espera embaixo do nome); o
+// link de cada etapa para Clientes filtrado. Ninguém na fila: o vazio do cartão.
 export default function FilaDeClientes({ fila, recorte, periodo, erro = false, atualizando = false, aoTentarDeNovo }) {
   const titulo = 'Fila de clientes'
   if (erro || !fila) {
@@ -141,9 +117,13 @@ export default function FilaDeClientes({ fila, recorte, periodo, erro = false, a
   const deEspera = etapas.filter((e) => e.espera)
   const nome = Object.fromEntries(deEspera.map((e) => [e.chave, e]))
   const primeiros = fila.pontos.slice(0, NA_TABELA)
+  const naFila = etapas.reduce((soma, e) => soma + (e.dados?.total ?? 0), 0)
 
   const tabela = (
     <div className="grid gap-3">
+      <TabelaDoGrafico rotulo="Etapas da fila hoje" colunas={['Etapa', 'Clientes', 'Espera média', 'Maior espera']}
+        linhas={etapas.map((e) => [e.nome, INTEIRO.format(e.dados?.total ?? 0),
+          e.espera && e.dados?.total ? dias(e.dados.media_dias) : '—', e.espera && e.dados?.total ? dias(e.dados.maior_dias) : '—'])} />
       {primeiros.length ? (
         // M6: no celular, só a coluna do cliente (a situação e a espera vão embaixo do nome) e nada rola para o lado.
         <div className="overflow-hidden rounded-xl border max-sm:[&_td+td]:hidden max-sm:[&_th+th]:hidden">
@@ -167,10 +147,9 @@ export default function FilaDeClientes({ fila, recorte, periodo, erro = false, a
   )
 
   return (
-    <CartaoDeGrafico titulo={titulo} leitura={fraseDaFila(fila, periodo)} atualizando={atualizando} tabela={tabela}>
-      <ul role="list" aria-label="Etapas da fila hoje" className={cn('grid gap-2 sm:auto-cols-fr sm:grid-flow-col')}>
-        {etapas.map((e) => <Etapa key={e.chave} etapa={e} periodo={periodo} />)}
-      </ul>
+    <CartaoDeGrafico titulo={titulo} leitura={fraseDaFila(fila, periodo)} atualizando={atualizando} tabela={tabela}
+      estado={naFila ? 'pronto' : 'vazio'} vazio="Nenhum cliente na fila hoje.">
+      <FaixaDeGrupos rotulo="Etapas da fila hoje" grupos={etapas.map((e) => ({ nome: e.nome, n: e.dados?.total ?? 0, cor: e.cor }))} />
       {fila.total_esperando > 0 && <div className="mt-3"><Pontos etapas={deEspera} pontos={fila.pontos} central={central} /></div>}
       <div className="mt-3"><Links etapas={etapas} /></div>
     </CartaoDeGrafico>

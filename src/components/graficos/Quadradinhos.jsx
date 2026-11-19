@@ -53,7 +53,11 @@ function Grade({ rotulo, grupos, total }) {
     const quadradinho = e.target.closest?.('[data-grupo]')
     if (quadradinho) mostrarGrupo(Number(quadradinho.dataset.grupo), e.clientX, e.clientY)
   }
-  const focarGrupo = (i) => mostrarGrupo(i, ...pontoDoFoco(contem.current.querySelector(`[data-grupo="${i}"]`)))
+  // O grupo pedido pode ter sumido (ou zerado) numa releitura: volta ao primeiro com quadradinhos.
+  const focarGrupo = (pedido) => {
+    const i = comQuadradinhos.includes(pedido) ? pedido : comQuadradinhos[0]
+    mostrarGrupo(i, ...pontoDoFoco(contem.current.querySelector(`[data-grupo="${i}"]`)))
+  }
   const soltar = () => {
     setAtivo(null)
     esconder()

@@ -27,7 +27,8 @@ function caminhoDoArco(ini, fim) {
 // (`centro`: { valor, rotulo }) e, ao lado, a legenda com o valor e o % de cada parte. SVG de 160 px (sem viewBox que
 // estica). Cada arco com valor é focável (aria-label "Nome: valor (N%)") e mostra a dica no mouse, no toque e no foco; a
 // parte zero fica só na legenda. Os arcos se desenham em sequência (.grafico-desenha). Total 0: nada (o cartão mostra o
-// vazio). partes: [{ nome, valor, cor (nome de COR ou valor de CSS) }]; `formatar` dá o texto do valor ("12 h").
+// vazio). partes: [{ nome (único: é a chave do arco, que não se desenha de novo numa releitura), valor, cor (nome de COR
+// ou valor de CSS), icone? (estado: vai na legenda) }]; `formatar` dá o texto do valor ("12 h").
 export default function Rosca({ rotulo, partes, centro, formatar = INTEIRO.format }) {
   const contem = useRef(null)
   const { dica, mostrar, esconder } = useDica(contem)
@@ -43,7 +44,7 @@ export default function Rosca({ rotulo, partes, centro, formatar = INTEIRO.forma
     const d = caminhoDoArco(limites[i], Math.max(limites[i] + MINIMO, limites[i + 1] - vao))
     const conteudo = { titulo: p.nome, linhas: [{ valor: formatar(p.valor), rotulo: `${porcento(p.valor)}%`, cor: p.cor }] }
     return (
-      <g key={i} role="img" aria-label={`${p.nome}: ${formatar(p.valor)} (${porcento(p.valor)}%)`} tabIndex={0}
+      <g key={p.nome} role="img" aria-label={`${p.nome}: ${formatar(p.valor)} (${porcento(p.valor)}%)`} tabIndex={0}
         className="group/arco outline-none" {...alvoDaDica(conteudo, mostrar, esconder)}>
         <path d={d} fill="none" strokeWidth={ESPESSURA + 6} className="stroke-transparent group-focus-visible/arco:stroke-ring" />
         <path data-arco="" d={d} pathLength="1" fill="none" strokeWidth={ESPESSURA} style={{ stroke: corDe(p.cor), '--i': i }}
@@ -72,7 +73,7 @@ export default function Rosca({ rotulo, partes, centro, formatar = INTEIRO.forma
         )}
       </svg>
       <div className="min-w-[180px] flex-1">
-        <LegendaComNumeros itens={partes.map((p) => ({ nome: p.nome, cor: p.cor, valor: formatar(p.valor), porcento: porcento(p.valor) }))} />
+        <LegendaComNumeros itens={partes.map((p) => ({ nome: p.nome, cor: p.cor, icone: p.icone, valor: formatar(p.valor), porcento: porcento(p.valor) }))} />
       </div>
       <Dica estado={dica} />
     </div>

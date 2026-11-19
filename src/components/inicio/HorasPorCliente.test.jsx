@@ -31,6 +31,18 @@ describe('HorasPorCliente', () => {
     expect(screen.queryByRole('button', { name: /Fazer check-in/ })).toBeNull()
   })
 
+  it('ranking colorido: uma cor por cliente, na ordem da paleta; a legenda sem o "Realizado" azul', async () => {
+    vi.mocked(horasPorCliente).mockResolvedValue(DEZ)
+    renderizarTela(<HorasPorCliente periodo={MES} recorte="consultoria" />, { perfil: {} })
+    const linhas = within(await screen.findByRole('list', { name: 'Horas por cliente (10 maiores)' })).getAllByRole('listitem')
+    const cor = (linha) => linha.querySelector('[data-trecho="base"]').style.background
+    expect(cor(linhas[0])).toBe('var(--cor-azul-forte)')
+    expect(cor(linhas[1])).toBe('var(--cor-turquesa-forte)')
+    expect(cor(linhas[7])).toBe('var(--cor-indigo-forte)')
+    const legenda = within(screen.getByRole('list', { name: 'Legenda' })).getAllByRole('listitem').map((li) => li.textContent)
+    expect(legenda).toEqual(['Previsão atual', 'Acima da previsão'])
+  })
+
   it('consultor: botão de check-in por linha; desabilitado com check-in aberto em outro cliente, ligado ao aviso', async () => {
     vi.mocked(horasPorCliente).mockResolvedValue({
       itens: [cliente(1, { nome: 'Cliente Meu', sub: null, horas: 0 }), cliente(2, { nome: 'Outro Meu', sub: null })],

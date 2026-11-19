@@ -2,7 +2,10 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { meuCheckinAberto } from '@/data/checkins'
-import { checkinsPorSemana, clientesEmRisco, comparacaoDoInicio, filaDeClientes, horasPorCliente, painelDoInicio } from '@/data/painel'
+import {
+  checkinsPorDiaEHora, checkinsPorSemana, clientesEmRisco, clientesPorCidade, comparacaoDoInicio, filaDeClientes, horasDoPainelPorDia, horasPorCliente,
+  horasPorUnidadePorSemana, painelDoInicio, tarefasPorSituacao,
+} from '@/data/painel'
 import { avisarQueOCheckinMudou } from '@/lib/checkinMudou'
 import { escolherData, escolherNoSeletor } from '@/test/campos'
 import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
@@ -11,7 +14,8 @@ import Inicio from './Inicio'
 
 vi.mock('@/data/painel', () => ({
   painelDoInicio: vi.fn(), comparacaoDoInicio: vi.fn(), filaDeClientes: vi.fn(), clientesEmRisco: vi.fn(), horasPorCliente: vi.fn(),
-  checkinsPorSemana: vi.fn(),
+  checkinsPorSemana: vi.fn(), horasDoPainelPorDia: vi.fn(), horasPorUnidadePorSemana: vi.fn(), checkinsPorDiaEHora: vi.fn(),
+  tarefasPorSituacao: vi.fn(), clientesPorCidade: vi.fn(),
 }))
 vi.mock('@/data/checkins', () => ({ meuCheckinAberto: vi.fn(), fazerCheckin: vi.fn(), fazerCheckout: vi.fn(), tarefasDoCheckin: vi.fn() }))
 
@@ -40,6 +44,14 @@ const HORAS = { itens: [{ id: 'c3', nome: 'Cliente Meu', sub: null, horas: 4, pr
 const SEMANAS = { semanas: ['2026-09-28', '2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26', '2026-11-02', '2026-11-09', '2026-11-16']
   .map((semana, i) => ({ semana, checkins: 5 + i, horas: 10, no_periodo: i >= 4, parcial: i === 7 })), media: 9.5, pico: { semana: '2026-11-09', checkins: 11 } }
 
+// Gráficos variados (pedido do Diego, 19/11).
+const BURNUP = { dias: Array.from({ length: 30 }, (_, i) => ({ dia: `2026-11-${String(i + 1).padStart(2, '0')}`, horas: i < 17 ? 6 : 0 })), capacidade: 1480, hoje: '2026-11-17' }
+const UNIDADES = { recorte: 'consultoria', semanas: ['2026-11-02', '2026-11-09', '2026-11-16'], series: [{ id: 'p2', nome: 'Beto Consultor', horas: [10, 12, 4] }] }
+const CALOR = { de: '2026-11-01', ate: '2026-11-30', celulas: [{ dia_semana: 2, hora: 10, checkins: 3 }, { dia_semana: 1, hora: 9, checkins: 1 }] }
+const TAREFAS = { feitas: 6, nao_se_aplica: 1, andamento: 1, pausadas: 0, a_fazer: 3, atrasadas: 1, checklists: 2 }
+const CIDADES = { cidades: [{ cidade: 'Chapecó', uf: 'SC', clientes: 5 }, { cidade: null, uf: null, clientes: 1 }], outras: 2, total: 8 }
+const NOVOS = [horasDoPainelPorDia, horasPorUnidadePorSemana, checkinsPorDiaEHora, tarefasPorSituacao, clientesPorCidade]
+
 const perfil = (papel) => ({ id: 'u1', nome: 'Ana Lima', papel, consultoria: papel === 'central' ? null : { nome: 'Consultoria Exemplo' } })
 const regioes = () => [...document.querySelectorAll('[data-bloco] > section')].map((s) => s.querySelector('h2').textContent)
 const ultimaChamada = () => vi.mocked(painelDoInicio).mock.calls.at(-1)[0]
@@ -51,14 +63,44 @@ function responder(painel) {
   vi.mocked(clientesEmRisco).mockResolvedValue(RISCO)
   vi.mocked(horasPorCliente).mockResolvedValue(HORAS)
   vi.mocked(checkinsPorSemana).mockResolvedValue(SEMANAS)
+  vi.mocked(horasDoPainelPorDia).mockResolvedValue(BURNUP)
+  vi.mocked(horasPorUnidadePorSemana).mockResolvedValue(painel.recorte === 'tudo' ? { ...UNIDADES, recorte: 'tudo' } : UNIDADES)
+  vi.mocked(checkinsPorDiaEHora).mockResolvedValue(CALOR)
+  vi.mocked(tarefasPorSituacao).mockResolvedValue(TAREFAS)
+  vi.mocked(clientesPorCidade).mockResolvedValue(CIDADES)
 }
+
+// Os spans de cada bloco numa linha de 12 colunas (xl, a partir de 1280 px; lg, de 1024 a 1279): a soma de cada linha
+// fecha em 12, sem bloco sozinho com espaço sobrando.
+function linhasDaGrade(tamanho) {
+  const spans = [...document.querySelectorAll('[data-bloco]')].map((b) => {
+    const de = (prefixo) => Number(b.className.match(new RegExp(`(?:^| )${prefixo}:col-span-(\\d+)`))?.[1] ?? 0)
+    return tamanho === 'xl' ? de('xl') || de('lg') : de('lg')
+  })
+  const linhas = [[]]
+  for (const span of spans) {
+    if (linhas.at(-1).reduce((a, b) => a + b, 0) + span > 12) linhas.push([])
+    linhas.at(-1).push(span)
+  }
+  return linhas.map((l) => l.reduce((a, b) => a + b, 0))
+}
+
+// Os números dos cartões correm até o valor (useContagem): com "reduzir movimento" vêm prontos (o jsdom não tem
+// matchMedia). O largo (min-width) responde que sim, para a barra de filtros ficar a do computador.
+const reduzirMovimento = () => vi.stubGlobal('matchMedia', vi.fn((consulta) => ({
+  matches: /reduce|min-width/.test(consulta), media: consulta, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+})))
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-17T15:00:00Z'))
+  reduzirMovimento()
   vi.mocked(meuCheckinAberto).mockResolvedValue(null)
-  return () => vi.useRealTimers()
+  return () => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  }
 })
 
 describe('Início (gráficos)', () => {
@@ -71,18 +113,40 @@ describe('Início (gráficos)', () => {
     expect(cartoes.nextElementSibling.querySelector('[data-bloco="meses"]')).not.toBeNull()
   })
 
-  it('central: blocos na ordem meses, fila, ocupação por consultoria, risco, horas por cliente, semanas', async () => {
+  it('central: horas no período e fila, por consultoria por semana e calor, ocupação e check-lists, horas por cliente e cidades, meses e risco, semanas', async () => {
     responder(CENTRAL)
     renderizarTela(<Inicio />, { perfil: perfil('central') })
     await screen.findByRole('region', { name: 'Ocupação por consultoria' })
-    expect(regioes()).toEqual(['Realizado × capacidade por mês', 'Fila de clientes', 'Ocupação por consultoria', 'Clientes em risco',
-      'Horas por cliente (10 maiores)', 'Check-ins por semana'])
+    await screen.findByRole('group', { name: 'Horas por consultoria por semana' })
+    expect(regioes()).toEqual(['Horas no mês × capacidade', 'Fila de clientes', 'Horas por consultoria por semana', 'Quando os check-ins acontecem',
+      'Ocupação por consultoria', 'Check-lists dos clientes', 'Horas por cliente (10 maiores)', 'Clientes por cidade',
+      'Realizado × capacidade por mês', 'Clientes em risco', 'Check-ins por semana'])
     const cartoes = screen.getByRole('region', { name: 'Indicadores do mês' })
     expect(within(cartoes).getByText('Aguardando (consultoria ou consultor)')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Fila de clientes' })).getByRole('group', { name: /Aguardando consultoria: 3 clientes/ })).toBeInTheDocument()
-    expect(document.querySelector('[data-bloco="meses"]')).toHaveClass('lg:col-span-12', 'xl:col-span-8')
+    expect(within(screen.getByRole('region', { name: 'Fila de clientes' })).getByRole('img', { name: 'Aguardando consultoria: 3 (19%)' })).toBeInTheDocument()
+    expect(document.querySelector('[data-bloco="horas-no-periodo"]')).toHaveClass('lg:col-span-12', 'xl:col-span-8')
     expect(document.querySelector('[data-bloco="fila"]')).toHaveClass('lg:col-span-12', 'xl:col-span-4')
-    expect(document.querySelector('[data-bloco="risco"]')).toHaveClass('lg:col-span-6')
+    expect(document.querySelector('[data-bloco="calor"]')).toHaveClass('lg:col-span-6')
+    // O último (ímpar) ocupa a largura toda.
+    expect(document.querySelector('[data-bloco="semanas"]')).toHaveClass('lg:col-span-12')
+    expect(linhasDaGrade('xl').every((soma) => soma === 12)).toBe(true)
+    expect(linhasDaGrade('lg').every((soma) => soma === 12)).toBe(true)
+  })
+
+  it('cada bloco novo com os números do banco e a leitura (gestão)', async () => {
+    responder(ADMIN)
+    renderizarTela(<Inicio />, { perfil: perfil('gestor') })
+    const regiao = async (nome) => screen.findByRole('region', { name: nome })
+    expect(within(await regiao('Horas no mês × capacidade')).getByText(/No ritmo de hoje/).textContent)
+      .toBe('No ritmo de hoje, o mês fecha com ≈ 180 h: 12% da capacidade (1.480 h)')
+    expect(await within(await regiao('Horas por consultor por semana')).findByRole('img', { name: '09/11: 12 h (Beto Consultor 12 h)' })).toBeInTheDocument()
+    expect(within(await regiao('Quando os check-ins acontecem')).getByText(/Mais check-ins/).textContent)
+      .toBe('Mais check-ins na terça às 10h (3) · dia mais cheio: terça (3)')
+    expect(within(await regiao('Check-lists dos clientes')).getByRole('img', { name: 'Atrasadas: 1 (8%)' })).toBeInTheDocument()
+    expect(within(await regiao('Clientes por cidade')).getByText(/dos clientes/).textContent).toBe('Chapecó/SC tem 63% dos clientes (5 de 8)')
+    for (const f of NOVOS) expect(f).toHaveBeenCalledTimes(1)
+    expect(horasDoPainelPorDia).toHaveBeenCalledWith(MES)
+    expect(tarefasPorSituacao).toHaveBeenCalledWith()
   })
 
   it('gestão: fila sem "Aguardando consultoria" e "Ocupação por consultor"', async () => {
@@ -90,23 +154,59 @@ describe('Início (gráficos)', () => {
     vi.mocked(filaDeClientes).mockResolvedValue({ ...FILA, a_distribuir: null, pontos: [] })
     renderizarTela(<Inicio />, { perfil: perfil('gestor') })
     const fila = await screen.findByRole('region', { name: 'Fila de clientes' })
-    await within(fila).findByRole('list', { name: 'Etapas da fila hoje' })
+    await within(fila).findByRole('group', { name: 'Etapas da fila hoje' })
     expect(within(fila).queryByText('Aguardando consultoria')).toBeNull()
     expect(screen.getByRole('region', { name: 'Ocupação por consultor' })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Indicadores do mês' })).getByText('Aguardando consultor')).toBeInTheDocument()
   })
 
-  it('consultor: meses, "Meus clientes em risco", "Horas nos meus clientes" com "Fazer check-in em Cliente Meu", semanas, e nenhuma chamada à fila', async () => {
+  it('consultor: horas no período e risco, horas nos meus clientes e semanas, calor e check-lists, meses; sem fila, ocupação, horas por unidade e cidades', async () => {
     responder(PESSOA)
     renderizarTela(<Inicio />, { perfil: perfil('pessoa') })
     expect(await screen.findByRole('button', { name: 'Fazer check-in em Cliente Meu' })).toBeEnabled()
-    expect(regioes()).toEqual(['Realizado × capacidade por mês', 'Meus clientes em risco', 'Horas nos meus clientes', 'Check-ins por semana'])
+    expect(regioes()).toEqual(['Horas no mês × capacidade', 'Meus clientes em risco', 'Horas nos meus clientes', 'Check-ins por semana',
+      'Quando os check-ins acontecem', 'Check-lists dos meus clientes', 'Realizado × capacidade por mês'])
     expect(document.querySelector('[data-bloco="risco"]')).toHaveClass('xl:col-span-4')
+    expect(document.querySelector('[data-bloco="meses"]')).toHaveClass('lg:col-span-12')
+    expect(document.querySelector('[data-bloco="meses"]')).not.toHaveClass('xl:col-span-8')
+    expect(linhasDaGrade('xl').every((soma) => soma === 12)).toBe(true)
     const cartoes = screen.getByRole('region', { name: 'Indicadores do mês' })
     expect(numeroDoCartao(cartoes, 'Check-ins')).toBe('9')
     expect(within(cartoes).getByText('Minha ocupação')).toBeInTheDocument()
-    expect(filaDeClientes).not.toHaveBeenCalled()
+    for (const f of [filaDeClientes, horasPorUnidadePorSemana, clientesPorCidade]) expect(f).not.toHaveBeenCalled()
     expect(meuCheckinAberto).toHaveBeenCalledWith('u1')
+  })
+
+  it('check-in feito no Início relê os blocos sem os números contarem de novo nem os gráficos se desenharem de novo', async () => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+    vi.useFakeTimers({ toFake: ['Date', 'requestAnimationFrame', 'cancelAnimationFrame'] })
+    vi.setSystemTime(new Date('2026-11-17T15:00:00Z'))
+    const avancar = (ms) => act(() => vi.advanceTimersByTime(ms))
+    responder(PESSOA)
+    renderizarTela(<Inicio />, { perfil: perfil('pessoa') })
+    const cartoes = await cartoesAbaixoDaBarra('Indicadores do mês')
+    await screen.findByRole('group', { name: 'Tarefas dos check-lists por situação' })
+    await screen.findByRole('group', { name: /^Horas no mês:/ })
+    avancar(2000)
+    expect(numeroDoCartao(cartoes, 'Realizado')).toBe('112 h')
+    const linha = document.querySelector('[data-bloco="horas-no-periodo"] [data-serie="0"]')
+    const arco = document.querySelector('[data-bloco="tarefas"] [data-arco]')
+    const celula = document.querySelector('[data-bloco="calor"] [data-celula="0-0"]')
+
+    vi.mocked(painelDoInicio).mockResolvedValue({ ...PESSOA, indicadores: { ...PESSOA.indicadores, realizado: 114, checkins: 10 } })
+    vi.mocked(horasDoPainelPorDia).mockResolvedValue({ ...BURNUP, dias: BURNUP.dias.map((d) => (d.dia === '2026-11-17' ? { ...d, horas: 8 } : d)) })
+    vi.mocked(tarefasPorSituacao).mockResolvedValue({ ...TAREFAS, feitas: 7, a_fazer: 2 })
+    act(() => { avisarQueOCheckinMudou() })
+    // Sem avançar a animação: o número novo já aparece inteiro (não volta a correr do zero).
+    await waitFor(() => expect(numeroDoCartao(cartoes, 'Realizado')).toBe('114 h'))
+    expect(numeroDoCartao(cartoes, 'Check-ins')).toBe('10')
+    await waitFor(() => expect(screen.getByRole('img', { name: 'Feitas: 7 (58%)' })).toBeInTheDocument())
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Horas no mês × capacidade' })).getByText(/No ritmo de hoje/).textContent).toMatch(/≈ 183,5 h/))
+    expect(document.querySelector('[data-bloco="horas-no-periodo"] [data-serie="0"]')).toBe(linha)
+    expect(document.querySelector('[data-bloco="tarefas"] [data-arco]')).toBe(arco)
+    expect(document.querySelector('[data-bloco="calor"] [data-celula="0-0"]')).toBe(celula)
+    for (const f of [horasDoPainelPorDia, checkinsPorDiaEHora, tarefasPorSituacao]) expect(f).toHaveBeenCalledTimes(2)
   })
 
   it('check-in feito ou fechado em outra parte do app (o selo da barra de cima) relê o check-in aberto e o painel (auditoria, G2)', async () => {
@@ -126,13 +226,15 @@ describe('Início (gráficos)', () => {
     renderizarTela(<Inicio />, { perfil: perfil('admin') })
     await screen.findByRole('list', { name: 'Clientes em risco' })
     await waitFor(() => expect(horasPorCliente).toHaveBeenCalledTimes(1))
-    for (const f of [painelDoInicio, comparacaoDoInicio, filaDeClientes, checkinsPorSemana]) expect(f).toHaveBeenCalledWith(MES)
+    const doPeriodo = [painelDoInicio, comparacaoDoInicio, filaDeClientes, checkinsPorSemana, horasDoPainelPorDia, horasPorUnidadePorSemana, checkinsPorDiaEHora]
+    for (const f of doPeriodo) expect(f).toHaveBeenCalledWith(MES)
     await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }))
-    for (const f of [painelDoInicio, comparacaoDoInicio, filaDeClientes, checkinsPorSemana]) {
+    for (const f of doPeriodo) {
       await waitFor(() => expect(f).toHaveBeenLastCalledWith('2026-10-01'))
     }
     await waitFor(() => expect(horasPorCliente).toHaveBeenLastCalledWith('2026-10-01'))
-    expect(clientesEmRisco).toHaveBeenCalledTimes(1)
+    // O risco, as tarefas e as cidades são de hoje: trocar o período não relê.
+    for (const f of [clientesEmRisco, tarefasPorSituacao, clientesPorCidade]) expect(f).toHaveBeenCalledTimes(1)
   })
 
   it('a variação aparece quando a comparação chega ("▲ 12%" e "vs 1–17 de out."), "—" antes, e some se ela falhar', async () => {
@@ -179,12 +281,24 @@ describe('Início (gráficos)', () => {
     expect(painelDoInicio).toHaveBeenCalledTimes(1)
   })
 
+  it('um bloco novo com erro mostra "Tentar de novo", que relê só ele', async () => {
+    responder(ADMIN)
+    vi.mocked(clientesPorCidade).mockRejectedValueOnce(new Error('x')).mockResolvedValue(CIDADES)
+    renderizarTela(<Inicio />, { perfil: perfil('admin') })
+    const cidades = await screen.findByRole('region', { name: 'Clientes por cidade' })
+    expect(await within(cidades).findByRole('alert')).toHaveTextContent('Não foi possível carregar os clientes por cidade.')
+    await userEvent.click(within(cidades).getByRole('button', { name: 'Tentar de novo' }))
+    expect(await within(cidades).findByRole('img', { name: /^Clientes por cidade: Chapecó\/SC/ })).toBeInTheDocument()
+    expect(clientesPorCidade).toHaveBeenCalledTimes(2)
+    expect(tarefasPorSituacao).toHaveBeenCalledTimes(1)
+  })
+
   it('período inválido não chama nenhuma função', async () => {
     responder(ADMIN)
     renderizarTela(<Inicio />, { perfil: perfil('admin'), endereco: '/?periodo=personalizado&de=2026-11-01&ate=2026-12-05' })
     expect(await screen.findByRole('alert')).toHaveTextContent('O período vai no máximo até o fim do mês atual.')
     expect(screen.getByText('Ajuste as datas na barra de filtros para ver o painel.')).toBeInTheDocument()
-    for (const f of [painelDoInicio, comparacaoDoInicio, filaDeClientes, clientesEmRisco, horasPorCliente, checkinsPorSemana, meuCheckinAberto]) {
+    for (const f of [painelDoInicio, comparacaoDoInicio, filaDeClientes, clientesEmRisco, horasPorCliente, checkinsPorSemana, meuCheckinAberto, ...NOVOS]) {
       expect(f).not.toHaveBeenCalled()
     }
     expect(screen.queryByRole('region', { name: /Indicadores/ })).toBeNull()

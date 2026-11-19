@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { Ban, Check } from 'lucide-react'
 import { describe, expect, it } from 'vitest'
 import Rosca from './Rosca'
 
@@ -78,6 +79,24 @@ describe('Rosca', () => {
     await userEvent.tab()
     expect(screen.getByRole('img', { name: `${nome}: 12 h (60%)` })).toHaveFocus()
     expect(within(screen.getByRole('tooltip')).getByText(nome)).toBeInTheDocument()
+  })
+
+  it('estado com ícone e palavra: o ícone de cada parte vai na legenda, antes do nome', () => {
+    render(<Rosca rotulo="Tarefas" partes={[{ ...PARTES[0], icone: Check }, { ...PARTES[1], icone: Ban }, PARTES[3]]} />)
+    const linhas = within(screen.getByRole('list', { name: 'Legenda' })).getAllByRole('listitem')
+    expect(linhas[1].querySelector('svg.lucide-ban')).toHaveAttribute('aria-hidden', 'true')
+    expect(linhas[0].querySelector('svg.lucide-check')).not.toBeNull()
+    expect(linhas[2].querySelector('svg')).toBeNull()
+    expect(linhas[1]).toHaveTextContent('Não se aplicam147%')
+  })
+
+  it('releitura com uma parte que volta de zero: os arcos que já existiam continuam os mesmos (não se desenham de novo)', () => {
+    const { rerender } = desenhar()
+    const feitas = screen.getByRole('img', { name: /^Feitas/ })
+    const aFazer = screen.getByRole('img', { name: /^A fazer no prazo/ })
+    rerender(<Rosca rotulo="Tarefas dos check-lists" partes={PARTES.map((p) => (p.nome === 'Atrasadas' ? { ...p, valor: 3 } : p))} />)
+    expect(screen.getByRole('img', { name: /^Feitas/ })).toBe(feitas)
+    expect(screen.getByRole('img', { name: /^A fazer no prazo/ })).toBe(aFazer)
   })
 
   it('uma parte só fecha o círculo (sem NaN)', () => {
