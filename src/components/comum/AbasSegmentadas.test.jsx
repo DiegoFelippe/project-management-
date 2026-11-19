@@ -24,10 +24,11 @@ describe('AbasSegmentadas (lista)', () => {
     expect(screen.queryByRole('tab')).toBeNull()
   })
 
-  it('a ativa fica branca e elevada; as outras, em cinza', () => {
+  it('a ativa fica branca e elevada, com o texto no azul do realce; as outras, em cinza', () => {
     render(<Controlada />)
-    expect(screen.getByRole('button', { name: 'Ativos' })).toHaveClass('bg-card', 'shadow-sm')
+    expect(screen.getByRole('button', { name: 'Ativos' })).toHaveClass('bg-card', 'shadow-sm', 'text-primary-texto')
     expect(screen.getByRole('button', { name: /Desativados/ })).not.toHaveClass('bg-card')
+    expect(screen.getByRole('button', { name: /Desativados/ })).toHaveClass('text-muted-foreground')
   })
 
   it('clicar chama aoMudar com o valor da aba', async () => {

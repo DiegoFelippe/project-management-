@@ -56,6 +56,10 @@ function pares(t) {
     .concat([
       { texto: t.domingo, fundo: fimDeSemana, onde: 'domingo sobre a célula do fim de semana' },
       { texto: t.sabado, fundo: fimDeSemana, onde: 'sábado sobre a célula do fim de semana' },
+      // Linha da tabela com o mouse: véu do --accent (50%) sobre o cartão (cores vivas, 19/11). O link da linha fica no
+      // primary-texto ao passar o mouse (o --primary do escuro dá 4,1:1 ali).
+      { texto: t['muted-foreground'], fundo: misturar(t.accent, t.card, 0.5), onde: 'texto de apoio na linha da tabela com o mouse' },
+      { texto: t['primary-texto'], fundo: misturar(t.accent, t.card, 0.5), onde: 'link da linha da tabela com o mouse' },
       { texto: t.domingo, fundo: t.accent, onde: 'domingo no dia escolhido' },
       { texto: t.sabado, fundo: t.accent, onde: 'sábado no dia escolhido' },
       // Azul-claro de realce (bg-primary/5…/20) sobre o cartão e o painel: "Hoje", opção escolhida, selos, números.
@@ -98,11 +102,21 @@ describe('contraste dos tokens de src/index.css', () => {
     expect(CSS).toMatch(/\.dark \{[^}]*--grafico-lavado:\s*rgb\(/)
   })
 
-  it.each(Object.keys(TEMAS))('no %s, as marcas dos gráficos seguram o mínimo sobre o cartão (série 3:1; acima, folga e referência 4,5:1)', (tema) => {
+  // Só o claro precisa do piso de 3:1 na série (o azul forte #3b82f6 dá 3,68:1); no escuro o #60a5fa segura 4,5:1.
+  it.each(Object.keys(TEMAS))('no %s, as marcas dos gráficos seguram o mínimo sobre o cartão (série 3:1 só no claro; o resto 4,5:1)', (tema) => {
     const t = TEMAS[tema]
-    const fracas = MARCAS.map((nome) => ({ nome, contraste: arredondar(contraste(t[nome], t.card)), minimo: nome === 'grafico-serie' ? 3 : CONTRASTE_MINIMO }))
+    const minimo = (nome) => (nome === 'grafico-serie' && tema === 'claro' ? 3 : CONTRASTE_MINIMO)
+    const fracas = MARCAS.map((nome) => ({ nome, contraste: arredondar(contraste(t[nome], t.card)), minimo: minimo(nome) }))
       .filter((m) => !(m.contraste >= m.minimo))
     expect(fracas).toEqual([])
+  })
+
+  it('o lavado (área sob a linha) é a própria série com transparência, nos dois temas', () => {
+    const lavado = (seletor) => new RegExp(`(?:^|\\n)${seletor.replace('.', '\\.')}\\s*\\{[^}]*--grafico-lavado:\\s*rgb\\((\\d+) (\\d+) (\\d+) \\/`)
+      .exec(CSS).slice(1).map(Number)
+    const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+    expect(lavado(':root')).toEqual(rgb(TEMAS.claro['grafico-serie']))
+    expect(lavado('.dark')).toEqual(rgb(TEMAS.escuro['grafico-serie']))
   })
 
   // A barra de folga da Ocupação fica sobre a zona --notice-soft: marca de 3:1 também ali (o --notice-cheio dava 2,86:1).
@@ -223,14 +237,25 @@ function arquivos(pasta) {
 const REGRAS = [
   { motivo: 'texto branco sobre bg-primary (use bg-primary-cheio)', fundo: (c) => c === 'bg-primary', texto: (c) => c === 'text-primary-foreground' || c === 'text-white' },
   { motivo: 'text-primary sobre azul-claro (use text-primary-texto)', fundo: (c) => /^bg-primary\/\d+$/.test(c) || c === 'bg-accent', texto: (c) => c === 'text-primary' },
+  // Cores vivas (19/11): sobre o cheio, só o "sobre" (o texto de antes, feito para o suave, some no cheio). Olha cada
+  // texto entre aspas: o ternário "ligado ? cheio + sobre : suave + texto" é o caso comum e está certo.
+  { motivo: 'texto de suave sobre um cheio (use o sobre)', porTexto: true, fundo: (c) => /^bg-[\w-]+-cheio$/.test(c),
+    texto: (c) => /^text-[\w-]+-texto$/.test(c) || /^text-(?:primary|positive|notice|destructive)$/.test(c) },
 ]
 
 // Classes de cor de um trecho, sem as variantes: "hover:bg-primary/10" vira "bg-primary/10".
 const classesDe = (trecho) => new Set([...trecho.matchAll(/(?<![\w-])(?:[\w-]+:)*((?:bg|text)-[\w/-]+)/g)].map((m) => m[1]))
 
+const textosEntreAspas = (trecho) => [...trecho.matchAll(/(['"`])([^'"`]*)\1/g)].map((m) => m[2])
+
 function problemas(trecho) {
-  const classes = [...classesDe(trecho)]
-  return REGRAS.filter((r) => classes.some(r.fundo) && classes.some(r.texto)).map((r) => r.motivo)
+  const junto = (parte) => {
+    const classes = [...classesDe(parte)]
+    return (r) => classes.some(r.fundo) && classes.some(r.texto)
+  }
+  const noTrecho = junto(trecho)
+  const porTexto = textosEntreAspas(trecho).map(junto)
+  return REGRAS.filter((r) => (r.porTexto ? porTexto.some((tem) => tem(r)) : noTrecho(r))).map((r) => r.motivo)
 }
 
 // Cada cn(…) com os parênteses equilibrados, e a linha onde começa.
@@ -264,11 +289,19 @@ describe('varredura das combinações sem contraste', () => {
     expect(varrer("cn('px-2',\n  marcada && 'bg-primary/10',\n  marcada ? 'text-primary' : 'text-foreground')")).toEqual(['1: text-primary sobre azul-claro (use text-primary-texto)'])
     expect(varrer("'aria-pressed:bg-primary/10 aria-pressed:text-primary'")).toHaveLength(1)
     expect(varrer("'bg-accent text-primary'")).toHaveLength(1)
+    expect(varrer("'bg-primary-cheio text-primary-texto'")).toEqual(['1: texto de suave sobre um cheio (use o sobre)'])
+    expect(varrer("'bg-cor-azul-cheio text-cor-azul-texto'")).toHaveLength(1)
+    expect(varrer("'bg-destructive-cheio text-destructive'")).toHaveLength(1)
+  })
+
+  it('o ternário cheio + sobre / suave + texto passa (cada texto entre aspas conta sozinho)', () => {
+    expect(varrer("cn('px-2', ligada ? 'bg-primary-cheio text-primary-foreground' : 'bg-primary/10 text-primary-texto')")).toEqual([])
   })
 
   it('deixa passar o azul cheio, o texto de realce, as barras e o texto azul sem fundo', () => {
     for (const bom of ["'bg-primary-cheio text-primary-foreground'", "'bg-primary/10 text-primary-texto'", "'h-full rounded-full bg-primary'",
-      "'text-primary underline'", "'bg-primary/10 text-primary-foreground'", "'bg-accent text-accent-foreground'"]) {
+      "'text-primary underline'", "'bg-primary/10 text-primary-foreground'", "'bg-accent text-accent-foreground'",
+      "'bg-cor-azul-cheio text-cor-azul-sobre'", "'bg-notice-cheio text-sobre-notice'"]) {
       expect(varrer(bom), bom).toEqual([])
     }
   })

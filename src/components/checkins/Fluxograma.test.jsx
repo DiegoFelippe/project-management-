@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import Fluxograma, { LegendaDoFluxo } from './Fluxograma'
+import { COR } from '@/components/graficos/cores'
 import { TAMANHO } from '@/lib/tipografia'
 
 const ETAPAS = [{ id: 'e1', nome: 'Diagnóstico' }, { id: 'e2', nome: 'Plano' }]
@@ -193,7 +194,8 @@ describe('Fluxograma', () => {
       }
     }
     // As cores das situações estão lá, e todas trocam no escuro.
-    for (const cor of ['card', 'input', 'primary', 'positive', 'positive-soft', 'notice', 'notice-soft', 'destructive', 'muted']) {
+    for (const cor of ['card', 'input', 'primary', 'positive', 'positive-soft', 'notice', 'notice-soft', 'destructive', 'destructive-soft',
+      'cor-azul-suave', 'muted']) {
       expect(usadas, cor).toContain(cor)
     }
     for (const cor of usadas) {
@@ -205,6 +207,31 @@ describe('Fluxograma', () => {
       const codigo = readFileSync(`src/components/checkins/${arquivo}`, 'utf8')
       expect(codigo, arquivo).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|oklch\(/)
     }
+  })
+
+  // Cores vivas (19/11): a mesma cor de estado em toda tela. A família da cor (positive, cor-azul…) vem do COR dos gráficos.
+  it('as situações nas mesmas cores de estado dos gráficos: feita verde, não se aplica grafite, em andamento azul, pausada turquesa, a fazer violeta, atrasada vermelha', () => {
+    const familia = (chave) => /^var\(--((?:cor-)?[a-z]+)-/.exec(COR[chave])[1]
+    const situacoes = { feita: 'feita', nao_se_aplica: 'nsa', andamento: 'andamento', pausada: 'pausada', livre: 'afazer', atrasada: 'atrasada' }
+    const tarefas = Object.keys(situacoes).map((cor, i) => ({ id: cor, etapa_id: 'e1', titulo: `Tarefa ${i}`, depende_de: [] }))
+    const { container } = render(
+      <>
+        <Fluxograma etapas={ETAPAS.slice(0, 1)} tarefas={tarefas} infoDaTarefa={(t) => ({ cor: t.id })} rotulo="X" />
+        <LegendaDoFluxo />
+      </>,
+    )
+    expect(familia('pausada')).toBe('cor-turquesa')
+    for (const [cor, chave] of Object.entries(situacoes)) {
+      const no = container.querySelector(`[data-tarefa="${cor}"]`)
+      expect(no.querySelector('rect').getAttribute('class'), cor).toMatch(new RegExp(`(?:^| )stroke-${familia(chave)}(?:-|\\s|$)`))
+      expect(no.getAttribute('class'), cor).toMatch(new RegExp(`(?:^| )text-${familia(chave)}(?:-|\\s|$)`))
+    }
+    // A legenda nas mesmas cores (a pausada continua com o ícone de pausa, agora no turquesa).
+    const legenda = screen.getByRole('list', { name: 'Legenda do fluxograma' })
+    expect(within(legenda).getByText('Pausada').querySelector('.lucide-pause')).toHaveClass('text-cor-turquesa-texto')
+    expect(within(legenda).getByText('Em andamento').querySelector('span')).toHaveClass('bg-cor-azul-suave', 'border-cor-azul-forte')
+    expect(within(legenda).getByText('A fazer').querySelector('span')).toHaveClass('bg-cor-violeta-suave', 'border-cor-violeta-forte')
+    expect(within(legenda).getByText('Atrasada').querySelector('span')).toHaveClass('bg-destructive-soft', 'border-destructive')
   })
 
   it('o quadro rola dentro do cartão (a página não rola para o lado) e arrastar com o mouse rola o quadro', () => {

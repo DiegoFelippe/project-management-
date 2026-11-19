@@ -52,7 +52,7 @@ export default function PainelDaSessao({ sessao, ultimo, souConsultor = false, c
         </div>
         {sessao ? (
           <Badge variant="positive">
-            <span aria-hidden="true" className="bg-positive size-1.5 animate-pulse rounded-full" />
+            <span aria-hidden="true" className="bg-current size-1.5 animate-pulse rounded-full" />
             Em andamento
           </Badge>
         ) : (

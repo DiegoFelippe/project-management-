@@ -1,23 +1,22 @@
 import { useContagem } from '@/lib/useContagem'
 import { cn } from '@/lib/utils'
 
-// Cor do quadradinho do ícone.
+// Cor do quadradinho do ícone: sólido, o cheio com o ícone no "sobre" (cores vivas, 19/11; ≥ 4,5:1 em contraste.test.js).
 const TONS = {
-  azul: 'bg-primary/10 text-primary-texto',
-  ceu: 'bg-sky-500/10 text-sky-600 dark:text-sky-300',
-  aviso: 'bg-notice-soft text-notice',
-  positivo: 'bg-positive-soft text-positive',
-  perigo: 'bg-destructive/10 text-destructive',
-  neutro: 'bg-muted text-muted-foreground',
-  // Paleta de 19/11: fundo suave e ícone no tom de texto.
-  turquesa: 'bg-cor-turquesa-suave text-cor-turquesa-texto',
-  violeta: 'bg-cor-violeta-suave text-cor-violeta-texto',
-  mostarda: 'bg-cor-mostarda-suave text-cor-mostarda-texto',
-  rosa: 'bg-cor-rosa-suave text-cor-rosa-texto',
-  verde: 'bg-cor-verde-suave text-cor-verde-texto',
-  laranja: 'bg-cor-laranja-suave text-cor-laranja-texto',
-  indigo: 'bg-cor-indigo-suave text-cor-indigo-texto',
-  grafite: 'bg-cor-grafite-suave text-cor-grafite-texto',
+  azul: 'bg-primary-cheio text-primary-foreground',
+  ceu: 'bg-cor-turquesa-cheio text-cor-turquesa-sobre',
+  aviso: 'bg-notice-cheio text-sobre-notice',
+  positivo: 'bg-positive-cheio text-sobre-positive',
+  perigo: 'bg-destructive-cheio text-sobre-destructive',
+  neutro: 'bg-cor-grafite-cheio text-cor-grafite-sobre',
+  turquesa: 'bg-cor-turquesa-cheio text-cor-turquesa-sobre',
+  violeta: 'bg-cor-violeta-cheio text-cor-violeta-sobre',
+  mostarda: 'bg-cor-mostarda-cheio text-cor-mostarda-sobre',
+  rosa: 'bg-cor-rosa-cheio text-cor-rosa-sobre',
+  verde: 'bg-cor-verde-cheio text-cor-verde-sobre',
+  laranja: 'bg-cor-laranja-cheio text-cor-laranja-sobre',
+  indigo: 'bg-cor-indigo-cheio text-cor-indigo-sobre',
+  grafite: 'bg-cor-grafite-cheio text-cor-grafite-sobre',
 }
 
 // Cor opcional do número (quando ele pede atenção).

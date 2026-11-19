@@ -32,7 +32,7 @@ export default function ListaDoChecklist({
     return (
       <section key={etapa.id} aria-label={nome} className="card min-w-0 overflow-hidden">
         <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3">
-          <span className="bg-primary/10 text-primary-texto grid size-7 shrink-0 place-items-center rounded-lg text-rotulo font-bold tabular-nums">
+          <span className="bg-primary-cheio text-primary-foreground grid size-7 shrink-0 place-items-center rounded-lg text-rotulo font-bold tabular-nums">
             {i + 1}
           </span>
           <h3 className="min-w-0 flex-1 text-subtitulo font-semibold break-words">{etapa.nome}</h3>

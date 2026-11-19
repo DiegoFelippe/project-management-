@@ -47,12 +47,27 @@ describe('CartoesDeNumeros', () => {
     expect(within(regiao).getByText('Capacidade 200 h')).toBeInTheDocument()
   })
 
-  it('o ícone vai num quadradinho colorido pelo tom (azul quando não diz)', () => {
+  it('o ícone vai num quadradinho cheio pelo tom, com o ícone no "sobre" (azul quando não diz; cores vivas, 19/11)', () => {
     render(<CartoesDeNumeros rotulo="Indicadores de teste" cartoes={CARTOES} />)
     const [ativos, ocupacao, aguardando] = screen.getByRole('region').querySelectorAll('[data-cartao]')
-    expect(ativos.querySelector('svg').parentElement).toHaveClass('bg-primary/10', 'text-primary-texto')
-    expect(ocupacao.querySelector('svg').parentElement).toHaveClass('text-destructive')
+    expect(ativos.querySelector('svg').parentElement).toHaveClass('bg-primary-cheio', 'text-primary-foreground')
+    expect(ocupacao.querySelector('svg').parentElement).toHaveClass('bg-destructive-cheio', 'text-sobre-destructive')
     expect(aguardando.querySelector('svg')).toBeNull()
+  })
+
+  it('todo tom é cheio + sobre: estados, céu (turquesa), neutro (grafite) e as cores da paleta', () => {
+    const esperado = {
+      aviso: ['bg-notice-cheio', 'text-sobre-notice'], positivo: ['bg-positive-cheio', 'text-sobre-positive'],
+      ceu: ['bg-cor-turquesa-cheio', 'text-cor-turquesa-sobre'], neutro: ['bg-cor-grafite-cheio', 'text-cor-grafite-sobre'],
+      ...Object.fromEntries(['turquesa', 'violeta', 'mostarda', 'rosa', 'verde', 'laranja', 'indigo', 'grafite']
+        .map((n) => [n, [`bg-cor-${n}-cheio`, `text-cor-${n}-sobre`]])),
+    }
+    render(<CartoesDeNumeros rotulo="Tons" cartoes={Object.keys(esperado).map((tom) => ({ chave: tom, rotulo: tom, valor: 1, icone: Users, tom }))} />)
+    for (const [tom, classes] of Object.entries(esperado)) {
+      const ladrilho = screen.getByRole('region').querySelector(`[data-cartao="${tom}"] svg`).parentElement
+      expect(ladrilho, tom).toHaveClass(...classes)
+      expect(ladrilho.className, tom).not.toMatch(/-suave|-soft|\/10\b|bg-muted/)
+    }
   })
 
   it('aceita classes de fora (ex.: sem a margem de baixo dentro de uma grade)', () => {

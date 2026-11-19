@@ -38,6 +38,13 @@ describe('SeletorDeCor', () => {
     expect(screen.getByText('Cor da coluna')).toHaveClass('sr-only')
   })
 
+  it('a classe que traz o texto vence o branco do check (o mostarda cheio leva tinta escura)', () => {
+    render(<SeletorDeCor rotulo="Cor" cores={[{ valor: 0, nome: 'Amarelo', classe: 'bg-cor-mostarda-cheio text-cor-mostarda-sobre' }]} valor={0} aoMudar={() => {}} />)
+    const amostra = screen.getByRole('radio', { name: 'Amarelo' })
+    expect(amostra).toHaveClass('text-cor-mostarda-sobre')
+    expect(amostra).not.toHaveClass('text-white')
+  })
+
   it('clicar escolhe; com `automatica`, a opção sem cor (null) vem no fim', async () => {
     const aoMudar = vi.fn()
     render(<Controlado rotulo="Cor do avatar" cores={PELO_HEX} automatica={{ rotulo: 'Automática', titulo: 'A que o sistema escolhe' }} aoMudar={aoMudar} />)

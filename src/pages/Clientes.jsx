@@ -278,7 +278,7 @@ export default function Clientes() {
             <Linha key={c.id} marca={c.id} aoDuploClique={central || (gestao && !c.arquivado) ? () => abrir('formulario', c) : undefined}>
               <Celula>
                 <p className="flex items-center gap-2 font-semibold">
-                  <Link to={`/clientes/${c.id}`} className="rounded-sm hover:text-primary">{c.nome}</Link>
+                  <Link to={`/clientes/${c.id}`} className="rounded-sm hover:text-primary-texto">{c.nome}</Link>
                   {!buscando && !c.arquivado && c.consultoria_id && !c.consultor_id && <Badge variant="notice">Novo</Badge>}
                 </p>
                 {c.razao_social && <p className="truncate text-rotulo text-muted-foreground">{c.razao_social}</p>}

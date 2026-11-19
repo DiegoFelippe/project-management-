@@ -13,6 +13,14 @@ function rolagemDe(conteudo, visivel) {
 }
 
 describe('Tabela (padrão das listas)', () => {
+  it('a linha, ao passar o mouse, ganha um véu do azul de realce (--accent), também na coluna de ações fixa', () => {
+    render(<Tabela rotulo="Pessoas" colunas={['Nome']}><Linha><Celula>Ana</Celula><CelulaAcoes><button type="button" className="botao-animado">Editar</button></CelulaAcoes></Linha></Tabela>)
+    const linha = screen.getByRole('row', { name: /Ana/ })
+    expect(linha).toHaveClass('hover:bg-accent/50')
+    expect(linha.className).not.toMatch(/hover:bg-muted/)
+    expect(within(linha).getAllByRole('cell').at(-1)).toHaveClass('group-hover:bg-[color-mix(in_oklab,var(--accent)_50%,var(--card))]')
+  })
+
   it('semAcoes tira a coluna de ações e titulo entra no cartão', () => {
     render(<Tabela rotulo="Fila" titulo="Quem espera" semAcoes colunas={['Nome']}><Linha><Celula>Ana</Celula></Linha></Tabela>)
     const tabela = screen.getByRole('table', { name: 'Fila' })

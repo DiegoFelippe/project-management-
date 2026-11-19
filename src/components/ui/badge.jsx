@@ -11,8 +11,9 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground dark:bg-secondary/80",
         destructive: "border-transparent bg-destructive-cheio text-sobre-destructive",
         outline: "text-foreground",
-        notice: "border-transparent bg-notice-soft text-notice",
-        positive: "border-transparent bg-positive-soft text-positive",
+        // Selos de estado sólidos (cores vivas, 19/11): o cheio do estado com o "sobre" por cima.
+        notice: "border-transparent bg-notice-cheio text-sobre-notice",
+        positive: "border-transparent bg-positive-cheio text-sobre-positive",
       },
     },
     defaultVariants: { variant: "default" },

@@ -38,7 +38,7 @@ function CartaoNoQuadro({ cartao, indice, concluidos, hoje, arrastavel, aoAbrir 
           )}>
           {prioridade && (
             <span className={cn('inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-legenda font-semibold', prioridade.selo)}>
-              <span className={cn('size-1.5 rounded-full', prioridade.ponto)} aria-hidden="true" />{prioridade.rotulo}
+              <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />{prioridade.rotulo}
             </span>
           )}
           <div className="min-w-0">

@@ -61,12 +61,12 @@ describe('HojeDoCliente', () => {
     expect(cartao('Check-list').getByText('próxima 20/11')).toBeInTheDocument()
   })
 
-  it('cada cartão com o ícone num quadradinho de um tom da paleta (azul, turquesa, violeta, mostarda, verde)', () => {
+  it('cada cartão com o ícone num quadradinho cheio de um tom da paleta, o ícone no "sobre" (azul, turquesa, violeta, mostarda, verde)', () => {
     tela()
     const tons = { 'Previsão do mês': 'azul', 'Último check-in': 'turquesa', 'Próxima reunião': 'violeta', Quadro: 'mostarda', 'Check-list': 'verde' }
     for (const [nome, tom] of Object.entries(tons)) {
       const ladrilho = screen.getByRole('group', { name: nome }).querySelector('[data-ladrilho]')
-      expect(ladrilho, nome).toHaveClass(`bg-cor-${tom}-suave`, `text-cor-${tom}-texto`)
+      expect(ladrilho, nome).toHaveClass(`bg-cor-${tom}-cheio`, `text-cor-${tom}-sobre`)
       expect(ladrilho.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
     }
   })
@@ -111,6 +111,15 @@ describe('HojeDoCliente', () => {
     for (const texto of ['vai passar: ≈ 34 h', 'em dia', '3 atrasadas']) {
       expect(screen.getByText(texto, { selector: '[data-slot="badge"]' })).toHaveClass('max-w-full', 'whitespace-normal')
     }
+  })
+
+  it('os selos de estado são sólidos: atenção no âmbar, em dia no verde e atrasadas no vermelho (cheio + sobre)', () => {
+    tela()
+    const selo = (texto) => screen.getByText(texto, { selector: '[data-slot="badge"]' })
+    expect(selo('vai passar: ≈ 34 h')).toHaveClass('bg-notice-cheio', 'text-sobre-notice')
+    expect(selo('em dia')).toHaveClass('bg-positive-cheio', 'text-sobre-positive')
+    expect(selo('3 atrasadas')).toHaveClass('bg-destructive-cheio', 'text-sobre-destructive')
+    expect(selo('3 atrasadas').className).not.toMatch(/bg-destructive\/10/)
   })
 
   it('passou da previsão: o número e o medidor ficam vermelhos', () => {

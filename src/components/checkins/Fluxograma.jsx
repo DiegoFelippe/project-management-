@@ -10,18 +10,19 @@ import { ALTURA_DO_NO, LARGURA_DO_NO, caminhoDaSeta, cortar, layoutDoFluxo, queb
 // nunca rola para o lado) e, com o mouse, arrastar o fundo rola o quadro; no celular o dedo já rola.
 // Cores só pelos tokens do tema (mudam sozinhas no escuro); texto pela escala (TAMANHO), nunca abaixo de 11 px.
 
-// Cor de cada situação: `tom` pinta o ícone, a bolinha e a linha de baixo (currentColor); `fundo`, a caixa.
+// Cor de cada situação: `tom` pinta o ícone, a bolinha e a linha de baixo (currentColor); `fundo`, a caixa. As mesmas cores
+// de estado dos gráficos (COR de graficos/cores.js; cores vivas, 19/11): feita verde, não se aplica grafite, em andamento
+// azul, pausada turquesa, a fazer violeta, atrasada vermelha (o suave na caixa, o forte na borda, o texto na linha de baixo).
 const ESTILO = {
-  livre: { tom: 'text-muted-foreground', fundo: 'fill-card stroke-input' },
+  livre: { tom: 'text-cor-violeta-texto', fundo: 'fill-cor-violeta-suave stroke-cor-violeta-forte' },
   feita: { tom: 'text-positive', fundo: 'fill-positive-soft stroke-positive' },
-  andamento: { tom: 'text-primary', fundo: 'fill-accent stroke-primary' },
-  // Pausada: o fundo do cartão (em andamento é azul-claro), a borda e o texto no azul de texto, e o ícone de pausa.
-  pausada: { tom: 'text-primary-texto', fundo: 'fill-card stroke-primary-texto' },
+  andamento: { tom: 'text-cor-azul-texto', fundo: 'fill-cor-azul-suave stroke-cor-azul-forte' },
+  pausada: { tom: 'text-cor-turquesa-texto', fundo: 'fill-cor-turquesa-suave stroke-cor-turquesa-forte' },
   bloqueada: { tom: 'text-muted-foreground', fundo: 'fill-muted stroke-input', tracejada: true, titulo: 'fill-muted-foreground' },
   hoje: { tom: 'text-notice', fundo: 'fill-notice-soft stroke-notice' },
-  atrasada: { tom: 'text-destructive', fundo: 'fill-destructive/10 stroke-destructive' },
-  // Não se aplica: cinza (borda cheia, a bloqueada é tracejada) com o ícone próprio, nunca o check verde.
-  nao_se_aplica: { tom: 'text-muted-foreground', fundo: 'fill-muted stroke-muted-foreground/60', titulo: 'fill-muted-foreground' },
+  atrasada: { tom: 'text-destructive', fundo: 'fill-destructive-soft stroke-destructive' },
+  // Não se aplica: grafite (borda cheia, a bloqueada é tracejada) com o ícone próprio, nunca o check verde.
+  nao_se_aplica: { tom: 'text-cor-grafite-texto', fundo: 'fill-cor-grafite-suave stroke-cor-grafite-forte', titulo: 'fill-cor-grafite-texto' },
 }
 const ICONE = {
   livre: Circle, feita: Check, andamento: Play, pausada: Pause, bloqueada: Lock, hoje: Clock, atrasada: TriangleAlert, nao_se_aplica: Ban,
@@ -257,12 +258,11 @@ const ITENS_DA_LEGENDA = [
 ]
 const AMOSTRA = {
   feita: 'bg-positive-soft border-positive',
-  nao_se_aplica: 'bg-muted border-muted-foreground/60',
-  andamento: 'bg-accent border-primary',
-  livre: 'bg-card border-input',
+  andamento: 'bg-cor-azul-suave border-cor-azul-forte',
+  livre: 'bg-cor-violeta-suave border-cor-violeta-forte',
   bloqueada: 'bg-muted border-input border-dashed',
   hoje: 'bg-notice-soft border-notice',
-  atrasada: 'bg-destructive/10 border-destructive',
+  atrasada: 'bg-destructive-soft border-destructive',
 }
 
 // Legenda embaixo do fluxograma (no mesmo cartão): as cores das situações, a seta e uma dica de uso.
@@ -272,8 +272,8 @@ export function LegendaDoFluxo({ dica }) {
       <ul aria-label="Legenda do fluxograma" className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
         {ITENS_DA_LEGENDA.map(([cor, texto]) => (
           <li key={cor} className="inline-flex items-center gap-1.5">
-            {cor === 'nao_se_aplica' ? <Ban aria-hidden="true" className="size-3.5" />
-              : cor === 'pausada' ? <Pause aria-hidden="true" className="text-primary-texto size-3.5" />
+            {cor === 'nao_se_aplica' ? <Ban aria-hidden="true" className="text-cor-grafite-texto size-3.5" />
+              : cor === 'pausada' ? <Pause aria-hidden="true" className="text-cor-turquesa-texto size-3.5" />
                 : <span aria-hidden="true" className={cn('inline-block h-2.5 w-3.5 rounded-[3px] border', AMOSTRA[cor])} />}
             {texto}
           </li>

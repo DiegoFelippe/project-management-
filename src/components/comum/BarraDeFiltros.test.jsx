@@ -33,6 +33,11 @@ describe('BarraDeFiltros', () => {
     expect(container.firstChild.firstChild).toBe(rotulo)
   })
 
+  it('o ícone de Filtros fica no azul do realce (cores vivas, 19/11)', () => {
+    render(<BarraDeFiltros><button type="button">Filtro</button></BarraDeFiltros>)
+    expect(screen.getByText('Filtros').querySelector('svg')).toHaveClass('text-primary-texto')
+  })
+
   it('é um cartão que quebra linha em telas estreitas', () => {
     const { container } = render(<BarraDeFiltros><span>x</span></BarraDeFiltros>)
     expect(container.firstChild).toHaveClass('card', 'flex', 'flex-wrap')
@@ -88,6 +93,7 @@ describe('BarraDeFiltros no celular', () => {
     const botao = screen.getByRole('button', { name: 'Filtros' })
     expect(botao.closest('.card').firstChild).toBe(botao)
     expect(botao.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(botao.querySelector('svg')).toHaveClass('text-primary-texto')
     expect(botao).toHaveAttribute('aria-haspopup', 'dialog')
     expect(botao).toHaveAttribute('aria-expanded', 'false')
     expect(screen.getByText('Filtros')).toBe(botao.querySelector('span'))

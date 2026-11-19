@@ -193,7 +193,7 @@ export default function ModelosDeCheckin({ perfil }) {
             <Linha key={m.id}>
               <Celula className="max-w-80 min-w-56">
                 <button type="button" onClick={() => setJanela({ tipo: 'ver', linha: m })}
-                  className="botao-animado hover:text-primary text-left font-semibold transition-[color,translate,scale] outline-none hover:-translate-y-px hover:underline focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-[0.97]">
+                  className="botao-animado hover:text-primary-texto text-left font-semibold transition-[color,translate,scale] outline-none hover:-translate-y-px hover:underline focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-[0.97]">
                   {m.nome}
                 </button>
                 {m.descricao && <p className="text-muted-foreground line-clamp-2 text-rotulo">{m.descricao}</p>}

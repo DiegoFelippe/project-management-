@@ -69,7 +69,7 @@ export default function LateralDoCartao({
           <Seletor id="cartao-prioridade" valor={cartao.prioridade ?? ''} aoMudar={aoMudarPrioridade} opcoes={OPCOES} />
         ) : prioridade ? (
           <span className={cn('inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-rotulo font-semibold', prioridade.selo)}>
-            <span className={cn('size-1.5 rounded-full', prioridade.ponto)} aria-hidden="true" />{prioridade.rotulo}
+            <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />{prioridade.rotulo}
           </span>
         ) : <p className="text-corpo text-muted-foreground">Sem prioridade</p>}
       </Campo>

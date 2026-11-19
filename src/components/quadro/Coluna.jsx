@@ -8,15 +8,15 @@ import SeletorDeCor from '@/components/comum/SeletorDeCor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CARTOES_POR_PAGINA } from '@/data/quadro'
-import { corDoTextoSobre } from '@/lib/cores'
 import { cn } from '@/lib/utils'
 import CartaoNoQuadro from './CartaoNoQuadro'
-import { CORES_DAS_COLUNAS, corDaColuna, CORPO_NEUTRO } from './cores'
+import { CORES_DAS_COLUNAS, corDaColuna } from './cores'
 
 const contar = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`
 
-// As 10 cores das colunas no SeletorDeCor (o banco guarda o número, 0 a 9; null = a automática pela posição).
-const CORES_DO_SELETOR = CORES_DAS_COLUNAS.map((c, i) => ({ valor: i, nome: c.nome, fundo: c.solido }))
+// As 10 cores das colunas no SeletorDeCor (o banco guarda o número, 0 a 9; null = a automática pela posição), no cheio
+// com o check no "sobre", como o contador.
+const CORES_DO_SELETOR = CORES_DAS_COLUNAS.map((c, i) => ({ valor: i, nome: c.nome, classe: c.cheio }))
 
 // Painel da cor: as 10 cores e "Automática" (um clique grava na hora, para todos que veem o quadro; as setas só andam,
 // para não gravar a cada tecla) e a chave "Coluna de concluídos" (prazo não conta como atrasado), como no Mochi. Abre
@@ -86,7 +86,6 @@ export default function Coluna({
   }, [renomeando])
   const cor = corDaColuna(coluna, posicao)
   const paleta = CORES_DAS_COLUNAS[cor]
-  const escolhida = coluna.cor != null
   const itens = estado?.itens
   const total = estado?.total ?? coluna.cartoes ?? 0
   const faltam = Math.max(0, total - (itens?.length ?? 0))
@@ -94,7 +93,7 @@ export default function Coluna({
 
   return (
     <section aria-label={`Coluna ${coluna.nome}`}
-      className={cn('flex min-h-0 w-[300px] flex-col gap-2.5 rounded-2xl border p-2.5', escolhida ? paleta.corpo : CORPO_NEUTRO)}>
+      className={cn('flex min-h-0 w-[300px] flex-col gap-2.5 rounded-2xl border p-2.5', paleta.corpo)}>
       <div className="flex min-h-8 shrink-0 items-center justify-between gap-1 px-1 pt-0.5">
         {renomeando ? (
           <NomeNoLugar nome={coluna.nome} aoSalvar={aoRenomear} aoTerminar={() => { voltarAoMenu.current = true; setRenomeando(false) }} />
@@ -102,8 +101,7 @@ export default function Coluna({
           <div {...(alca ?? {})} aria-label={alca ? `Mover a coluna ${coluna.nome}` : undefined}
             className={cn('flex min-w-0 flex-1 items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary/50', alca && 'cursor-grab active:cursor-grabbing')}>
             <span title={contar(total, 'cartão', 'cartões')}
-              style={escolhida ? { backgroundColor: paleta.solido, color: corDoTextoSobre(paleta.solido) } : undefined}
-              className={cn('grid h-7 min-w-7 shrink-0 place-items-center rounded-lg px-1.5 text-rotulo font-bold tabular-nums', !escolhida && paleta.tom)}>
+              className={cn('grid h-7 min-w-7 shrink-0 place-items-center rounded-lg px-1.5 text-rotulo font-bold tabular-nums', paleta.cheio)}>
               {total.toLocaleString('pt-BR')}
             </span>
             <h3 className="truncate text-corpo font-semibold text-foreground">{coluna.nome}</h3>

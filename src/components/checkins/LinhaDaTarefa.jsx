@@ -11,9 +11,11 @@ import PrazoDaTarefa from './PrazoDaTarefa'
 import { mesmaSituacao, textoDaEspera } from './situacao'
 import { minutosFeitos, relogio, segundosDaTarefa, useAgora } from './tempo'
 
-const SELO_ANDAMENTO = 'border-transparent bg-accent text-primary-texto'
-// Pausada: o fundo do cartão com borda (em andamento é o azul-claro) e o ícone de pausa: nunca só a cor.
-const SELO_PAUSADA = 'border-input bg-card text-primary-texto'
+// As cores de estado dos gráficos (COR de graficos/cores.js; cores vivas, 19/11): em andamento azul e pausada turquesa,
+// sólidos (cheio + sobre); não se aplica no grafite suave (fechada, discreta); sempre com o ícone e a palavra.
+const SELO_ANDAMENTO = 'border-transparent bg-cor-azul-cheio text-cor-azul-sobre'
+const SELO_PAUSADA = 'border-transparent bg-cor-turquesa-cheio text-cor-turquesa-sobre'
+const SELO_NAO_SE_APLICA = 'border-transparent bg-cor-grafite-suave text-cor-grafite-texto'
 const SELO_CINZA = 'border-transparent bg-muted text-muted-foreground'
 const SELO_SESSAO = 'border-transparent bg-sky-500/10 text-sky-700 dark:text-sky-300'
 // A feita é o check verde (a Caixa da casa é azul): o texto do check na cor do cartão segura o contraste no claro e no escuro.
@@ -30,7 +32,7 @@ export function TempoCorrendo({ tarefa }) {
 // check verde já diz.
 export function SeloDaSituacao({ tarefa, situacao }) {
   if (tarefa.estado === 'nao_se_aplica') {
-    return <Badge variant="outline" data-selo="nao_se_aplica" className={SELO_CINZA}><Ban /> Não se aplica</Badge>
+    return <Badge variant="outline" data-selo="nao_se_aplica" className={SELO_NAO_SE_APLICA}><Ban /> Não se aplica</Badge>
   }
   if (tarefa.estado === 'andamento') {
     return (

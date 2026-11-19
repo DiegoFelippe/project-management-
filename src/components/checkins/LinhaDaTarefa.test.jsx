@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LinhaDaTarefa from './LinhaDaTarefa'
 import { situacaoDaTarefa } from './situacao'
+import { COR } from '@/components/graficos/cores'
 
 // "Hoje" é 17/11/2026 em São Paulo (12:00).
 const AGORA = new Date('2026-11-17T15:00:00Z')
@@ -83,7 +84,29 @@ describe('LinhaDaTarefa', () => {
     const selo = item.querySelector('[data-selo="pausada"]')
     expect(selo).toHaveTextContent('Pausada · 12 min')
     expect(selo.querySelector('.lucide-pause')).not.toBeNull()
-    expect(selo).toHaveClass('bg-card', 'text-primary-texto')
+    expect(selo).toHaveClass('bg-cor-turquesa-cheio', 'text-cor-turquesa-sobre')
+  })
+
+  // Cores vivas (19/11): o selo na cor do estado dos gráficos (COR): em andamento azul e pausada turquesa, sólidos (cheio +
+  // sobre); não se aplica no grafite suave (fechada, discreta); sempre com o ícone e a palavra.
+  it('os selos nas cores de estado dos gráficos: em andamento azul, pausada turquesa (cheios) e não se aplica grafite', () => {
+    const familia = (chave) => /^var\(--((?:cor-)?[a-z]+)-/.exec(COR[chave])[1]
+    const selo = (campos) => {
+      const { item } = linha(t('t1', 'Coleta', campos))
+      const achado = item.querySelector('[data-selo]')
+      cleanup()
+      return achado
+    }
+    const andamento = selo({ estado: 'andamento' })
+    expect(andamento).toHaveClass(`bg-${familia('andamento')}-cheio`, `text-${familia('andamento')}-sobre`)
+    const pausada = selo({ estado: 'pausada' })
+    expect(pausada).toHaveClass(`bg-${familia('pausada')}-cheio`, `text-${familia('pausada')}-sobre`)
+    const nsa = selo({ estado: 'nao_se_aplica', motivo: 'Sem estoque' })
+    expect(nsa).toHaveClass(`bg-${familia('nsa')}-suave`, `text-${familia('nsa')}-texto`)
+    for (const s of [andamento, pausada, nsa]) {
+      expect(s.querySelector('svg')).not.toBeNull()
+      expect(s.className).not.toMatch(/text-primary-texto/)
+    }
   })
 
   it('Opcional e "Nesta sessão" continuam na linha', () => {

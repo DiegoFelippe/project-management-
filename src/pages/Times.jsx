@@ -119,7 +119,7 @@ export default function Times() {
           {times.map((t) => (
             <Linha key={t.id}>
               <Celula>
-                <Link to={`/times/${t.id}`} className="font-semibold hover:text-primary hover:underline">{t.nome}</Link>
+                <Link to={`/times/${t.id}`} className="font-semibold hover:text-primary-texto hover:underline">{t.nome}</Link>
                 {t.descricao && <p className="truncate text-rotulo text-muted-foreground">{t.descricao}</p>}
               </Celula>
               <Celula className="text-muted-foreground">{t.gestor?.nome ?? '—'}</Celula>
