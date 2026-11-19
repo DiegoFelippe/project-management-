@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { avisar } from '@/components/comum/avisar'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
 import {
   ajustarPrevisao, apagarCliente, arquivarCliente, criarCliente, editarCliente, escolherConsultor,
@@ -8,6 +9,7 @@ import {
 import { limparPastaDoCliente } from '@/data/arquivos'
 import { lancarHoras } from '@/data/checkins'
 import { limparQuadroDoCliente } from '@/data/quadro'
+import { avisarQueOCheckinMudou } from '@/lib/checkinMudou'
 import FormularioCliente from './FormularioCliente'
 import JanelaCheckin from './JanelaCheckin'
 import JanelaConsultor from './JanelaConsultor'
@@ -82,10 +84,24 @@ export function useAcoesDoCliente({ aoMudar, aoApagar }) {
     return resposta
   }
 
+  // "Desfazer" dos avisos de Mandar e Escolher consultor (usabilidade, U3): a mesma escrita de volta, com a regra de sempre
+  // do banco. Só onde ela devolve o estado anterior: enviar da central (volta à Central) e escolher o primeiro consultor
+  // (volta a aguardar). Mover e trocar ficam só com "Ver cliente": mover tira o consultor e encerra o check-list e o
+  // check-in aberto; trocar fecha o check-in aberto e recomeça o "consultor desde". Voltar não devolve nada disso.
+  async function desfazer(escrita, aviso) {
+    const { erro } = await escrita()
+    if (erro) return toast.error(erro)
+    toast.success(aviso)
+    recarregar()
+  }
+  const verCliente = (cliente) => ({ rotulo: 'Ver cliente', para: `/clientes/${cliente.id}` })
+
   async function mandar(cliente, consultoriaId, consultoria) {
     const resposta = await mandarParaConsultoria(cliente.id, consultoriaId)
     if (!resposta.erro) {
-      toast.success(`Cliente ${cliente.nome} ${cliente.consultoria ? 'movido' : 'enviado'} para ${consultoria.nome}.`)
+      const voltar = { rotulo: 'Desfazer', aoClicar: () => desfazer(() => mandarParaConsultoria(cliente.id, null), `Cliente ${cliente.nome} voltou para a Central.`) }
+      avisar(`Cliente ${cliente.nome} ${cliente.consultoria_id ? 'movido' : 'enviado'} para ${consultoria.nome}.`,
+        { acoes: cliente.consultoria_id ? [verCliente(cliente)] : [voltar, verCliente(cliente)] })
       recarregar()
     }
     return resposta
@@ -94,7 +110,11 @@ export function useAcoesDoCliente({ aoMudar, aoApagar }) {
   async function escolher(cliente, consultorId, pessoa) {
     const resposta = await escolherConsultor(cliente.id, consultorId)
     if (!resposta.erro) {
-      toast.success(`${pessoa.nome} é o consultor de ${cliente.nome}.`)
+      const voltar = { rotulo: 'Desfazer', aoClicar: () => desfazer(() => escolherConsultor(cliente.id, null), `${cliente.nome} voltou a aguardar consultor.`) }
+      avisar(`${pessoa.nome} é o consultor de ${cliente.nome}.`,
+        { acoes: cliente.consultor_id ? [verCliente(cliente)] : [voltar, verCliente(cliente)] })
+      // Trocar fecha o check-in aberto do consultor anterior no cliente, que pode ser o de quem trocou (o selo relê).
+      if (cliente.consultor_id) avisarQueOCheckinMudou()
       recarregar()
     }
     return resposta

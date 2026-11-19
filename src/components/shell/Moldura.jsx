@@ -2,6 +2,7 @@
 // com só o canto superior esquerdo arredondado. No celular (abaixo de md), o trilho dá lugar à barra de baixo (até 5
 // itens do papel) e ao ☰ da barra de cima, com o resto do menu, o perfil, o tema e o Sair (auditoria, G7).
 // As margens seguras do iPhone (entalhe e barra de gestos; viewport-fit=cover no index.html) ficam por conta dela.
+// O check-in aberto de quem está logado vai para o selo da barra de cima, em qualquer tela (auditoria, G2).
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
@@ -12,12 +13,14 @@ import BarraTopo from './BarraTopo'
 import { tituloDaRota } from './menu'
 import MenuDoCelular from './MenuDoCelular'
 import Trilho from './Trilho'
+import { useCheckinAberto } from './useCheckinAberto'
 
 export default function Moldura() {
   const { perfil } = useAuth()
   const [gaveta, setGaveta] = useState(false)
   const [perfilAberto, setPerfilAberto] = useState(false)
   const { pathname } = useLocation()
+  const checkin = useCheckinAberto(perfil, pathname)
 
   useEffect(() => {
     document.title = `${tituloDaRota(pathname)} | IXC Consult`
@@ -37,7 +40,7 @@ export default function Moldura() {
         </SheetContent>
       </Sheet>
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <BarraTopo aoAbrirMenu={() => setGaveta(true)} />
+        <BarraTopo aoAbrirMenu={() => setGaveta(true)} checkin={checkin} />
         <main id="conteudo"
           className="relative min-h-0 flex-1 overflow-y-auto bg-painel shadow-[inset_0_2px_8px_rgb(15_23_42/0.07)] md:rounded-tl-2xl md:border-t md:border-l">
           <div key={pathname.split('/')[1]} className="w-full animate-page-enter p-4 md:p-6">

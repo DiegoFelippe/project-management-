@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
-import { editarCheckin, fazerCheckout, listarCheckins, tarefasDoCheckin } from './checkins'
+import { aoMudarOCheckin } from '@/lib/checkinMudou'
+import { apagarCheckin, editarCheckin, fazerCheckin, fazerCheckout, lancarHoras, listarCheckins, tarefasDoCheckin } from './checkins'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn() } }))
 
@@ -80,5 +81,51 @@ describe('escritas do check-in', () => {
     expect(await fazerCheckout('c1', { fim: '2026-11-10T15:00:00.000Z', descricao: 'Suporte' })).toEqual({
       erro: 'Um check-in não pode passar de 24 h. Ajuste o horário de fim.',
     })
+  })
+})
+
+describe('fazerCheckin', () => {
+  it('devolve o id do check-in feito (para o Desfazer do aviso)', async () => {
+    banco.resposta = { data: { id: 'c9' }, error: null }
+    expect(await fazerCheckin('k1')).toEqual({ erro: null, id: 'c9' })
+    expect(banco.chamou('insert', { cliente_id: 'k1' })).toBe(true)
+    expect(banco.chamou('select', 'id')).toBe(true)
+    expect(banco.chamou('single')).toBe(true)
+  })
+
+  it('tempo esgotado no banco (57014): diz que o check-in não foi feito e marca tempoEsgotado (usabilidade, U11)', async () => {
+    banco.resposta = { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } }
+    expect(await fazerCheckin('k1')).toEqual({
+      erro: 'O sistema demorou para responder. O check-in não foi feito; tente de novo.',
+      tempoEsgotado: true,
+    })
+  })
+
+  it('outra recusa continua com a mensagem de sempre', async () => {
+    banco.resposta = { data: null, error: { message: 'checkin_sem_cliente' } }
+    expect(await fazerCheckin('k1')).toEqual({ erro: 'Você não é o consultor deste cliente.' })
+  })
+})
+
+describe('aviso de que o check-in mudou (o selo da barra de cima e o Início relêem: auditoria, G2)', () => {
+  it('toda escrita que deu certo avisa; a recusada não', async () => {
+    const ouvinte = vi.fn()
+    const parar = aoMudarOCheckin(ouvinte)
+    banco.resposta = { data: { id: 'c9' }, error: null }
+    await fazerCheckin('k1')
+    banco.resposta = { data: [{ id: 'c9' }], error: null }
+    await fazerCheckout('c9', { fim: '2026-11-10T15:00:00.000Z', descricao: 'Suporte' })
+    await editarCheckin('c9', { descricao: 'Suporte' })
+    await apagarCheckin('c9')
+    await lancarHoras({ clienteId: 'k1', inicio: '2026-11-10T14:00:00.000Z', fim: '2026-11-10T15:00:00.000Z', descricao: 'Suporte' })
+    expect(ouvinte).toHaveBeenCalledTimes(5)
+    banco.resposta = { data: null, error: { code: '42501' } }
+    await fazerCheckin('k1')
+    await apagarCheckin('c9')
+    expect(ouvinte).toHaveBeenCalledTimes(5)
+    parar()
+    banco.resposta = { data: { id: 'c9' }, error: null }
+    await fazerCheckin('k1')
+    expect(ouvinte).toHaveBeenCalledTimes(5)
   })
 })

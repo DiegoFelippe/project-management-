@@ -2,18 +2,22 @@ import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
-import { fazerCheckin, fazerCheckout, tarefasDoCheckin } from '@/data/checkins'
+import { avisar } from '@/components/comum/avisar'
+import { apagarCheckin, fazerCheckin, fazerCheckout, tarefasDoCheckin } from '@/data/checkins'
+import { avisarQueOCheckinMudou } from '@/lib/checkinMudou'
 import BotaoCheckin from './BotaoCheckin'
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
-vi.mock('@/data/checkins', () => ({ fazerCheckin: vi.fn(), fazerCheckout: vi.fn(), tarefasDoCheckin: vi.fn() }))
+vi.mock('@/components/comum/avisar', () => ({ avisar: vi.fn() }))
+vi.mock('@/data/checkins', () => ({ fazerCheckin: vi.fn(), fazerCheckout: vi.fn(), tarefasDoCheckin: vi.fn(), apagarCheckin: vi.fn() }))
 
 const cliente = { id: 'k1', nome: 'Alfa' }
 const HORA = 3_600_000
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(fazerCheckin).mockResolvedValue({ erro: null })
+  vi.mocked(fazerCheckin).mockResolvedValue({ erro: null, id: 'c9' })
+  vi.mocked(apagarCheckin).mockResolvedValue({ erro: null })
   vi.mocked(fazerCheckout).mockResolvedValue({ erro: null })
   vi.mocked(tarefasDoCheckin).mockResolvedValue([])
 })
@@ -26,6 +30,54 @@ describe('BotaoCheckin', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Fazer check-in' }))
     expect(fazerCheckin).toHaveBeenCalledWith('k1')
     expect(aoMudar).toHaveBeenCalled()
+  })
+
+  it('o aviso do check-in traz Desfazer (apaga o check-in recém-feito) e Ver cliente (usabilidade, U3)', async () => {
+    const aoMudar = vi.fn()
+    render(<BotaoCheckin cliente={cliente} aberto={null} aoMudar={aoMudar} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Fazer check-in' }))
+    expect(avisar).toHaveBeenCalledWith('Check-in feito em Alfa.', {
+      acoes: [{ rotulo: 'Desfazer', aoClicar: expect.any(Function) }, { rotulo: 'Ver cliente', para: '/clientes/k1' }],
+    })
+    await act(() => vi.mocked(avisar).mock.calls[0][1].acoes[0].aoClicar())
+    expect(apagarCheckin).toHaveBeenCalledWith('c9')
+    expect(toast.success).toHaveBeenCalledWith('Check-in desfeito em Alfa.')
+    expect(aoMudar).toHaveBeenCalledTimes(2)
+  })
+
+  it('Desfazer recusado pelo banco mostra a mensagem e não recarrega de novo', async () => {
+    vi.mocked(apagarCheckin).mockResolvedValue({ erro: 'Você não tem permissão para isso.' })
+    const aoMudar = vi.fn()
+    render(<BotaoCheckin cliente={cliente} aberto={null} aoMudar={aoMudar} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Fazer check-in' }))
+    await act(() => vi.mocked(avisar).mock.calls[0][1].acoes[0].aoClicar())
+    expect(toast.error).toHaveBeenCalledWith('Você não tem permissão para isso.')
+    expect(aoMudar).toHaveBeenCalledTimes(1)
+  })
+
+  it('enquanto grava, o botão diz "Fazendo check-in…" (usabilidade, U11)', async () => {
+    let responder
+    vi.mocked(fazerCheckin).mockReturnValue(new Promise((r) => { responder = r }))
+    render(<BotaoCheckin cliente={cliente} aberto={null} aoMudar={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Fazer check-in' }))
+    expect(screen.getByRole('button', { name: 'Fazendo check-in…' })).toBeDisabled()
+    await act(async () => responder({ erro: null, id: 'c9' }))
+    expect(screen.getByRole('button', { name: 'Fazer check-in' })).toBeEnabled()
+  })
+
+  it('tempo esgotado: o aviso diz que o check-in não foi feito e traz "Tentar de novo" (usabilidade, U11)', async () => {
+    const demorou = 'O sistema demorou para responder. O check-in não foi feito; tente de novo.'
+    vi.mocked(fazerCheckin).mockResolvedValueOnce({ erro: demorou, tempoEsgotado: true })
+    const aoMudar = vi.fn()
+    render(<BotaoCheckin cliente={cliente} aberto={null} aoMudar={aoMudar} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Fazer check-in' }))
+    expect(avisar).toHaveBeenCalledWith(demorou, { erro: true, acoes: [{ rotulo: 'Tentar de novo', aoClicar: expect.any(Function) }] })
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(aoMudar).not.toHaveBeenCalled()
+    await act(() => vi.mocked(avisar).mock.calls[0][1].acoes[0].aoClicar())
+    expect(fazerCheckin).toHaveBeenCalledTimes(2)
+    expect(avisar).toHaveBeenLastCalledWith('Check-in feito em Alfa.', expect.anything())
+    expect(aoMudar).toHaveBeenCalledTimes(1)
   })
 
   it('erro do banco no check-in não avisa a tela e mostra a mensagem', async () => {
@@ -81,6 +133,7 @@ describe('BotaoCheckin', () => {
     render(<BotaoCheckin compacto cliente={{ id: 'k1', nome: 'Conecta Fibra' }} aberto={null} aoMudar={aoMudar} />)
     const botao = screen.getByRole('button', { name: 'Fazer check-in em Conecta Fibra' })
     expect(botao).toHaveAttribute('title', 'Fazer check-in em Conecta Fibra')
+    expect(screen.queryByRole('button', { name: /Fazendo/ })).not.toBeInTheDocument()
     expect(botao).toHaveTextContent('')
     expect(botao.querySelector('svg')).not.toBeNull()
     await userEvent.click(botao)
@@ -108,6 +161,16 @@ describe('BotaoCheckin', () => {
     const entrada = screen.getByRole('button', { name: 'Fazer check-in em Conecta Fibra' })
     expect(entrada).toBeDisabled()
     expect(entrada).toHaveAccessibleDescription('Você está com check-in aberto em Beta.')
+  })
+
+  it('check-in mudado em outra parte do app (o selo da barra de cima) também recarrega a tela do botão (auditoria, G2)', () => {
+    const aoMudar = vi.fn()
+    const { unmount } = render(<BotaoCheckin cliente={cliente} aberto={null} aoMudar={aoMudar} />)
+    act(() => { avisarQueOCheckinMudou() })
+    expect(aoMudar).toHaveBeenCalledTimes(1)
+    unmount()
+    avisarQueOCheckinMudou()
+    expect(aoMudar).toHaveBeenCalledTimes(1)
   })
 
   it('sem check-in aberto não aponta para aviso nenhum', () => {

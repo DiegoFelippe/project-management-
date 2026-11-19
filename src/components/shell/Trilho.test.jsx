@@ -10,6 +10,7 @@ import Moldura from './Moldura'
 import Trilho from './Trilho'
 
 vi.mock('@/data/usuarios', () => ({ gerenciarAcesso: vi.fn() }))
+vi.mock('@/data/checkins', () => ({ meuCheckinAberto: vi.fn().mockResolvedValue(null) }))
 vi.mock('@/data/capacidade', () => ({ listarAusencias: vi.fn().mockResolvedValue({ itens: [], total: 0 }) }))
 vi.mock('@/data/imagens', () => ({ trocarFoto: vi.fn(), tirarFoto: vi.fn() }))
 vi.mock('@/data/preferencias', () => ({ salvarTema: vi.fn().mockResolvedValue() }))

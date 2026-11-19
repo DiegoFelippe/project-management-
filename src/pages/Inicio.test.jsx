@@ -1,8 +1,9 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { meuCheckinAberto } from '@/data/checkins'
 import { checkinsPorSemana, clientesEmRisco, comparacaoDoInicio, filaDeClientes, horasPorCliente, painelDoInicio } from '@/data/painel'
+import { avisarQueOCheckinMudou } from '@/lib/checkinMudou'
 import { escolherData, escolherNoSeletor } from '@/test/campos'
 import { cartoesAbaixoDaBarra, numeroDoCartao } from '@/test/cartoes'
 import { renderizarTela } from '@/test/renderizar'
@@ -106,6 +107,18 @@ describe('Início (gráficos)', () => {
     expect(within(cartoes).getByText('Minha ocupação')).toBeInTheDocument()
     expect(filaDeClientes).not.toHaveBeenCalled()
     expect(meuCheckinAberto).toHaveBeenCalledWith('u1')
+  })
+
+  it('check-in feito ou fechado em outra parte do app (o selo da barra de cima) relê o check-in aberto e o painel (auditoria, G2)', async () => {
+    responder(PESSOA)
+    renderizarTela(<Inicio />, { perfil: perfil('pessoa') })
+    expect(await screen.findByRole('button', { name: 'Fazer check-in em Cliente Meu' })).toBeEnabled()
+    const leituras = vi.mocked(meuCheckinAberto).mock.calls.length
+    vi.mocked(meuCheckinAberto).mockResolvedValue({ id: 'a1', cliente_id: 'c3', inicio: new Date().toISOString(), cliente: { nome: 'Cliente Meu' } })
+    act(() => { avisarQueOCheckinMudou() })
+    expect(await screen.findByRole('button', { name: /^Fazer check-out de Cliente Meu/ })).toBeInTheDocument()
+    expect(meuCheckinAberto).toHaveBeenCalledTimes(leituras + 1)
+    expect(painelDoInicio).toHaveBeenCalledTimes(2)
   })
 
   it('trocar o período chama de novo painel, comparação, fila, horas e semanas, e não o risco', async () => {
