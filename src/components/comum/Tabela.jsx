@@ -86,8 +86,17 @@ export function Tabela({ rotulo, titulo, colunas, larguraMinima = 720, paginacao
   )
 }
 
-export function Linha({ className, children }) {
-  return <tr className={cn('group border-b transition-colors last:border-0 hover:bg-muted/40', className)}>{children}</tr>
+// Em cima de link, botão ou campo, o duplo clique é deles (o clique no nome, as ações), não da linha.
+const foraDeControle = (e) => !e.target.closest('a, button, input, textarea, select, label, [role="button"]')
+
+// aoDuploClique: atalho do mouse para editar a linha (Clientes, pedido do Diego, 18/11); o lápis continua sendo o
+// caminho pelo teclado e pelo toque. O mousedown do segundo clique não seleciona o texto da linha.
+export function Linha({ className, aoDuploClique, children }) {
+  const duplo = aoDuploClique ? {
+    onMouseDown: (e) => { if (e.detail > 1 && foraDeControle(e)) e.preventDefault() },
+    onDoubleClick: (e) => { if (foraDeControle(e)) aoDuploClique() },
+  } : {}
+  return <tr {...duplo} className={cn('group border-b transition-colors last:border-0 hover:bg-muted/40', className)}>{children}</tr>
 }
 
 export function Celula({ className, children }) {

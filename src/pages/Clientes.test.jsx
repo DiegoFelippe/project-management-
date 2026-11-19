@@ -61,9 +61,37 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('Clientes (link para a página)', () => {
-  it('o nome do cliente leva para a página dele', async () => {
+  it('o nome do cliente leva para a página dele, sem sublinhado', async () => {
     renderizarTela(<Clientes />, { perfil: central })
-    expect(await screen.findByRole('link', { name: 'Provedor Alfa' })).toHaveAttribute('href', '/clientes/k1')
+    const nome = await screen.findByRole('link', { name: 'Provedor Alfa' })
+    expect(nome).toHaveAttribute('href', '/clientes/k1')
+    expect(nome.className).not.toMatch(/underline/)
+  })
+})
+
+describe('Clientes (duplo clique edita)', () => {
+  it('central: duplo clique na linha abre o Editar com aquele cliente', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    await userEvent.dblClick(within(await screen.findByRole('row', { name: /Provedor Alfa/ })).getByText('11.222.333/0001-81'))
+    expect(within(screen.getByRole('dialog', { name: 'Editar cliente' })).getByLabelText('Nome')).toHaveValue('Provedor Alfa')
+  })
+
+  it('duplo clique no nome ou numa ação da linha não abre o Editar', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    await userEvent.dblClick(within(alfa).getByRole('link', { name: 'Provedor Alfa' }))
+    expect(screen.queryByRole('dialog', { name: 'Editar cliente' })).not.toBeInTheDocument()
+    await userEvent.dblClick(within(alfa).getByRole('button', { name: 'Arquivar' }))
+    expect(screen.queryByRole('dialog', { name: 'Editar cliente' })).not.toBeInTheDocument()
+  })
+
+  it('quem não edita os dados (admin e gestor): sem lápis e o duplo clique não abre nada', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: CLIENTES.map((c) => ({ ...c, consultoria_id: 'x' })), total: 2 })
+    renderizarTela(<Clientes />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'x' } })
+    const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    expect(within(alfa).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
+    await userEvent.dblClick(within(alfa).getByText('11.222.333/0001-81'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
 
