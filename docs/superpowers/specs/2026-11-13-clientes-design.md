@@ -259,7 +259,7 @@ do cliente mostra esse histórico. Os painéis estratégicos da central vão ler
 | --- | --- | --- | --- | --- |
 | Pessoa da central | dono | dono e central | dono (nome) | desativar/reativar: dono |
 | Consultoria | dono, central | dono, central (todas); admin (a dele) | renomear: dono, central | arquivar/reativar: dono, central |
-| Cliente | dono, central | conforme o papel (tabela de cima) | dados: dono, central; consultor: admin e gestor da consultoria; previsão: dono, central, admin e gestor da consultoria | arquivar/reativar e apagar (sem nada ligado): dono, central |
+| Cliente | dono, central | conforme o papel (tabela de cima) | dados: dono, central e, desde 19/11 (pedido do Diego), admin e gestor da consultoria, menos no arquivado; consultor: admin e gestor da consultoria; previsão: dono, central, admin e gestor da consultoria | arquivar/reativar e apagar (sem nada ligado): dono, central |
 | Carga semanal | (vem com o usuário, padrão 44) | quem vê a Capacidade | admin e gestor da consultoria, central, dono | — (é um campo; zerar tira da sugestão) |
 | Ausência | admin e gestor da consultoria, central, dono | os mesmos e o próprio consultor | os mesmos | os mesmos |
 | Check-in | o consultor do cliente | o consultor, admin e gestor da consultoria, central, dono | o consultor (os dele), admin e gestor da consultoria | os mesmos de editar |

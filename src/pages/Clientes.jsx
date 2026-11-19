@@ -274,8 +274,8 @@ export default function Clientes() {
         <Tabela rotulo="Clientes" paginacao={paginacao}
           colunas={['Cliente', ...(buscando ? ['Situação'] : []), 'CNPJ', 'Cidade', 'Previsão', 'Consultoria', 'Consultor']}>
           {clientes.map((c) => (
-            // Duplo clique edita, só para quem edita os dados (central e dono, como o lápis da linha).
-            <Linha key={c.id} aoDuploClique={central ? () => abrir('formulario', c) : undefined}>
+            // Duplo clique edita, só para quem edita os dados (central e dono; a gestão, menos o arquivado), como o lápis.
+            <Linha key={c.id} aoDuploClique={central || (gestao && !c.arquivado) ? () => abrir('formulario', c) : undefined}>
               <Celula>
                 <p className="flex items-center gap-2 font-semibold">
                   <Link to={`/clientes/${c.id}`} className="rounded-sm hover:text-primary">{c.nome}</Link>

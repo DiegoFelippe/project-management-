@@ -48,6 +48,9 @@ export function AcoesDaLinha({ cliente, aba, central, gestao, aberto, idDoAviso,
     )
   }
   if (!gestao) return null
+  // A gestão também edita os dados do cliente (pedido do Diego, 19/11), menos do arquivado. Na linha, o lápis fica no fim
+  // (o mesmo lugar em toda linha) e toma o lugar do "Ajustar previsão", que está no formulário (no máximo 3 ícones); na
+  // barra da página do cliente, os dois ficam.
   return (
     <>
       {aba === 'aguardando' && (
@@ -56,9 +59,10 @@ export function AcoesDaLinha({ cliente, aba, central, gestao, aberto, idDoAviso,
       {aba === 'atendimento' && (
         <>
           <Acao {...comum} nome="Trocar consultor" icone={ArrowRightLeft} onClick={() => abrir('consultor', cliente)} />
-          <Acao {...comum} nome="Ajustar previsão" icone={Clock} onClick={() => abrir('previsao', cliente)} />
+          {noCabecalho && <Acao {...comum} nome="Ajustar previsão" icone={Clock} onClick={() => abrir('previsao', cliente)} />}
         </>
       )}
+      {!cliente.arquivado && <Acao {...comum} nome="Editar" icone={Pencil} onClick={() => abrir('formulario', cliente)} />}
     </>
   )
 }

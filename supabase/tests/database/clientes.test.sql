@@ -2,7 +2,7 @@
 -- Cada passo fica no histórico (cliente_eventos). Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(53);
+select plan(59);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -167,9 +167,21 @@ select is((select count(*) from public.cliente_eventos where cliente_id = testes
 select ok((select consultor_desde is not null from public.clientes where id = testes.id('cli_mov')),
   'consultor_desde preenchido ao escolher o consultor');
 
+-- A gestão edita os dados do cliente da consultoria (pedido do Diego, 19/11); mandar, mover e arquivar seguem da central.
 select testes.como('gestor_a2');
-select throws_ok($$update public.clientes set nome = 'Outro nome' where id = testes.id('cli_mov')$$,
-  'P0001', 'so_central_muda', 'gestor não muda os dados do cliente');
+select lives_ok($$update public.clientes set nome = 'Cliente Móvel Ltda', cidade = 'Chapecó' where id = testes.id('cli_mov')$$,
+  'gestor edita os dados do cliente da consultoria dele');
+select throws_ok($$update public.clientes set consultoria_id = testes.id('B') where id = testes.id('cli_mov')$$,
+  'P0001', 'so_central_muda', 'gestor não move o cliente para outra consultoria');
+select throws_ok($$update public.clientes set arquivado_em = now() where id = testes.id('cli_mov')$$,
+  'P0001', 'so_central_muda', 'gestor não arquiva o cliente');
+reset role;
+select is((select nome || ' / ' || cidade from public.clientes where id = testes.id('cli_mov')), 'Cliente Móvel Ltda / Chapecó',
+  'os dados mudados pela gestão ficam gravados');
+select is((select count(*) from public.cliente_eventos where cliente_id = testes.id('cli_mov') and tipo = 'editado'
+    and autor = testes.id('gestor_a2')), 1::bigint,
+  'histórico: editado pela gestão, com o autor');
+select testes.como('gestor_a2');
 select lives_ok($$update public.clientes set horas_mes = 30 where id = testes.id('cli_mov')$$,
   'gestor ajusta a previsão de horas');
 select throws_ok($$update public.clientes set consultor_id = testes.id('pessoa_b') where id = testes.id('cli_mov')$$,
@@ -191,7 +203,13 @@ reset role;
 select testes.como('pessoa_a2');
 select is((select count(*) from public.clientes where id in (select id from testes.fx)), 1::bigint,
   'consultor vê só o cliente dele');
+update public.clientes set nome = 'Nome do consultor' where id = testes.id('cli_mov');
 reset role;
+select testes.como('admin_b');
+update public.clientes set nome = 'Nome da outra consultoria' where id = testes.id('cli_mov');
+reset role;
+select is((select nome from public.clientes where id = testes.id('cli_mov')), 'Cliente Móvel Ltda',
+  'nem o consultor nem outra consultoria mudam os dados do cliente (a política não alcança a linha)');
 select testes.como('pessoa_a');
 select is((select count(*) from public.clientes where id in (select id from testes.fx)), 0::bigint,
   'pessoa da consultoria que não é a consultora não vê o cliente');
@@ -234,7 +252,7 @@ select is((select array_agg(tipo) from public.cliente_eventos where cliente_id =
   array['movido'], 'a consultoria nova vê o histórico só a partir da chegada');
 reset role;
 select testes.como('central');
-select is((select count(*) from public.cliente_eventos where cliente_id = testes.id('cli_mov')), 5::bigint,
+select is((select count(*) from public.cliente_eventos where cliente_id = testes.id('cli_mov')), 6::bigint,
   'central vê o histórico inteiro');
 
 -- Consultoria arquivada não recebe cliente
@@ -280,6 +298,18 @@ reset role;
 select bag_eq($$select tipo from public.cliente_eventos where cliente_id = testes.id('cli_b')$$,
   $$values ('cadastrado'), ('enviado'), ('consultor_escolhido'), ('consultor_trocado'), ('consultor_removido')$$,
   'histórico: consultor escolhido, trocado e removido');
+
+-- Cliente arquivado: a gestão vê, mas não mexe nem nos dados. (Arquivar e reativar como a central.)
+select testes.como('central');
+update public.clientes set arquivado_em = now() where id = testes.id('cli_b');
+reset role;
+select testes.como('admin_b');
+select throws_ok($$update public.clientes set nome = 'Arquivado editado' where id = testes.id('cli_b')$$,
+  'P0001', 'so_central_muda', 'gestão não edita os dados de cliente arquivado');
+reset role;
+select testes.como('central');
+update public.clientes set arquivado_em = null where id = testes.id('cli_b');
+reset role;
 
 -- Devolver para a central
 select testes.como('central');

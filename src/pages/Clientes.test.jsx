@@ -85,9 +85,27 @@ describe('Clientes (duplo clique edita)', () => {
     expect(screen.queryByRole('dialog', { name: 'Editar cliente' })).not.toBeInTheDocument()
   })
 
-  it('quem não edita os dados (admin e gestor): sem lápis e o duplo clique não abre nada', async () => {
-    vi.mocked(listarClientes).mockResolvedValue({ itens: CLIENTES.map((c) => ({ ...c, consultoria_id: 'x' })), total: 2 })
+  it('a gestão (admin e gestor) também edita (19/11): lápis e duplo clique, menos no cliente arquivado', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: [
+      { ...CLIENTES[0], consultoria_id: 'x' }, { ...CLIENTES[1], consultoria_id: 'x', arquivado: true },
+    ], total: 2 })
     renderizarTela(<Clientes />, { perfil: { id: 'a1', papel: 'admin', consultoria_id: 'x' } })
+    const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    await userEvent.dblClick(within(alfa).getByText('11.222.333/0001-81'))
+    expect(within(screen.getByRole('dialog', { name: 'Editar cliente' })).getByLabelText('Nome')).toHaveValue('Provedor Alfa')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(within(alfa).getByRole('button', { name: 'Editar' }))
+    expect(screen.getByRole('dialog', { name: 'Editar cliente' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    const beta = linha('Provedor Beta')
+    expect(within(beta).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
+    await userEvent.dblClick(within(beta).getByText('Natal/RN'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('o consultor não edita os dados: sem lápis e o duplo clique não abre nada', async () => {
+    vi.mocked(listarClientes).mockResolvedValue({ itens: CLIENTES.map((c) => ({ ...c, consultoria_id: 's1', consultor_id: 'p9' })), total: 2 })
+    renderizarTela(<Clientes />, { perfil: { id: 'p9', papel: 'pessoa', consultoria_id: 's1' } })
     const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
     expect(within(alfa).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
     await userEvent.dblClick(within(alfa).getByText('11.222.333/0001-81'))
@@ -231,7 +249,7 @@ describe('Clientes (outros papéis)', () => {
     await userEvent.click(screen.getByLabelText('Situação'))
     expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Todas', 'Aguardando consultor', 'Em atendimento'])
     expect(screen.queryByRole('button', { name: 'Novo cliente' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
+    expect(within(linha('Provedor Alfa')).getByRole('button', { name: 'Editar' })).toBeInTheDocument()
   })
 
   it('?situacao= (links da fila do Início) abre nessa situação; valor desconhecido ou de outro papel usa o padrão do papel', async () => {
@@ -296,7 +314,7 @@ describe('Clientes: distribuir e escolher consultor', () => {
     await screen.findByRole('table', { name: 'Clientes' })
     const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
     ehSoIcone(within(alfa).getByRole('button', { name: 'Trocar consultor' }))
-    ehSoIcone(within(alfa).getByRole('button', { name: 'Ajustar previsão' }))
+    ehSoIcone(within(alfa).getByRole('button', { name: 'Editar' }))
     gestao.unmount()
     renderizarTela(<Clientes />, { perfil: { id: 'p9', papel: 'pessoa', consultoria_id: 's1' } })
     const minha = await screen.findByRole('row', { name: /Provedor Alfa/ })
@@ -345,30 +363,23 @@ describe('Clientes: distribuir e escolher consultor', () => {
     expect(escolherConsultor).toHaveBeenCalledWith('k1', 'p1')
   })
 
-  it('gestor: Em atendimento tem Trocar consultor e Ajustar previsão, sem Novo', async () => {
+  it('gestor: Em atendimento tem Trocar consultor e Editar (a previsão vem no formulário), sem Novo', async () => {
     vi.mocked(listarClientes).mockResolvedValue({ itens: NA_CONSULTORIA.map((c) => ({ ...c, consultor_id: 'p9', consultor: { id: 'p9', nome: 'Zé', ativo: true } })), total: 2 })
     renderizarTela(<Clientes />, { perfil: gestor })
     await screen.findByRole('table', { name: 'Clientes' })
     const alfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
     expect(within(alfa).queryByText('Novo')).not.toBeInTheDocument()
     expect(within(alfa).getByRole('button', { name: 'Trocar consultor' })).toBeInTheDocument()
-    await userEvent.click(within(alfa).getByRole('button', { name: 'Ajustar previsão' }))
-    const janela = screen.getByRole('dialog', { name: /previsão/i })
+    expect(within(alfa).queryByRole('button', { name: 'Ajustar previsão' })).not.toBeInTheDocument()
+    await userEvent.click(within(alfa).getByRole('button', { name: 'Editar' }))
+    const janela = screen.getByRole('dialog', { name: 'Editar cliente' })
     const campo = within(janela).getByLabelText('Previsão de horas por mês')
     expect(campo).toHaveValue('40')
     await userEvent.clear(campo)
-    await userEvent.type(campo, '0')
-    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
-    expect(ajustarPrevisao).not.toHaveBeenCalled()
-    expect(within(janela).getByText(/maior que zero/)).toBeInTheDocument()
-    await userEvent.clear(campo)
-    await userEvent.type(campo, '800')
-    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
-    expect(ajustarPrevisao).not.toHaveBeenCalled()
-    await userEvent.clear(campo)
     await userEvent.type(campo, '40,5')
     await userEvent.click(within(janela).getByRole('button', { name: 'Salvar' }))
-    expect(ajustarPrevisao).toHaveBeenCalledWith('k1', 40.5)
+    expect(editarCliente).toHaveBeenCalledWith('k1', expect.objectContaining({ nome: 'Provedor Alfa', horasMes: 40.5 }))
+    expect(ajustarPrevisao).not.toHaveBeenCalled()
   })
 
   it('pessoa não tem ações de distribuir, consultor ou previsão', async () => {
