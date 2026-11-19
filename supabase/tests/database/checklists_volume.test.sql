@@ -1,6 +1,8 @@
 -- Volume do check-list do cliente: 50 consultorias, 5.000 clientes com check-list ativo de 40 tarefas (200.000
 -- tarefas e 195.000 dependências) de um modelo da Central para todas, e um cliente que recebe, por aplicar_modelo, um
--- modelo de 500 tarefas em 50 etapas (989 dependências), com um check-in aberto. Tudo é criado aqui e desfeito no fim
+-- modelo de 500 tarefas em 50 etapas (989 dependências), com um check-in aberto; tarefas pausadas, 47.500 trechos de
+-- tempo e 50.000 comentários nos check-lists de 40, e no grande 2 trechos e 3 comentários por tarefa (a leitura soma os
+-- tempos e conta os comentários das 500). Tudo é criado aqui e desfeito no fim
 -- (rollback: nada fica no banco). Tempos (média de 5 execuções; o limite é o dobro do valor do meio do performs_within):
 -- o check-list de 500 tarefas inteiro numa leitura, marcar e desmarcar nele, aplicar o modelo de 500 tarefas, e a lista,
 -- os números e o uso dos modelos com um modelo usado por 5.000 clientes. Além do tempo, o plano das consultas que essas
@@ -8,7 +10,7 @@
 -- cresce com o número de check-lists. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(24);
+select plan(28);
 
 create schema testes;
 grant usage on schema testes to authenticated;
@@ -115,7 +117,8 @@ select t.id, a.id from v_m_tarefas t join v_m_tarefas a on a.m = t.m and a.k = t
 where t.m = 'grande' and t.k > 10;
 
 -- 5.000 check-lists do modelo da Central (um por cliente, k = 1..5000), como aplicar_modelo grava: as etapas, as 40
--- tarefas (as primeiras k % 20 feitas pelo consultor) e as 39 dependências de cada um.
+-- tarefas (as primeiras k % 20 feitas pelo consultor; nos k pares, a seguinte pausada) e as 39 dependências de cada um;
+-- um trecho de tempo fechado em cada feita e um comentário a cada 4 tarefas.
 create temp table v_checklists (k int primary key, id uuid not null default gen_random_uuid());
 insert into v_checklists (k) select generate_series(1, 5000);
 insert into public.cliente_checklists (id, cliente_id, consultoria_id, modelo_id, modelo_nome, inicio, aplicado_por)
@@ -132,7 +135,7 @@ analyze v_cl_tarefas;
 insert into public.checklist_tarefas (id, checklist_id, etapa_id, titulo, obrigatoria, prazo_dias, vence_em, posicao,
   estado, feita_em, feita_por)
 select t.id, l.id, e.id, 'Tarefa ' || t.t, t.t % 3 <> 0, t.t * 4, current_date - (t.k % 60) + t.t * 4, t.t,
-  case when t.t <= t.k % 20 then 'feita' else 'a_fazer' end,
+  case when t.t <= t.k % 20 then 'feita' when t.t = t.k % 20 + 1 and t.k % 2 = 0 then 'pausada' else 'a_fazer' end,
   case when t.t <= t.k % 20 then now() end,
   case when t.t <= t.k % 20 then p.id end
 from v_cl_tarefas t
@@ -150,10 +153,18 @@ from (
   select t.checklist_id, count(*) as tarefas, count(*) filter (where t.estado = 'feita') as feitas,
     count(*) filter (where t.obrigatoria) as obrigatorias,
     count(*) filter (where t.obrigatoria and t.estado = 'feita') as obrigatorias_feitas,
-    min(t.vence_em) filter (where t.estado in ('a_fazer', 'andamento')) as proximo
+    min(t.vence_em) filter (where t.estado in ('a_fazer', 'andamento', 'pausada')) as proximo
   from public.checklist_tarefas t join v_checklists l on l.id = t.checklist_id
   group by t.checklist_id) x
 where cl.id = x.checklist_id;
+insert into public.checklist_tarefa_tempos (tarefa_id, pessoa_id, inicio, fim)
+select t.id, p.id, now() - interval '3 hours', now() - interval '2 hours'
+from v_cl_tarefas t join v_clientes c on c.k = t.k join v_pessoas p on p.n = 50 + c.consultoria
+where t.t <= t.k % 20;
+insert into public.checklist_comentarios (tarefa_id, autor_id, texto)
+select t.id, p.id, 'Comentário de volume ' || t.t
+from v_cl_tarefas t join v_clientes c on c.k = t.k join v_pessoas p on p.n = 50 + c.consultoria
+where t.t % 4 = 0;
 
 insert into testes.fx select 'central', id from v_pessoas where n = 0;
 insert into testes.fx select 'gestor1', id from v_pessoas where n = 1;
@@ -172,6 +183,8 @@ analyze public.cliente_checklists;
 analyze public.checklist_etapas;
 analyze public.checklist_tarefas;
 analyze public.checklist_dependencias;
+analyze public.checklist_tarefa_tempos;
+analyze public.checklist_comentarios;
 
 -- ── Aplicar o modelo de 500 tarefas ──────────────────────────────────────────
 
@@ -237,6 +250,28 @@ begin
 end $$;
 select is((public.checklist_do_cliente(testes.id('cliente_grande')) #>> '{resumo,nao_se_aplica}')::int, 30,
   'as 30 bloqueadas viraram "não se aplica" (a cadeia continua esperando a tarefa 31)');
+-- Os tempos e os comentários do check-list grande: 2 trechos de 10 minutos e 3 comentários em cada tarefa, e a 31 em
+-- andamento (o trecho aberto).
+reset role;
+select set_config('request.jwt.claims', '', true);
+insert into public.checklist_tarefa_tempos (tarefa_id, pessoa_id, inicio, fim)
+select t.id, p.id, now() - make_interval(hours => n * 2), now() - make_interval(hours => n * 2) + interval '10 minutes'
+from public.checklist_tarefas t, generate_series(1, 2) n, (select id from v_pessoas where n = 51) p
+where t.checklist_id = testes.id('grande_ativo');
+insert into public.checklist_comentarios (tarefa_id, autor_id, texto)
+select t.id, p.id, 'Comentário ' || n
+from public.checklist_tarefas t, generate_series(1, 3) n, (select id from v_pessoas where n = 51) p
+where t.checklist_id = testes.id('grande_ativo');
+analyze public.checklist_tarefa_tempos;
+analyze public.checklist_comentarios;
+select testes.como('consultor1');
+select is(public.marcar_tarefa(testes.id('grande_t31'), 'andamento') ->> 'tempo_segundos', '1200',
+  'a tarefa 31 em andamento (dois trechos de 10 minutos e um aberto agora)');
+select is((select jsonb_build_object('tempo', t -> 'tempo_segundos', 'comentarios', t -> 'comentarios',
+      'aberto', t -> 'trecho_aberto_desde' is not null)
+    from jsonb_array_elements(public.checklist_do_cliente(testes.id('cliente_grande')) -> 'tarefas') t
+    where (t ->> 'id')::uuid = testes.id('grande_t31')),
+  '{"tempo": 1200, "comentarios": 3, "aberto": true}'::jsonb, 'a leitura de 500 traz o tempo e os comentários de cada tarefa');
 select diag('consultor, check-list de 500: '
   || testes.media_ms(format('select public.checklist_do_cliente(%L)', testes.id('cliente_grande'))) || ' ms; de 40: '
   || testes.media_ms(format('select public.checklist_do_cliente(%L)', testes.id('cliente_40'))) || ' ms; marcar e desmarcar: '
@@ -295,7 +330,7 @@ select ok(not testes.varre('checklist_tarefas', format($$
     testes.id('grande_ativo')))
   and not testes.varre('checklist_tarefas', format($$
   with recursive tarefas as materialized (
-    select t.id, t.posicao, t.estado, t.estado in ('a_fazer', 'andamento') as pendente
+    select t.id, t.posicao, t.estado, t.estado in ('a_fazer', 'andamento', 'pausada') as pendente
     from public.checklist_tarefas t where t.checklist_id = %1$L
   ), presas(id) as (
     select d.tarefa_id from tarefas n
@@ -330,16 +365,16 @@ select ok(not testes.varre('checklist_tarefas', format($$
     where a.estado = 'nao_se_aplica'
   )
   select t.id, t.titulo
-  from (select distinct a.id from acima a where a.estado in ('a_fazer', 'andamento')) x
+  from (select distinct a.id from acima a where a.estado in ('a_fazer', 'andamento', 'pausada')) x
   join public.checklist_tarefas t on t.id = x.id
   where not exists (select 1 from public.checklist_dependencias d2 join public.checklist_tarefas t2 on t2.id = d2.depende_de
     where d2.tarefa_id = t.id
-      and (t2.estado in ('a_fazer', 'andamento')
+      and (t2.estado in ('a_fazer', 'andamento', 'pausada')
         or (t2.estado = 'nao_se_aplica' and private.nao_se_aplica_espera(t2.id)))) $$, testes.id('grande_t1')))
   and not testes.varre('checklist_dependencias', format($$
   select 1 from public.checklist_dependencias d join public.checklist_tarefas t on t.id = d.depende_de
   where d.tarefa_id = %L
-    and (t.estado in ('a_fazer', 'andamento') or (t.estado = 'nao_se_aplica' and private.nao_se_aplica_espera(t.id))) $$,
+    and (t.estado in ('a_fazer', 'andamento', 'pausada') or (t.estado = 'nao_se_aplica' and private.nao_se_aplica_espera(t.id))) $$,
     testes.id('grande_t450')))
   and not testes.varre('checklist_tarefas', format($$
   with recursive cadeia(id, estado) as (
@@ -351,10 +386,10 @@ select ok(not testes.varre('checklist_tarefas', format($$
     join public.checklist_tarefas dt on dt.id = d.depende_de
     where c.estado = 'nao_se_aplica'
   )
-  select exists (select 1 from cadeia c where c.estado in ('a_fazer', 'andamento')) $$, testes.id('grande_t130')))
+  select exists (select 1 from cadeia c where c.estado in ('a_fazer', 'andamento', 'pausada')) $$, testes.id('grande_t130')))
   and not testes.varre('checklist_tarefas', format($$
   select count(*), count(*) filter (where t.estado = 'feita'), count(*) filter (where t.estado = 'nao_se_aplica'),
-    min(t.vence_em) filter (where t.estado in ('a_fazer', 'andamento'))
+    min(t.vence_em) filter (where t.estado in ('a_fazer', 'andamento', 'pausada'))
   from public.checklist_tarefas t where t.checklist_id = %L $$, testes.id('grande_ativo'))),
   'marcar (dependências, liberadas e recontar) vai por índice, sem Seq Scan');
 
@@ -376,6 +411,29 @@ select ok(testes.usa('cliente_checklists_consultoria_idx', format($$
   select count(*) from public.cliente_checklists cl where cl.encerrado_em is null and cl.consultoria_id = %L $$,
     testes.id('c1'))),
   '"clientes usando" de uma consultoria vai pelo índice da consultoria');
+reset enable_seqscan;
+
+-- Os tempos e os comentários das tarefas (leitura do check-list): no de 40 (o comum), o plano de verdade vai pelo índice
+-- da tarefa; no de 500, com dezenas de milhares de linhas, ler a tabela ou buscar 500 vezes no índice custam quase o
+-- mesmo e o plano escolhe por um fio (aqui, a tabela); com mais linhas o índice ganha. Conferido com a varredura
+-- desligada (o tempo de verdade está nos testes de tempo acima).
+create function testes.tempos_e_comentarios(p_checklist uuid) returns boolean language sql as $f$
+  select not testes.varre('checklist_tarefa_tempos', format($$
+    with tarefas as materialized (select t.id from public.checklist_tarefas t where t.checklist_id = %L)
+    select tt.tarefa_id, sum(extract(epoch from coalesce(tt.fim, now()) - tt.inicio)),
+      max(tt.inicio) filter (where tt.fim is null)
+    from tarefas t join public.checklist_tarefa_tempos tt on tt.tarefa_id = t.id group by tt.tarefa_id $$, p_checklist))
+  and not testes.varre('checklist_comentarios', format($$
+    with tarefas as materialized (select t.id from public.checklist_tarefas t where t.checklist_id = %L)
+    select m.tarefa_id, count(*) from tarefas t join public.checklist_comentarios m on m.tarefa_id = t.id
+    group by m.tarefa_id $$, p_checklist))
+$f$;
+select ok(testes.tempos_e_comentarios((select id from public.cliente_checklists
+    where cliente_id = testes.id('cliente_40') and encerrado_em is null)),
+  'os tempos e os comentários do check-list de 40 saem por índice, sem Seq Scan');
+set local enable_seqscan = off;
+select ok(testes.tempos_e_comentarios(testes.id('grande_ativo')),
+  'os do check-list de 500 podem ir pelo índice');
 reset enable_seqscan;
 
 select ok(testes.varre('checklist_tarefas', $$ select t.id from public.checklist_tarefas t where t.nota = 'x' $$),

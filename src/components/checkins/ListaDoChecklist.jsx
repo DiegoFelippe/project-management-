@@ -119,9 +119,10 @@ const VAZIO = {
   nao_se_aplica: 'Nenhuma tarefa marcada como "não se aplica".',
 }
 
-// O check-list em lista: um cartão por etapa (número, nome, "3 de 5" resolvidas e barra) com as tarefas na ordem do
-// modelo. Cada tarefa: a caixa de marcar (desligada para quem não marca e na bloqueada, que mostra o que espera; a que
-// não se aplica tem o quadrado cinza no lugar), o título (abre a janela da tarefa), "Opcional", "Nesta sessão", a
+// O check-list em lista: um cartão por etapa (número, nome, a contagem — "3 de 5 feitas", ou "4 de 5 resolvidas" quando
+// alguma não se aplica — e a barra das resolvidas) com as tarefas na ordem do modelo. Cada tarefa: a caixa de marcar
+// (desligada para quem não marca e na bloqueada, que mostra o que espera pela cadeia; a que não se aplica tem o quadrado
+// cinza no lugar), o título (abre a janela da tarefa), "Opcional", "Nesta sessão", a
 // descrição, os selos, o motivo (a que não se aplica) e a nota. `filtro` ('todas' | 'pendentes' | 'feitas' |
 // 'nao_se_aplica') roda na tela: o check-list já veio inteiro; etapa sem nenhuma tarefa no filtro some. `ocupadas`: as
 // tarefas que estão indo para o banco agora. `aoMarcar` e `aoAbrir` precisam ser estáveis (useCallback) para o memo dos

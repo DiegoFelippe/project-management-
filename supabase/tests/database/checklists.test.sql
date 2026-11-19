@@ -7,7 +7,7 @@
 -- apaga; modelo em uso não se apaga; "clientes usando" nas listas e números dos modelos. Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(286);
+select plan(406);
 
 -- Ajudantes só do teste (somem no rollback do fim).
 create schema testes;
@@ -499,7 +499,7 @@ select is(testes.chamar('gestor_a', format('public.modelos_para_aplicar(%L)', te
 -- ── Ler o check-list ─────────────────────────────────────────────────────────
 
 select is(testes.ler('pessoa_a', 'c1') - 'checklist' - 'etapas' - 'tarefas' - 'resumo',
-  jsonb_build_object('pode_aplicar', false, 'pode_marcar', true,
+  jsonb_build_object('pode_aplicar', false, 'pode_marcar', true, 'pode_comentar', true,
     'consultor', jsonb_build_object('id', testes.id('pessoa_a'), 'nome', 'Pessoa pessoa_a'),
     'sessao', null, 'ultimo_checkin', null),
   'o consultor do cliente marca e não aplica; sem check-in aberto nem anterior');
@@ -515,7 +515,7 @@ select is(testes.da_leitura(testes.ler('pessoa_a', 'c1'), 'Análise do DRE'),
     'etapa_id', (select etapa_id from public.checklist_tarefas where id = testes.tarefa(testes.id('cl_c1_2'), 'Análise do DRE')),
     'posicao', 1, 'titulo', 'Análise do DRE', 'descricao', 'Ler o DRE', 'obrigatoria', true, 'prazo_dias', 5,
     'vence_em', testes.hoje() - 2, 'estado', 'a_fazer', 'nota', null, 'motivo', null, 'feita_em', null, 'feita_por', null,
-    'depende_de', '[]'::jsonb, 'na_sessao', false),
+    'depende_de', '[]'::jsonb, 'na_sessao', false, 'tempo_segundos', 0, 'trecho_aberto_desde', null, 'comentarios', 0),
   'cada tarefa traz o que a lista, o fluxograma e a janela da tarefa mostram');
 select is(testes.da_leitura(testes.ler('pessoa_a', 'c1'), 'Plano de ação') -> 'depende_de',
   jsonb_build_array(testes.tarefa(testes.id('cl_c1_2'), 'Análise do DRE'), testes.tarefa(testes.id('cl_c1_2'), 'Mapa de custos')),
@@ -540,7 +540,7 @@ select is((select jsonb_build_object('consultor', r -> 'consultor', 'marcar', r 
     from testes.ler('gestor_a', 'c_aguarda') r),
   '{"consultor": null, "marcar": false, "aplicar": true}'::jsonb, 'cliente aguardando consultor: ninguém marca');
 select is(testes.ler('gestor_a', 'c_vazio') - 'consultor' - 'sessao' - 'ultimo_checkin',
-  jsonb_build_object('pode_aplicar', true, 'pode_marcar', false, 'checklist', null, 'etapas', '[]'::jsonb,
+  jsonb_build_object('pode_aplicar', true, 'pode_marcar', false, 'pode_comentar', false, 'checklist', null, 'etapas', '[]'::jsonb,
     'tarefas', '[]'::jsonb, 'resumo', jsonb_build_object('tarefas', 0, 'feitas', 0, 'nao_se_aplica', 0, 'resolvidas', 0,
       'obrigatorias', 0, 'obrigatorias_feitas', 0, 'vencem_7_dias', 0, 'atrasadas', 0, 'proxima', null)),
   'cliente sem modelo: check-list nulo, listas vazias e números zerados');
@@ -574,10 +574,12 @@ select is(testes.marcar('pessoa_a', gen_random_uuid(), 'feita') ->> 'erro', 'P00
   'tarefa que não existe: sem_permissao');
 
 select is(testes.marcar('pessoa_a', testes.id('c1_analise'), 'andamento'),
-  '{"estado": "andamento", "feita_em": null, "liberadas": [], "na_sessao": false}'::jsonb, 'o consultor começa a tarefa');
+  jsonb_build_object('estado', 'andamento', 'feita_em', null, 'liberadas', '[]'::jsonb, 'na_sessao', false,
+    'tempo_segundos', 0, 'trecho_aberto_desde', now()),
+  'o consultor começa a tarefa (o relógio dela começa a correr)');
 select is(testes.marcar('pessoa_a', testes.id('c1_analise'), 'feita') - 'feita_em',
   jsonb_build_object('estado', 'feita', 'liberadas', jsonb_build_array(jsonb_build_object('id', testes.id('c1_mapa'),
-    'titulo', 'Mapa de custos')), 'na_sessao', false),
+    'titulo', 'Mapa de custos')), 'na_sessao', false, 'tempo_segundos', 0, 'trecho_aberto_desde', null),
   'e marca como feita: diz o que liberou e que ficou fora de uma sessão (sem check-in aberto)');
 select is((select (estado, feita_em, feita_por)::text from public.checklist_tarefas where id = testes.id('c1_analise')),
   ('feita', now(), testes.id('pessoa_a'))::text, 'grava quem e quando');
@@ -589,7 +591,7 @@ select is(testes.marcar('pessoa_a', testes.id('c1_mapa'), 'feita') -> 'liberadas
   jsonb_build_array(jsonb_build_object('id', testes.id('c1_plano'), 'titulo', 'Plano de ação')),
   'feita a última dependência, libera a seguinte');
 select is(testes.marcar('pessoa_a', testes.id('c1_analise'), 'a_fazer') - 'liberadas',
-  '{"estado": "a_fazer", "feita_em": null, "na_sessao": false}'::jsonb,
+  '{"estado": "a_fazer", "feita_em": null, "na_sessao": false, "tempo_segundos": 0, "trecho_aberto_desde": null}'::jsonb,
   'reabrir pode mesmo com tarefa dependente já feita');
 select is((select array_agg(estado order by posicao) from public.checklist_tarefas where checklist_id = testes.id('cl_c1_2')),
   array['a_fazer', 'feita', 'a_fazer'], 'a dependente feita continua feita');
@@ -607,7 +609,7 @@ select is(testes.marcar('pessoa_a', testes.id('c1_analise'), 'feita') -> 'libera
   jsonb_build_array(jsonb_build_object('id', testes.id('c1_plano'), 'titulo', 'Plano de ação')),
   'marcada de novo, libera só a que ainda não estava feita');
 select is(testes.marcar('pessoa_a', testes.id('c1_analise'), 'feita') - 'feita_em',
-  '{"estado": "feita", "liberadas": [], "na_sessao": false}'::jsonb, 'marcar de novo no mesmo estado não muda nada');
+  '{"estado": "feita", "liberadas": [], "na_sessao": false, "tempo_segundos": 0, "trecho_aberto_desde": null}'::jsonb, 'marcar de novo no mesmo estado não muda nada');
 select is(testes.ler('pessoa_a', 'c1') -> 'resumo',
   jsonb_build_object('tarefas', 3, 'feitas', 2, 'nao_se_aplica', 0, 'resolvidas', 2, 'obrigatorias', 2,
     'obrigatorias_feitas', 1, 'vencem_7_dias', 0, 'atrasadas', 0, 'proxima', jsonb_build_object('id', testes.id('c1_plano'), 'titulo', 'Plano de ação',
@@ -642,7 +644,7 @@ select is(testes.fazer('pessoa_a2', format($$public.anotar_tarefa(%L, 'Oi')$$, t
 
 select testes.checkin('pessoa_a', 'k1', 'c1', now() - interval '6 hours');
 select is(testes.marcar('pessoa_a', testes.id('c1_plano'), 'feita') - 'feita_em',
-  '{"estado": "feita", "liberadas": [], "na_sessao": true}'::jsonb,
+  '{"estado": "feita", "liberadas": [], "na_sessao": true, "tempo_segundos": 0, "trecho_aberto_desde": null}'::jsonb,
   'com o check-in aberto neste cliente, a tarefa feita entra na sessão');
 select is((select (checkin_id, titulo)::text from public.checkin_tarefas where tarefa_id = testes.id('c1_plano')),
   (testes.id('k1'), 'Plano de ação')::text, 'o check-in guarda a tarefa com o título');
@@ -1028,7 +1030,7 @@ select is((testes.chamar('pessoa_n', $$public.andamento_dos_clientes(p_situacao 
 -- Marcar.
 select is(testes.nsa('pessoa_n', testes.id('n_analise'), '  Cliente já tem o DRE auditado  ') - 'feita_em',
   jsonb_build_object('estado', 'nao_se_aplica', 'liberadas', jsonb_build_array(jsonb_build_object('id', testes.id('n_mapa'),
-    'titulo', 'Mapa de custos')), 'na_sessao', false),
+    'titulo', 'Mapa de custos')), 'na_sessao', false, 'tempo_segundos', 0, 'trecho_aberto_desde', null),
   'o consultor marca "não se aplica" (tarefa obrigatória e atrasada): libera a que dependia dela, fora de uma sessão');
 select is(testes.gravada(testes.id('n_analise')),
   concat_ws(' | ', 'nao_se_aplica', 'Cliente já tem o DRE auditado', now()::text, testes.id('pessoa_n')::text),
@@ -1069,7 +1071,7 @@ select is(testes.historico_nsa('gestor_a', 'c_nsa'), array['Análise do DRE: Cli
 select testes.checkin('pessoa_n', 'kn', 'c_nsa', now() - interval '1 hour');
 select is(testes.nsa('pessoa_n', testes.id('n_mapa'), 'Sem custos fixos') - 'feita_em',
   jsonb_build_object('estado', 'nao_se_aplica', 'liberadas', jsonb_build_array(jsonb_build_object('id', testes.id('n_plano'),
-    'titulo', 'Plano de ação')), 'na_sessao', true),
+    'titulo', 'Plano de ação')), 'na_sessao', true, 'tempo_segundos', 0, 'trecho_aberto_desde', null),
   'com o check-in aberto, entra na sessão e libera a seguinte');
 select is((select (titulo, estado, motivo)::text from public.checkin_tarefas
     where checkin_id = testes.id('kn') and tarefa_id = testes.id('n_mapa')),
@@ -1101,7 +1103,7 @@ select is((select (estado, motivo, nota)::text from public.checklist_tarefas whe
 
 -- Voltar para a fazer bloqueia de novo as que dependem dela.
 select is(testes.marcar('pessoa_n', testes.id('n_analise'), 'a_fazer') - 'liberadas',
-  '{"estado": "a_fazer", "feita_em": null, "na_sessao": false}'::jsonb, 'o consultor desfaz o "não se aplica"');
+  '{"estado": "a_fazer", "feita_em": null, "na_sessao": false, "tempo_segundos": 0, "trecho_aberto_desde": null}'::jsonb, 'o consultor desfaz o "não se aplica"');
 select is(testes.gravada(testes.id('n_analise')), 'a_fazer | — | — | —', 'o motivo, quem e quando saem');
 select is(testes.marcar('pessoa_n', testes.id('n_plano'), 'feita') ->> 'erro', 'P0001 tarefa_bloqueada',
   'e a que dependia dela volta a ficar bloqueada');
@@ -1176,7 +1178,7 @@ select 'ca_' || k, testes.tarefa(testes.id('cl_cadeia'), t)
 from (values ('a', 'Tarefa A'), ('b', 'Tarefa B'), ('c', 'Tarefa C')) x(k, t);
 
 select is(testes.nsa('pessoa_k', testes.id('ca_b'), 'O cliente já faz isso') - 'feita_em',
-  '{"estado": "nao_se_aplica", "liberadas": [], "na_sessao": false}'::jsonb,
+  '{"estado": "nao_se_aplica", "liberadas": [], "na_sessao": false, "tempo_segundos": 0, "trecho_aberto_desde": null}'::jsonb,
   'a bloqueada pode ser "não se aplica" (com motivo), e não libera ninguém enquanto A está pendente');
 select is(testes.marcar('pessoa_k', testes.id('ca_c'), 'feita') ->> 'erro', 'P0001 tarefa_bloqueada',
   'C continua bloqueada: espera A pela cadeia');
@@ -1198,6 +1200,402 @@ select is(testes.nsa('pessoa_k', testes.id('ca_b'), 'O cliente já faz isso') ->
   'com A feita, B "não se aplica" libera C na hora');
 select is(testes.historico_reaberta('gestor_a', 'c_cadeia'), array['Tarefa B (Pessoa pessoa_k)'],
   'reabrir B fica no Histórico');
+
+-- ── A cadeia com mais de um elo (revisão da T8) e a pausada na cadeia ────────
+-- C depende de B, B de A, A de Z. B e depois A viram "não se aplica" com Z pendente: C espera Z através dos dois. Z
+-- pausada continua pendente (C espera); Z feita libera C.
+
+select testes.cliente('c_cadeia2', 'A', 'pessoa_k');
+select testes.criar('gestor_a', 'm_cadeia2', jsonb_build_object('nome', 'Zqc Cadeia longa', 'para', 'todas',
+  'etapas', jsonb_build_array(jsonb_build_object('nome', 'Única', 'tarefas', jsonb_build_array(
+    jsonb_build_object('chave', 'z', 'titulo', 'Tarefa Z', 'prazo_dias', 30),
+    jsonb_build_object('chave', 'a', 'titulo', 'Tarefa A', 'prazo_dias', 20, 'depende_de', jsonb_build_array('z')),
+    jsonb_build_object('chave', 'b', 'titulo', 'Tarefa B', 'prazo_dias', 10, 'depende_de', jsonb_build_array('a')),
+    jsonb_build_object('chave', 'c', 'titulo', 'Tarefa C', 'prazo_dias', 1, 'depende_de', jsonb_build_array('b')))))));
+select is(testes.aplicar('gestor_a', testes.id('c_cadeia2'), testes.id('m_cadeia2'), testes.hoje(), 'cl_cadeia2'), 'ok',
+  'cadeia longa: o check-list do cenário');
+insert into testes.fx
+select 'cl2_' || k, testes.tarefa(testes.id('cl_cadeia2'), t)
+from (values ('z', 'Tarefa Z'), ('a', 'Tarefa A'), ('b', 'Tarefa B'), ('c', 'Tarefa C')) x(k, t);
+
+-- A próxima tarefa da linha do cliente no Andamento (o consultor tem mais de um cliente).
+create function testes.proxima_no_andamento(p_quem text, p_cliente text) returns text language sql as $$
+  select i #>> '{checklist,proxima,titulo}'
+  from jsonb_array_elements(testes.chamar(p_quem, 'public.andamento_dos_clientes()') -> 'itens') i
+  where (i #>> '{cliente,id}')::uuid = testes.id(p_cliente)
+$$;
+
+select is(testes.nsa('pessoa_k', testes.id('cl2_b'), 'Já feito antes') -> 'liberadas', '[]'::jsonb,
+  'B "não se aplica" com A pendente: não libera ninguém');
+select is(testes.nsa('pessoa_k', testes.id('cl2_a'), 'Também já feito') -> 'liberadas', '[]'::jsonb,
+  'A também "não se aplica" (com Z pendente): C continua esperando, agora Z');
+select is(testes.marcar('pessoa_k', testes.id('cl2_c'), 'feita') ->> 'erro', 'P0001 tarefa_bloqueada',
+  'C espera Z através de dois elos que não se aplicam');
+select is(testes.ler('pessoa_k', 'c_cadeia2') #>> '{resumo,proxima,titulo}', 'Tarefa Z', 'a próxima é Z');
+select is(testes.proxima_no_andamento('pessoa_k', 'c_cadeia2'), 'Tarefa Z', 'no Andamento também');
+select is(testes.marcar('pessoa_k', testes.id('cl2_z'), 'andamento') ->> 'estado', 'andamento', 'Z em andamento');
+select is(testes.marcar('pessoa_k', testes.id('cl2_z'), 'pausada') ->> 'estado', 'pausada', 'Z pausada');
+select is(testes.marcar('pessoa_k', testes.id('cl2_c'), 'andamento') ->> 'erro', 'P0001 tarefa_bloqueada',
+  'pausada é pendente na cadeia: C continua esperando Z');
+select is(testes.ler('pessoa_k', 'c_cadeia2') #>> '{resumo,proxima,titulo}', 'Tarefa Z', 'e Z pausada continua a próxima');
+select is(testes.proxima_no_andamento('pessoa_k', 'c_cadeia2'), 'Tarefa Z', 'no Andamento também');
+select is(testes.marcar('pessoa_k', testes.id('cl2_z'), 'feita') -> 'liberadas',
+  jsonb_build_array(jsonb_build_object('id', testes.id('cl2_c'), 'titulo', 'Tarefa C')),
+  'Z feita libera C, através de A e B (não se aplicam)');
+select is(testes.ler('pessoa_k', 'c_cadeia2') #>> '{resumo,proxima,titulo}', 'Tarefa C', 'e C vira a próxima');
+select is(testes.marcar('pessoa_k', testes.id('cl2_a'), 'a_fazer') ->> 'estado', 'a_fazer', 'reabrir A');
+select is(testes.marcar('pessoa_k', testes.id('cl2_c'), 'feita') ->> 'erro', 'P0001 tarefa_bloqueada',
+  'reaberta A, C volta a esperar (através de B)');
+
+-- ── Pausada, tempo por tarefa, motivo no Editar e comentários (acréscimo de 18/11 (2)) ──
+-- Um consultor só deste cliente (pessoa_p). Início 7 dias atrás: Análise do DRE venceu há 2 dias (atrasada), Mapa de
+-- custos vence em 3 (depende da Análise) e Plano de ação em 13 (depende das duas).
+
+select testes.perfil('pessoa_p', 'pessoa', 'A');
+select testes.cliente('c_pausa', 'A', 'pessoa_p');
+select is(testes.aplicar('gestor_a', testes.id('c_pausa'), testes.id('m_a2'), testes.hoje() - 7, 'cl_pausa'), 'ok',
+  'pausada: o check-list do cenário');
+insert into testes.fx
+select 'p_' || k, testes.tarefa(testes.id('cl_pausa'), t)
+from (values ('analise', 'Análise do DRE'), ('mapa', 'Mapa de custos'), ('plano', 'Plano de ação')) x(k, t);
+
+-- Os trechos de tempo da tarefa: "N abertos, M fechados".
+create function testes.trechos(p_tarefa uuid) returns text language sql stable as $$
+  select count(*) filter (where fim is null) || ' abertos, ' || count(*) filter (where fim is not null) || ' fechados'
+  from public.checklist_tarefa_tempos where tarefa_id = p_tarefa
+$$;
+
+-- Leva o começo do trecho aberto da tarefa para p_minutos antes (dentro da transação o relógio não anda).
+create function testes.recuar(p_tarefa uuid, p_minutos int) returns void language sql as $$
+  update public.checklist_tarefa_tempos set inicio = inicio - make_interval(mins => p_minutos)
+  where tarefa_id = p_tarefa and fim is null
+$$;
+
+-- As linhas de um tipo no histórico do cliente, como a pessoa: "tarefa: motivo (autor)" em ordem de texto.
+create function testes.historico_do_tipo(p_quem text, p_cliente text, p_tipo text) returns text[] language plpgsql as $$
+declare v text[];
+begin
+  perform testes.como(p_quem);
+  select coalesce(array_agg(x.linha order by x.linha collate "C"), '{}') into v
+  from (select coalesce(h.tarefa, '—') || ': ' || coalesce(h.motivo, '—') || ' (' || coalesce(h.autor, '—') || ')' as linha
+    from public.historico_do_cliente(testes.id(p_cliente), 50) h
+    where h.tipo = p_tipo) x;
+  reset role;
+  perform testes.sistema();
+  return v;
+end $$;
+
+create function testes.trocar(p_quem text, p_tarefa uuid, p_motivo text) returns text language sql as $$
+  select testes.fazer(p_quem, format('public.trocar_motivo(%L::uuid, %L)', p_tarefa, p_motivo))
+$$;
+
+create function testes.comentar(p_quem text, p_tarefa uuid, p_texto text) returns jsonb language sql as $$
+  select testes.chamar(p_quem, format('public.comentar_tarefa(%L::uuid, %L)', p_tarefa, p_texto))
+$$;
+
+create function testes.comentarios(p_quem text, p_tarefa uuid) returns jsonb language sql as $$
+  select testes.chamar(p_quem, format('public.comentarios_da_tarefa(%L::uuid)', p_tarefa))
+$$;
+
+-- Os comentários da leitura, cada um "texto: pode_editar/pode_apagar", em ordem de texto.
+create function testes.permissoes(p jsonb) returns text[] language sql immutable as $$
+  select array_agg((i ->> 'texto') || ': ' || (i ->> 'pode_editar') || '/' || (i ->> 'pode_apagar') order by i ->> 'texto')
+  from jsonb_array_elements(p -> 'itens') i
+$$;
+
+-- Estrutura e permissões.
+select ok((select bool_and(relrowsecurity) from pg_class
+  where oid in ('public.checklist_tarefa_tempos'::regclass, 'public.checklist_comentarios'::regclass)),
+  'RLS ligado nos tempos e nos comentários das tarefas');
+select ok((select bool_and(has_table_privilege('authenticated', t, 'select')
+      and not has_table_privilege('authenticated', t, 'insert')
+      and not has_table_privilege('authenticated', t, 'update')
+      and not has_table_privilege('authenticated', t, 'delete')
+      and not has_table_privilege('anon', t, 'select'))
+    from unnest(array['public.checklist_tarefa_tempos', 'public.checklist_comentarios']) t),
+  'authenticated só lê os tempos e os comentários (escrita só pelas funções do banco); anon nada');
+select ok((select bool_and(has_function_privilege('authenticated', f, 'execute')
+      and not has_function_privilege('anon', f, 'execute'))
+    from unnest(array['public.trocar_motivo(uuid, text)', 'public.comentar_tarefa(uuid, text)',
+      'public.editar_comentario(uuid, text)', 'public.apagar_comentario(uuid)',
+      'public.comentarios_da_tarefa(uuid, uuid, int)', 'public.historico_da_tarefa(uuid)']) f),
+  'as funções novas: authenticated executa, anon não');
+select ok((select bool_and(p.prosecdef and p.proconfig @> array['search_path=""'])
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname in ('trocar_motivo', 'comentar_tarefa', 'editar_comentario',
+      'apagar_comentario', 'comentarios_da_tarefa', 'historico_da_tarefa')),
+  'as funções novas são security definer com search_path vazio');
+select ok(not has_function_privilege('authenticated', 'private.travar_para_comentar(uuid)', 'execute'),
+  'travar para comentar é só das funções do banco');
+
+-- Iniciar, pausar e retomar: o tempo da tarefa é a soma dos trechos.
+select is(testes.marcar('pessoa_p', testes.id('p_analise'), 'andamento') - 'liberadas',
+  jsonb_build_object('estado', 'andamento', 'feita_em', null, 'na_sessao', false, 'tempo_segundos', 0,
+    'trecho_aberto_desde', now()),
+  'Iniciar: em andamento, com o trecho aberto agora');
+select is((select (pessoa_id, inicio, fim)::text from public.checklist_tarefa_tempos where tarefa_id = testes.id('p_analise')),
+  (testes.id('pessoa_p'), now(), null::timestamptz)::text, 'o trecho guarda quem e quando');
+select is(testes.marcar('pessoa_p', testes.id('p_analise'), 'andamento') ->> 'estado', 'andamento',
+  'Iniciar de novo não muda nada');
+select is(testes.trechos(testes.id('p_analise')), '1 abertos, 0 fechados', 'nem abre outro trecho');
+select throws_ok(format($$insert into public.checklist_tarefa_tempos (tarefa_id, pessoa_id) values (%L, %L)$$,
+    testes.id('p_analise'), testes.id('pessoa_p')), '23505', null, 'a tabela não deixa dois trechos abertos na tarefa');
+select throws_ok(format($$update public.checklist_tarefa_tempos set fim = inicio - interval '1 minute' where tarefa_id = %L$$,
+    testes.id('p_analise')), '23514', null, 'nem trecho que acaba antes de começar');
+select testes.recuar(testes.id('p_analise'), 10);
+select is(testes.marcar('pessoa_p', testes.id('p_analise'), 'pausada') - 'liberadas',
+  '{"estado": "pausada", "feita_em": null, "na_sessao": false, "tempo_segundos": 600, "trecho_aberto_desde": null}'::jsonb,
+  'Pausar fecha o trecho: 10 minutos feitos');
+select is(testes.trechos(testes.id('p_analise')), '0 abertos, 1 fechados', 'o trecho fica fechado');
+
+-- Pausada é pendente como em andamento.
+select is((select jsonb_build_object('atrasadas', r -> 'atrasadas', 'resolvidas', r -> 'resolvidas',
+      'proxima', r #> '{proxima,titulo}')
+    from (select testes.ler('pessoa_p', 'c_pausa') -> 'resumo' as r) x),
+  '{"atrasadas": 1, "resolvidas": 0, "proxima": "Análise do DRE"}'::jsonb,
+  'resumo: a pausada vencida é atrasada, não resolvida, e é a próxima');
+select is((select proximo_vencimento from public.cliente_checklists where id = testes.id('cl_pausa')), testes.hoje() - 2,
+  'o próximo vencimento conta a pausada');
+select is(testes.chamar('pessoa_p', 'public.indicadores_de_checkins()'),
+  '{"recorte": "pessoa", "clientes": 1, "com_modelo": 1, "progresso_medio": 0, "atrasadas": 1, "vencem_7_dias": 1}'::jsonb,
+  'os números contam a pausada atrasada');
+select is((testes.chamar('pessoa_p', 'public.andamento_dos_clientes()') #> '{itens,0,checklist}') - 'id' - 'modelo_nome',
+  jsonb_build_object('tarefas', 3, 'feitas', 0, 'nao_se_aplica', 0, 'pct', 0, 'atrasadas', 1,
+    'proxima', jsonb_build_object('titulo', 'Análise do DRE', 'vence_em', testes.hoje() - 2)),
+  'o Andamento: atrasada e a próxima');
+select is((testes.chamar('pessoa_p', $$public.andamento_dos_clientes(p_situacao => 'com_atraso')$$) ->> 'total')::int, 1,
+  'e o cliente fica "com atraso"');
+select is(testes.chamar('pessoa_p', format('public.hoje_do_cliente(%L)', testes.id('c_pausa'))) #> '{checklist,etapas,0,atrasadas}',
+  '1'::jsonb, 'a faixa Hoje do cliente conta a pausada atrasada na etapa');
+select is(testes.marcar('pessoa_p', testes.id('p_mapa'), 'feita') ->> 'erro', 'P0001 tarefa_bloqueada',
+  'a pausada segura as que dependem dela');
+
+-- Retomar e marcar como feita.
+select is(testes.marcar('pessoa_p', testes.id('p_analise'), 'andamento') ->> 'tempo_segundos', '600',
+  'Retomar abre outro trecho; o tempo continua de onde parou');
+select is(testes.trechos(testes.id('p_analise')), '1 abertos, 1 fechados', 'um aberto e um fechado');
+select testes.recuar(testes.id('p_analise'), 5);
+select is((select jsonb_build_object('tempo', t -> 'tempo_segundos',
+      'desde', (t ->> 'trecho_aberto_desde')::timestamptz = now() - interval '5 minutes', 'comentarios', t -> 'comentarios')
+    from testes.da_leitura(testes.ler('gestor_a', 'c_pausa'), 'Análise do DRE') t),
+  '{"tempo": 900, "desde": true, "comentarios": 0}'::jsonb,
+  'a leitura soma os trechos (o aberto até agora) e diz desde quando corre (a gestão vê)');
+select is(testes.marcar('pessoa_p', testes.id('p_analise'), 'feita') - 'feita_em',
+  jsonb_build_object('estado', 'feita', 'na_sessao', false, 'tempo_segundos', 900, 'trecho_aberto_desde', null,
+    'liberadas', jsonb_build_array(jsonb_build_object('id', testes.id('p_mapa'), 'titulo', 'Mapa de custos'))),
+  'feita fecha o trecho, guarda o tempo e libera a seguinte');
+select is(testes.trechos(testes.id('p_analise')), '0 abertos, 2 fechados', 'os dois trechos ficam');
+
+-- A fazer e "não se aplica" também fecham o trecho; com o check-in aberto, a "não se aplica" entra nele.
+select testes.checkin('pessoa_p', 'kp', 'c_pausa', now() - interval '1 hour');
+select is(testes.marcar('pessoa_p', testes.id('p_mapa'), 'andamento') ->> 'estado', 'andamento', 'Mapa em andamento');
+select is(testes.marcar('pessoa_p', testes.id('p_mapa'), 'a_fazer') -> 'trecho_aberto_desde', 'null'::jsonb,
+  'voltar para a fazer fecha o trecho');
+select is(testes.trechos(testes.id('p_mapa')), '0 abertos, 1 fechados', 'o trecho fechado fica');
+select is(testes.marcar('pessoa_p', testes.id('p_mapa'), 'andamento') ->> 'estado', 'andamento', 'Mapa em andamento de novo');
+select is(testes.nsa('pessoa_p', testes.id('p_mapa'), 'Sem custos') -> 'na_sessao', 'true'::jsonb,
+  '"não se aplica" com o check-in aberto entra na sessão');
+select is(testes.trechos(testes.id('p_mapa')), '0 abertos, 2 fechados', 'e fecha o trecho');
+
+-- Trocar o motivo (no Editar).
+select is(testes.trocar('pessoa_p', testes.id('p_plano'), 'Outro'), 'P0001 so_em_nao_se_aplica',
+  'trocar o motivo só numa tarefa que não se aplica');
+select is(testes.trocar('pessoa_p', testes.id('p_mapa'), '   '), '22023 motivo_obrigatorio', 'motivo em branco: recusa');
+select ok(testes.trocar('pessoa_p', testes.id('p_mapa'), repeat('x', 501)) like '23514 %', 'motivo acima de 500: recusa');
+select is(testes.trocar('gestor_a', testes.id('p_mapa'), 'Outro'), 'P0001 so_o_consultor_marca', 'a gestão não troca');
+select is(testes.trocar('central1', testes.id('p_mapa'), 'Outro'), 'P0001 so_o_consultor_marca', 'nem a Central');
+select is(testes.trocar('pessoa_a2', testes.id('p_mapa'), 'Outro'), 'P0001 sem_permissao', 'nem outro consultor');
+select is(testes.trocar('gestor_b', testes.id('p_mapa'), 'Outro'), 'P0001 sem_permissao', 'nem outra consultoria');
+select is(testes.gravada(testes.id('p_mapa')),
+  concat_ws(' | ', 'nao_se_aplica', 'Sem custos', now()::text, testes.id('pessoa_p')::text), 'as recusas não mudam nada');
+select is(testes.trocar('pessoa_p', testes.id('p_mapa'), '  O cliente não tem custos fixos  '), 'ok', 'o consultor troca');
+select is(testes.gravada(testes.id('p_mapa')),
+  concat_ws(' | ', 'nao_se_aplica', 'O cliente não tem custos fixos', now()::text, testes.id('pessoa_p')::text),
+  'o motivo novo (sem os espaços das pontas); o estado, quem e quando ficam');
+select is((select motivo from public.checkin_tarefas where checkin_id = testes.id('kp') and tarefa_id = testes.id('p_mapa')),
+  'O cliente não tem custos fixos', 'o check-in aberto leva o motivo novo');
+select is(testes.historico_do_tipo('gestor_a', 'c_pausa', 'motivo_trocado'),
+  array['Mapa de custos: O cliente não tem custos fixos (Pessoa pessoa_p)'], 'o Histórico ganha "Motivo trocado"');
+select is(testes.trocar('pessoa_p', testes.id('p_mapa'), 'O cliente não tem custos fixos'), 'ok',
+  'trocar pelo mesmo motivo não muda nada');
+select is(cardinality(testes.historico_do_tipo('gestor_a', 'c_pausa', 'motivo_trocado')), 1, 'nem grava outra linha');
+select testes.checkout('pessoa_p', 'kp', now());
+select is(testes.trocar('pessoa_p', testes.id('p_mapa'), 'Terceiro motivo'), 'ok', 'depois do check-out, troca de novo');
+select is((select motivo from public.checkin_tarefas where checkin_id = testes.id('kp') and tarefa_id = testes.id('p_mapa')),
+  'O cliente não tem custos fixos', 'o check-in fechado guarda o motivo de então');
+
+-- "Tarefa reaberta" só quando volta para a fazer.
+select is(testes.marcar('pessoa_p', testes.id('p_mapa'), 'feita') ->> 'estado', 'feita', 'de não se aplica para feita');
+select is(testes.nsa('pessoa_p', testes.id('p_mapa'), 'De novo') ->> 'estado', 'nao_se_aplica', 'e de volta');
+select is(testes.marcar('pessoa_p', testes.id('p_mapa'), 'andamento') ->> 'estado', 'andamento',
+  'de não se aplica para em andamento');
+select is(cardinality(testes.historico_do_tipo('gestor_a', 'c_pausa', 'tarefa_reaberta')), 0,
+  'sair de "não se aplica" para feita ou em andamento não grava "tarefa reaberta"');
+select is(testes.nsa('pessoa_p', testes.id('p_mapa'), 'Outra vez') ->> 'estado', 'nao_se_aplica', 'não se aplica outra vez');
+select is(testes.marcar('pessoa_p', testes.id('p_mapa'), 'a_fazer') ->> 'estado', 'a_fazer', 'e para a fazer');
+select is(testes.historico_do_tipo('gestor_a', 'c_pausa', 'tarefa_reaberta'), array['Mapa de custos: — (Pessoa pessoa_p)'],
+  'voltar para a fazer grava "tarefa reaberta"');
+
+-- O histórico curto da tarefa (o Editar).
+select is((select jsonb_build_object(
+      'tipos', (select jsonb_agg(e ->> 'tipo' order by e ->> 'tipo') from jsonb_array_elements(h -> 'eventos') e),
+      'motivos', (select jsonb_agg(e ->> 'motivo' order by e ->> 'motivo') from jsonb_array_elements(h -> 'eventos') e
+        where e ->> 'motivo' is not null),
+      'autores', (select jsonb_agg(distinct e ->> 'autor') from jsonb_array_elements(h -> 'eventos') e),
+      'trechos', jsonb_array_length(h -> 'trechos'),
+      'pessoa', h #> '{trechos,0,pessoa}', 'tempo', h -> 'tempo_segundos')
+    from testes.chamar('pessoa_p', format('public.historico_da_tarefa(%L)', testes.id('p_mapa'))) h),
+  jsonb_build_object(
+    'tipos', jsonb_build_array('motivo_trocado', 'motivo_trocado', 'tarefa_nao_se_aplica', 'tarefa_nao_se_aplica',
+      'tarefa_nao_se_aplica', 'tarefa_reaberta'),
+    'motivos', jsonb_build_array('De novo', 'O cliente não tem custos fixos', 'Outra vez', 'Sem custos', 'Terceiro motivo'),
+    'autores', jsonb_build_array('Pessoa pessoa_p'), 'trechos', 3, 'pessoa', 'Pessoa pessoa_p', 'tempo', 0),
+  'o histórico da tarefa: as linhas dela no Histórico, os trechos de tempo e o total');
+select is(testes.chamar('central1', format('public.historico_da_tarefa(%L)', testes.id('p_mapa'))) -> 'tempo_segundos',
+  '0'::jsonb, 'a Central também lê');
+select is(testes.chamar('pessoa_p', format('public.historico_da_tarefa(%L)', testes.id('p_plano'))),
+  '{"eventos": [], "trechos": [], "tempo_segundos": 0}'::jsonb, 'tarefa sem histórico: listas vazias');
+select is(testes.chamar('gestor_b', format('public.historico_da_tarefa(%L)', testes.id('p_mapa'))), null,
+  'outra consultoria não lê');
+select is(testes.chamar('pessoa_a2', format('public.historico_da_tarefa(%L)', testes.id('p_mapa'))), null,
+  'nem outro consultor');
+do $$
+begin
+  for i in 1..3 loop
+    perform testes.nsa('pessoa_p', testes.id('p_mapa'), 'Volta ' || i);
+    perform testes.marcar('pessoa_p', testes.id('p_mapa'), 'a_fazer');
+  end loop;
+end $$;
+select is(jsonb_array_length(testes.chamar('pessoa_p', format('public.historico_da_tarefa(%L)', testes.id('p_mapa'))) -> 'eventos'),
+  10, 'só as últimas 10 linhas');
+
+-- Pausar uma em andamento pode sempre; começar ou pausar a que espera, não.
+select is(testes.marcar('pessoa_p', testes.id('p_mapa'), 'feita') ->> 'estado', 'feita', 'Mapa feita');
+select is(testes.marcar('pessoa_p', testes.id('p_plano'), 'andamento') ->> 'estado', 'andamento', 'Plano em andamento');
+select is(testes.marcar('pessoa_p', testes.id('p_analise'), 'a_fazer') ->> 'estado', 'a_fazer',
+  'a Análise é reaberta (o Plano fica em andamento esperando)');
+select is(testes.marcar('pessoa_p', testes.id('p_plano'), 'pausada') ->> 'estado', 'pausada',
+  'pausar a em andamento pode, mesmo esperando uma dependência');
+select is(testes.marcar('pessoa_p', testes.id('p_plano'), 'andamento') ->> 'erro', 'P0001 tarefa_bloqueada',
+  'retomar, não');
+select is(testes.marcar('pessoa_p', testes.id('p_plano'), 'a_fazer') ->> 'estado', 'a_fazer', 'o Plano volta para a fazer');
+select is(testes.marcar('pessoa_p', testes.id('p_plano'), 'pausada') ->> 'erro', 'P0001 tarefa_bloqueada',
+  'e de a fazer para pausada pede as dependências, como Iniciar');
+select is(testes.marcar('gestor_a', testes.id('p_analise'), 'pausada') ->> 'erro', 'P0001 so_o_consultor_marca',
+  'só o consultor pausa');
+select throws_ok(format($$update public.checklist_tarefas set estado = 'pausada', feita_em = now() where id = %L$$,
+    testes.id('p_plano')), '23514', null, 'pausada não tem quem fechou nem quando: a tabela recusa');
+
+-- Comentários: o consultor do cliente e a gestão comentam; a Central e o dono só leem.
+select is((select r - 'id' - 'criado_em' - 'autor' || jsonb_build_object('autor', r #> '{autor,nome}')
+    from testes.comentar('pessoa_p', testes.id('p_plano'), '  Falei com o contador  ') r),
+  '{"texto": "Falei com o contador", "editado_em": null, "pode_editar": true, "pode_apagar": true, "autor": "Pessoa pessoa_p"}'::jsonb,
+  'o consultor comenta (sem os espaços das pontas)');
+select is(testes.comentar('gestor_a', testes.id('p_plano'), 'Combine a data') ->> 'texto', 'Combine a data', 'o gestor comenta');
+select is(testes.comentar('admin_a', testes.id('p_plano'), 'Anotado') ->> 'texto', 'Anotado', 'o administrador comenta');
+select is(testes.comentar('central1', testes.id('p_plano'), 'Oi') ->> 'erro', 'P0001 sem_permissao', 'a Central não comenta');
+select is(testes.comentar('pessoa_a2', testes.id('p_plano'), 'Oi') ->> 'erro', 'P0001 sem_permissao',
+  'nem outro consultor');
+select is(testes.comentar('gestor_b', testes.id('p_plano'), 'Oi') ->> 'erro', 'P0001 sem_permissao', 'nem outra consultoria');
+select is(testes.comentar('pessoa_p', testes.id('p_plano'), '   ') ->> 'erro', '22023 comentario_vazio',
+  'comentário em branco: recusa');
+select ok(testes.comentar('pessoa_p', testes.id('p_plano'), repeat('x', 2001)) ->> 'erro' like '23514 %',
+  'comentário acima de 2.000 letras: recusa');
+insert into testes.fx
+select case autor_id when testes.id('pessoa_p') then 'com_p' when testes.id('gestor_a') then 'com_g' else 'com_adm' end, id
+from public.checklist_comentarios where tarefa_id = testes.id('p_plano');
+
+select is((select jsonb_build_object('pode', r -> 'pode_comentar', 'mais', r -> 'ha_mais',
+      'itens', testes.permissoes(r), 'autor', (select i #> '{autor,nome}' from jsonb_array_elements(r -> 'itens') i
+        where i ->> 'texto' = 'Combine a data'))
+    from testes.comentarios('pessoa_p', testes.id('p_plano')) r),
+  '{"pode": true, "mais": false, "itens": ["Anotado: false/false", "Combine a data: false/false", "Falei com o contador: true/true"],
+    "autor": "Pessoa gestor_a"}'::jsonb,
+  'o consultor lê os três; edita e apaga só o dele');
+select is(testes.permissoes(testes.comentarios('gestor_a', testes.id('p_plano'))),
+  array['Anotado: false/true', 'Combine a data: true/true', 'Falei com o contador: false/true'],
+  'a gestão edita o dela e apaga qualquer um');
+select is((select jsonb_build_object('pode', r -> 'pode_comentar', 'itens', testes.permissoes(r))
+    from testes.comentarios('central1', testes.id('p_plano')) r),
+  '{"pode": false, "itens": ["Anotado: false/false", "Combine a data: false/false", "Falei com o contador: false/false"]}'::jsonb,
+  'a Central só lê');
+select is(testes.comentarios('gestor_b', testes.id('p_plano')), null, 'outra consultoria não lê');
+select is(testes.comentarios('pessoa_a2', testes.id('p_plano')), null, 'nem outro consultor');
+select is(array[testes.contar('central1', format('select 1 from public.checklist_comentarios where tarefa_id = %L', testes.id('p_plano'))),
+    testes.contar('pessoa_p', format('select 1 from public.checklist_comentarios where tarefa_id = %L', testes.id('p_plano'))),
+    testes.contar('gestor_b', format('select 1 from public.checklist_comentarios where tarefa_id = %L', testes.id('p_plano'))),
+    testes.contar('pessoa_a2', format('select 1 from public.checklist_comentarios where tarefa_id = %L', testes.id('p_plano'))),
+    testes.contar('gestor_b', format('select 1 from public.checklist_tarefa_tempos where tarefa_id = %L', testes.id('p_analise'))),
+    testes.contar('central1', format('select 1 from public.checklist_tarefa_tempos where tarefa_id = %L', testes.id('p_analise')))],
+  array[3, 3, 0, 0, 0, 2], 'pela API, os comentários e os tempos seguem quem vê o check-list');
+select is((select jsonb_build_object('n', jsonb_array_length(r -> 'itens'), 'mais', r -> 'ha_mais',
+      'resto', jsonb_array_length(testes.chamar('pessoa_p', format('public.comentarios_da_tarefa(%L, %L)', testes.id('p_plano'),
+        r #>> '{itens,1,id}')) -> 'itens'))
+    from testes.chamar('pessoa_p', format('public.comentarios_da_tarefa(%L, null, 2)', testes.id('p_plano'))) r),
+  '{"n": 2, "mais": true, "resto": 1}'::jsonb, 'de 2 em 2: "ver anteriores" traz o que falta');
+select is((select jsonb_build_object('comentarios', t -> 'comentarios', 'pode', l -> 'pode_comentar')
+    from (select testes.ler('pessoa_p', 'c_pausa') as l) x, testes.da_leitura(x.l, 'Plano de ação') t),
+  '{"comentarios": 3, "pode": true}'::jsonb, 'a leitura do check-list traz quantos comentários e se dá para comentar');
+select is(array[testes.ler('gestor_a', 'c_pausa') -> 'pode_comentar', testes.ler('central1', 'c_pausa') -> 'pode_comentar'],
+  array['true'::jsonb, 'false'::jsonb], 'a gestão comenta; a Central, não');
+
+-- Editar e apagar.
+select is((select jsonb_build_object('texto', r -> 'texto', 'editado', r -> 'editado_em' = to_jsonb(now()))
+    from testes.chamar('pessoa_p', format($$public.editar_comentario(%L, ' Falei com o contador ontem ')$$, testes.id('com_p'))) r),
+  '{"texto": "Falei com o contador ontem", "editado": true}'::jsonb, 'o autor edita o dele (fica "editado")');
+select is(testes.fazer('gestor_a', format($$public.editar_comentario(%L, 'Mudei')$$, testes.id('com_p'))), 'P0001 sem_permissao',
+  'a gestão não edita o dos outros');
+select is(testes.fazer('pessoa_p', format($$public.editar_comentario(%L, 'Mudei')$$, testes.id('com_g'))), 'P0001 sem_permissao',
+  'nem o consultor');
+select is(testes.fazer('pessoa_p', format($$public.editar_comentario(%L, '  ')$$, testes.id('com_p'))), '22023 comentario_vazio',
+  'editar para em branco: recusa');
+select is(testes.fazer('pessoa_p', format($$public.editar_comentario(%L, 'Mudei')$$, gen_random_uuid())),
+  'P0001 comentario_nao_encontrado', 'comentário que não existe (ou foi apagado)');
+select is(testes.fazer('pessoa_p', format('public.apagar_comentario(%L)', testes.id('com_g'))), 'P0001 sem_permissao',
+  'o consultor não apaga o da gestão');
+select is(testes.fazer('central1', format('public.apagar_comentario(%L)', testes.id('com_p'))), 'P0001 sem_permissao',
+  'nem a Central apaga');
+select is(testes.fazer('gestor_a', format('public.apagar_comentario(%L)', testes.id('com_p'))), 'ok',
+  'a gestão apaga o do consultor');
+select is(testes.fazer('admin_a', format('public.apagar_comentario(%L)', testes.id('com_adm'))), 'ok', 'cada um apaga o seu');
+select is(testes.fazer('pessoa_p', format('public.apagar_comentario(%L)', testes.id('com_p'))),
+  'P0001 comentario_nao_encontrado', 'apagar de novo: não existe mais');
+select is((select array_agg(texto) from public.checklist_comentarios where tarefa_id = testes.id('p_plano')),
+  array['Combine a data'], 'fica só o do gestor');
+select testes.como('pessoa_p');
+select throws_ok(format($$insert into public.checklist_comentarios (tarefa_id, autor_id, texto) values (%L, %L, 'Direto')$$,
+    testes.id('p_plano'), testes.id('pessoa_p')), '42501', null, 'escrever direto na tabela de comentários é recusado');
+reset role;
+select testes.sistema();
+
+-- Cliente arquivado: tudo só para ler.
+update public.clientes set arquivado_em = now() where id = testes.id('c_pausa');
+select is(array[testes.comentar('pessoa_p', testes.id('p_plano'), 'Oi') ->> 'erro',
+    testes.fazer('gestor_a', format($$public.editar_comentario(%L, 'Mudei')$$, testes.id('com_g'))),
+    testes.fazer('gestor_a', format('public.apagar_comentario(%L)', testes.id('com_g'))),
+    testes.marcar('pessoa_p', testes.id('p_analise'), 'andamento') ->> 'erro',
+    testes.trocar('pessoa_p', testes.id('p_analise'), 'Outro')],
+  array['P0001 cliente_arquivado', 'P0001 cliente_arquivado', 'P0001 cliente_arquivado', 'P0001 cliente_arquivado',
+    'P0001 cliente_arquivado'],
+  'cliente arquivado: ninguém comenta, edita, apaga, inicia nem troca o motivo');
+select is(testes.comentarios('gestor_a', testes.id('p_plano')) -> 'pode_comentar', 'false'::jsonb,
+  'e a leitura diz que não dá para comentar');
+update public.clientes set arquivado_em = null where id = testes.id('c_pausa');
+
+-- Cliente movido: a consultoria nova não vê os comentários, o tempo, o histórico da tarefa nem o motivo trocado.
+select testes.como('central1');
+update public.clientes set consultoria_id = testes.id('B'), consultor_id = null where id = testes.id('c_pausa');
+reset role;
+select testes.sistema();
+select is(array[testes.comentarios('gestor_b', testes.id('p_plano')),
+    testes.chamar('gestor_b', format('public.historico_da_tarefa(%L)', testes.id('p_mapa')))],
+  array[null::jsonb, null], 'a consultoria nova não lê os comentários nem o histórico da tarefa');
+select is(testes.contar('gestor_b', format('select 1 from public.checklist_comentarios where tarefa_id = %L', testes.id('p_plano'))),
+  0, 'nem pela API');
+select is(testes.historico_do_tipo('gestor_b', 'c_pausa', 'motivo_trocado'), array['—: — (—)', '—: — (—)'],
+  'e o Histórico não diz a tarefa, o motivo nem quem trocou');
+select is(testes.comentar('gestor_a', testes.id('p_plano'), 'Oi') ->> 'erro', 'P0001 sem_permissao',
+  'a consultoria antiga não comenta mais');
 
 -- ── Nenhuma seta para a frente ───────────────────────────────────────────────
 

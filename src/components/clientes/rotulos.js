@@ -20,8 +20,8 @@ export function lerHoras(texto) {
 }
 
 // Texto de cada evento do histórico. Nome nulo = o banco escondeu (é de outra consultoria). O nome do modelo de check-in,
-// a tarefa e o motivo do "não se aplica" só vêm para a Central e para a consultoria do check-list; sem eles, o texto
-// fica só com o fato.
+// a tarefa e o motivo do "não se aplica" (e do motivo trocado) só vêm para a Central e para a consultoria do check-list;
+// sem eles, o texto fica só com o fato.
 export function textoDoEvento(e) {
   const consultoria = (nome) => nome ?? 'outra consultoria'
   const consultor = (nome) => nome ?? 'outro consultor'
@@ -50,6 +50,9 @@ export function textoDoEvento(e) {
     case 'tarefa_reaberta': return e.tarefa
       ? `Tarefa reaberta: ${e.tarefa} (desfeito o "não se aplica")`
       : 'Tarefa do check-list reaberta (desfeito o "não se aplica")'
+    case 'motivo_trocado': return e.tarefa
+      ? `Motivo trocado: ${e.tarefa}${e.motivo ? ` (${e.motivo})` : ''}`
+      : 'Motivo do "não se aplica" trocado numa tarefa do check-list'
     default: return e.tipo
   }
 }

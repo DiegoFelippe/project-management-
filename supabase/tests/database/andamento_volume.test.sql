@@ -1,13 +1,14 @@
 -- Volume do andamento dos clientes (aba Andamento de Check-ins): 50 consultorias, 5.515 clientes (5.000 com check-list
--- ativo de 40 tarefas — 200.000 tarefas e 195.000 dependências —, 500 sem modelo e 15 com o pior caso da próxima
--- tarefa: 500 tarefas em que a única livre é a última na ordem de data), criados aqui e desfeitos no fim (rollback: nada
+-- ativo de 40 tarefas — 200.000 tarefas e 195.000 dependências, com tarefas em andamento, pausadas e que não se
+-- aplicam —, 500 sem modelo e 15 com o pior caso da próxima tarefa: 500 tarefas em que a única livre é a última na ordem
+-- de data e as outras esperam pela cadeia de uma que não se aplica), criados aqui e desfeitos no fim (rollback: nada
 -- fica no banco). Tempos (média de 5 execuções; o limite é o dobro do valor do meio do performs_within): a página de 15
 -- e os números, para a Central (todas as consultorias), a gestão e o consultor, e a página do pior caso. Além do tempo,
 -- o plano das consultas que as funções rodam não pode varrer checklist_tarefas nem checklist_dependencias (Seq Scan):
 -- atrasadas e próxima tarefa saem só para as 15 linhas da página (a próxima, já na ordem do índice, para na primeira
 -- livre), e os números de prazo só olham as tarefas dos check-lists que vencem em até 7 dias, pelo índice das pendentes.
--- Medido: Central ~7 a 12 ms a página e ~15 ms os números; gestão e consultor ~5 ms a página e ~1,5 ms os números; o pior
--- caso ~24 ms. Roda com: npm run test:db
+-- Medido: Central ~6 a 11 ms a página e ~15 ms os números; gestão e consultor ~5 ms a página e ~1,5 ms os números; o pior
+-- caso ~31 ms (com a cadeia: chamando private.nao_se_aplica_espera por candidata eram ~88 ms). Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(22);
@@ -94,8 +95,9 @@ insert into public.modelos (id, nome, da_central, consultoria_id, criado_por, et
 select testes.id('modelo'), 'Modelo volume andamento', true, null, p.id, 4, 40, 27, 160 from v_pessoas p where p.n = 0;
 
 -- 5.000 check-lists (um por cliente, k = 1..5000), como aplicar_modelo grava: as etapas, as 40 tarefas (as primeiras
--- k % 20 feitas pelo consultor; o início varia de hoje a 59 dias atrás, então há atrasadas, as que vencem em 7 dias e
--- as em dia) e as 39 dependências de cada um.
+-- k % 20 feitas pelo consultor, a seguinte pausada, em andamento ou a fazer, e nos k pares a outra "não se aplica",
+-- presa na cadeia; o início varia de hoje a 59 dias atrás, então há atrasadas, as que vencem em 7 dias e as em dia) e as
+-- 39 dependências de cada um.
 create temp table v_checklists (k int primary key, id uuid not null default gen_random_uuid());
 insert into v_checklists (k) select generate_series(1, 5000);
 insert into public.cliente_checklists (id, cliente_id, consultoria_id, modelo_id, modelo_nome, inicio, aplicado_por)
@@ -110,12 +112,17 @@ create temp table v_cl_tarefas (k int, t int, id uuid not null default gen_rando
 insert into v_cl_tarefas (k, t) select k, t from generate_series(1, 5000) k, generate_series(1, 40) t;
 analyze v_cl_tarefas;
 insert into public.checklist_tarefas (id, checklist_id, etapa_id, titulo, obrigatoria, prazo_dias, vence_em, posicao,
-  estado, feita_em, feita_por)
+  estado, motivo, feita_em, feita_por)
 select t.id, l.id, e.id, 'Tarefa ' || t.t, t.t % 3 <> 0, t.t * 4, testes.hoje() - (t.k % 60) + t.t * 4, t.t,
-  case when t.t <= t.k % 20 then 'feita' else 'a_fazer' end,
-  case when t.t <= t.k % 20 then now() end,
-  case when t.t <= t.k % 20 then p.id end
+  x.estado, case when x.estado = 'nao_se_aplica' then 'Volume: não se aplica' end,
+  case when x.estado in ('feita', 'nao_se_aplica') then now() end,
+  case when x.estado in ('feita', 'nao_se_aplica') then p.id end
 from v_cl_tarefas t
+cross join lateral (select case
+    when t.t <= t.k % 20 then 'feita'
+    when t.t = t.k % 20 + 1 then (array['pausada', 'andamento', 'a_fazer'])[t.k % 3 + 1]
+    when t.t = t.k % 20 + 2 and t.k % 2 = 0 then 'nao_se_aplica'
+    else 'a_fazer' end as estado) x
 join v_checklists l on l.k = t.k
 join v_cl_etapas e on e.k = t.k and e.e = (t.t - 1) / 10 + 1
 join v_clientes c on c.k = t.k
@@ -124,39 +131,46 @@ insert into public.checklist_dependencias (checklist_id, tarefa_id, depende_de)
 select l.id, t.id, a.id
 from v_cl_tarefas t join v_cl_tarefas a on a.k = t.k and a.t = t.t - 1 join v_checklists l on l.k = t.k;
 update public.cliente_checklists cl
-set tarefas = x.tarefas, feitas = x.feitas, obrigatorias = x.obrigatorias, obrigatorias_feitas = x.obrigatorias_feitas,
-    proximo_vencimento = x.proximo
+set tarefas = x.tarefas, feitas = x.feitas, nao_se_aplica = x.nao_se_aplica, obrigatorias = x.obrigatorias,
+    obrigatorias_feitas = x.obrigatorias_feitas, proximo_vencimento = x.proximo
 from (
   select t.checklist_id, count(*) as tarefas, count(*) filter (where t.estado = 'feita') as feitas,
+    count(*) filter (where t.estado = 'nao_se_aplica') as nao_se_aplica,
     count(*) filter (where t.obrigatoria) as obrigatorias,
     count(*) filter (where t.obrigatoria and t.estado = 'feita') as obrigatorias_feitas,
-    min(t.vence_em) filter (where t.estado in ('a_fazer', 'andamento')) as proximo
+    min(t.vence_em) filter (where t.estado in ('a_fazer', 'andamento', 'pausada')) as proximo
   from public.checklist_tarefas t join v_checklists l on l.id = t.checklist_id
   group by t.checklist_id) x
 where cl.id = x.checklist_id;
 
 -- O pior caso da próxima tarefa, na consultoria 2: 15 clientes com o check-list "Pior caso" de 500 tarefas, a 1ª vence
--- daqui a 365 dias e as outras 499 vencem amanhã, todas dependendo dela (bloqueadas): para achar a próxima livre, a
--- leitura passa pelas 499 bloqueadas.
+-- daqui a 365 dias, a 2ª (também daqui a 365) depende dela e não se aplica, e as outras 498 vencem amanhã, todas
+-- dependendo da 2ª (presas pela cadeia: esperam a 1ª através dela): para achar a próxima livre, a leitura passa pelas
+-- 498 e confere a cadeia de cada uma.
 create temp table v_pior (k int primary key, cliente uuid not null default gen_random_uuid(),
   checklist uuid not null default gen_random_uuid(), etapa uuid not null default gen_random_uuid());
 insert into v_pior (k) select generate_series(1, 15);
 insert into public.clientes (id, nome, horas_mes, consultoria_id, consultor_id)
 select v.id, 'Cliente pior ' || v.k, 10, c.id, p.id
 from (select k, cliente as id from v_pior) v join v_consultorias c on c.n = 2 join v_pessoas p on p.n = 52;
-insert into public.cliente_checklists (id, cliente_id, consultoria_id, modelo_nome, inicio, tarefas, proximo_vencimento)
-select v.checklist, v.cliente, c.id, 'Pior caso', testes.hoje(), 500, testes.hoje() + 1
+insert into public.cliente_checklists (id, cliente_id, consultoria_id, modelo_nome, inicio, tarefas, nao_se_aplica,
+  proximo_vencimento)
+select v.checklist, v.cliente, c.id, 'Pior caso', testes.hoje(), 500, 1, testes.hoje() + 1
 from v_pior v join v_consultorias c on c.n = 2;
 insert into public.checklist_etapas (id, checklist_id, nome, posicao) select v.etapa, v.checklist, 'Única', 1 from v_pior v;
 create temp table v_pior_t (k int, t int, id uuid not null default gen_random_uuid(), primary key (k, t));
 insert into v_pior_t (k, t) select k, t from generate_series(1, 15) k, generate_series(1, 500) t;
-insert into public.checklist_tarefas (id, checklist_id, etapa_id, titulo, prazo_dias, vence_em, posicao)
-select t.id, v.checklist, v.etapa, 'Pior ' || t.t, case when t.t = 1 then 365 else 1 end,
-  testes.hoje() + case when t.t = 1 then 365 else 1 end, t.t
+insert into public.checklist_tarefas (id, checklist_id, etapa_id, titulo, prazo_dias, vence_em, posicao, estado, motivo,
+  feita_em)
+select t.id, v.checklist, v.etapa, 'Pior ' || t.t, case when t.t <= 2 then 365 else 1 end,
+  testes.hoje() + case when t.t <= 2 then 365 else 1 end, t.t,
+  case when t.t = 2 then 'nao_se_aplica' else 'a_fazer' end, case when t.t = 2 then 'Volume: não se aplica' end,
+  case when t.t = 2 then now() end
 from v_pior_t t join v_pior v on v.k = t.k;
 insert into public.checklist_dependencias (checklist_id, tarefa_id, depende_de)
 select v.checklist, t.id, f.id
-from v_pior_t t join v_pior_t f on f.k = t.k and f.t = 1 join v_pior v on v.k = t.k where t.t > 1;
+from v_pior_t t join v_pior_t f on f.k = t.k and f.t = case when t.t = 2 then 1 else 2 end join v_pior v on v.k = t.k
+where t.t > 1;
 
 insert into testes.fx select 'central', id from v_pessoas where n = 0;
 insert into testes.fx select 'gestor2', id from v_pessoas where n = 2;
@@ -199,7 +213,7 @@ reset role;
 select testes.como('gestor2');
 select is(public.andamento_dos_clientes(p_busca => 'pior caso') #> '{itens,0,checklist,proxima}',
   jsonb_build_object('titulo', 'Pior 1', 'vence_em', testes.hoje() + 365),
-  'pior caso: a próxima é a única livre, a última na ordem de data');
+  'pior caso: a próxima é a única livre, a última na ordem de data (as outras esperam pela cadeia)');
 reset role;
 
 -- ── Tempos ───────────────────────────────────────────────────────────────────
@@ -243,7 +257,7 @@ select testes.como('gestor2');
 select diag('gestor, página do pior caso (15 linhas de 500 tarefas): '
   || testes.media_ms($$select public.andamento_dos_clientes(p_busca => 'pior caso')$$) || ' ms');
 select performs_within($$select public.andamento_dos_clientes(p_busca => 'pior caso')$$, 25, 25, 5,
-  'gestor: a página do pior caso da próxima tarefa em até 50 ms na média');
+  'gestor: a página do pior caso da próxima tarefa (498 presas pela cadeia em cada linha) em até 50 ms na média');
 reset role;
 
 -- ── Planos ───────────────────────────────────────────────────────────────────
@@ -279,42 +293,46 @@ select ok(not testes.varre('clientes', format($$
   'a do consultor também');
 reset enable_seqscan;
 
+-- A próxima tarefa de uma linha, como andamento_dos_clientes roda (as presas pela cadeia numa CTE recursiva, uma vez
+-- por linha), para o check-list dado.
+create function testes.proxima_sql(p_checklist uuid) returns text language sql stable as $f$
+  select format($$
+    with recursive presas(id) as (
+      select d.tarefa_id
+      from public.checklist_tarefas n
+      join public.checklist_dependencias d on d.tarefa_id = n.id
+      join public.checklist_tarefas dp on dp.id = d.depende_de
+      where n.checklist_id = %1$L and n.estado = 'nao_se_aplica' and dp.estado in ('a_fazer', 'andamento', 'pausada')
+      union
+      select d.tarefa_id
+      from presas x
+      join public.checklist_dependencias d on d.depende_de = x.id
+      join public.checklist_tarefas n on n.id = d.tarefa_id
+      where n.estado = 'nao_se_aplica'
+    )
+    select jsonb_build_object('titulo', t.titulo, 'vence_em', t.vence_em)
+    from public.checklist_tarefas t
+    where t.checklist_id = %1$L and t.estado in ('a_fazer', 'andamento', 'pausada')
+      and not exists (select 1 from public.checklist_dependencias d
+        join public.checklist_tarefas dt on dt.id = d.depende_de
+        where d.tarefa_id = t.id
+          and (dt.estado in ('a_fazer', 'andamento', 'pausada') or dt.id in (select x.id from presas x)))
+    order by t.vence_em, t.posicao limit 1 $$, p_checklist)
+$f$;
+insert into testes.fx select 'checklist_pior', checklist from v_pior where k = 1;
+
 -- Atrasadas e próxima tarefa de uma linha da página (15 vezes por página): pelo índice das pendentes.
 select ok(not testes.varre('checklist_tarefas', format($$
   select count(*) from public.checklist_tarefas t
-  where %L::date < %L::date and t.checklist_id = %L and t.estado in ('a_fazer', 'andamento')
+  where %L::date < %L::date and t.checklist_id = %L and t.estado in ('a_fazer', 'andamento', 'pausada')
     and t.vence_em < %L $$,
     testes.hoje() - 30, testes.hoje(), testes.id('checklist_atrasado'), testes.hoje()))
-  and not testes.varre('checklist_tarefas', format($$
-  select jsonb_build_object('titulo', t.titulo, 'vence_em', t.vence_em)
-  from public.checklist_tarefas t
-  where t.checklist_id = %L and t.estado in ('a_fazer', 'andamento')
-    and not exists (select 1 from public.checklist_dependencias d
-      join public.checklist_tarefas dt on dt.id = d.depende_de
-      where d.tarefa_id = t.id
-        and (dt.estado in ('a_fazer', 'andamento')
-          or (dt.estado = 'nao_se_aplica' and private.nao_se_aplica_espera(dt.id))))
-  order by t.vence_em, t.posicao limit 1 $$, testes.id('checklist_atrasado')))
-  and not testes.varre('checklist_dependencias', format($$
-  select 1 from public.checklist_tarefas t
-  where t.checklist_id = %L and t.estado in ('a_fazer', 'andamento')
-    and not exists (select 1 from public.checklist_dependencias d
-      join public.checklist_tarefas dt on dt.id = d.depende_de
-      where d.tarefa_id = t.id
-        and (dt.estado in ('a_fazer', 'andamento')
-          or (dt.estado = 'nao_se_aplica' and private.nao_se_aplica_espera(dt.id)))) $$,
-    testes.id('checklist_atrasado'))),
-  'atrasadas e próxima tarefa de cada linha: por índice, sem Seq Scan nas tarefas e dependências');
-select ok(not testes.ordena(format($$
-  select jsonb_build_object('titulo', t.titulo, 'vence_em', t.vence_em)
-  from public.checklist_tarefas t
-  where t.checklist_id = %L and t.estado in ('a_fazer', 'andamento')
-    and not exists (select 1 from public.checklist_dependencias d
-      join public.checklist_tarefas dt on dt.id = d.depende_de
-      where d.tarefa_id = t.id
-        and (dt.estado in ('a_fazer', 'andamento')
-          or (dt.estado = 'nao_se_aplica' and private.nao_se_aplica_espera(dt.id))))
-  order by t.vence_em, t.posicao limit 1 $$, testes.id('checklist_atrasado'))),
+  and not testes.varre('checklist_tarefas', testes.proxima_sql(testes.id('checklist_atrasado')))
+  and not testes.varre('checklist_dependencias', testes.proxima_sql(testes.id('checklist_atrasado')))
+  and not testes.varre('checklist_tarefas', testes.proxima_sql(testes.id('checklist_pior')))
+  and not testes.varre('checklist_dependencias', testes.proxima_sql(testes.id('checklist_pior'))),
+  'atrasadas e próxima tarefa de cada linha (com a cadeia): por índice, sem Seq Scan nas tarefas e dependências');
+select ok(not testes.ordena(testes.proxima_sql(testes.id('checklist_atrasado'))),
   'a próxima tarefa sai na ordem do índice (vencimento e posição), sem ordenar: para na primeira livre');
 
 -- Os números de prazo da Central (todas as consultorias): só as tarefas dos check-lists que vencem em até 7 dias, uma
@@ -331,7 +349,7 @@ select ok(not testes.varre('checklist_tarefas', format($$
   cross join lateral (
     select count(*) filter (where t.vence_em < %1$L) as atrasadas, count(*) filter (where t.vence_em >= %1$L) as vencem
     from public.checklist_tarefas t
-    where t.checklist_id = a.checklist_id and t.estado in ('a_fazer', 'andamento') and t.vence_em <= %2$L) x
+    where t.checklist_id = a.checklist_id and t.estado in ('a_fazer', 'andamento', 'pausada') and t.vence_em <= %2$L) x
   where a.proximo_vencimento <= %2$L $$, testes.hoje(), testes.hoje() + 7)),
   'os números de prazo de todas as consultorias: pelo índice das pendentes, sem Seq Scan nas tarefas');
 

@@ -412,9 +412,9 @@ select is(testes.numeros('central1') - 'recorte' - 'progresso_medio',
       'clientes', count(*),
       'com_modelo', count(cl.id),
       'atrasadas', coalesce(sum((select count(*) from public.checklist_tarefas t
-        where t.checklist_id = cl.id and t.estado in ('a_fazer', 'andamento') and t.vence_em < testes.hoje())), 0),
+        where t.checklist_id = cl.id and t.estado in ('a_fazer', 'andamento', 'pausada') and t.vence_em < testes.hoje())), 0),
       'vencem_7_dias', coalesce(sum((select count(*) from public.checklist_tarefas t
-        where t.checklist_id = cl.id and t.estado in ('a_fazer', 'andamento')
+        where t.checklist_id = cl.id and t.estado in ('a_fazer', 'andamento', 'pausada')
           and t.vence_em between testes.hoje() and testes.hoje() + 7)), 0))
     from public.clientes c
     left join public.cliente_checklists cl on cl.cliente_id = c.id and cl.encerrado_em is null

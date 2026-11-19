@@ -384,7 +384,7 @@ Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as
   mudam o início dos prazos; **só o consultor do cliente marca** as tarefas e escreve a nota (a Central e a gestão
   acompanham, só leem; o gestor só marca se for o consultor do cliente). Cliente arquivado: só leitura.
 - **Escrita só por funções do banco** (`salvar_modelo`, `aplicar_modelo`, `mudar_inicio_do_checklist`, `tirar_modelo`,
-  `marcar_tarefa`, `anotar_tarefa`); direto na tabela, só arquivar, reativar e apagar modelo (pela RLS). A aba do cliente
+  `marcar_tarefa`, `anotar_tarefa`, `trocar_motivo`, `comentar_tarefa`, `editar_comentario`, `apagar_comentario`); direto na tabela, só arquivar, reativar e apagar modelo (pela RLS). A aba do cliente
   vem numa leitura só (`checklist_do_cliente`, até 500 tarefas). Na tela: `src/data/modelos.js` e
   `src/data/checklists.js`.
 - **Sem ciclo pela ordem:** "depende de" só aponta para tarefa que vem antes na lista do modelo (da mesma etapa ou de
@@ -409,19 +409,33 @@ Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as
   tarefa, com ou sem check-in) e vale para obrigatória. **Bloqueada pode ser "não se aplica"; as que dependem dela
   esperam as dependências dela** (pedido do Diego, 18/11): a cadeia — a dependência feita libera; a que não se aplica
   só libera quando nenhuma pendente fica atrás dela (`private.nao_se_aplica_espera`; em `checklist_do_cliente`, a CTE
-  recursiva `presas`), e a tela mostra o que a tarefa espera de verdade ("espera Tarefa A"). Ex.: C depende de B, B de
-  A; B não se aplica com A pendente: C espera A. Voltar para a fazer (Reabrir) tira o motivo e grava
-  `tarefa_reaberta` no Histórico. **Trocar o motivo = reabrir e marcar de novo** (o CRUD do motivo: marcar de novo com
-  outro motivo dá `ja_nao_se_aplica`). **Motivo obrigatório** (1 a 500 letras, `motivo_obrigatorio` 22023), na coluna
+  recursiva `presas`; no Andamento, a mesma CTE uma vez por linha), e a tela mostra o que a tarefa espera de verdade
+  ("espera Tarefa A"). Ex.: C depende de B, B de A; B não se aplica com A pendente: C espera A. Voltar para a fazer
+  (Reabrir) tira o motivo e grava `tarefa_reaberta` no Histórico (só para a fazer: de "não se aplica" para feita ou em
+  andamento não grava). **Trocar o motivo é no Editar** (`trocar_motivo`, só o consultor, só em "não se aplica"; o
+  Histórico ganha `motivo_trocado`, com a tarefa e o motivo novo; decisão de 18/11, substitui "reabrir e marcar de
+  novo"); marcar "não se aplica" de novo com outro motivo continua dando `ja_nao_se_aplica` (tela velha). **Motivo obrigatório** (1 a 500 letras, `motivo_obrigatorio` 22023), na coluna
   `motivo`, à parte da nota (a nota se edita sem mexer no motivo); quem e quando ficam em `feita_por`/`feita_em`, e o
   Histórico ganha a linha `tarefa_nao_se_aplica` (tarefa e motivo — e a tarefa da `tarefa_reaberta` — só para a Central
   e a consultoria do check-list). **Resolvida = feita ou não se aplica:** conta no % e no Andamento, mas aparece à parte
   ("4 de 5 resolvidas: 3 feitas, 1 não se aplica"; "2 não se aplicam") e nunca entra em atrasadas, "vencem em 7 dias",
-  próximo vencimento nem vira a próxima (no banco, pendente = `estado in ('a_fazer', 'andamento')`, o predicado do
-  índice das pendentes). Com o check-in aberto, entra em
+  próximo vencimento nem vira a próxima (no banco, pendente = `estado in ('a_fazer', 'andamento', 'pausada')`, o
+  predicado do índice das pendentes). Com o check-in aberto, entra em
   `checkin_tarefas` com estado e motivo, e o check-out traz "Não se aplica: <tarefa> (<motivo>)". Visual: cinza com o
   ícone `Ban` (nunca o check verde) na lista, no fluxograma, nos chips, na janela e na legenda; "Mostrar" ganha a aba
   "Não se aplica" quando há alguma.
+- **Pausada e o tempo de cada tarefa** (design, "Acréscimo de 18/11 (2)"): `estado = 'pausada'` é pendente como em
+  andamento (atrasadas, vencem em 7 dias, próxima, a cadeia, o Andamento, os números e a faixa Hoje). Iniciar/Retomar
+  (`andamento`) abre um trecho em `checklist_tarefa_tempos` (no máximo um aberto por tarefa); qualquer outra situação o
+  fecha. O tempo é a soma dos trechos (o aberto, até agora): `tempo_segundos` e `trecho_aberto_desde` vêm em
+  `marcar_tarefa` e em cada tarefa de `checklist_do_cliente`. Pausar a em andamento pode sempre; começar ou pausar a
+  partir de outra situação pede as dependências. Quem: o consultor do cliente, como marcar.
+- **Comentários da tarefa** (CRUD, como no Quadro): comentam o consultor do cliente e a gestão (admin e gestor da
+  consultoria do cliente), com o cliente e o check-list ativos; a Central e o dono só leem; cada um edita o seu; apaga
+  o autor ou a gestão. Leitura por `comentarios_da_tarefa` (30 por vez, `pode_editar`/`pode_apagar` por comentário) e,
+  direto, pela RLS do check-list; a contagem vem em cada tarefa de `checklist_do_cliente` (`comentarios`), com
+  `pode_comentar`. O histórico curto da tarefa (o Editar) é `historico_da_tarefa`: as últimas 10 linhas do Histórico
+  dela (`cliente_eventos.tarefa_id`) e os trechos de tempo.
 - **Uso no recorte de quem vê:** "N clientes que você vê usam" (a Central conta todos). Uma consultoria nunca vê modelos,
   check-lists, clientes ou nomes de outra; o Histórico só diz o nome do modelo para a Central e para a consultoria dele.
 - **Menu Check-lists** (`/checklists`; `/checkins` redireciona com a mesma `?aba=`; "Check-in" fica só para as horas,

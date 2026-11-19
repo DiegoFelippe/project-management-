@@ -2,13 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import {
   anotarTarefa,
+  apagarComentarioDaTarefa,
   aplicarModelo,
+  comentarTarefa,
+  comentariosDaTarefa,
+  editarComentarioDaTarefa,
+  historicoDaTarefa,
   lerChecklist,
   listarAndamento,
   marcarTarefa,
   modelosParaAplicar,
   mudarInicio,
   tirarModelo,
+  trocarMotivo,
   usoDoModelo,
 } from './checklists'
 
@@ -174,5 +180,77 @@ describe('escritas do check-list', () => {
       message: 'new row for relation "checklist_tarefas" violates check constraint "checklist_tarefas_nota_check"',
     })
     expect(await anotarTarefa('t1', 'x'.repeat(501))).toEqual({ erro: 'A nota vai até 500 letras.' })
+  })
+})
+
+describe('pausada, tempo, motivo no Editar, comentários e o histórico da tarefa', () => {
+  it('marcarTarefa: pausada vai como os outros estados; a resposta traz o tempo da tarefa', async () => {
+    const resultado = { estado: 'pausada', feita_em: null, liberadas: [], na_sessao: false, tempo_segundos: 600, trecho_aberto_desde: null }
+    rpcResponde(resultado)
+    expect(await marcarTarefa('t1', 'pausada')).toEqual({ ...resultado, erro: null })
+    expect(supabase.rpc).toHaveBeenCalledWith('marcar_tarefa', { p_tarefa: 't1', p_estado: 'pausada' })
+  })
+
+  it('trocarMotivo manda a tarefa e o motivo; recusas traduzidas, tela velha relê', async () => {
+    rpcResponde(null)
+    expect(await trocarMotivo('t1', 'O cliente não tem estoque')).toEqual({ erro: null })
+    expect(supabase.rpc).toHaveBeenCalledWith('trocar_motivo', { p_tarefa: 't1', p_motivo: 'O cliente não tem estoque' })
+    rpcResponde(null, { code: '22023', message: 'motivo_obrigatorio' })
+    expect(await trocarMotivo('t1', ' ')).toEqual({ erro: 'Conte por que esta tarefa não se aplica.' })
+    rpcResponde(null, { code: 'P0001', message: 'so_em_nao_se_aplica' })
+    expect(await trocarMotivo('t1', 'Outro')).toEqual({
+      erro: 'Esta tarefa não está mais como "não se aplica". Atualize a página.', desatualizado: true,
+    })
+    rpcResponde(null, { code: 'P0001', message: 'so_o_consultor_marca' })
+    expect((await trocarMotivo('t1', 'Outro')).desatualizado).toBe(true)
+  })
+
+  it('comentariosDaTarefa pede a página ao banco: { itens, haMais, podeComentar }; sem acesso, vazio', async () => {
+    const itens = [{ id: 'c1', texto: 'Oi', pode_editar: true, pode_apagar: true, autor: { nome: 'Ana' } }]
+    rpcResponde({ itens, ha_mais: true, pode_comentar: true })
+    expect(await comentariosDaTarefa({ tarefaId: 't1' })).toEqual({ itens, haMais: true, podeComentar: true })
+    expect(supabase.rpc).toHaveBeenCalledWith('comentarios_da_tarefa', { p_tarefa: 't1', p_antes: null, p_limite: 30 })
+    await comentariosDaTarefa({ tarefaId: 't1', antesId: 'c9', limite: 10 })
+    expect(supabase.rpc).toHaveBeenLastCalledWith('comentarios_da_tarefa', { p_tarefa: 't1', p_antes: 'c9', p_limite: 10 })
+    rpcResponde(null)
+    expect(await comentariosDaTarefa({ tarefaId: 't2' })).toEqual({ itens: [], haMais: false, podeComentar: false })
+    rpcResponde(null, { code: 'P0001', message: 'sem_permissao' })
+    await expect(comentariosDaTarefa({ tarefaId: 't1' })).rejects.toEqual({ code: 'P0001', message: 'sem_permissao' })
+  })
+
+  it('comentarTarefa e editarComentarioDaTarefa devolvem o comentário como a leitura', async () => {
+    const comentario = { id: 'c1', texto: 'Falei com o contador', editado_em: null, pode_editar: true, pode_apagar: true }
+    rpcResponde(comentario)
+    expect(await comentarTarefa('t1', 'Falei com o contador')).toEqual({ erro: null, comentario })
+    expect(supabase.rpc).toHaveBeenCalledWith('comentar_tarefa', { p_tarefa: 't1', p_texto: 'Falei com o contador' })
+    rpcResponde({ ...comentario, editado_em: '2026-11-19T12:00:00Z' })
+    expect((await editarComentarioDaTarefa('c1', 'Mudei')).comentario.editado_em).toBe('2026-11-19T12:00:00Z')
+    expect(supabase.rpc).toHaveBeenLastCalledWith('editar_comentario', { p_comentario: 'c1', p_texto: 'Mudei' })
+  })
+
+  it('comentário em branco, grande demais, apagado ou sem permissão: o texto para a pessoa', async () => {
+    rpcResponde(null, { code: '22023', message: 'comentario_vazio' })
+    expect(await comentarTarefa('t1', ' ')).toEqual({ erro: 'Escreva o comentário.' })
+    rpcResponde(null, {
+      code: '23514',
+      message: 'new row for relation "checklist_comentarios" violates check constraint "checklist_comentarios_texto_check"',
+    })
+    expect(await editarComentarioDaTarefa('c1', 'x'.repeat(2001))).toEqual({ erro: 'O comentário vai até 2.000 letras.' })
+    rpcResponde(null, { code: 'P0001', message: 'comentario_nao_encontrado' })
+    expect(await apagarComentarioDaTarefa('c1')).toEqual({
+      erro: 'Este comentário foi apagado. Atualize a tarefa.', desatualizado: true,
+    })
+    expect(supabase.rpc).toHaveBeenLastCalledWith('apagar_comentario', { p_comentario: 'c1' })
+    rpcResponde(null, { code: 'P0001', message: 'sem_permissao' })
+    expect(await comentarTarefa('t1', 'Oi')).toEqual({ erro: 'Você não tem permissão para isso.', desatualizado: true })
+  })
+
+  it('historicoDaTarefa: as linhas do Histórico e os trechos de tempo; null quando a pessoa não vê', async () => {
+    const lido = { eventos: [{ tipo: 'motivo_trocado', motivo: 'Outro' }], trechos: [], tempo_segundos: 0 }
+    rpcResponde(lido)
+    expect(await historicoDaTarefa('t1')).toEqual(lido)
+    expect(supabase.rpc).toHaveBeenCalledWith('historico_da_tarefa', { p_tarefa: 't1' })
+    rpcResponde(null)
+    expect(await historicoDaTarefa('t2')).toBeNull()
   })
 })

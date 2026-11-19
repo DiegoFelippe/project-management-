@@ -205,6 +205,13 @@ describe('traduzirErroBanco com contexto', () => {
     expect(msg('ja_nao_se_aplica')).toBe('Esta tarefa já está como não se aplica. Para trocar o motivo, reabra e marque de novo.')
     expect(msg('new row for relation "checklist_tarefas" violates check constraint "checklist_tarefas_motivo_check"', '23514'))
       .toBe('O motivo vai até 500 letras.')
+    // Trocar o motivo (o Editar) numa tarefa que deixou de ser "não se aplica".
+    expect(msg('so_em_nao_se_aplica')).toBe('Esta tarefa não está mais como "não se aplica". Atualize a página.')
+    // Comentários da tarefa.
+    expect(msg('comentario_vazio', '22023')).toBe('Escreva o comentário.')
+    expect(msg('comentario_nao_encontrado')).toBe('Este comentário foi apagado. Atualize a tarefa.')
+    expect(msg('new row for relation "checklist_comentarios" violates check constraint "checklist_comentarios_texto_check"', '23514'))
+      .toBe('O comentário vai até 2.000 letras.')
     // Fora do check-list, estado_invalido e o 23514 continuam os de sempre.
     expect(traduzirErroBanco({ code: 'P0001', message: 'estado_invalido' })).toBe('Algo deu errado. Tente de novo.')
     expect(traduzirErroBanco({ code: '23514' })).toBe('Confira os campos destacados.')

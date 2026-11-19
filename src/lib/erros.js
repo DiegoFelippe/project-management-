@@ -113,6 +113,11 @@ const ERROS_MENSAGEM_BANCO = {
   motivo_obrigatorio: MOTIVO_OBRIGATORIO,
   // "Não se aplica" de novo, com outro motivo (a tela estava velha): trocar o motivo é reabrir e marcar de novo
   ja_nao_se_aplica: 'Esta tarefa já está como não se aplica. Para trocar o motivo, reabra e marque de novo.',
+  // Trocar o motivo (o Editar) de uma tarefa que deixou de ser "não se aplica" (a tela estava velha)
+  so_em_nao_se_aplica: 'Esta tarefa não está mais como "não se aplica". Atualize a página.',
+  // Comentários da tarefa: em branco (22023) e o que alguém apagou enquanto a tela estava aberta
+  comentario_vazio: 'Escreva o comentário.',
+  comentario_nao_encontrado: 'Este comentário foi apagado. Atualize a tarefa.',
   // Quadros do menu (pessoais e de time)
   time_invalido: 'Esse time não está mais disponível para você. Escolha outro time.',
   quadro_arquivado: 'Este quadro está arquivado: restaure antes de renomear.',
@@ -183,8 +188,9 @@ export function traduzirErroBanco(erro, { sobre } = {}) {
     if (sobre === 'checkin') return CHECKIN_DE_MAIS_DE_24H
     // No quadro, o que a pessoa digita é só o nome.
     if (sobre === 'quadro') return 'O nome do quadro precisa ter de 1 a 80 letras.'
-    // No check-list, o que a pessoa digita é a nota da tarefa e o motivo do "não se aplica".
+    // No check-list, o que a pessoa digita é a nota da tarefa, o motivo do "não se aplica" e os comentários.
     if (sobre === 'checklist') {
+      if (/checklist_comentarios_texto_check/.test(erro.message ?? '')) return 'O comentário vai até 2.000 letras.'
       return /checklist_tarefas_motivo_check/.test(erro.message ?? '') ? 'O motivo vai até 500 letras.' : 'A nota vai até 500 letras.'
     }
     // Só as regras de tamanho dos textos (nome, descrição, título); as outras (ex.: tipo) ficam no texto de sempre.

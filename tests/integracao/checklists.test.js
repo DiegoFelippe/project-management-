@@ -24,7 +24,8 @@ vi.mock('@/lib/supabase', () => ({
 }))
 
 const {
-  anotarTarefa, aplicarModelo, lerChecklist, listarAndamento, marcarTarefa, modelosParaAplicar, mudarInicio, tirarModelo,
+  anotarTarefa, apagarComentarioDaTarefa, aplicarModelo, comentarTarefa, comentariosDaTarefa, editarComentarioDaTarefa,
+  historicoDaTarefa, lerChecklist, listarAndamento, marcarTarefa, modelosParaAplicar, mudarInicio, tirarModelo, trocarMotivo,
   usoDoModelo,
 } = await import('../../src/data/checklists.js')
 const { indicadoresDeCheckins } = await import('../../src/data/indicadores.js')
@@ -283,6 +284,89 @@ describe('check-list do cliente contra o banco de verdade', () => {
     expect(await anotarTarefa(tarefa['Plano de ação'], 'x'.repeat(501))).toEqual({ erro: 'A nota vai até 500 letras.' })
     entrar('gestorB')
     expect(await lerChecklist(clienteId)).toBeNull()
+  })
+
+  it('Pausada com o tempo, trocar o motivo, comentários e o histórico da tarefa pela API', async () => {
+    const mapa = tarefa['Mapa de custos']
+    const plano = tarefa['Plano de ação']
+    entrar('pessoa')
+    const iniciada = await marcarTarefa(mapa, 'andamento')
+    expect(iniciada).toMatchObject({ estado: 'andamento', tempo_segundos: 0, erro: null })
+    expect(iniciada.trecho_aberto_desde).toEqual(expect.any(String))
+    // O trecho aberto vai para 10 minutos atrás (o relógio da tarefa correu).
+    await admin.from('checklist_tarefa_tempos').update({ inicio: new Date(Date.now() - 600_000).toISOString() })
+      .eq('tarefa_id', mapa).is('fim', null)
+    const pausada = await marcarTarefa(mapa, 'pausada')
+    expect(pausada).toMatchObject({ estado: 'pausada', trecho_aberto_desde: null, erro: null })
+    expect(pausada.tempo_segundos).toBeGreaterThanOrEqual(590)
+    const lido = await lerChecklist(clienteId)
+    expect(lido).toMatchObject({ pode_comentar: true, resumo: { resolvidas: 1 } })
+    expect(lido.tarefas[1]).toMatchObject({ estado: 'pausada', tempo_segundos: pausada.tempo_segundos, trecho_aberto_desde: null,
+      comentarios: 0 })
+    expect(await marcarTarefa(plano, 'feita')).toEqual({
+      erro: 'Esta tarefa depende de outras que ainda não foram feitas.', desatualizado: true,
+    })
+
+    // Trocar o motivo (o Editar): só numa que não se aplica, só o consultor; o Histórico ganha "Motivo trocado".
+    expect(await trocarMotivo(mapa, 'Outro')).toEqual({
+      erro: 'Esta tarefa não está mais como "não se aplica". Atualize a página.', desatualizado: true,
+    })
+    expect(await marcarTarefa(mapa, 'nao_se_aplica', 'Sem custos fixos')).toMatchObject({ estado: 'nao_se_aplica', erro: null })
+    expect(await trocarMotivo(mapa, ' Sem custos fixos nem variáveis ')).toEqual({ erro: null })
+    expect((await lerChecklist(clienteId)).tarefas[1].motivo).toBe('Sem custos fixos nem variáveis')
+    entrar('gestor')
+    expect(await trocarMotivo(mapa, 'Outro')).toEqual({ erro: 'Só o consultor do cliente marca as tarefas.', desatualizado: true })
+    const { itens: eventos } = await listarEventos(clienteId)
+    expect(eventos.find((e) => e.tipo === 'motivo_trocado'))
+      .toMatchObject({ tarefa: 'Mapa de custos', motivo: 'Sem custos fixos nem variáveis', autor: expect.any(String) })
+
+    // Comentários: o consultor e a gestão comentam; cada um edita o seu; a gestão apaga qualquer um; a Central só lê.
+    entrar('pessoa')
+    const meu = await comentarTarefa(plano, ' Falei com o contador ')
+    expect(meu).toMatchObject({ erro: null, comentario: { texto: 'Falei com o contador', editado_em: null, pode_editar: true,
+      pode_apagar: true, autor: { nome: expect.any(String) } } })
+    expect(await comentarTarefa(plano, '   ')).toEqual({ erro: 'Escreva o comentário.' })
+    expect(await comentarTarefa(plano, 'x'.repeat(2001))).toEqual({ erro: 'O comentário vai até 2.000 letras.' })
+    entrar('gestor')
+    const doGestor = await comentarTarefa(plano, 'Combine a data')
+    expect(doGestor.erro).toBeNull()
+    expect(await editarComentarioDaTarefa(meu.comentario.id, 'Mudei'))
+      .toEqual({ erro: 'Você não tem permissão para isso.', desatualizado: true })
+    const lista = await comentariosDaTarefa({ tarefaId: plano })
+    expect(lista).toMatchObject({ haMais: false, podeComentar: true })
+    expect(lista.itens.map((c) => [c.texto, c.pode_editar, c.pode_apagar]))
+      .toEqual([['Combine a data', true, true], ['Falei com o contador', false, true]])
+    entrar('central')
+    expect(await comentarTarefa(plano, 'Oi')).toEqual({ erro: 'Você não tem permissão para isso.', desatualizado: true })
+    expect((await comentariosDaTarefa({ tarefaId: plano })).itens.map((c) => [c.pode_editar, c.pode_apagar]))
+      .toEqual([[false, false], [false, false]])
+    entrar('gestorB')
+    expect(await comentariosDaTarefa({ tarefaId: plano })).toEqual({ itens: [], haMais: false, podeComentar: false })
+    expect((await sessoes.gestorB.from('checklist_comentarios').select('id').eq('tarefa_id', plano)).data).toEqual([])
+    expect(await historicoDaTarefa(mapa)).toBeNull()
+
+    entrar('pessoa')
+    expect((await editarComentarioDaTarefa(meu.comentario.id, 'Falei com o contador ontem')).comentario)
+      .toMatchObject({ texto: 'Falei com o contador ontem', editado_em: expect.any(String) })
+    expect(await apagarComentarioDaTarefa(doGestor.comentario.id))
+      .toEqual({ erro: 'Você não tem permissão para isso.', desatualizado: true })
+    expect((await lerChecklist(clienteId)).tarefas[2].comentarios).toBe(2)
+    const { error: direto } = await sessoes.pessoa.from('checklist_comentarios').insert({ tarefa_id: plano, texto: 'Direto' })
+    expect(direto?.code).toBe('42501')
+    entrar('gestor')
+    expect(await apagarComentarioDaTarefa(meu.comentario.id)).toEqual({ erro: null })
+    expect(await apagarComentarioDaTarefa(meu.comentario.id))
+      .toEqual({ erro: 'Este comentário foi apagado. Atualize a tarefa.', desatualizado: true })
+
+    // O histórico curto da tarefa: as linhas dela no Histórico e os trechos de tempo.
+    const historico = await historicoDaTarefa(mapa)
+    expect(historico.eventos.map((e) => e.tipo)).toContain('motivo_trocado')
+    expect(historico.eventos[0]).toMatchObject({ tipo: 'motivo_trocado', motivo: 'Sem custos fixos nem variáveis' })
+    expect(historico.trechos).toEqual([expect.objectContaining({ fim: expect.any(String), pessoa: expect.any(String) })])
+    expect(historico.tempo_segundos).toBe(pausada.tempo_segundos)
+
+    entrar('pessoa')
+    expect(await marcarTarefa(mapa, 'a_fazer')).toMatchObject({ estado: 'a_fazer', erro: null })
   })
 
   it('a gestão muda o início, troca e tira o modelo; o antigo vira histórico', async () => {

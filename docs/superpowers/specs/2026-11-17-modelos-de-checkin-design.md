@@ -28,8 +28,8 @@ Plano de construção: `docs/superpowers/plans/2026-11-17-modelos-de-checkin.md`
 
 ## O que não é (anti-objetivos)
 
-- Não é um segundo Quadro: tarefa do check-list não tem responsável, anexo, comentário nem subtarefa. Quem marca é o
-  consultor do cliente.
+- Não é um segundo Quadro: tarefa do check-list não tem responsável, anexo nem subtarefa (comentários entraram no
+  "Acréscimo de 18/11 (2)"). Quem marca é o consultor do cliente.
 - Não troca as horas: o check-in continua sendo abrir, fechar e contar o que foi feito. O check-list só acrescenta "o
   que foi marcado nesta sessão".
 - Não mexe em "a central cadastra e manda; a consultoria escolhe o consultor".
@@ -118,7 +118,8 @@ botões (a ação principal fica no fim da barra, como "Novo time" em Times).
   dia 10 a partir de 10/11/2026"); Situação ("Faltam 3 dias", "Atrasada há 2 dias", "por Ana em 12/11"); Depende de e
   Libera (listas clicáveis, com a situação de cada uma); Nota (o consultor escreve; os outros leem). Rodapé do consultor:
   a fazer → Começar + **Marcar como feita**; em andamento → Voltar para a fazer + **Marcar como feita**; feita → Reabrir
-  tarefa + **Salvar nota**; bloqueada → **Salvar nota**. Para os outros: Fechar.
+  tarefa + **Salvar nota**; bloqueada → Não se aplica (com o motivo) + **Salvar nota**; a que não se aplica → Reabrir
+  tarefa + **Salvar nota**. Para os outros: Fechar. (O Editar do "Acréscimo de 18/11 (2)" substitui esta janela.)
 - Depois de marcar, o aviso diz o que liberou e onde ficou: "Análise do DRE feita. Agora dá para fazer: Mapa de custos.
   Entrou no resumo deste check-in." (ou "Sem check-in aberto: fica feita, fora de uma sessão.").
 
@@ -288,7 +289,8 @@ Nomes provisórios; o plano diz as funções.
 
 ## Fora desta entrega
 
-Acrescentar ou apagar tarefa só num cliente; responsável por tarefa; anexos, comentários e evidências na tarefa; dias
+Acrescentar ou apagar tarefa só num cliente; responsável por tarefa; anexos e evidências na tarefa (os comentários
+entraram no "Acréscimo de 18/11 (2)"); dias
 úteis e feriados no prazo; tempo real (quem acompanha vê o que o consultor marcou ao abrir ou recarregar); avisos de
 tarefa atrasada (Slack, WhatsApp, e-mail); ligar tarefa a cartão do Quadro ou a evento da Agenda; números do check-list
 no Início; versões e histórico de edições do modelo; importar e exportar modelos; a Central ver os check-lists encerrados
@@ -332,9 +334,10 @@ isso para a auditoria saber. Proposta aprovada ("Pode fazer", 18/11 08:50):
 
 - **Terceiro jeito de fechar uma tarefa**, ao lado de "feita": **"Não se aplica"** (`estado = 'nao_se_aplica'`).
 - **Quem marca:** o consultor do cliente, como "feita", com ou sem check-in aberto; volta para "a fazer" pelo mesmo
-  caminho (o motivo sai junto, e o Histórico ganha a linha "Tarefa reaberta", com quem). **Trocar o motivo = reabrir e
-  marcar de novo** (marcar de novo com outro motivo é recusado e a tela diz isso; a nota da tarefa continua editável
-  sem mexer no motivo).
+  caminho (o motivo sai junto, e o Histórico ganha a linha "Tarefa reaberta", com quem; só quando volta para "a fazer").
+  **Trocar o motivo é no Editar** ("Acréscimo de 18/11 (2)": a linha "Motivo trocado" no Histórico; substitui "reabrir
+  e marcar de novo"); marcar "não se aplica" de novo com outro motivo continua recusado (a tela estava velha); a nota da
+  tarefa continua editável sem mexer no motivo.
 - **Motivo obrigatório** (1 a 500 letras, o que o auditor lê), guardado à parte da nota da tarefa; fica quem marcou e
   quando, e o Histórico do cliente ganha uma linha (tarefa, motivo, quem).
 - **Vale também para tarefa obrigatória**, desde que tenha motivo (decisão do controlador; o Diego pode travar depois).
@@ -378,3 +381,11 @@ Pausar, Não se aplica e Comentário. Protótipo `docs/prototipo/checklist-linha
   check-list.
 - **Decisão do controlador:** o balão do prazo não oferece "Mudar prazo" (não existe mudar o prazo de uma tarefa; só o
   início dos prazos do check-list, como hoje).
+- **No banco (Task 10):** os trechos ficam em `checklist_tarefa_tempos` (no máximo um aberto por tarefa; quem e de
+  quando a quando). Pausar a que está em andamento pode sempre, mesmo se uma dependência foi reaberta no meio (o relógio
+  não fica preso); começar, retomar ou pausar a partir de outra situação pede as dependências, como Iniciar. As tarefas
+  que já estavam em andamento antes desta entrega não têm trecho aberto: o relógio delas começa no próximo Iniciar ou
+  Retomar. "Tarefa reaberta" só quando a que não se aplica volta para a fazer. Os comentários são escritos só por
+  funções (`comentar_tarefa`, `editar_comentario`, `apagar_comentario`) e lidos por `comentarios_da_tarefa` (30 por vez)
+  ou pela regra do check-list; o histórico curto é `historico_da_tarefa` (as 10 últimas linhas do Histórico da tarefa e
+  os trechos).
