@@ -165,7 +165,7 @@ describe('LinhaDaTarefa', () => {
       const { item } = linha(t('t1', 'Feita', { estado: 'feita' }))
       expect(within(item).queryByRole('button', { name: /^Iniciar/ })).not.toBeInTheDocument()
       expect(within(item).queryByRole('button', { name: /^Não se aplica/ })).not.toBeInTheDocument()
-      expect(item.querySelectorAll('[data-acoes] > [aria-hidden="true"]')).toHaveLength(3)
+      expect(item.querySelectorAll('[data-acoes] > [aria-hidden="true"]')).toHaveLength(2)
       expect(within(item).getByRole('button', { name: 'Editar Feita' })).toBeInTheDocument()
     })
 
@@ -187,6 +187,17 @@ describe('LinhaDaTarefa', () => {
       const { item } = linha(t('t1', 'Plano', { estado: 'andamento', depende_de: ['t0'] }))
       expect(within(item).getByRole('button', { name: 'Pausar Plano' })).toBeEnabled()
       expect(item).toHaveTextContent('Espera: Reunião de alinhamento')
+    })
+
+    // Pedido do Diego (19/11): sem comentários, nada de espaço vazio entre os botões; o 💬 fica antes do prazo.
+    it('sem comentários não sobra espaço entre Não se aplica e o lápis; o 💬 fica antes do prazo, fora das ações', () => {
+      const { item } = linha(t('a', 'Sem conversa'))
+      expect(item.querySelectorAll('[data-acoes] > [aria-hidden="true"]')).toHaveLength(0)
+      cleanup()
+      const { item: comConversa } = linha(t('t1', 'Análise do DRE', { comentarios: 2 }))
+      const botao = within(comConversa).getByRole('button', { name: '2 comentários em Análise do DRE' })
+      expect(comConversa.querySelector('[data-acoes]').contains(botao)).toBe(false)
+      expect(botao.closest('[data-prazo]')).not.toBeNull()
     })
 
     it('💬 N só quando há comentários; abre o Editar', async () => {

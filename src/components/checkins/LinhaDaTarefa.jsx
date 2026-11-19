@@ -110,9 +110,17 @@ function LinhaDaTarefa({ tarefa, situacao, inicio, podeMarcar, podeComentar, ocu
         {tarefa.descricao && <p className="text-muted-foreground text-rotulo break-words">{tarefa.descricao}</p>}
         {bloqueada && <p id={idEspera} className="text-muted-foreground text-legenda break-words">{textoDaEspera(situacao)}</p>}
       </div>
-      {tarefa.vence_em && (
-        <div className="col-start-2 row-start-2 sm:col-start-3 sm:row-start-1 sm:-mt-1">
-          <PrazoDaTarefa tarefa={tarefa} situacao={situacao} inicio={inicio} />
+      {/* O 💬 N fica antes do prazo, só quando há comentários (pedido do Diego, 19/11: sem espaço vazio entre os botões);
+          o prazo e as ações não mudam de lugar de uma linha para outra. No celular, os comentários estão no "⋯". */}
+      {(tarefa.vence_em || comentarios > 0) && (
+        <div data-prazo className="col-start-2 row-start-2 flex items-center gap-1 sm:col-start-3 sm:row-start-1 sm:-mt-1 sm:justify-end">
+          {comentarios > 0 && (
+            <Button type="button" variant="ghost" size="sm" className="tabular-nums max-sm:hidden" title={plural(comentarios, 'comentário', 'comentários')}
+              aria-label={`${plural(comentarios, 'comentário', 'comentários')} em ${titulo}`} aria-haspopup="dialog" onClick={() => aoEditar(tarefa)}>
+              <MessageSquare /> {comentarios}
+            </Button>
+          )}
+          {tarefa.vence_em && <PrazoDaTarefa tarefa={tarefa} situacao={situacao} inicio={inicio} />}
         </div>
       )}
       <div className="col-start-3 row-start-1 -mt-1.5 flex items-center sm:col-start-4">
@@ -126,12 +134,6 @@ function LinhaDaTarefa({ tarefa, situacao, inicio, podeMarcar, podeComentar, ocu
                 aria-haspopup="dialog" onClick={() => aoNaoSeAplica(tarefa)} />
             </>
           )}
-          {comentarios > 0 ? (
-            <Button type="button" variant="ghost" size="sm" className="w-14 tabular-nums" title={plural(comentarios, 'comentário', 'comentários')}
-              aria-label={`${plural(comentarios, 'comentário', 'comentários')} em ${titulo}`} aria-haspopup="dialog" onClick={() => aoEditar(tarefa)}>
-              <MessageSquare /> {comentarios}
-            </Button>
-          ) : <span aria-hidden="true" className="inline-block w-14" />}
           <AcaoDaLinha nome={lapis.nome} aria-label={`${lapis.nome} ${titulo}`} icone={lapis.icone} aria-haspopup="dialog"
             onClick={() => aoEditar(tarefa)} />
         </div>
