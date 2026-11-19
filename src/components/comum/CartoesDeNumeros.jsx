@@ -8,6 +8,15 @@ const TONS = {
   positivo: 'bg-positive-soft text-positive',
   perigo: 'bg-destructive/10 text-destructive',
   neutro: 'bg-muted text-muted-foreground',
+  // Paleta de 19/11: fundo suave e ícone no tom de texto.
+  turquesa: 'bg-cor-turquesa-suave text-cor-turquesa-texto',
+  violeta: 'bg-cor-violeta-suave text-cor-violeta-texto',
+  mostarda: 'bg-cor-mostarda-suave text-cor-mostarda-texto',
+  rosa: 'bg-cor-rosa-suave text-cor-rosa-texto',
+  verde: 'bg-cor-verde-suave text-cor-verde-texto',
+  laranja: 'bg-cor-laranja-suave text-cor-laranja-texto',
+  indigo: 'bg-cor-indigo-suave text-cor-indigo-texto',
+  grafite: 'bg-cor-grafite-suave text-cor-grafite-texto',
 }
 
 // Cor opcional do número (quando ele pede atenção).

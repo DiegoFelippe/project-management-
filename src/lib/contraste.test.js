@@ -123,6 +123,31 @@ describe('contraste dos tokens de src/index.css', () => {
   })
 })
 
+// Paleta de 9 cores e estados em trios (design 2026-11-19-graficos-variados-e-paleta, pedido do Diego, 19/11).
+const NOMES_DA_PALETA = ['azul', 'turquesa', 'violeta', 'mostarda', 'rosa', 'verde', 'laranja', 'indigo', 'grafite']
+
+describe.each(Object.keys(TEMAS))('paleta e estados no %s', (tema) => {
+  const t = TEMAS[tema]
+
+  it('paleta: texto segura 4,5:1 sobre o cartão e sobre o suave; forte segura 3:1 sobre o cartão', () => {
+    const fracos = NOMES_DA_PALETA.flatMap((n) => [
+      { onde: `${n} texto/cartão`, c: contraste(t[`cor-${n}-texto`], t.card), minimo: CONTRASTE_MINIMO },
+      { onde: `${n} texto/suave`, c: contraste(t[`cor-${n}-texto`], t[`cor-${n}-suave`]), minimo: CONTRASTE_MINIMO },
+      { onde: `${n} forte/cartão`, c: contraste(t[`cor-${n}-forte`], t.card), minimo: 3 },
+    ]).filter((m) => !(arredondar(m.c) >= m.minimo)).map((m) => `${m.onde}: ${arredondar(m.c)}`)
+    expect(fracos).toEqual([])
+  })
+
+  it('estados: texto/cartão, texto/suave e sobre/cheio seguram 4,5:1', () => {
+    const fracos = ['positive', 'notice', 'destructive'].flatMap((n) => [
+      { onde: `${n} texto/cartão`, c: contraste(t[n], t.card) },
+      { onde: `${n} texto/suave`, c: contraste(t[n], t[`${n}-soft`]) },
+      { onde: `${n} sobre/cheio`, c: contraste(t[`sobre-${n}`], t[`${n}-cheio`]) },
+    ]).filter((m) => !(arredondar(m.c) >= CONTRASTE_MINIMO)).map((m) => `${m.onde}: ${arredondar(m.c)}`)
+    expect(fracos).toEqual([])
+  })
+})
+
 describe('texto sobre a cor da pessoa ou do evento', () => {
   it('toda cor do avatar tem texto com pelo menos 4,5:1; branco onde o branco segura', () => {
     const fracas = CORES_DO_AVATAR

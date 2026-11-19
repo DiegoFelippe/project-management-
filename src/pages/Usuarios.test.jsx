@@ -202,7 +202,7 @@ describe('Usuários', () => {
       expect(confirmar).toHaveTextContent(/no próximo acesso.*configura o app de novo/)
       expect(confirmar).not.toHaveTextContent(/ainda não foi salva/)
       const botao = within(confirmar).getByRole('button', { name: 'Zerar' })
-      expect(botao).toHaveClass('bg-destructive')
+      expect(botao).toHaveClass('bg-destructive-cheio')
       await userEvent.click(botao)
       expect(gerenciarAcesso).toHaveBeenCalledWith('zerar_2fa', 'p1')
       expect(toast.success).toHaveBeenCalledWith('Verificação em duas etapas de Ana zerada.')

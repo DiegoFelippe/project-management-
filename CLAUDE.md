@@ -11,7 +11,7 @@ Pedido do Diego (2026-11-17), ao instalar o Ponytail e o UI UX Pro Max.
 - **Ponytail:** "menos código" e "reaproveitar o que existe" valem, mas o que existe aqui são os componentes do projeto:
   campos só de `src/components/campos/` (nunca `<input type="date">` nem `<select>` nativos), `Button`, `Tabela`,
   `JanelaFormulario`. Nunca corta teste, RLS, validação, acessibilidade nem CRUD completo.
-- **UI UX Pro Max:** não troca a fonte (só Inter), as cores (as da consultoria, em `src/index.css`), a escala de
+- **UI UX Pro Max:** não troca a fonte (só Inter), as cores (as da consultoria e a paleta de 19/11, em `src/index.css`), a escala de
   tipografia nem o Padrão Hub. Serve para ideias dentro desses limites.
 
 ## CRUD completo: criar, consultar, editar e apagar
@@ -166,7 +166,11 @@ tela também (`QuadroKanban`, usado pela aba do cliente e pela tela Quadros).
 
 Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/2026-11-16-padrao-hub.md`.
 
-- **Cores continuam as da consultoria** (`--primary` etc. em `src/index.css`); do Hub vem só o layout. **Contraste mínimo
+- **Cores: as da consultoria (`--primary` etc. em `src/index.css`) e a paleta de 9 cores de 19/11** (pedido do Diego;
+  `--cor-<azul|turquesa|violeta|mostarda|rosa|verde|laranja|indigo|grafite>-<texto|forte|suave>`): a paleta separa
+  **categorias** (pessoas, séries, cidades, etapas), **nunca estado**; estado é verde, âmbar e vermelho, sempre com ícone e
+  palavra, em trios (`--positive|--notice|--destructive`, `-cheio`, `-soft`, `--sobre-<estado>`; fundo cheio com texto é
+  `bg-<estado>-cheio text-sobre-<estado>`). Do Hub vem só o layout. **Contraste mínimo
   4,5:1** em todo texto (auditoria, pedido do Diego 17/11): fundo azul com texto branco é `bg-primary-cheio` (no escuro o
   `--primary` é o azul claro, só para texto, foco e barras); texto azul sobre o azul-claro de realce (`bg-primary/10`,
   `bg-accent`: "Hoje", opção escolhida, selos) é `text-primary-texto`; texto sobre a cor da pessoa ou do evento usa
@@ -335,6 +339,8 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
   `src/components/graficos/` — `CartaoDeGrafico` (título, leitura, legenda, estados), `GraficoDeColunas`,
   `GraficoDeLinha`, `BarrasHorizontais`, `MiniBarra`, `Medidor`, `BarraSegmentada`, `DiasComCheckin`, com a `Dica` e a
   `Legenda` deles. Gráfico novo reaproveita essas peças; peça nova entra lá, com teste.
+- **Séries pela paleta de 19/11** (`corDaSerie(i)` de `graficos/cores.js`): ordem fixa azul, turquesa, violeta, mostarda,
+  rosa, verde, laranja, índigo; mais de 8 itens: os 8 maiores e "Outros" em grafite (`COR_OUTROS`). Estado nunca usa a paleta.
 - **Cores só por `--grafico-*`** (`src/index.css`, claro e escuro; nomes curtos em `graficos/cores.js`): nada de hex
   nem `--primary` direto no gráfico. Série, acima, folga e referência seguram 4,5:1 sobre o cartão
   (`src/lib/contraste.test.js`); vermelho e âmbar sempre com ícone e o número escrito; texto nunca na cor da série.
