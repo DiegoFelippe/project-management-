@@ -8,7 +8,7 @@
 -- Roda com: npm run test:db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(54);
+select plan(58);
 
 create schema testes;
 grant usage on schema testes to authenticated, anon;
@@ -176,6 +176,19 @@ create function testes.series(p jsonb) returns text[] language sql immutable as 
     order by o), '{}')
   from jsonb_array_elements(p -> 'series') with ordinality x(s, o)
 $$;
+-- A soma das séries (a primeira semana) de horas_por_unidade_por_semana.
+create function testes.soma_series(p jsonb) returns numeric language sql immutable as $$
+  select coalesce(sum((e -> 'horas' ->> 0)::numeric), 0) from jsonb_array_elements(p -> 'series') e
+$$;
+-- As horas fechadas de cada consultoria do teste na semana S, contadas direto dos check-ins (só as com horas).
+create function testes.horas_na_semana_s() returns table (id uuid, horas numeric) language sql stable as $$
+  select k.consultoria_id, sum(extract(epoch from k.fim - k.inicio)) / 3600
+  from public.checkins k
+  where k.consultoria_id in (select f.id from testes.fx f) and k.fim is not null
+    and k.inicio >= testes.s()::timestamp at time zone 'America/Sao_Paulo'
+    and k.inicio < (testes.s() + 7)::timestamp at time zone 'America/Sao_Paulo'
+  group by k.consultoria_id
+$$;
 -- As partes das tarefas na ordem do desenho (feitas, não se aplica, andamento, pausadas, a fazer, atrasadas) e quantos
 -- check-lists; com p_antes, só a diferença.
 create function testes.partes(p jsonb, p_antes jsonb default '{}') returns int[] language sql immutable as $$
@@ -218,6 +231,7 @@ select testes.consultoria('E');
 select testes.perfil('central', 'central', null);
 select testes.guardar('antes_dias', 'central', 'public.horas_do_painel_por_dia(' || testes.periodo() || ')');
 select testes.guardar('antes_calor', 'central', 'public.checkins_por_dia_e_hora(' || testes.periodo() || ')');
+select testes.guardar('antes_unid', 'central', 'public.horas_por_unidade_por_semana(' || testes.periodo() || ')');
 select testes.guardar('antes_tarefas', 'central', 'public.tarefas_por_situacao()');
 select testes.guardar('antes_cidades', 'central', 'public.clientes_por_cidade()');
 
@@ -396,9 +410,11 @@ select is((testes.j('dias_central') ->> 'capacidade')::numeric - (testes.j('ante
   'por dia, central: a capacidade soma a de todos (o que o teste acrescentou: os consultores ativos do teste)');
 
 -- ── Quando os check-ins acontecem ────────────────────────────────────────────
-select is(testes.calor(testes.j('calor_admin')) || array[jsonb_array_length(testes.j('calor_admin') -> 'celulas')::text],
-  array['0/20=1', '1/10=1', '1/14=1', '2/20=1', '3/7=1', '98'],
-  'calor, gestão: domingo 23h30 no domingo às 20h, 21h15 na 20h, 6h na 7h; as 98 células (dom = 0, 7h a 20h)');
+select is(testes.calor(testes.j('calor_admin')) || array[jsonb_array_length(testes.j('calor_admin') -> 'celulas')::text,
+    testes.j('calor_admin') ->> 'de', testes.j('calor_admin') ->> 'ate'],
+  array['0/20=1', '1/10=1', '1/14=1', '2/20=1', '3/7=1', '98', testes.s()::text, (testes.s() + 6)::text],
+  'calor, gestão: domingo 23h30 no domingo às 20h, 21h15 na 20h, 6h na 7h; as 98 células (dom = 0, 7h a 20h); período '
+  'de menos de 8 semanas: a janela é o período inteiro');
 select is(testes.calor(testes.j('calor_pessoa')), array['0/20=1', '1/10=1', '3/7=1'], 'calor, consultor: só os check-ins dele');
 select is(testes.calor(testes.j('calor_central'), testes.j('antes_calor')),
   array['0/20=1', '1/10=2', '1/14=1', '2/20=1', '3/7=1', '4/8=10'],
@@ -421,12 +437,24 @@ select is(testes.series(testes.j('unid_k')),
 select ok((select e -> 'id' = 'null'::jsonb from jsonb_array_elements(testes.j('unid_k') -> 'series') e where e ->> 'nome' = 'Outros')
     and (select sum((e -> 'horas' ->> 0)::numeric) from jsonb_array_elements(testes.j('unid_k') -> 'series') e) = 55,
   'por unidade: "Outros" tem id nulo e a soma das séries é o total da consultoria (55 h)');
+-- A central também vê os dados do banco local, que podem empurrar as consultorias do teste para "Outros": cada uma é
+-- conferida na própria série ou dentro de "Outros", e a soma das séries contra a soma direta dos check-ins do teste.
 select ok(testes.j('unid_central') ->> 'recorte' = 'tudo'
     and (select bool_and(e -> 'id' = 'null'::jsonb or exists (select 1 from public.consultorias co where co.id = (e ->> 'id')::uuid))
-      from jsonb_array_elements(testes.j('unid_central') -> 'series') e)
-    and array['Gráficos variados K:55', 'Gráficos variados A:5.8', 'Gráficos variados B:1']
-      <@ testes.series(testes.j('unid_central')),
-  'por unidade, central: uma série por consultoria (K 55 h, A 5,75 h, B 1 h)');
+      from jsonb_array_elements(testes.j('unid_central') -> 'series') e),
+  'por unidade, central: as séries são consultorias (e "Outros")');
+select ok((select bool_and(case
+      when exists (select 1 from jsonb_array_elements(testes.j('unid_central') -> 'series') e where e ->> 'id' = u.id::text)
+        then exists (select 1 from jsonb_array_elements(testes.j('unid_central') -> 'series') e
+          where e ->> 'id' = u.id::text and (e -> 'horas' ->> 0)::numeric = round(u.horas, 1))
+      else exists (select 1 from jsonb_array_elements(testes.j('unid_central') -> 'series') e
+          where e -> 'id' = 'null'::jsonb and (e -> 'horas' ->> 0)::numeric >= u.horas - 0.05) end)
+    from testes.horas_na_semana_s() u),
+  'por unidade, central: cada consultoria do teste com as horas dela (A 5,75 h, B 1 h, K 55 h) ou dentro de "Outros"');
+select ok(abs(testes.soma_series(testes.j('unid_central')) - testes.soma_series(testes.j('antes_unid'))
+      - (select sum(u.horas) from testes.horas_na_semana_s() u))
+    <= 0.05 * (jsonb_array_length(testes.j('unid_central') -> 'series') + jsonb_array_length(testes.j('antes_unid') -> 'series')),
+  'por unidade, central: a soma das séries cresce o total dos check-ins do teste (61,75 h; até 0,05 h por série arredondada)');
 
 -- ── Tarefas por situação ─────────────────────────────────────────────────────
 select is(testes.partes(testes.j('tarefas_admin')), array[3, 1, 1, 1, 3, 3, 2],
@@ -494,6 +522,25 @@ select is(array[
     '{atrasadas,etapas,feitas,mais_tempo,modelo_nome,nao_se_aplica,proxima,tarefas}',
     '{andamento,atrasadas,feitas,id,nao_se_aplica,nome,pausadas,tarefas}'],
   'hoje: as chaves de antes continuam; entram só mais_tempo e, por etapa, andamento e pausadas');
+
+-- ── Calor: as últimas 8 semanas do período ───────────────────────────────────
+-- J: um período de um ano até hoje (como "Este ano", mas sem depender da data em que o teste roda); a janela do calor é
+-- de hoje - 55 a hoje. Check-ins 10 semanas antes do fim (9h) e no dia antes da janela (11h): fora; no primeiro dia da
+-- janela (13h) e 3 semanas antes do fim (15h): dentro. Fica depois das conferências da central (que contam pela
+-- diferença e pelos dados do teste).
+select testes.consultoria('J');
+select testes.perfil('admin_j', 'admin', 'J');
+select testes.perfil('pessoa_j', 'pessoa', 'J');
+select testes.cliente('j1', 'J', 'pessoa_j');
+select testes.checkin('pessoa_j', 'j1', ((testes.hoje() - x.d)::timestamp + x.h * interval '1 hour') at time zone 'America/Sao_Paulo', 30)
+from (values (70, 9), (56, 11), (55, 13), (21, 15)) x(d, h);
+select testes.guardar('calor_j', 'admin_j',
+  format('public.checkins_por_dia_e_hora(p_de => %L::date, p_ate => %L::date)', testes.hoje() - 364, testes.hoje()));
+select is(array[testes.j('calor_j') ->> 'de', testes.j('calor_j') ->> 'ate'] || testes.calor(testes.j('calor_j')),
+  array[(testes.hoje() - 55)::text, testes.hoje()::text] || (select array_agg(x.d || '/' || x.h || '=1' order by x.d, x.h)
+    from (values (extract(dow from testes.hoje() - 55)::int, 13), (extract(dow from testes.hoje() - 21)::int, 15)) x(d, h)),
+  'calor, período longo: só as últimas 8 semanas (de hoje - 55 a hoje, devolvidas em de e ate); 10 semanas antes e o '
+  'dia antes da janela ficam fora, 3 semanas antes e o primeiro dia entram');
 
 -- ── Tempos ───────────────────────────────────────────────────────────────────
 -- 20 consultorias (V), 250 consultores (o n-ésimo é da consultoria (n - 1) % 20 + 1; os 20 primeiros administram), 5.000
@@ -588,6 +635,9 @@ select diag('central, Este ano: por dia ' || testes.media_ms_de(format('select p
 select performs_within('select public.horas_do_painel_por_dia()', 37.5, 37.5, 5, 'central: horas por dia em até 50 ms na média (+50%)');
 select performs_within('select public.horas_por_unidade_por_semana()', 37.5, 37.5, 5, 'central: horas por unidade em até 50 ms na média (+50%)');
 select performs_within('select public.checkins_por_dia_e_hora()', 37.5, 37.5, 5, 'central: calor em até 50 ms na média (+50%)');
+select performs_within(format('select public.checkins_por_dia_e_hora(p_de => %L::date, p_ate => %L::date)',
+    date_trunc('year', testes.hoje()::timestamp)::date, testes.hoje()), 37.5, 37.5, 5,
+  'central: calor de "Este ano" (as últimas 8 semanas) em até 50 ms na média (+50%)');
 select performs_within('select public.tarefas_por_situacao()', 37.5, 37.5, 5, 'central: tarefas em até 50 ms na média (+50%)');
 select performs_within('select public.clientes_por_cidade()', 37.5, 37.5, 5, 'central: cidades em até 50 ms na média (+50%)');
 select is(testes.varreduras('select public.horas_do_painel_por_dia()') + testes.varreduras('select public.horas_por_unidade_por_semana()')

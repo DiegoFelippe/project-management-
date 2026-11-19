@@ -144,6 +144,8 @@ describe('gráficos variados contra o banco de verdade', () => {
     expect(porDia.hoje).toBe(diaDeSaoPaulo(Date.now()))
     expect(porDia.capacidade).toEqual(expect.any(Number))
     const calor = await checkinsPorDiaEHora(ULTIMOS_30)
+    // 30 dias cabem nas 8 semanas: a janela é o período inteiro.
+    expect(calor).toMatchObject({ de: ULTIMOS_30.de, ate: ULTIMOS_30.ate })
     expect(calor.celulas).toHaveLength(98)
     expect(calor.celulas.filter((c) => c.checkins > 0)).toEqual([{
       dia_semana: diaDaSemanaEmSaoPaulo(ids.inicio), hora: Math.min(Math.max(horaEmSaoPaulo(ids.inicio), 7), 20), checkins: 1,
@@ -171,8 +173,16 @@ describe('gráficos variados contra o banco de verdade', () => {
     entrar('central')
     const porUnidade = await horasPorUnidadePorSemana(ULTIMOS_30)
     expect(porUnidade.recorte).toBe('tudo')
-    expect(porUnidade.series.map((s) => s.id)).toEqual(expect.arrayContaining([ids.A, ids.B]))
     expect(porUnidade.series.map((s) => s.id)).not.toContain(ids.pessoaA)
+    // Os dados do banco local também entram: A e B (1 h cada) aparecem com a própria série ou, fora das 8 maiores,
+    // dentro de "Outros".
+    const soma = (serie) => serie.horas.reduce((total, h) => total + h, 0)
+    const outros = porUnidade.series.find((s) => s.id === null)
+    for (const consultoria of [ids.A, ids.B]) {
+      const propria = porUnidade.series.find((s) => s.id === consultoria)
+      if (propria) expect(soma(propria)).toBe(1)
+      else expect(soma(outros)).toBeGreaterThanOrEqual(1)
+    }
   })
 })
 

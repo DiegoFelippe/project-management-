@@ -63,7 +63,8 @@ export const horasDoPainelPorDia = (periodo) => chamar('horas_do_painel_por_dia'
 // as 8 maiores e { id: null, nome: 'Outros' }. O consultor recebe sem_recorte (42501).
 export const horasPorUnidadePorSemana = (periodo) => chamar('horas_por_unidade_por_semana', argumentosDoPeriodo(periodo))
 
-// O calor: { celulas: [{ dia_semana (domingo = 0), hora (7 a 20), checkins }] }, as 98 células.
+// O calor das últimas 8 semanas do período (o período inteiro, se for mais curto): { de, ate (a janela usada), celulas:
+// [{ dia_semana (domingo = 0), hora (7 a 20), checkins }] }, as 98 células.
 export const checkinsPorDiaEHora = (periodo) => chamar('checkins_por_dia_e_hora', argumentosDoPeriodo(periodo))
 
 // A rosca, hoje (não depende do período): { feitas, nao_se_aplica, andamento, pausadas, a_fazer, atrasadas, checklists }.
