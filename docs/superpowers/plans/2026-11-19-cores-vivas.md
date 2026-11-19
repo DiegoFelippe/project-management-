@@ -74,3 +74,41 @@ os testes de cada um.
 - [ ] **Passo 3:** `npm test` (guardas `contraste`, `button.test`, `tipografiaVarredura`), lint, build; navegador como
   central, gestor e consultor em todas as telas do menu e na página do cliente (todas as abas), 1440 e 390, claro e
   escuro, comparando com as capturas de `docs/auditoria-ux/cores/`. Commit `Cores vivas: ladrilhos, selos, etiquetas e abas no cheio`.
+
+---
+
+## Fase 2 — paleta Tropical (19/11, "Aplicar a Tropical")
+
+O Diego trocou a direção (17:22): não queria cores fortes; quer cores alegres e leves (fundo suave com texto escuro, sem
+cor cheia além dos botões) e gráficos em tons frescos com o número escrito, conferidos pelo método da dataviz. Escolheu a
+paleta **Tropical** (19:13) e aprovou a aplicação (19:33). **Spec desta fase:** `docs/auditoria-ux/cores/versao-tropical.md`
+(tabelas claro/escuro mapeadas aos 9 nomes, estados, ordem das séries, saída do validador, linhas do `CLAUDE.md` que
+mudam, lista do que muda em `src/`) e `docs/auditoria-ux/cores/versao-leve.md` (a estrutura: suave + texto escuro);
+protótipo `docs/prototipo/cores-poc.html?cores=tropical`. A moldura (fundo da página, menu, bordas, azul dos botões) volta
+ao **Atual** (os valores de antes de `918f1ac`).
+
+### Task 3: Tokens Tropical, moldura de volta, ordem das séries, guardas e regras
+
+**Files:** `src/index.css` (paleta 9 × texto/forte/suave/cheio/sobre com os valores Tropical — `cheio` = o suave, `sobre`
+= o texto escuro —, estados, `--grafico-*`, moldura de volta ao Atual, `src/tema/tema.js`/`index.html` se a moldura
+escura voltar), `src/components/graficos/cores.js` (`PALETA` na ordem do validador: azul, mostarda, rosa, laranja,
+turquesa, indigo, violeta, verde; `COR` dos estados: feita verde, atenção âmbar, atrasada/perigo coral, em andamento
+azul, a fazer violeta, não se aplica grafite, pausada mostarda), `src/lib/contraste.test.js`, `CLAUDE.md` (as linhas que o
+relatório lista: sem cor cheia além de botões; ordem das séries; marcas leves com o número escrito e só a referência a
+4,5:1), `docs/superpowers/specs/2026-11-19-graficos-variados-e-paleta-design.md` seção 1.
+
+- [ ] Testes de contraste primeiro (texto/suave e sobre/cheio ≥ 4,5 nos dois temas; marcas no escuro ≥ 3; no claro, o
+  piso que o relatório justifica para marca com número escrito; estados), ver FALHAR; tokens; regras; `npm test`, lint,
+  build; navegador Início e Clientes claro/escuro. Commit `Cores: paleta Tropical (tokens, moldura de volta, ordem das séries e regras)`.
+
+### Task 4: Componentes de volta ao suave e número escrito nos gráficos
+
+Depende da Task 3. **Files:** os cinco componentes que o relatório da Leve lista (de cheio para suave: ladrilhos dos
+cartões e da faixa Hoje, selos, etiquetas/contadores do quadro, número da etapa, avatares se for o caso), e os gráficos
+que precisam do número ao lado da marca (totais das colunas empilhadas, totais por pessoa/situação na legenda, valores de
+hoje e da projeção na linha), com os testes.
+
+- [ ] Testes primeiro (nenhuma classe `bg-*-cheio` com `text-*-sobre` claro sobrando onde agora é suave; número escrito
+  em cada gráfico de marcas leves), ver FALHAR; escrever; `npm test` (guardas), lint, build; navegador como central,
+  gestor e consultor em todas as telas e abas do cliente, 1440/390, claro e escuro, comparando com o protótipo
+  `?cores=tropical`. Commit `Cores: componentes no suave e número escrito nos gráficos (Tropical)`.
