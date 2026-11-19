@@ -9,6 +9,7 @@ import JanelaFormulario from '@/components/comum/JanelaFormulario'
 import { useEnvio } from '@/components/comum/useEnvio'
 import { Textarea } from '@/components/ui/textarea'
 import { tarefasDoCheckin } from '@/data/checkins'
+import { somarDias } from '@/lib/calendario'
 import { CHECKIN_DE_MAIS_DE_24H } from '@/lib/erros'
 import { formatarDuracao, horasEntre } from '@/lib/horas'
 import { cn } from '@/lib/utils'
@@ -122,7 +123,11 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
   const fechando = Boolean(checkin?.inicio && !checkin?.fim)
   // Data do fim: sempre no check-out; nos outros, quando o check-in atravessa a meia-noite.
   const comDataDoFim = checkout || iniciais.dataFim !== iniciais.data
-  const diaDoFim = comDataDoFim ? dataFim : data
+  // Lançar horas sem Data do fim (revisão do lote F): um fim antes do início é do dia seguinte, como num ponto (Ontem
+  // 23:00 → 01:00 = 2 h). Mostrar a Data do fim aqui obrigaria a acertar duas datas a cada "Ontem", e quase todo
+  // atendimento acaba no mesmo dia; a Duração ao lado do Fim diz que passou da meia-noite.
+  const viraODia = lancar && Boolean(data && inicio && fim) && fim < inicio
+  const diaDoFim = comDataDoFim ? dataFim : viraODia ? somarDias(data, 1) : data
   const mudouInicio = data !== iniciais.data || inicio !== iniciais.inicio
   const mudouFim = diaDoFim !== iniciais.dataFim || fim !== iniciais.fim
   // O que vai ao banco: o início e o fim que a pessoa mudou (sem mexer, ficam os guardados, com os segundos).
@@ -184,7 +189,7 @@ export default function JanelaCheckin({ aberto, modo, nomeDoCliente, checkin, ao
     </Campo>
   )
   const campoFim = (
-    <Campo id="checkin-fim" rotulo="Fim" erro={erros.fim} dica={duracao && !checkout ? <span className="tabular-nums">Duração: {duracao}</span> : undefined}>
+    <Campo id="checkin-fim" rotulo="Fim" erro={erros.fim} dica={duracao && !checkout ? <span className="tabular-nums">Duração: {duracao}{viraODia && ', termina no dia seguinte'}</span> : undefined}>
       <CampoHora id="checkin-fim" valor={fim} aoMudar={setFim} obrigatorio />
     </Campo>
   )

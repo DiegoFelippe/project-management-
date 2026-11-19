@@ -525,7 +525,7 @@ describe('Clientes: check-in do consultor', () => {
     const janela = screen.getByRole('dialog', { name: 'Lançar horas em Provedor Alfa' })
     await escolherData(userEvent, 'Data', '2026-11-10')
     await escolherHora(userEvent, 'Início', '10:00')
-    await escolherHora(userEvent, 'Fim', '09:00')
+    await escolherHora(userEvent, 'Fim', '10:00')
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
     await userEvent.click(within(janela).getByRole('button', { name: 'Lançar horas' }))
     expect(within(janela).getByText('O fim precisa ser depois do início.')).toBeInTheDocument()

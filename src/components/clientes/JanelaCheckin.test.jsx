@@ -101,9 +101,10 @@ describe('JanelaCheckin: lançar horas', () => {
   }
   const enviar = (janela) => userEvent.click(within(janela).getByRole('button', { name: 'Lançar horas' }))
 
-  it('fim antes do início mostra o erro e não envia', async () => {
+  // Fim antes do início é do dia seguinte (a sessão passou da meia-noite); igual ao início, não há sessão.
+  it('fim igual ao início mostra o erro e não envia', async () => {
     const { aoSalvar, janela } = abrir()
-    await preencher(janela, { data: '2026-11-10', inicio: '10:00', fim: '09:00' })
+    await preencher(janela, { data: '2026-11-10', inicio: '10:00', fim: '10:00' })
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
     await enviar(janela)
     expect(within(janela).getByText('O fim precisa ser depois do início.')).toBeInTheDocument()
@@ -144,9 +145,9 @@ describe('JanelaCheckin: lançar horas', () => {
     expect(aoSalvar).not.toHaveBeenCalled()
   })
 
-  it('fim antes do início: o erro fica embaixo do Fim', async () => {
+  it('fim igual ao início: o erro fica embaixo do Fim', async () => {
     const { janela } = abrir()
-    await preencher(janela, { data: '2026-11-10', inicio: '10:00', fim: '09:00' })
+    await preencher(janela, { data: '2026-11-10', inicio: '10:00', fim: '10:00' })
     await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Reunião')
     await enviar(janela)
     expect(within(janela).getByLabelText('Fim')).toHaveAttribute('aria-invalid', 'true')
@@ -175,15 +176,30 @@ describe('JanelaCheckin: lançar horas', () => {
       })
     })
 
-    it('mostra a duração calculada ao lado do Fim (e nada enquanto falta um horário ou o fim vem antes)', async () => {
+    it('mostra a duração calculada ao lado do Fim (e nada enquanto falta um horário ou o fim é igual ao início)', async () => {
       const { janela } = abrir()
       expect(within(janela).queryByText(/Duração/)).toBeNull()
       await escolherHora(userEvent, 'Início', '09:00')
       await escolherHora(userEvent, 'Fim', '10:30')
       expect(within(janela).getByText('Duração: 1 h 30')).toBeInTheDocument()
       expect(within(janela).getByLabelText('Fim')).toHaveAccessibleDescription(/Duração: 1 h 30/)
-      await escolherHora(userEvent, 'Fim', '08:00')
+      await escolherHora(userEvent, 'Fim', '09:00')
       expect(within(janela).queryByText(/Duração/)).toBeNull()
+    })
+
+    // Revisão do lote F: a sessão que passa da meia-noite (Lançar horas não tem Data do fim).
+    it('fim antes do início é do dia seguinte: Ontem 23:00 → 01:00 lança 2 h, com a duração dizendo isso', async () => {
+      const { aoSalvar, janela } = abrir()
+      await userEvent.click(within(janela).getByRole('button', { name: 'Ontem' }))
+      await escolherHora(userEvent, 'Início', '23:00')
+      await escolherHora(userEvent, 'Fim', '01:00')
+      expect(within(janela).getByLabelText('Fim')).toHaveAccessibleDescription(/Duração: 2 h 00, termina no dia seguinte/)
+      await userEvent.type(within(janela).getByLabelText('O que foi feito'), 'Virada de sistema')
+      await enviar(janela)
+      expect(within(janela).getByLabelText('Fim')).not.toHaveAttribute('aria-invalid')
+      expect(aoSalvar).toHaveBeenCalledWith({
+        inicio: new Date('2026-11-09T23:00').toISOString(), fim: new Date('2026-11-10T01:00').toISOString(), descricao: 'Virada de sistema',
+      })
     })
   })
 
