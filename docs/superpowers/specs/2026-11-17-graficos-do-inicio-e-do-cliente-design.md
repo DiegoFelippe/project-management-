@@ -500,4 +500,5 @@ resumos), mantidas pelo banco, sem acesso pela tela. Nenhuma operação de CRUD 
 ## Decisões da construção
 
 - O tom da Ocupação segue o valor atual, como no protótipo: ir de 105% para 95% aparece como "ruim" (Task 5).
-- O separador do ranking de ocupação diz só "… N no meio" até a contagem `sem_capacidade` do banco (Task 3) chegar.
+- Ranking de ocupação: "… N no meio" conta só as unidades com capacidade; as sem capacidade que ficam de fora vão
+  para o fim, depois da última barra ("+ N consultores sem capacidade"), pela chave `ranking_resumo.sem_capacidade`.

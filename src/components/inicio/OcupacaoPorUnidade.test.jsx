@@ -26,6 +26,17 @@ describe('OcupacaoPorUnidade', () => {
     expect(linhas[7].querySelector('[data-icone="folga"]')).not.toBeNull()
   })
 
+  it('as sem capacidade que ficaram de fora aparecem depois da última barra (sem_capacidade); com 0, nada', () => {
+    const { unmount } = ver(painel({ ranking_resumo: { total: 16, acima: 2, folga: 7, no_meio: 2, sem_capacidade: 2 } }))
+    expect(screen.getByText('+ 2 consultores sem capacidade')).toBeInTheDocument()
+    unmount()
+    const { unmount: fechar } = ver(painel({ recorte: 'tudo', ranking_resumo: { total: 15, acima: 2, folga: 7, no_meio: 2, sem_capacidade: 1 } }))
+    expect(screen.getByText('+ 1 consultoria sem capacidade')).toBeInTheDocument()
+    fechar()
+    ver(painel({ ranking_resumo: { total: 14, acima: 2, folga: 7, no_meio: 2, sem_capacidade: 0 } }))
+    expect(screen.queryByText(/sem capacidade/)).not.toBeInTheDocument()
+  })
+
   it('leitura pelo ranking_resumo (todos, não só as 12 barras)', () => {
     ver(painel())
     expect(screen.getByText(/acima de 100%/).textContent).toBe('2 consultores acima de 100% · 7 com folga')

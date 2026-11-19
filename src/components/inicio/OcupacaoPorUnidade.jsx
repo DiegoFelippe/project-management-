@@ -33,6 +33,11 @@ export default function OcupacaoPorUnidade({ painel, recorte: recorteAgora, erro
   const verTodos = central ? `/consultorias?aba=ocupacao&mes=${mes}` : `/usuarios?mes=${mes}`
   const resumo = painel.ranking_resumo ?? {}
   const noMeio = resumo.no_meio ?? 0
+  // As sem capacidade vão para o fim da ordem: as que ficaram de fora aparecem depois da última barra.
+  const foraSemCapacidade = resumo.sem_capacidade ?? 0
+  const rodape = foraSemCapacidade > 0
+    ? `+ ${INTEIRO.format(foraSemCapacidade)} ${central ? (foraSemCapacidade === 1 ? 'consultoria' : 'consultorias') : (foraSemCapacidade === 1 ? 'consultor' : 'consultores')} sem capacidade`
+    : undefined
   const neste = painel.intervalo ? 'neste período' : 'neste mês'
   const usado = (u) => (passado ? u.realizado : u.reservado)
   const acoes = (
@@ -48,7 +53,7 @@ export default function OcupacaoPorUnidade({ painel, recorte: recorteAgora, erro
         colunas: [central ? 'Consultoria' : 'Consultor', passado ? 'Utilização' : 'Ocupação', passado ? 'Realizado' : 'Reservado', 'Capacidade'],
         linhas: ranking.map((u) => [u.nome, formatarOcupacao(u.ocupacao), formatarHoras(usado(u)), formatarHoras(u.capacidade)]),
       }}>
-      <BarrasHorizontais rotulo={titulo} marca100={{ valor: 1, rotulo: '100%' }}
+      <BarrasHorizontais rotulo={titulo} marca100={{ valor: 1, rotulo: '100%' }} rodape={rodape}
         escalaMax={Math.max(1.25, ...ranking.map((u) => u.ocupacao ?? 0)) * 1.03}
         separador={noMeio > 0 ? { depoisDe: 6, texto: `… ${INTEIRO.format(noMeio)} no meio` } : null}
         itens={ranking.map((u) => {
