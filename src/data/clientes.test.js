@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
 import {
-  buscarClientes, contarClientesAtivos, hojeDoCliente, horasPorDia, horasPorMes, listarClientes, listarEventos,
+  buscarClientes, checkinsPorSemana, contarClientesAtivos, hojeDoCliente, horasPorConsultor, horasPorDia, horasPorMes,
+  listarClientes, listarEventos,
 } from './clientes'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
@@ -121,6 +122,32 @@ describe('gráficos da aba Geral (nomes dos parâmetros)', () => {
     vi.mocked(supabase.rpc).mockResolvedValue({ data: mes, error: null })
     expect(await horasPorDia('k1', '2026-11-01')).toEqual(mes)
     expect(supabase.rpc).toHaveBeenLastCalledWith('horas_do_cliente_por_dia', { p_cliente: 'k1', p_mes: '2026-11-01' })
+  })
+
+  it('horasPorMes(id, até, meses): quantos meses até o mês do até (o período do filtro cobre mais de 6)', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: [], error: null })
+    await horasPorMes('k1', '2026-11-01', 13)
+    expect(supabase.rpc).toHaveBeenLastCalledWith('horas_do_cliente_por_mes', { p_cliente: 'k1', p_meses: 13, p_ate: '2026-11-01' })
+  })
+
+  it('num período { de, ate }, as funções do período (o mês continua com as do mês)', async () => {
+    const periodo = { de: '2026-10-21', ate: '2026-11-19' }
+    const dias = { de: periodo.de, ate: periodo.ate, ate_efetivo: periodo.ate, dias: [], realizado: 0, previsao: 29.4, previsao_mes: 30 }
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: dias, error: null })
+    expect(await horasPorDia('k1', periodo)).toEqual(dias)
+    expect(supabase.rpc).toHaveBeenLastCalledWith('horas_do_cliente_por_dia_no_periodo', { p_cliente: 'k1', p_de: periodo.de, p_ate: periodo.ate })
+
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: [{ consultor_id: 'p1', nome: 'Ana', horas: '3.5' }], error: null })
+    expect(await horasPorConsultor('k1', periodo)).toEqual([{ consultorId: 'p1', nome: 'Ana', horas: 3.5 }])
+    expect(supabase.rpc).toHaveBeenLastCalledWith('horas_do_cliente_por_consultor_no_periodo', { p_cliente: 'k1', p_de: periodo.de, p_ate: periodo.ate })
+    await horasPorConsultor('k1', '2026-11-01')
+    expect(supabase.rpc).toHaveBeenLastCalledWith('horas_do_cliente_por_consultor', { p_cliente: 'k1', p_mes: '2026-11-01' })
+
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: [{ semana: '2026-10-19', quantidade: 2, horas: '3' }], error: null })
+    expect(await checkinsPorSemana('k1', periodo)).toEqual([{ semana: '2026-10-19', quantidade: 2, horas: 3 }])
+    expect(supabase.rpc).toHaveBeenLastCalledWith('checkins_do_cliente_por_semana_no_periodo', { p_cliente: 'k1', p_de: periodo.de, p_ate: periodo.ate })
+    await checkinsPorSemana('k1', '2026-11-01')
+    expect(supabase.rpc).toHaveBeenLastCalledWith('checkins_do_cliente_por_semana', { p_cliente: 'k1', p_mes: '2026-11-01' })
   })
 
   it('hojeDoCliente manda p_cliente e devolve o JSON do banco (nulo quando a pessoa não vê o cliente)', async () => {

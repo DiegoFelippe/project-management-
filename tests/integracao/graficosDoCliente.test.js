@@ -13,7 +13,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
-const { hojeDoCliente, horasPorDia, horasPorMes } = await import('../../src/data/clientes.js')
+const { checkinsPorSemana, hojeDoCliente, horasPorConsultor, horasPorDia, horasPorMes } = await import('../../src/data/clientes.js')
 const { quadroDoCliente } = await import('../../src/data/quadro.js')
 
 const admin = clienteAdmin()
@@ -143,5 +143,37 @@ describe('faixa Hoje e horas do cliente contra o banco de verdade', () => {
     const meses = await horasPorMes(ids.muda, ate)
     expect(meses).toHaveLength(6)
     expect(meses.at(-1).mes).toBe(`${ate.slice(0, 7)}-01`)
+    expect(await horasPorMes(ids.muda, ate, 13)).toHaveLength(13)
+  })
+
+  it('no período (filtro da aba Geral): as funções do período somam o que cada um vê e recusam o período inválido', async () => {
+    // Cliente da pessoaA na A com 1 h há 2 dias; o período são os últimos 30 dias.
+    const cliente = await novoCliente(`Período ${marca}`, ids.A, ids.pessoaA)
+    const inicio = Date.now() - 2 * DIA
+    confere(await sessoes.pessoaA.from('checkins').insert({
+      cliente_id: cliente, inicio: new Date(inicio).toISOString(), fim: new Date(inicio + HORA).toISOString(), descricao: 'Período',
+    }))
+    const hoje = diaDeSaoPaulo(Date.now())
+    const periodo = { de: diaDeSaoPaulo(Date.now() - 29 * DIA), ate: hoje }
+
+    entrar('adminA')
+    const dias = await horasPorDia(cliente, periodo)
+    expect(dias).toMatchObject({ de: periodo.de, ate: hoje, ate_efetivo: hoje, realizado: 1, previsao_mes: 10 })
+    expect(dias.dias).toHaveLength(30)
+    expect(dias.previsao).toBeGreaterThan(9)
+    expect(await horasPorConsultor(cliente, periodo)).toEqual([{ consultorId: ids.pessoaA, nome: expect.any(String), horas: 1 }])
+    const semanas = await checkinsPorSemana(cliente, periodo)
+    expect(semanas.reduce((soma, s) => soma + s.quantidade, 0)).toBe(1)
+
+    // A gestão da B não soma nada do cliente da A nem vê a previsão.
+    entrar('adminB')
+    expect(await horasPorDia(cliente, periodo)).toMatchObject({ realizado: 0, previsao: null, previsao_mes: null })
+    expect(await horasPorConsultor(cliente, periodo)).toEqual([])
+    expect((await checkinsPorSemana(cliente, periodo)).every((s) => s.quantidade === 0)).toBe(true)
+
+    // As mesmas recusas do Início.
+    entrar('adminA')
+    await expect(horasPorDia(cliente, { de: hoje, ate: periodo.de })).rejects
+      .toMatchObject({ code: '22023', message: 'periodo_invalido', details: 'A data inicial vem depois da final.' })
   })
 })

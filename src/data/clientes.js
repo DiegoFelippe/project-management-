@@ -155,17 +155,24 @@ async function chamar(funcao, argumentos) {
   return data
 }
 
-// Os 6 meses até o mês de `ate` (qualquer dia dele; nulo ou futuro = o atual), do mais antigo ao mais novo:
-// [{ mes: '2026-06-01', realizado }].
-export async function horasPorMes(clienteId, ate = null) {
-  const linhas = await chamar('horas_do_cliente_por_mes', { p_cliente: clienteId, p_meses: 6, p_ate: ate })
+// Os `meses` meses (6 por padrão; o banco aceita até 24) até o mês de `ate` (qualquer dia dele; nulo ou futuro = o atual),
+// do mais antigo ao mais novo: [{ mes: '2026-06-01', realizado }].
+export async function horasPorMes(clienteId, ate = null, meses = 6) {
+  const linhas = await chamar('horas_do_cliente_por_mes', { p_cliente: clienteId, p_meses: meses, p_ate: ate })
   return linhas.map((l) => ({ mes: l.mes, realizado: Number(l.realizado) }))
 }
 
-// O mês (qualquer dia dele; nulo = o atual) dia a dia, como o banco manda: { mes, dias: [{ dia, horas, acumulado }],
-// realizado, previsao, projecao (só no mês atual, a partir do dia 7), dias_no_mes }.
-export function horasPorDia(clienteId, mes = null) {
-  return chamar('horas_do_cliente_por_dia', { p_cliente: clienteId, p_mes: mes })
+// `periodo`: o mês 'AAAA-MM-01' (nulo = o atual), com as funções do mês, ou { de, ate } (dias de São Paulo, inclusive),
+// com as funções do período, que recusam o período inválido como o Início (periodo_invalido).
+const doPeriodo = (clienteId, periodo, funcao) => (periodo?.de
+  ? chamar(`${funcao}_no_periodo`, { p_cliente: clienteId, p_de: periodo.de, p_ate: periodo.ate })
+  : chamar(funcao, { p_cliente: clienteId, p_mes: periodo }))
+
+// Dia a dia, como o banco manda. No mês: { mes, dias: [{ dia, horas, acumulado }], realizado, previsao, projecao (só no
+// mês atual, a partir do dia 7), dias_no_mes }. No período: { de, ate, ate_efetivo, dias (até hoje no máximo), realizado,
+// previsao (proporcional aos dias), previsao_mes }.
+export function horasPorDia(clienteId, periodo = null) {
+  return doPeriodo(clienteId, periodo, 'horas_do_cliente_por_dia')
 }
 
 // A faixa "Hoje" (a situação de hoje, no recorte de quem vê), como o banco manda: { arquivado_em, previsao, checkin,
@@ -174,14 +181,14 @@ export function hojeDoCliente(clienteId) {
   return chamar('hoje_do_cliente', { p_cliente: clienteId })
 }
 
-// Horas do mês por consultor (mais horas primeiro): [{ consultorId, nome (null se não visível), horas }].
-export async function horasPorConsultor(clienteId, mes) {
-  const linhas = await chamar('horas_do_cliente_por_consultor', { p_cliente: clienteId, p_mes: mes })
+// Horas por consultor no mês ou no período (mais horas primeiro): [{ consultorId, nome (null se não visível), horas }].
+export async function horasPorConsultor(clienteId, periodo) {
+  const linhas = await doPeriodo(clienteId, periodo, 'horas_do_cliente_por_consultor')
   return linhas.map((l) => ({ consultorId: l.consultor_id, nome: l.nome, horas: Number(l.horas) }))
 }
 
-// Semanas (segunda a domingo) que tocam o mês: [{ semana: '2026-11-02', quantidade, horas }].
-export async function checkinsPorSemana(clienteId, mes) {
-  const linhas = await chamar('checkins_do_cliente_por_semana', { p_cliente: clienteId, p_mes: mes })
+// Semanas (segunda a domingo) que tocam o mês ou o período: [{ semana: '2026-11-02', quantidade, horas }].
+export async function checkinsPorSemana(clienteId, periodo) {
+  const linhas = await doPeriodo(clienteId, periodo, 'checkins_do_cliente_por_semana')
   return linhas.map((l) => ({ semana: l.semana, quantidade: Number(l.quantidade), horas: Number(l.horas) }))
 }
