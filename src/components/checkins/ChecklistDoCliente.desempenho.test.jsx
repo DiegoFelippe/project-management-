@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { lerChecklist, marcarTarefa } from '@/data/checklists'
+import { comentariosDaTarefa, historicoDaTarefa, lerChecklist, marcarTarefa } from '@/data/checklists'
 import { renderizarTela } from '@/test/renderizar'
 import ChecklistDoCliente from './ChecklistDoCliente'
 
@@ -18,7 +18,8 @@ vi.mock('./fluxo', async (importOriginal) => {
 })
 vi.mock('@/data/checklists', () => ({
   lerChecklist: vi.fn(), modelosParaAplicar: vi.fn(), aplicarModelo: vi.fn(), mudarInicio: vi.fn(), tirarModelo: vi.fn(),
-  marcarTarefa: vi.fn(), anotarTarefa: vi.fn(),
+  marcarTarefa: vi.fn(), anotarTarefa: vi.fn(), trocarMotivo: vi.fn(), comentariosDaTarefa: vi.fn(), comentarTarefa: vi.fn(),
+  editarComentarioDaTarefa: vi.fn(), apagarComentarioDaTarefa: vi.fn(), historicoDaTarefa: vi.fn(),
 }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
 
@@ -52,6 +53,8 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-17T15:00:00Z') })
   contagem.caixas = 0
   contagem.layouts = 0
+  vi.mocked(comentariosDaTarefa).mockResolvedValue({ itens: [], haMais: false, podeComentar: true })
+  vi.mocked(historicoDaTarefa).mockResolvedValue({ eventos: [], trechos: [], tempo_segundos: 0 })
 })
 afterEach(() => vi.useRealTimers())
 
@@ -69,7 +72,7 @@ describe('ChecklistDoCliente com 500 tarefas', () => {
     contagem.caixas = 0
     await userEvent.click(caixa)
     await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(caixa.closest('li')).toHaveTextContent('por Ana Lima em 17/11/2026'))
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Tarefa 2' })).toBeEnabled())
     expect(caixa).toBeChecked()
     // A seguinte ficou livre.
     expect(screen.getByRole('checkbox', { name: 'Tarefa 2' })).toBeEnabled()
@@ -84,7 +87,8 @@ describe('ChecklistDoCliente com 500 tarefas', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Fluxograma' }))
     expect(contagem.layouts).toBe(1)
     await userEvent.click(screen.getByRole('button', { name: 'Tarefa 1: A fazer' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Marcar como feita' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Feita' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Tarefa 1: Feita' })).toBeInTheDocument())
     expect(contagem.layouts).toBe(1)

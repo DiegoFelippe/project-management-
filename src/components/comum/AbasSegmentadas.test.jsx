@@ -49,6 +49,17 @@ describe('AbasSegmentadas (lista)', () => {
     expect(pendente).toHaveClass('bg-notice-soft', 'text-notice')
   })
 
+  it('aba desligada (ex.: situação que espera outra tarefa): não clica, fica esmaecida', async () => {
+    const aoMudar = vi.fn()
+    render(<AbasSegmentadas rotulo="Situação" valor="a" aoMudar={aoMudar}
+      abas={[{ valor: 'a', rotulo: 'A fazer' }, { valor: 'b', rotulo: 'Feita', desligada: true }]} />)
+    const feita = screen.getByRole('button', { name: 'Feita' })
+    expect(feita).toBeDisabled()
+    expect(feita).toHaveClass('disabled:opacity-50')
+    await userEvent.click(feita)
+    expect(aoMudar).not.toHaveBeenCalled()
+  })
+
   it('contador zero aparece (zero não é "sem número")', () => {
     render(<AbasSegmentadas rotulo="Mostrar" abas={[{ valor: 'a', rotulo: 'Ativos', contador: 0 }]} valor="a" aoMudar={() => {}} />)
     expect(screen.getByRole('button', { name: /Ativos/ })).toHaveTextContent('0')

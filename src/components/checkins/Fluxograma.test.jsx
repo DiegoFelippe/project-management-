@@ -90,6 +90,17 @@ describe('Fluxograma', () => {
     expect(container.querySelector('[data-tarefa="t2"]')).not.toHaveClass('opacity-30')
   })
 
+  it('pausada: caixa com o ícone de pausa e outro estilo que o de em andamento', () => {
+    const info = (t) => ({ cor: t.id === 't1' ? 'pausada' : 'andamento', sub: t.id === 't1' ? 'Pausada · 20/11' : 'Em andamento', rotulo: '' })
+    const { container } = render(<Fluxograma etapas={ETAPAS} tarefas={TAREFAS} infoDaTarefa={info} rotulo="X" />)
+    const pausada = container.querySelector('[data-tarefa="t1"]')
+    const andamento = container.querySelector('[data-tarefa="t2"]')
+    expect(pausada).toHaveAttribute('data-situacao', 'pausada')
+    expect(pausada.querySelector('.lucide-pause')).not.toBeNull()
+    expect(pausada.querySelector('rect').getAttribute('class')).not.toBe(andamento.querySelector('rect').getAttribute('class'))
+    expect(within(pausada).getByText('Pausada · 20/11')).toBeInTheDocument()
+  })
+
   it('setas do "depende de" com a classe do estado: a que sai de tarefa feita é "feita"; as da selecionada, "realce", por cima', () => {
     const { container, rerender } = desenhar()
     expect(seta(container, 't1', 't2')).toHaveClass('feita')
@@ -236,12 +247,14 @@ describe('Fluxograma', () => {
 })
 
 describe('LegendaDoFluxo', () => {
-  it('mostra as sete situações (com "Não se aplica" e o ícone dele), o "depende de" e a dica', () => {
+  it('mostra as oito situações (com "Não se aplica" e "Pausada" e os ícones deles), o "depende de" e a dica', () => {
     render(<LegendaDoFluxo dica="Clique numa tarefa para ver os detalhes." />)
     const legenda = screen.getByRole('list', { name: 'Legenda do fluxograma' })
     const itens = within(legenda).getAllByRole('listitem').map((li) => li.textContent)
-    expect(itens).toEqual(['Feita', 'Não se aplica', 'Em andamento', 'A fazer', 'Bloqueada', 'Vence hoje', 'Atrasada', 'depende de'])
+    expect(itens).toEqual(['Feita', 'Não se aplica', 'Em andamento', 'Pausada', 'A fazer', 'Bloqueada', 'Vence hoje', 'Atrasada', 'depende de'])
     expect(within(legenda).getByText('Não se aplica').querySelector('.lucide-ban')).not.toBeNull()
+    // Pausada: o ícone de pausa (nunca só a cor) e outro estilo que o de em andamento.
+    expect(within(legenda).getByText('Pausada').querySelector('.lucide-pause')).not.toBeNull()
     expect(screen.getByText('Clique numa tarefa para ver os detalhes.')).toHaveClass('text-legenda')
   })
 

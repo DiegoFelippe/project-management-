@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  contagemDaEtapa, diaCurto, estaResolvida, feitaPorEm, mesmaSituacao, naoSeAplicaEmPalavras, progressoEmPalavras,
+  contagemDaEtapa, diaCurto, entraNoFiltro, estaResolvida, feitaPorEm, mesmaSituacao, naoSeAplicaEmPalavras, progressoEmPalavras,
   quandoVence, resumoDaSituacao, rotuloDaSituacao, situacaoDaTarefa,
 } from './situacao'
 
@@ -106,6 +106,29 @@ describe('situacaoDaTarefa', () => {
     const porMapa = new Map(TODAS.map((x) => [x.id, x]))
     expect(situacao(BLOQUEADA, porMapa).espera.map((x) => x.id)).toEqual(['pendente', 'andamento'])
     expect(situacao(t('x', { vence_em: null }))).toMatchObject({ cor: 'livre', faltam: null, atrasada: false, venceHoje: false })
+  })
+})
+
+describe('pausada (acréscimo de 18/11 (2))', () => {
+  const PAUSADA = t('pausada', { estado: 'pausada', vence_em: '2026-11-20' })
+  const COM_PAUSADA = { ...POR_ID, pausada: PAUSADA }
+
+  it('cor própria e pendente: atrasada e "vence hoje" vêm antes na cor; segura as que dependem dela', () => {
+    expect(situacao(PAUSADA, COM_PAUSADA)).toMatchObject({ cor: 'pausada', faltam: 3, bloqueada: false })
+    expect(situacao(t('p', { estado: 'pausada', vence_em: '2026-11-16' }))).toMatchObject({ cor: 'atrasada', atrasada: true })
+    expect(situacao(t('p', { estado: 'pausada', vence_em: HOJE }))).toMatchObject({ cor: 'hoje', venceHoje: true })
+    expect(situacao(t('d', { depende_de: ['pausada'] }), COM_PAUSADA)).toMatchObject({ cor: 'bloqueada', bloqueada: true })
+    expect(estaResolvida(PAUSADA)).toBe(false)
+    expect(entraNoFiltro(PAUSADA, 'pendentes')).toBe(true)
+    expect(entraNoFiltro(PAUSADA, 'feitas')).toBe(false)
+  })
+
+  it('o nome e a linha de baixo do fluxograma dizem "Pausada" (bloqueada: com quantas ela espera)', () => {
+    expect(rotuloDaSituacao(PAUSADA, situacao(PAUSADA, COM_PAUSADA))).toBe('Pausada')
+    expect(resumoDaSituacao(PAUSADA, situacao(PAUSADA, COM_PAUSADA))).toBe('Pausada · 20/11')
+    const presa = t('presa', { estado: 'pausada', depende_de: ['pendente'] })
+    expect(rotuloDaSituacao(presa, situacao(presa))).toBe('Pausada · espera 1 tarefa')
+    expect(resumoDaSituacao(presa, situacao(presa))).toBe('Pausada · espera 1')
   })
 })
 

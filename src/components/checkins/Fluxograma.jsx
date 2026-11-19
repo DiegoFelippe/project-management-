@@ -1,5 +1,5 @@
 import { useId, useMemo, useRef } from 'react'
-import { ArrowRight, Ban, Check, Circle, Clock, Lock, Play, TriangleAlert } from 'lucide-react'
+import { ArrowRight, Ban, Check, Circle, Clock, Lock, Pause, Play, TriangleAlert } from 'lucide-react'
 import { TAMANHO } from '@/lib/tipografia'
 import { cn } from '@/lib/utils'
 import { ALTURA_DO_NO, LARGURA_DO_NO, caminhoDaSeta, cortar, layoutDoFluxo, quebrarTitulo } from './fluxo'
@@ -15,6 +15,8 @@ const ESTILO = {
   livre: { tom: 'text-muted-foreground', fundo: 'fill-card stroke-input' },
   feita: { tom: 'text-positive', fundo: 'fill-positive-soft stroke-positive' },
   andamento: { tom: 'text-primary', fundo: 'fill-accent stroke-primary' },
+  // Pausada: o fundo do cartão (em andamento é azul-claro), a borda e o texto no azul de texto, e o ícone de pausa.
+  pausada: { tom: 'text-primary-texto', fundo: 'fill-card stroke-primary-texto' },
   bloqueada: { tom: 'text-muted-foreground', fundo: 'fill-muted stroke-input', tracejada: true, titulo: 'fill-muted-foreground' },
   hoje: { tom: 'text-notice', fundo: 'fill-notice-soft stroke-notice' },
   atrasada: { tom: 'text-destructive', fundo: 'fill-destructive/10 stroke-destructive' },
@@ -22,7 +24,7 @@ const ESTILO = {
   nao_se_aplica: { tom: 'text-muted-foreground', fundo: 'fill-muted stroke-muted-foreground/60', titulo: 'fill-muted-foreground' },
 }
 const ICONE = {
-  livre: Circle, feita: Check, andamento: Play, bloqueada: Lock, hoje: Clock, atrasada: TriangleAlert, nao_se_aplica: Ban,
+  livre: Circle, feita: Check, andamento: Play, pausada: Pause, bloqueada: Lock, hoje: Clock, atrasada: TriangleAlert, nao_se_aplica: Ban,
 }
 
 // Setas: a que sai de tarefa feita fica verde; as da tarefa escolhida, em destaque (por cima das outras); a que aponta
@@ -250,7 +252,7 @@ export default function Fluxograma({
 }
 
 const ITENS_DA_LEGENDA = [
-  ['feita', 'Feita'], ['nao_se_aplica', 'Não se aplica'], ['andamento', 'Em andamento'], ['livre', 'A fazer'],
+  ['feita', 'Feita'], ['nao_se_aplica', 'Não se aplica'], ['andamento', 'Em andamento'], ['pausada', 'Pausada'], ['livre', 'A fazer'],
   ['bloqueada', 'Bloqueada'], ['hoje', 'Vence hoje'], ['atrasada', 'Atrasada'],
 ]
 const AMOSTRA = {
@@ -270,9 +272,9 @@ export function LegendaDoFluxo({ dica }) {
       <ul aria-label="Legenda do fluxograma" className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
         {ITENS_DA_LEGENDA.map(([cor, texto]) => (
           <li key={cor} className="inline-flex items-center gap-1.5">
-            {cor === 'nao_se_aplica'
-              ? <Ban aria-hidden="true" className="size-3.5" />
-              : <span aria-hidden="true" className={cn('inline-block h-2.5 w-3.5 rounded-[3px] border', AMOSTRA[cor])} />}
+            {cor === 'nao_se_aplica' ? <Ban aria-hidden="true" className="size-3.5" />
+              : cor === 'pausada' ? <Pause aria-hidden="true" className="text-primary-texto size-3.5" />
+                : <span aria-hidden="true" className={cn('inline-block h-2.5 w-3.5 rounded-[3px] border', AMOSTRA[cor])} />}
             {texto}
           </li>
         ))}

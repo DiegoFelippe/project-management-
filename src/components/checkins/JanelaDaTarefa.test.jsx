@@ -1,286 +1,288 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
-import JanelaDaTarefa from './JanelaDaTarefa'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { comentariosDaTarefa, historicoDaTarefa } from '@/data/checklists'
+import JanelaDaTarefa, { JanelaNaoSeAplica } from './JanelaDaTarefa'
 import { situacaoDaTarefa } from './situacao'
 
+vi.mock('@/data/checklists', () => ({
+  comentariosDaTarefa: vi.fn(), comentarTarefa: vi.fn(), editarComentarioDaTarefa: vi.fn(), apagarComentarioDaTarefa: vi.fn(),
+  historicoDaTarefa: vi.fn(),
+}))
+
+// "Hoje" é 17/11/2026 em São Paulo (12:00).
+const AGORA = new Date('2026-11-17T15:00:00Z')
 const HOJE = '2026-11-17'
 const ETAPAS = [{ id: 'e1', nome: 'Diagnóstico' }, { id: 'e2', nome: 'Plano' }]
 const t = (id, etapa, titulo, campos = {}) => ({
   id, etapa_id: etapa, titulo, descricao: null, obrigatoria: true, prazo_dias: 10, vence_em: '2026-11-20', estado: 'a_fazer',
-  nota: null, feita_em: null, feita_por: null, depende_de: [], na_sessao: false, ...campos,
+  nota: null, motivo: null, feita_em: null, feita_por: null, depende_de: [], na_sessao: false, tempo_segundos: 0,
+  trecho_aberto_desde: null, comentarios: 0, ...campos,
 })
 const TAREFAS = [
   t('t1', 'e1', 'Reunião de alinhamento', { prazo_dias: 2, vence_em: '2026-11-12', estado: 'feita', feita_em: '2026-11-12T15:00:00Z', feita_por: { nome: 'Ana Lima' } }),
   t('t2', 'e1', 'Análise do DRE', { descricao: 'Últimos 12 meses', depende_de: ['t1'], nota: 'Faltam os extratos' }),
-  t('t3', 'e2', 'Mapa de custos', { obrigatoria: false, prazo_dias: 7, vence_em: '2026-11-17', depende_de: ['t2'] }),
-  t('t4', 'e2', 'Plano de ação', { prazo_dias: 3, vence_em: '2026-11-13', estado: 'andamento' }),
-  t('t5', 'e2', 'Revisão', { estado: 'andamento', depende_de: ['t2', 't3'] }),
+  t('t3', 'e2', 'Mapa de custos', { obrigatoria: false, prazo_dias: 7, vence_em: HOJE, depende_de: ['t2'] }),
+  t('t4', 'e2', 'Plano de ação', {
+    prazo_dias: 3, vence_em: '2026-11-13', estado: 'andamento', tempo_segundos: 300, trecho_aberto_desde: '2026-11-17T14:55:00Z',
+    lido_em: AGORA.getTime(),
+  }),
+  t('t5', 'e2', 'Revisão', { estado: 'pausada', tempo_segundos: 12 * 60 }),
+  t('t6', 'e2', 'Inventário', {
+    estado: 'nao_se_aplica', motivo: 'O cliente não tem estoque', feita_em: '2026-11-14T15:00:00Z', feita_por: { nome: 'Ana Lima' },
+  }),
 ]
 
-function abrir(id, { podeMarcar = true, tarefas = TAREFAS, aoAgir = vi.fn().mockResolvedValue({ erro: null }) } = {}) {
+function abrir(id, { podeMarcar = true, tarefas = TAREFAS, aoSalvar = vi.fn().mockResolvedValue({ erro: null }) } = {}) {
   const porId = new Map(tarefas.map((x) => [x.id, x]))
   const situacoes = new Map(tarefas.map((x) => [x.id, situacaoDaTarefa(x, porId, HOJE)]))
   const aoFechar = vi.fn()
-  const aoAbrir = vi.fn()
+  const aoMexer = vi.fn()
   render(
     <JanelaDaTarefa tarefa={porId.get(id)} etapas={ETAPAS} tarefas={tarefas} situacoes={situacoes} nomeDoCliente="Provedor Alfa"
-      inicio="2026-11-10" podeMarcar={podeMarcar} aoAgir={aoAgir} aoAbrir={aoAbrir} aoFechar={aoFechar} />,
+      inicio="2026-11-10" podeMarcar={podeMarcar} aoSalvar={aoSalvar} aoMexer={aoMexer} aoFechar={aoFechar} />,
   )
   const janela = screen.getByRole('dialog', { name: porId.get(id).titulo })
   const rodape = janela.querySelector('[data-slot="janela-rodape"]')
   const botoes = () => within(rodape).getAllByRole('button').map((b) => b.textContent.trim())
-  return { janela, rodape, botoes, aoAgir, aoFechar, aoAbrir }
+  const situacao = () => within(janela).getByRole('group', { name: 'Situação' })
+  const aba = (nome) => within(situacao()).getByRole('button', { name: nome })
+  return { janela, rodape, botoes, situacao, aba, aoSalvar, aoFechar, aoMexer }
 }
 
-describe('JanelaDaTarefa', () => {
-  it('mostra onde a tarefa está, os selos, a descrição, o prazo, a situação, do que depende e o que libera', () => {
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.useFakeTimers({ toFake: ['Date'], now: AGORA })
+  vi.mocked(comentariosDaTarefa).mockResolvedValue({ itens: [], haMais: false, podeComentar: true })
+  vi.mocked(historicoDaTarefa).mockResolvedValue({ eventos: [], trechos: [], tempo_segundos: 0 })
+})
+afterEach(() => vi.useRealTimers())
+
+describe('JanelaDaTarefa (Editar tarefa)', () => {
+  it('onde a tarefa está, o que vem do modelo (só ler), o prazo (só ler) e a nota', () => {
     const { janela } = abrir('t2')
-    expect(janela).toHaveTextContent('Provedor Alfa · etapa 1, Diagnóstico · obrigatória')
-    expect(janela).toHaveTextContent('Vence 20/11')
+    expect(janela).toHaveTextContent('Editar tarefa · Provedor Alfa · etapa 1, Diagnóstico · obrigatória')
     expect(janela).toHaveTextContent('Últimos 12 meses')
-    expect(janela).toHaveTextContent('20/11/2026 · dia 10 a partir de 10/11/2026')
-    expect(janela).toHaveTextContent('Faltam 3 dias')
-    const depende = within(janela).getByRole('list', { name: 'Depende de' })
-    expect(within(depende).getByRole('button', { name: /Reunião de alinhamento/ })).toHaveTextContent('Feita')
-    const libera = within(janela).getByRole('list', { name: 'Libera' })
-    expect(within(libera).getAllByRole('button').map((b) => b.textContent)).toEqual([
-      'Mapa de custosBloqueada, vence hoje', 'RevisãoEm andamento · espera 2 tarefas',
-    ])
-    expect(within(janela).getByLabelText('Nota (opcional)')).toHaveValue('Faltam os extratos')
+    expect(janela).toHaveTextContent('Vem do modelo: o título e a descrição mudam no modelo.')
+    const prazo = within(janela).getByRole('region', { name: 'Prazo' })
+    expect(prazo).toHaveTextContent('Vence 20/11 · faltam 3 dias')
+    expect(prazo).toHaveTextContent('sexta-feira, 20/11/2026 · dia 10 a partir de 10/11/2026')
+    expect(within(prazo).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(janela).getByRole('textbox', { name: 'Nota (opcional)' })).toHaveValue('Faltam os extratos')
   })
 
-  it('sem dependências e sem quem espere por ela, diz isso', () => {
-    const { janela } = abrir('t4')
-    expect(janela).toHaveTextContent('Nada: pode começar quando quiser.')
-    expect(janela).toHaveTextContent('Nenhuma tarefa espera por esta.')
+  it('situação em abas: A fazer, Em andamento, Pausada, Feita e Não se aplica, com a de agora escolhida', () => {
+    const { situacao, aba } = abrir('t2')
+    expect(within(situacao()).getAllByRole('button').map((b) => b.textContent)).toEqual(['A fazer', 'Em andamento', 'Pausada', 'Feita', 'Não se aplica'])
+    expect(aba('A fazer')).toHaveAttribute('aria-pressed', 'true')
+    for (const b of within(situacao()).getAllByRole('button')) expect(b).toBeEnabled()
   })
 
-  it('a fazer (livre): Começar e Marcar como feita; cada um manda a situação com a nota', async () => {
-    const { botoes, rodape, aoAgir, aoFechar } = abrir('t2')
-    expect(botoes()).toEqual(['Cancelar', 'Começar', 'Marcar como feita'])
-    await userEvent.click(within(rodape).getByRole('button', { name: 'Começar' }))
-    expect(aoAgir).toHaveBeenCalledWith({ estado: 'andamento', nota: 'Faltam os extratos' })
-    expect(aoFechar).toHaveBeenCalled()
-  })
-
-  it('Marcar como feita é o botão principal (envia o formulário), com a nota mudada', async () => {
-    const { janela, rodape, aoAgir } = abrir('t2')
-    const nota = within(janela).getByLabelText('Nota (opcional)')
+  it('trocar a situação e salvar manda a situação e a nota (Salvar mostra "Salvando…")', async () => {
+    let responder
+    const aoSalvar = vi.fn(() => new Promise((r) => { responder = r }))
+    const { janela, rodape, aba, botoes, aoFechar } = abrir('t2', { aoSalvar })
+    expect(botoes()).toEqual(['Cancelar', 'Salvar'])
+    await userEvent.click(aba('Feita'))
+    const nota = within(janela).getByRole('textbox', { name: 'Nota (opcional)' })
     await userEvent.clear(nota)
     await userEvent.type(nota, 'Recebi tudo')
-    const principal = within(rodape).getByRole('button', { name: 'Marcar como feita' })
-    expect(principal).toHaveAttribute('type', 'submit')
-    await userEvent.click(principal)
-    expect(aoAgir).toHaveBeenCalledWith({ estado: 'feita', nota: 'Recebi tudo' })
+    await userEvent.click(within(rodape).getByRole('button', { name: 'Salvar' }))
+    expect(aoSalvar).toHaveBeenCalledWith({ estado: 'feita', motivo: null, nota: 'Recebi tudo', comentario: null })
+    expect(within(rodape).getByRole('button', { name: 'Salvando…' })).toBeDisabled()
+    responder({ erro: null })
+    await waitFor(() => expect(aoFechar).toHaveBeenCalled())
   })
 
-  it('em andamento: Voltar para a fazer e Marcar como feita', async () => {
-    const { botoes, rodape, aoAgir, janela } = abrir('t4')
-    expect(janela).toHaveTextContent('Em andamento')
-    expect(janela).toHaveTextContent('Atrasada há 4 dias')
-    expect(botoes()).toEqual(['Cancelar', 'Voltar para a fazer', 'Marcar como feita'])
-    await userEvent.click(within(rodape).getByRole('button', { name: 'Voltar para a fazer' }))
-    expect(aoAgir).toHaveBeenCalledWith({ estado: 'a_fazer', nota: '' })
+  it('erro do banco fica na janela', async () => {
+    const aoSalvar = vi.fn().mockResolvedValue({ erro: 'Esta tarefa depende de outras que ainda não foram feitas.' })
+    const { janela, rodape, aba, aoFechar } = abrir('t2', { aoSalvar })
+    await userEvent.click(aba('Em andamento'))
+    await userEvent.click(within(rodape).getByRole('button', { name: 'Salvar' }))
+    expect(await within(janela).findByText('Esta tarefa depende de outras que ainda não foram feitas.')).toBeInTheDocument()
+    expect(aoFechar).not.toHaveBeenCalled()
   })
 
-  it('feita: Reabrir tarefa e Salvar nota (só a nota); a situação diz por quem e quando', async () => {
-    const { botoes, rodape, aoAgir, janela } = abrir('t1')
-    expect(janela).toHaveTextContent('por Ana Lima em 12/11/2026')
-    expect(botoes()).toEqual(['Cancelar', 'Reabrir tarefa', 'Salvar nota'])
-    await userEvent.type(within(janela).getByLabelText('Nota (opcional)'), 'Ata no Drive')
-    await userEvent.click(within(rodape).getByRole('button', { name: 'Salvar nota' }))
-    expect(aoAgir).toHaveBeenCalledWith({ estado: null, nota: 'Ata no Drive' })
-    await userEvent.click(within(rodape).getByRole('button', { name: 'Reabrir tarefa' }))
-    expect(aoAgir).toHaveBeenLastCalledWith({ estado: 'a_fazer', nota: 'Ata no Drive' })
+  it('o motivo só aparece em "Não se aplica": obrigatório (erro embaixo do campo), até 500, com o contador', async () => {
+    const { janela, rodape, aba, aoSalvar } = abrir('t2')
+    expect(within(janela).queryByRole('textbox', { name: 'Motivo' })).not.toBeInTheDocument()
+    await userEvent.click(aba('Não se aplica'))
+    const motivo = within(janela).getByRole('textbox', { name: 'Motivo' })
+    expect(motivo).toHaveAttribute('maxlength', '500')
+    expect(motivo).toHaveClass('texto-de-campo')
+    expect(janela).toHaveTextContent('0/500')
+    expect(janela).toHaveTextContent('A tarefa fecha sem ser feita e libera as que dependem dela.')
+    await userEvent.click(within(rodape).getByRole('button', { name: 'Salvar' }))
+    expect(aoSalvar).not.toHaveBeenCalled()
+    expect(motivo).toHaveAttribute('aria-invalid', 'true')
+    expect(motivo).toHaveAccessibleDescription(/Conte por que esta tarefa não se aplica\./)
+    expect(motivo).toHaveFocus()
+    await userEvent.type(motivo, '  Cliente já tem o DRE auditado ')
+    expect(motivo).not.toHaveAttribute('aria-invalid')
+    await userEvent.click(within(rodape).getByRole('button', { name: 'Salvar' }))
+    expect(aoSalvar).toHaveBeenCalledWith({ estado: 'nao_se_aplica', motivo: 'Cliente já tem o DRE auditado', nota: 'Faltam os extratos', comentario: null })
   })
 
-  it('bloqueada: só Salvar nota, com o aviso do que ela espera; vence hoje na situação', () => {
-    const { botoes, janela } = abrir('t3')
-    expect(janela).toHaveTextContent('Ainda não dá para marcar como feita: espera Análise do DRE.')
-    expect(janela).toHaveTextContent('Vence hoje')
-    expect(janela).toHaveTextContent('Provedor Alfa · etapa 2, Plano · opcional')
-    expect(botoes()).toEqual(['Cancelar', 'Salvar nota'])
+  it('a que não se aplica: o motivo vem preenchido e trocar o motivo é ali (vai no Salvar)', async () => {
+    const { janela, rodape, aba, aoSalvar } = abrir('t6')
+    expect(aba('Não se aplica')).toHaveAttribute('aria-pressed', 'true')
+    expect(janela).toHaveTextContent('Não se aplica por Ana Lima em 14/11/2026')
+    const motivo = within(janela).getByRole('textbox', { name: 'Motivo' })
+    expect(motivo).toHaveValue('O cliente não tem estoque')
+    expect(janela).toHaveTextContent('Trocar o motivo grava "Motivo trocado" no Histórico do cliente.')
+    await userEvent.clear(motivo)
+    await userEvent.type(motivo, 'O estoque é do fornecedor')
+    await userEvent.click(within(rodape).getByRole('button', { name: 'Salvar' }))
+    expect(aoSalvar).toHaveBeenCalledWith({ estado: 'nao_se_aplica', motivo: 'O estoque é do fornecedor', nota: '', comentario: null })
   })
 
-  it('em andamento e bloqueada (uma dependência foi reaberta): Voltar para a fazer e Salvar nota, sem marcar', () => {
-    const { botoes, janela } = abrir('t5')
-    const selos = janela.querySelector('[data-selos]')
-    expect(selos).toHaveTextContent('Em andamento · espera 2 tarefas')
-    expect(selos).not.toHaveTextContent('Bloqueada')
-    expect(janela).toHaveTextContent('Ainda não dá para marcar como feita: espera Análise do DRE e Mapa de custos.')
-    expect(botoes()).toEqual(['Cancelar', 'Voltar para a fazer', 'Salvar nota'])
+  it('bloqueada: Em andamento, Pausada e Feita desligadas com "Espera: …"; A fazer e Não se aplica continuam', () => {
+    const { janela, aba } = abrir('t3')
+    for (const nome of ['Em andamento', 'Pausada', 'Feita']) expect(aba(nome)).toBeDisabled()
+    for (const nome of ['A fazer', 'Não se aplica']) expect(aba(nome)).toBeEnabled()
+    expect(janela).toHaveTextContent('Espera: Análise do DRE.')
+    expect(janela).toHaveTextContent('Editar tarefa · Provedor Alfa · etapa 2, Plano · opcional')
   })
 
-  it('quem só acompanha: Fechar e a nota só para ler, sem aviso de bloqueio', () => {
-    const { botoes, janela } = abrir('t2', { podeMarcar: false })
-    expect(botoes()).toEqual(['Fechar'])
-    expect(within(janela).queryByRole('textbox')).not.toBeInTheDocument()
-    expect(janela).toHaveTextContent('Faltam os extratos')
-    const semNota = abrir('t3', { podeMarcar: false }).janela
-    expect(semNota).toHaveTextContent('Sem nota.')
-    expect(semNota).not.toHaveTextContent('Ainda não dá para marcar')
+  it('em andamento e bloqueada (dependência reaberta): Pausada continua ligada', () => {
+    const tarefas = TAREFAS.map((x) => (x.id === 't4' ? { ...x, depende_de: ['t2'] } : x))
+    const { aba } = abrir('t4', { tarefas })
+    expect(aba('Pausada')).toBeEnabled()
+    expect(aba('Feita')).toBeDisabled()
   })
 
-  it('clicar numa tarefa de "Depende de" ou "Libera" abre aquela tarefa', async () => {
-    const { janela, aoAbrir } = abrir('t2')
-    await userEvent.click(within(within(janela).getByRole('list', { name: 'Libera' })).getByRole('button', { name: /Mapa de custos/ }))
-    expect(aoAbrir).toHaveBeenCalledWith(expect.objectContaining({ id: 't3' }))
+  it('o tempo: correndo na em andamento (desde quando) e os minutos feitos na pausada', () => {
+    expect(abrir('t4').janela).toHaveTextContent('Tempo feito: 05:00 · em andamento desde 11:55')
+    expect(abrir('t5').janela).toHaveTextContent('Tempo feito: 12 min · pausada')
   })
 
-  describe('não se aplica', () => {
-    const NSA = t('t6', 'e2', 'Inventário', {
-      estado: 'nao_se_aplica', motivo: 'O cliente não tem estoque', feita_em: '2026-11-14T15:00:00Z', feita_por: { nome: 'Ana Lima' },
-      depende_de: ['t1'], vence_em: '2026-11-01',
+  it('o histórico curto da tarefa: as linhas do Histórico e os trechos de tempo, do mais novo ao mais antigo', async () => {
+    vi.mocked(historicoDaTarefa).mockResolvedValue({
+      eventos: [
+        { id: 'h2', tipo: 'motivo_trocado', em: '2026-11-16T13:00:00Z', autor: 'Ana Lima', motivo: 'Sem estoque próprio' },
+        { id: 'h1', tipo: 'tarefa_nao_se_aplica', em: '2026-11-14T15:00:00Z', autor: 'Ana Lima', motivo: 'Sem estoque' },
+      ],
+      trechos: [{ inicio: '2026-11-13T13:00:00Z', fim: '2026-11-13T13:12:00Z', pessoa: 'Ana Lima' }],
+      tempo_segundos: 720,
     })
-    const COM_NSA = [...TAREFAS, NSA, t('t7', 'e2', 'Contagem', { depende_de: ['t6'] })]
+    const { janela } = abrir('t6')
+    expect(historicoDaTarefa).toHaveBeenCalledWith('t6')
+    const historico = await within(janela).findByRole('list', { name: 'Histórico da tarefa' })
+    await waitFor(() => expect(within(historico).getAllByRole('listitem')).toHaveLength(3))
+    expect(within(historico).getAllByRole('listitem').map((i) => i.textContent)).toEqual([
+      'Motivo trocado por Ana Lima: “Sem estoque próprio”16/11/2026, 10:00',
+      'Não se aplica por Ana Lima: “Sem estoque”14/11/2026, 12:00',
+      'Trabalhada por Ana Lima: 12 min13/11/2026, 10:00',
+    ])
+    expect(janela).toHaveTextContent('O histórico completo fica na aba Histórico do cliente.')
+  })
 
-    it('a fazer e livre: "Não se aplica" no corpo; abre o Motivo (obrigatório, até 500) e o rodapé confirma', async () => {
-      const { janela, rodape, botoes, aoAgir, aoFechar } = abrir('t2')
-      expect(botoes()).toEqual(['Cancelar', 'Começar', 'Marcar como feita'])
-      // No celular o secundário fica só com o ícone (o nome continua), para Cancelar e o principal caberem a 360 px.
-      expect(within(rodape).getByText('Começar')).toHaveClass('max-sm:sr-only')
-      await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
-      const motivo = within(janela).getByRole('textbox', { name: 'Motivo' })
-      expect(motivo).toHaveFocus()
-      expect(motivo).toHaveAttribute('maxlength', '500')
-      expect(motivo).toHaveClass('texto-de-campo')
-      expect(janela).toHaveTextContent('0/500')
-      expect(janela).toHaveTextContent('A tarefa fecha sem ser feita e libera as que dependem dela.')
-      expect(botoes()).toEqual(['Cancelar', 'Voltar', 'Não se aplica'])
-      expect(within(rodape).getByText('Voltar')).toHaveClass('max-sm:sr-only')
-      const confirmar = within(rodape).getByRole('button', { name: 'Não se aplica' })
-      expect(confirmar).toHaveAttribute('type', 'submit')
+  it('os comentários ficam no formulário; o rascunho vai junto no Salvar', async () => {
+    const { janela, rodape, aoSalvar } = abrir('t2')
+    const campo = await within(janela).findByRole('textbox', { name: 'Novo comentário' })
+    await userEvent.type(campo, 'Liguei para o cliente')
+    await userEvent.click(within(rodape).getByRole('button', { name: 'Salvar' }))
+    expect(aoSalvar).toHaveBeenCalledWith({ estado: 'a_fazer', motivo: null, nota: 'Faltam os extratos', comentario: 'Liguei para o cliente' })
+  })
 
-      await userEvent.click(confirmar)
-      expect(aoAgir).not.toHaveBeenCalled()
-      expect(motivo).toHaveAttribute('aria-invalid', 'true')
-      expect(motivo).toHaveAccessibleDescription(/Conte por que esta tarefa não se aplica\./)
-      expect(within(janela).getByText('Conte por que esta tarefa não se aplica.')).toHaveClass('text-destructive')
+  it('com um comentário em edição, Salvar pede para salvar ou cancelar a edição (erro embaixo do campo)', async () => {
+    vi.mocked(comentariosDaTarefa).mockResolvedValue({
+      itens: [{ id: 'c1', texto: 'Oi', criado_em: '2026-11-17T12:00:00Z', editado_em: null, autor: { nome: 'Ana Lima' }, pode_editar: true, pode_apagar: true }],
+      haMais: false, podeComentar: true,
+    })
+    const { janela, rodape, aoSalvar } = abrir('t2')
+    await userEvent.click(await within(janela).findByRole('button', { name: 'Editar comentário' }))
+    await userEvent.click(within(rodape).getByRole('button', { name: 'Salvar' }))
+    expect(aoSalvar).not.toHaveBeenCalled()
+    const campo = within(janela).getByRole('textbox', { name: 'Texto do comentário' })
+    expect(campo).toHaveAttribute('aria-invalid', 'true')
+    expect(campo).toHaveAccessibleDescription('Salve ou cancele o comentário que você está editando.')
+  })
 
-      await userEvent.type(motivo, '   ')
-      await userEvent.click(confirmar)
-      expect(aoAgir).not.toHaveBeenCalled()
-
-      await userEvent.clear(motivo)
-      await userEvent.type(motivo, 'Cliente já tem o DRE auditado')
-      expect(janela).toHaveTextContent('29/500')
-      expect(motivo).not.toHaveAttribute('aria-invalid')
-      await userEvent.click(confirmar)
-      expect(aoAgir).toHaveBeenCalledWith({ estado: 'nao_se_aplica', nota: 'Faltam os extratos', motivo: 'Cliente já tem o DRE auditado' })
-      expect(aoFechar).toHaveBeenCalled()
+  describe('pergunta ao descartar', () => {
+    it('sem mudança, Cancelar fecha direto', async () => {
+      const { aoFechar } = abrir('t2')
+      await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+      expect(aoFechar).toHaveBeenCalledTimes(1)
     })
 
-    it('Voltar sai do Motivo sem gravar; o rodapé volta a ser o de antes', async () => {
-      const { janela, rodape, botoes, aoAgir } = abrir('t4')
-      await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
-      await userEvent.click(within(rodape).getByRole('button', { name: 'Voltar' }))
-      expect(within(janela).queryByRole('textbox', { name: 'Motivo' })).not.toBeInTheDocument()
-      expect(botoes()).toEqual(['Cancelar', 'Voltar para a fazer', 'Marcar como feita'])
-      expect(aoAgir).not.toHaveBeenCalled()
+    it('com a nota mudada, Esc pergunta; Descartar fecha', async () => {
+      const { aoFechar } = abrir('t2')
+      await userEvent.type(screen.getByRole('textbox', { name: 'Nota (opcional)' }), ' e de outubro')
+      await userEvent.keyboard('{Escape}')
+      expect(aoFechar).not.toHaveBeenCalled()
+      await userEvent.click(within(screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })).getByRole('button', { name: 'Descartar' }))
+      expect(aoFechar).toHaveBeenCalledTimes(1)
     })
 
-    it('enquanto grava: "Marcando…" e tudo parado; erro do banco fica na janela', async () => {
-      let responder
-      const aoAgir = vi.fn(() => new Promise((r) => { responder = r }))
-      const { janela, rodape, aoFechar } = abrir('t2', { aoAgir })
-      await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
-      await userEvent.type(within(janela).getByRole('textbox', { name: 'Motivo' }), 'Não precisa')
-      await userEvent.click(within(rodape).getByRole('button', { name: 'Não se aplica' }))
-      expect(within(rodape).getByRole('button', { name: 'Marcando…' })).toBeDisabled()
-      expect(within(rodape).getByRole('button', { name: 'Voltar' })).toBeDisabled()
-      responder({ erro: 'Só o consultor do cliente marca as tarefas.' })
-      expect(await within(janela).findByText('Só o consultor do cliente marca as tarefas.')).toBeInTheDocument()
+    it('a situação trocada e o comentário escrito também perguntam', async () => {
+      const a = abrir('t2')
+      await userEvent.click(a.aba('Feita'))
+      await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+      expect(screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })).toBeInTheDocument()
+      expect(a.aoFechar).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('quem só acompanha', () => {
+    it('a gestão: Fechar; situação, nota e motivo só para ler; comenta (com rascunho, Fechar pergunta)', async () => {
+      const { janela, botoes, aoFechar } = abrir('t6', { podeMarcar: false })
+      expect(botoes()).toEqual(['Fechar'])
+      expect(within(janela).queryByRole('group', { name: 'Situação' })).not.toBeInTheDocument()
+      expect(within(janela).getByRole('region', { name: 'Motivo' })).toHaveTextContent('O cliente não tem estoque')
+      expect(within(janela).getByRole('region', { name: 'Nota' })).toHaveTextContent('Sem nota.')
+      expect(within(janela).queryByRole('textbox', { name: /Nota|Motivo/ })).not.toBeInTheDocument()
+      await userEvent.type(await within(janela).findByRole('textbox', { name: 'Novo comentário' }), 'Ok')
+      await userEvent.click(within(janela.querySelector('[data-slot="janela-rodape"]')).getByRole('button', { name: 'Fechar' }))
+      expect(screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })).toBeInTheDocument()
       expect(aoFechar).not.toHaveBeenCalled()
     })
 
-    it('feita ou para quem só acompanha: sem "Não se aplica"', () => {
-      expect(within(abrir('t1').janela).queryByRole('button', { name: 'Não se aplica' })).not.toBeInTheDocument()
-      expect(within(abrir('t2', { podeMarcar: false }).janela).queryByRole('button', { name: 'Não se aplica' })).not.toBeInTheDocument()
-    })
-
-    // Pedido do Diego (18/11): a bloqueada pode ser "não se aplica"; as que dependem dela esperam as dependências dela.
-    it('bloqueada: oferece "Não se aplica"; o motivo avisa que as que dependem dela continuam esperando', async () => {
-      const { janela, rodape, botoes, aoAgir } = abrir('t3')
-      expect(botoes()).toEqual(['Cancelar', 'Salvar nota'])
-      await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
-      expect(janela).toHaveTextContent('A tarefa fecha sem ser feita. As que dependem dela continuam esperando Análise do DRE.')
-      expect(botoes()).toEqual(['Cancelar', 'Voltar', 'Não se aplica'])
-      await userEvent.type(within(janela).getByRole('textbox', { name: 'Motivo' }), 'Opcional e o cliente não quer')
-      await userEvent.click(within(rodape).getByRole('button', { name: 'Não se aplica' }))
-      expect(aoAgir).toHaveBeenCalledWith({ estado: 'nao_se_aplica', nota: '', motivo: 'Opcional e o cliente não quer' })
-    })
-
-    it('a que depende de uma "não se aplica" presa diz o que espera de verdade (a pendente da cadeia)', () => {
-      const presa = t('t8', 'e2', 'Inventário', { estado: 'nao_se_aplica', motivo: 'x', depende_de: ['t2'] })
-      const tarefas = [...TAREFAS, presa, t('t9', 'e2', 'Contagem', { depende_de: ['t8'] })]
-      const { janela, botoes } = abrir('t9', { tarefas })
-      expect(janela).toHaveTextContent('Ainda não dá para marcar como feita: espera Análise do DRE.')
-      expect(botoes()).toEqual(['Cancelar', 'Salvar nota'])
-    })
-
-    it('no celular os secundários só com ícone têm 44 px no toque', async () => {
-      const { janela, rodape } = abrir('t2')
-      expect(within(rodape).getByRole('button', { name: 'Começar' })).toHaveClass('max-sm:pointer-coarse:min-w-11')
-      await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
-      expect(within(rodape).getByRole('button', { name: 'Voltar' })).toHaveClass('max-sm:pointer-coarse:min-w-11')
-    })
-
-    it('a que não se aplica: selo cinza com ícone próprio (nunca o check), o motivo, quem e quando; Reabrir volta para a fazer', async () => {
-      const { janela, rodape, botoes, aoAgir } = abrir('t6', { tarefas: COM_NSA })
-      const selos = janela.querySelector('[data-selos]')
-      expect(selos).toHaveTextContent('Não se aplica')
-      expect(selos).toHaveTextContent('por Ana Lima em 14/11/2026')
-      expect(selos).not.toHaveTextContent('Atrasada')
-      expect(selos.querySelector('[data-selo="nao_se_aplica"] svg.lucide-ban')).not.toBeNull()
-      expect(selos.querySelector('.lucide-check')).toBeNull()
-      expect(within(janela).getByRole('region', { name: 'Motivo' })).toHaveTextContent('O cliente não tem estoque')
-      expect(within(janela).getByRole('list', { name: 'Libera' })).toHaveTextContent('Contagem')
-      expect(botoes()).toEqual(['Cancelar', 'Reabrir tarefa', 'Salvar nota'])
-      await userEvent.click(within(rodape).getByRole('button', { name: 'Reabrir tarefa' }))
-      expect(aoAgir).toHaveBeenCalledWith({ estado: 'a_fazer', nota: '' })
-    })
-
-    it('quem só acompanha vê o motivo, sem mudar nada', () => {
-      const { janela, botoes } = abrir('t6', { tarefas: COM_NSA, podeMarcar: false })
-      expect(within(janela).getByRole('region', { name: 'Motivo' })).toHaveTextContent('O cliente não tem estoque')
+    it('a Central: Fechar e nada para mudar', async () => {
+      vi.mocked(comentariosDaTarefa).mockResolvedValue({ itens: [], haMais: false, podeComentar: false })
+      const { janela, botoes, aoFechar } = abrir('t2', { podeMarcar: false })
       expect(botoes()).toEqual(['Fechar'])
+      await within(janela).findByText('Nenhum comentário ainda.')
+      expect(within(janela).queryByRole('textbox', { name: /Nota|Motivo|comentário/ })).not.toBeInTheDocument()
+      expect(janela).toHaveTextContent('Faltam os extratos')
+      await userEvent.click(within(janela.querySelector('[data-slot="janela-rodape"]')).getByRole('button', { name: 'Fechar' }))
+      expect(aoFechar).toHaveBeenCalled()
     })
-
-    it('nas relacionadas, a que não se aplica diz isso (e libera: a dependente fica "A fazer")', () => {
-      const { janela } = abrir('t7', { tarefas: COM_NSA })
-      expect(within(janela).getByRole('list', { name: 'Depende de' })).toHaveTextContent('InventárioNão se aplica')
-      expect(within(janela).queryByText(/Ainda não dá para marcar/)).not.toBeInTheDocument()
-    })
-  })
-
-  it('enquanto grava, o botão diz o que está fazendo e tudo fica parado; erro do banco fica na janela', async () => {
-    let responder
-    const aoAgir = vi.fn(() => new Promise((r) => { responder = r }))
-    const { rodape, aoFechar, janela } = abrir('t2', { aoAgir })
-    await userEvent.click(within(rodape).getByRole('button', { name: 'Marcar como feita' }))
-    expect(within(rodape).getByRole('button', { name: 'Marcando…' })).toBeDisabled()
-    expect(within(rodape).getByRole('button', { name: 'Começar' })).toBeDisabled()
-    responder({ erro: 'Esta tarefa depende de outras que ainda não foram feitas.' })
-    expect(await within(janela).findByText('Esta tarefa depende de outras que ainda não foram feitas.')).toBeInTheDocument()
-    expect(aoFechar).not.toHaveBeenCalled()
-    expect(within(rodape).getByRole('button', { name: 'Marcar como feita' })).toBeEnabled()
-  })
-
-  // Usabilidade, U4: a nota digitada não some sem perguntar.
-  it('fechar com a nota mudada pergunta antes de descartar; sem mudança, fecha direto', async () => {
-    const { aoFechar } = abrir('t2')
-    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
-    expect(aoFechar).toHaveBeenCalledTimes(1)
-  })
-
-  it('com a nota mudada, Esc pergunta; Descartar fecha', async () => {
-    const { aoFechar } = abrir('t2')
-    await userEvent.type(screen.getByLabelText('Nota (opcional)'), ' e de outubro')
-    await userEvent.keyboard('{Escape}')
-    expect(aoFechar).not.toHaveBeenCalled()
-    await userEvent.click(within(screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })).getByRole('button', { name: 'Descartar' }))
-    expect(aoFechar).toHaveBeenCalledTimes(1)
   })
 })
 
+describe('JanelaNaoSeAplica (o motivo pedido na hora, da linha)', () => {
+  function abrirNsa(id, { aoMarcar = vi.fn().mockResolvedValue({ erro: null }), tarefas = TAREFAS } = {}) {
+    const porId = new Map(tarefas.map((x) => [x.id, x]))
+    const aoFechar = vi.fn()
+    render(<JanelaNaoSeAplica tarefa={porId.get(id)} situacao={situacaoDaTarefa(porId.get(id), porId, HOJE)} aoMarcar={aoMarcar} aoFechar={aoFechar} />)
+    return { janela: screen.getByRole('dialog', { name: 'Por que não se aplica?' }), aoMarcar, aoFechar }
+  }
+
+  it('motivo obrigatório (erro embaixo do campo); grava sem os espaços das pontas e fecha', async () => {
+    const { janela, aoMarcar, aoFechar } = abrirNsa('t2')
+    expect(janela).toHaveTextContent('Análise do DRE')
+    const motivo = within(janela).getByRole('textbox', { name: 'Motivo' })
+    expect(motivo).toHaveFocus()
+    const marcar = within(janela).getByRole('button', { name: 'Marcar não se aplica' })
+    await userEvent.click(marcar)
+    expect(aoMarcar).not.toHaveBeenCalled()
+    expect(motivo).toHaveAccessibleDescription(/Conte por que esta tarefa não se aplica\./)
+    await userEvent.type(motivo, ' Não precisa ')
+    await userEvent.click(marcar)
+    expect(aoMarcar).toHaveBeenCalledWith('Não precisa')
+    await waitFor(() => expect(aoFechar).toHaveBeenCalled())
+  })
+
+  it('bloqueada: avisa que as que dependem dela continuam esperando', () => {
+    expect(abrirNsa('t3').janela).toHaveTextContent('A tarefa fecha sem ser feita. As que dependem dela continuam esperando Análise do DRE.')
+  })
+
+  it('com o motivo escrito, fechar pergunta', async () => {
+    const { janela, aoFechar } = abrirNsa('t2')
+    await userEvent.type(within(janela).getByRole('textbox', { name: 'Motivo' }), 'x')
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('alertdialog', { name: 'Descartar o que você digitou?' })).toBeInTheDocument()
+    expect(aoFechar).not.toHaveBeenCalled()
+  })
+})

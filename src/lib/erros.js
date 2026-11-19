@@ -112,7 +112,7 @@ const ERROS_MENSAGEM_BANCO = {
   // "Não se aplica" sem motivo (ou só com espaços): 22023
   motivo_obrigatorio: MOTIVO_OBRIGATORIO,
   // "Não se aplica" de novo, com outro motivo (a tela estava velha): trocar o motivo é reabrir e marcar de novo
-  ja_nao_se_aplica: 'Esta tarefa já está como não se aplica. Para trocar o motivo, reabra e marque de novo.',
+  ja_nao_se_aplica: 'Esta tarefa já está como não se aplica. Para trocar o motivo, use o Editar da tarefa.',
   // Trocar o motivo (o Editar) de uma tarefa que deixou de ser "não se aplica" (a tela estava velha)
   so_em_nao_se_aplica: 'Esta tarefa não está mais como "não se aplica". Atualize a página.',
   // Comentários da tarefa: em branco (22023) e o que alguém apagou enquanto a tela estava aberta

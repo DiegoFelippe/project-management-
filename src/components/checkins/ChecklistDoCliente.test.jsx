@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  anotarTarefa, aplicarModelo, lerChecklist, marcarTarefa, modelosParaAplicar, mudarInicio, tirarModelo,
+  anotarTarefa, aplicarModelo, comentariosDaTarefa, comentarTarefa, historicoDaTarefa, lerChecklist, marcarTarefa, modelosParaAplicar,
+  mudarInicio, tirarModelo, trocarMotivo,
 } from '@/data/checklists'
 import { escolherData, escolherNoSeletor } from '@/test/campos'
 import { renderizarTela } from '@/test/renderizar'
@@ -11,7 +12,8 @@ import ChecklistDoCliente from './ChecklistDoCliente'
 
 vi.mock('@/data/checklists', () => ({
   lerChecklist: vi.fn(), modelosParaAplicar: vi.fn(), aplicarModelo: vi.fn(), mudarInicio: vi.fn(), tirarModelo: vi.fn(),
-  marcarTarefa: vi.fn(), anotarTarefa: vi.fn(),
+  marcarTarefa: vi.fn(), anotarTarefa: vi.fn(), trocarMotivo: vi.fn(), comentariosDaTarefa: vi.fn(), comentarTarefa: vi.fn(),
+  editarComentarioDaTarefa: vi.fn(), apagarComentarioDaTarefa: vi.fn(), historicoDaTarefa: vi.fn(),
 }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
 
@@ -75,11 +77,23 @@ function tela(perfil, { cliente = CLIENTE, aoMudar = vi.fn(), checkins } = {}) {
 // A tabela de check-ins que a página manda (CheckinsDoCliente): aqui, um marcador.
 const TABELA_DE_CHECKINS = <section aria-label="Tabela de check-ins (teste)">tabela</section>
 const nomesDasCaixas = () => screen.getAllByRole('checkbox').map((c) => c.getAttribute('aria-label'))
+// A linha da tarefa pelo título (o título é texto, não abre nada).
+const linhaDe = (titulo) => screen.getByText(titulo, { selector: '[data-titulo]' }).closest('li')
+const titulosNaLista = () => [...document.querySelectorAll('[data-titulo]')].map((el) => el.textContent)
+// O Editar: o lápis da linha, a aba da situação e o Salvar.
+async function editar(titulo) {
+  await userEvent.click(await screen.findByRole('button', { name: `Editar ${titulo}` }))
+  return screen.getByRole('dialog', { name: titulo })
+}
+const situacaoNoEditar = (janela, nome) => within(within(janela).getByRole('group', { name: 'Situação' })).getByRole('button', { name: nome })
+const salvar = (janela) => userEvent.click(within(janela.querySelector('[data-slot="janela-rodape"]')).getByRole('button', { name: 'Salvar' }))
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers({ toFake: ['Date'], now: AGORA })
   vi.mocked(lerChecklist).mockResolvedValue(DADOS)
+  vi.mocked(comentariosDaTarefa).mockResolvedValue({ itens: [], haMais: false, podeComentar: true })
+  vi.mocked(historicoDaTarefa).mockResolvedValue({ eventos: [], trechos: [], tempo_segundos: 0 })
 })
 afterEach(() => vi.useRealTimers())
 
@@ -114,7 +128,7 @@ describe('ChecklistDoCliente: com modelo', () => {
     expect(screen.queryByText(/Você acompanha/)).not.toBeInTheDocument()
   })
 
-  it('a lista: um cartão por etapa ("1 de 3" e barra) e, em cada tarefa, a caixa, o título, os selos, a descrição e a nota', async () => {
+  it('a lista: um cartão por etapa ("1 de 3" e barra) e, em cada tarefa, o check, o título, o selo, a descrição e o prazo', async () => {
     vi.mocked(lerChecklist).mockResolvedValue({ ...DADOS, tarefas: TAREFAS.map((t) => (t.id === 't1' ? { ...t, na_sessao: true } : t)) })
     tela(consultor)
     const diagnostico = await screen.findByRole('region', { name: '1 · Diagnóstico' })
@@ -124,15 +138,16 @@ describe('ChecklistDoCliente: com modelo', () => {
     expect(nomesDasCaixas()).toEqual(['Reunião de alinhamento', 'Análise do DRE', 'Coleta de documentos', 'Mapa de custos', 'Plano de ação'])
 
     const item = (titulo) => screen.getByRole('checkbox', { name: titulo }).closest('li')
-    expect(item('Reunião de alinhamento')).toHaveTextContent('Feita')
-    expect(item('Reunião de alinhamento')).toHaveTextContent('por Ana Lima em 12/11/2026')
+    // A feita é o check verde: sem selo, sem "feita por" e sem a nota na linha (ficam no Editar).
+    expect(screen.getByRole('checkbox', { name: 'Reunião de alinhamento' })).toBeChecked()
+    expect(item('Reunião de alinhamento')).not.toHaveTextContent('Ana Lima')
     expect(item('Reunião de alinhamento')).toHaveTextContent('Nesta sessão')
     expect(item('Reunião de alinhamento')).toHaveTextContent('Objetivos e escopo')
-    expect(item('Análise do DRE')).toHaveTextContent('Vence 20/11')
-    expect(item('Análise do DRE')).toHaveTextContent('Faltam os extratos de setembro')
+    expect(within(item('Análise do DRE')).getByRole('button', { name: /^Vence 20\/11/ })).toBeInTheDocument()
+    expect(item('Análise do DRE')).not.toHaveTextContent('Faltam os extratos de setembro')
     expect(item('Coleta de documentos')).toHaveTextContent('Opcional')
-    expect(item('Coleta de documentos')).toHaveTextContent('Atrasada · venceu 15/11')
-    expect(item('Mapa de custos')).toHaveTextContent('Vence hoje')
+    expect(within(item('Coleta de documentos')).getByRole('button', { name: /^Venceu 15\/11, atrasada há 2 dias/ })).toBeInTheDocument()
+    expect(within(item('Mapa de custos')).getByRole('button', { name: /^Vence hoje/ })).toBeInTheDocument()
     expect(item('Mapa de custos')).toHaveTextContent('Bloqueada')
     expect(item('Plano de ação')).toHaveTextContent('Em andamento')
     expect(item('Análise do DRE')).not.toHaveTextContent('Nesta sessão')
@@ -225,11 +240,12 @@ describe('ChecklistDoCliente: com modelo', () => {
     expect(aoMudar).not.toHaveBeenCalled()
   })
 
-  it('na janela, recusa de tela velha fecha a janela, avisa e relê', async () => {
+  it('no Editar, recusa de tela velha fecha a janela, avisa e relê', async () => {
     vi.mocked(marcarTarefa).mockResolvedValue({ erro: 'Só o consultor do cliente marca as tarefas.', desatualizado: true })
     const { aoMudar } = tela(consultor)
-    await userEvent.click(await screen.findByRole('button', { name: 'Análise do DRE' }))
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Marcar como feita' }))
+    const janela = await editar('Análise do DRE')
+    await userEvent.click(situacaoNoEditar(janela, 'Feita'))
+    await salvar(janela)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(toast.error).toHaveBeenCalledWith('Só o consultor do cliente marca as tarefas.')
     await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
@@ -248,25 +264,26 @@ describe('ChecklistDoCliente: com modelo', () => {
     expect(screen.getByRole('region', { name: 'Modelo aplicado' })).toBeInTheDocument()
   })
 
-  it('em andamento e bloqueada: um selo só, "Em andamento · espera N tarefas", como no fluxograma e na janela', async () => {
+  it('em andamento e bloqueada (uma dependência foi reaberta): o selo "Em andamento" e o que ela espera; Pausar continua', async () => {
     vi.mocked(lerChecklist).mockResolvedValue({
       ...DADOS, tarefas: TAREFAS.map((t) => (t.id === 't5' ? { ...t, depende_de: ['t2', 't3'] } : t)),
     })
     tela(consultor)
     const caixa = await screen.findByRole('checkbox', { name: 'Plano de ação' })
-    const selos = caixa.closest('li').querySelector('[data-selos]')
-    expect(within(selos).getAllByText(/Em andamento/)).toHaveLength(1)
-    expect(selos).toHaveTextContent('Em andamento · espera 2 tarefas')
-    expect(selos).not.toHaveTextContent('Bloqueada')
+    const item = caixa.closest('li')
+    expect(within(item).getAllByText(/Em andamento/)).toHaveLength(1)
+    expect(item).not.toHaveTextContent('Bloqueada')
     expect(caixa).toBeDisabled()
-    expect(caixa).toHaveAccessibleDescription('Em andamento · espera 2 tarefas Análise do DRE e Coleta de documentos')
+    expect(caixa).toHaveAccessibleDescription('Espera: Análise do DRE e Coleta de documentos')
+    expect(within(item).getByRole('button', { name: 'Pausar Plano de ação' })).toBeEnabled()
   })
 
-  it('a bloqueada fica desligada, com o motivo (o que ela espera) à vista e ligado à caixa', async () => {
+  it('a bloqueada fica desligada, com o que ela espera à vista e ligado à caixa e ao Iniciar', async () => {
     tela(consultor)
     const caixa = await screen.findByRole('checkbox', { name: 'Mapa de custos' })
     expect(caixa).toBeDisabled()
-    expect(caixa).toHaveAccessibleDescription('Bloqueada espera Análise do DRE')
+    expect(caixa).toHaveAccessibleDescription('Espera: Análise do DRE')
+    expect(screen.getByRole('button', { name: 'Iniciar Mapa de custos' })).toBeDisabled()
     expect(screen.getByRole('checkbox', { name: 'Análise do DRE' })).toBeEnabled()
   })
 
@@ -280,13 +297,16 @@ describe('ChecklistDoCliente: com modelo', () => {
     expect(within(modelo).getAllByRole('button').map((b) => b.textContent.trim())).toEqual(['Trocar modelo', 'Início dos prazos', 'Tirar modelo'])
   })
 
-  it('a Central só lê as tarefas (a janela da tarefa só tem Fechar) e aplica', async () => {
-    vi.mocked(lerChecklist).mockResolvedValue(GERENCIA)
+  it('a Central só lê as tarefas (o lápis vira "Ver"; a janela da tarefa só tem Fechar) e aplica', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue({ ...GERENCIA, pode_comentar: false })
+    vi.mocked(comentariosDaTarefa).mockResolvedValue({ itens: [], haMais: false, podeComentar: false })
     tela(central)
-    await userEvent.click(await screen.findByRole('button', { name: 'Análise do DRE' }))
+    expect(screen.queryByRole('button', { name: /^Iniciar/ })).not.toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('button', { name: 'Ver Análise do DRE' }))
     const janela = screen.getByRole('dialog', { name: 'Análise do DRE' })
     const rodape = janela.querySelector('[data-slot="janela-rodape"]')
     expect(within(rodape).getAllByRole('button').map((b) => b.textContent.trim())).toEqual(['Fechar'])
+    expect(await within(janela).findByText('Nenhum comentário ainda.')).toBeInTheDocument()
     expect(within(janela).queryByRole('textbox')).not.toBeInTheDocument()
     expect(janela).toHaveTextContent('Faltam os extratos de setembro')
     await userEvent.click(within(rodape).getByRole('button', { name: 'Fechar' }))
@@ -387,13 +407,15 @@ describe('ChecklistDoCliente: com modelo', () => {
     expect(screen.getByText('Nenhuma tarefa feita ainda.')).toBeInTheDocument()
   })
 
-  it('o título da tarefa abre a janela; "Marcar como feita" marca, fecha, relê e avisa', async () => {
+  it('o lápis abre o Editar (o título não abre nada); Feita + Salvar marca, fecha, relê e avisa', async () => {
     vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'feita', liberadas: [], na_sessao: false, erro: null })
     const { aoMudar } = tela(consultor)
-    await userEvent.click(await screen.findByRole('button', { name: 'Análise do DRE' }))
-    const janela = screen.getByRole('dialog', { name: 'Análise do DRE' })
+    await userEvent.click(await screen.findByText('Análise do DRE', { selector: '[data-titulo]' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    const janela = await editar('Análise do DRE')
     expect(janela).toHaveTextContent('Provedor Alfa · etapa 1, Diagnóstico · obrigatória')
-    await userEvent.click(within(janela).getByRole('button', { name: 'Marcar como feita' }))
+    await userEvent.click(situacaoNoEditar(janela, 'Feita'))
+    await salvar(janela)
     expect(marcarTarefa).toHaveBeenCalledWith('t2', 'feita')
     // A nota não mudou: não grava a nota.
     expect(anotarTarefa).not.toHaveBeenCalled()
@@ -403,23 +425,23 @@ describe('ChecklistDoCliente: com modelo', () => {
     expect(aoMudar).toHaveBeenCalled()
   })
 
-  it('na janela, a nota mudada é gravada antes de mudar a situação; só a nota: "Nota salva."', async () => {
+  it('no Editar, a nota mudada é gravada antes de mudar a situação; só a nota: "Nota salva."', async () => {
     vi.mocked(anotarTarefa).mockResolvedValue({ erro: null })
     vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'andamento', liberadas: [], na_sessao: false, erro: null })
     tela(consultor)
-    await userEvent.click(await screen.findByRole('button', { name: 'Coleta de documentos' }))
-    let janela = screen.getByRole('dialog', { name: 'Coleta de documentos' })
+    let janela = await editar('Coleta de documentos')
     await userEvent.type(within(janela).getByLabelText('Nota (opcional)'), 'Pedi ao financeiro')
-    await userEvent.click(within(janela).getByRole('button', { name: 'Começar' }))
+    await userEvent.click(situacaoNoEditar(janela, 'Em andamento'))
+    await salvar(janela)
     expect(anotarTarefa).toHaveBeenCalledWith('t3', 'Pedi ao financeiro')
     expect(marcarTarefa).toHaveBeenCalledWith('t3', 'andamento')
     expect(anotarTarefa.mock.invocationCallOrder[0]).toBeLessThan(marcarTarefa.mock.invocationCallOrder[0])
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Coleta de documentos em andamento.'))
 
-    await userEvent.click(screen.getByRole('button', { name: 'Reunião de alinhamento' }))
-    janela = screen.getByRole('dialog', { name: 'Reunião de alinhamento' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    janela = await editar('Reunião de alinhamento')
     await userEvent.type(within(janela).getByLabelText('Nota (opcional)'), 'Ata no Drive')
-    await userEvent.click(within(janela).getByRole('button', { name: 'Salvar nota' }))
+    await salvar(janela)
     expect(anotarTarefa).toHaveBeenLastCalledWith('t1', 'Ata no Drive')
     expect(marcarTarefa).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Nota salva.'))
@@ -468,6 +490,82 @@ describe('ChecklistDoCliente: com modelo', () => {
     for (const caixa of screen.getAllByRole('checkbox')) expect(caixa).toBeDisabled()
   })
 
+  it('Iniciar na linha: em andamento na hora (otimista); com a resposta, o relógio corre; o aviso diz isso', async () => {
+    let responder
+    vi.mocked(marcarTarefa).mockImplementation(() => new Promise((r) => { responder = r }))
+    const desde = AGORA.toISOString()
+    vi.mocked(lerChecklist).mockResolvedValueOnce(DADOS).mockResolvedValue({
+      ...DADOS, tarefas: TAREFAS.map((t) => (t.id === 't2' ? { ...t, estado: 'andamento', tempo_segundos: 65, trecho_aberto_desde: desde } : t)),
+    })
+    tela(consultor)
+    await userEvent.click(await screen.findByRole('button', { name: 'Iniciar Análise do DRE' }))
+    expect(marcarTarefa).toHaveBeenCalledWith('t2', 'andamento')
+    const item = linhaDe('Análise do DRE')
+    expect(item.querySelector('[data-selo="andamento"]')).toHaveTextContent('Em andamento')
+    expect(item).toHaveAttribute('aria-busy', 'true')
+    responder({ estado: 'andamento', liberadas: [], na_sessao: false, tempo_segundos: 65, trecho_aberto_desde: desde, erro: null })
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Análise do DRE em andamento.'))
+    expect(linhaDe('Análise do DRE').querySelector('[data-selo="andamento"]')).toHaveTextContent('Em andamento · 01:05')
+    await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
+  })
+
+  it('Pausar na linha: pausada, com os minutos feitos no aviso', async () => {
+    vi.mocked(marcarTarefa).mockResolvedValue({
+      estado: 'pausada', liberadas: [], na_sessao: false, tempo_segundos: 12 * 60 + 30, trecho_aberto_desde: null, erro: null,
+    })
+    tela(consultor)
+    await userEvent.click(await screen.findByRole('button', { name: 'Pausar Plano de ação' }))
+    expect(marcarTarefa).toHaveBeenCalledWith('t5', 'pausada')
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Plano de ação pausada (12 min feitos).'))
+  })
+
+  it('a pausada: o selo com os minutos, Retomar na linha e "Pausada" no fluxograma e na legenda', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue({
+      ...DADOS, tarefas: TAREFAS.map((t) => (t.id === 't5' ? { ...t, estado: 'pausada', tempo_segundos: 25 * 60 } : t)),
+    })
+    const { container } = tela(consultor)
+    expect(await screen.findByRole('button', { name: 'Retomar Plano de ação' })).toBeEnabled()
+    expect(linhaDe('Plano de ação').querySelector('[data-selo="pausada"]')).toHaveTextContent('Pausada · 25 min')
+    await userEvent.click(screen.getByRole('button', { name: 'Fluxograma' }))
+    expect(screen.getByRole('button', { name: 'Plano de ação: Pausada' })).toBeInTheDocument()
+    expect(container.querySelector('[data-tarefa="t5"]')).toHaveAttribute('data-situacao', 'pausada')
+    expect(within(screen.getByRole('list', { name: 'Legenda do fluxograma' })).getByText('Pausada')).toBeInTheDocument()
+  })
+
+  it('💬 N na linha abre o Editar; comentar lá relê o check-list (a contagem) sem avisar a página', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue({
+      ...DADOS, pode_comentar: true, tarefas: TAREFAS.map((t) => (t.id === 't2' ? { ...t, comentarios: 2 } : t)),
+    })
+    vi.mocked(comentarTarefa).mockResolvedValue({
+      erro: null,
+      comentario: { id: 'c1', texto: 'Liguei', criado_em: AGORA.toISOString(), editado_em: null, autor: { nome: 'Ana Lima' }, pode_editar: true, pode_apagar: true },
+    })
+    const { aoMudar } = tela(consultor)
+    await userEvent.click(await screen.findByRole('button', { name: '2 comentários em Análise do DRE' }))
+    const janela = screen.getByRole('dialog', { name: 'Análise do DRE' })
+    expect(comentariosDaTarefa).toHaveBeenCalledWith({ tarefaId: 't2' })
+    await userEvent.type(await within(janela).findByRole('textbox', { name: 'Novo comentário' }), 'Liguei')
+    await userEvent.click(within(janela).getByRole('button', { name: 'Comentar' }))
+    expect(comentarTarefa).toHaveBeenCalledWith('t2', 'Liguei')
+    await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
+    expect(aoMudar).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Análise do DRE' })).toBeInTheDocument()
+  })
+
+  it('no Editar, o comentário escrito vai junto no Salvar, depois da situação', async () => {
+    vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'feita', liberadas: [], na_sessao: false, erro: null })
+    vi.mocked(comentarTarefa).mockResolvedValue({ erro: null, comentario: { id: 'c1' } })
+    tela(consultor)
+    const janela = await editar('Coleta de documentos')
+    await userEvent.click(situacaoNoEditar(janela, 'Feita'))
+    await userEvent.type(await within(janela).findByRole('textbox', { name: 'Novo comentário' }), 'Recebi por e-mail')
+    await salvar(janela)
+    expect(comentarTarefa).toHaveBeenCalledWith('t3', 'Recebi por e-mail')
+    expect(marcarTarefa.mock.invocationCallOrder[0]).toBeLessThan(comentarTarefa.mock.invocationCallOrder[0])
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
+      'Coleta de documentos feita. Sem check-in aberto neste cliente: fica feita, fora de uma sessão. Comentário enviado.'))
+  })
+
   it('a 360 px nada rola para o lado: barra quebra linha, caixas uma embaixo da outra, o fluxograma rola dentro do cartão', async () => {
     const { container } = tela(consultor)
     const modelo = await screen.findByRole('region', { name: 'Modelo aplicado' })
@@ -506,19 +604,22 @@ describe('ChecklistDoCliente: não se aplica', () => {
     resumo: { ...DADOS.resumo, tarefas: 6, nao_se_aplica: 1, resolvidas: 2 },
   }
 
-  it('lista: selo cinza com ícone próprio no lugar da caixa, o motivo à vista; a etapa conta como resolvida', async () => {
+  it('lista: selo cinza com ícone próprio no lugar da caixa; o motivo e quem marcou só no Editar; a etapa conta como resolvida', async () => {
     vi.mocked(lerChecklist).mockResolvedValue(COM_NSA)
     tela(consultor)
     const plano = await screen.findByRole('region', { name: '2 · Plano' })
     expect(plano).toHaveTextContent('1 de 3')
     expect(nomesDasCaixas()).not.toContain('Inventário')
-    const item = within(plano).getByRole('button', { name: 'Inventário' }).closest('li')
+    const item = linhaDe('Inventário')
     expect(item.querySelector('[data-selo="nao_se_aplica"] .lucide-ban')).not.toBeNull()
     expect(item.querySelector('.lucide-check')).toBeNull()
     expect(item).toHaveTextContent('Não se aplica')
-    expect(item).toHaveTextContent('por Ana Lima em 14/11/2026')
-    expect(item).toHaveTextContent('Motivo: O cliente não tem estoque')
+    expect(item).not.toHaveTextContent('Ana Lima')
+    expect(item).not.toHaveTextContent('O cliente não tem estoque')
     expect(item).not.toHaveTextContent('Atrasada')
+    const janela = await editar('Inventário')
+    expect(within(janela).getByRole('textbox', { name: 'Motivo' })).toHaveValue('O cliente não tem estoque')
+    expect(janela).toHaveTextContent('por Ana Lima em 14/11/2026')
   })
 
   it('a etapa diz "resolvidas" como o fluxograma; Tirar e Trocar modelo contam também as que não se aplicam', async () => {
@@ -542,21 +643,20 @@ describe('ChecklistDoCliente: não se aplica', () => {
     tela(consultor)
     const caixa = await screen.findByRole('checkbox', { name: 'Contagem' })
     expect(caixa).toBeDisabled()
-    expect(caixa).toHaveAccessibleDescription('Bloqueada espera Análise do DRE')
+    expect(caixa).toHaveAccessibleDescription('Espera: Análise do DRE')
   })
 
   it('marcar "não se aplica" numa tarefa que já estava (tela velha, outro motivo): avisa, fecha e relê', async () => {
     vi.mocked(marcarTarefa).mockResolvedValue({
-      erro: 'Esta tarefa já está como não se aplica. Para trocar o motivo, reabra e marque de novo.', desatualizado: true,
+      erro: 'Esta tarefa já está como não se aplica. Para trocar o motivo, use o Editar da tarefa.', desatualizado: true,
     })
     const { aoMudar } = tela(consultor)
-    await userEvent.click(await screen.findByRole('button', { name: 'Análise do DRE' }))
-    const janela = screen.getByRole('dialog', { name: 'Análise do DRE' })
-    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Não se aplica: Análise do DRE' }))
+    const janela = screen.getByRole('dialog', { name: 'Por que não se aplica?' })
     await userEvent.type(within(janela).getByRole('textbox', { name: 'Motivo' }), 'Outro motivo')
-    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    await userEvent.click(within(janela).getByRole('button', { name: 'Marcar não se aplica' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(toast.error).toHaveBeenCalledWith('Esta tarefa já está como não se aplica. Para trocar o motivo, reabra e marque de novo.')
+    expect(toast.error).toHaveBeenCalledWith('Esta tarefa já está como não se aplica. Para trocar o motivo, use o Editar da tarefa.')
     await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
     expect(aoMudar).toHaveBeenCalled()
   })
@@ -575,21 +675,20 @@ describe('ChecklistDoCliente: não se aplica', () => {
     const mostrar = await screen.findByRole('group', { name: 'Mostrar' })
     expect(within(mostrar).getAllByRole('button').map((b) => b.textContent)).toEqual(['Todas6', 'Pendentes4', 'Feitas1', 'Não se aplica1'])
     await userEvent.click(within(mostrar).getByRole('button', { name: /^Não se aplica/ }))
-    expect(screen.getAllByRole('listitem').map((li) => li.querySelector('button').textContent)).toEqual(['Inventário'])
+    expect(titulosNaLista()).toEqual(['Inventário'])
     await userEvent.click(within(mostrar).getByRole('button', { name: /^Pendentes/ }))
-    expect(screen.queryByRole('button', { name: 'Inventário' })).not.toBeInTheDocument()
+    expect(titulosNaLista()).not.toContain('Inventário')
     await userEvent.click(within(mostrar).getByRole('button', { name: /^Feitas/ }))
     expect(nomesDasCaixas()).toEqual(['Reunião de alinhamento'])
   })
 
-  it('o consultor marca pela janela, com o motivo: grava, fecha, avisa o que liberou, relê e avisa a página', async () => {
+  it('o consultor marca pela linha, com o motivo pedido na hora: grava, fecha, avisa o que liberou, relê e avisa a página', async () => {
     vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'nao_se_aplica', liberadas: [{ id: 't4', titulo: 'Mapa de custos' }], na_sessao: true, erro: null })
     const { aoMudar } = tela(consultor)
-    await userEvent.click(await screen.findByRole('button', { name: 'Análise do DRE' }))
-    const janela = screen.getByRole('dialog', { name: 'Análise do DRE' })
-    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Não se aplica: Análise do DRE' }))
+    const janela = screen.getByRole('dialog', { name: 'Por que não se aplica?' })
     await userEvent.type(within(janela).getByRole('textbox', { name: 'Motivo' }), '  O DRE já veio auditado ')
-    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    await userEvent.click(within(janela).getByRole('button', { name: 'Marcar não se aplica' }))
     expect(marcarTarefa).toHaveBeenCalledWith('t2', 'nao_se_aplica', 'O DRE já veio auditado')
     expect(anotarTarefa).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -603,18 +702,18 @@ describe('ChecklistDoCliente: não se aplica', () => {
     vi.mocked(lerChecklist).mockResolvedValue(COM_NSA)
     vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'nao_se_aplica', liberadas: [], na_sessao: false, erro: null })
     tela(consultor)
-    await userEvent.click(await screen.findByRole('button', { name: 'Coleta de documentos' }))
-    let janela = screen.getByRole('dialog', { name: 'Coleta de documentos' })
-    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Não se aplica: Coleta de documentos' }))
+    let janela = screen.getByRole('dialog', { name: 'Por que não se aplica?' })
     await userEvent.type(within(janela).getByRole('textbox', { name: 'Motivo' }), 'Documentos já entregues')
-    await userEvent.click(within(janela).getByRole('button', { name: 'Não se aplica' }))
+    await userEvent.click(within(janela).getByRole('button', { name: 'Marcar não se aplica' }))
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
       'Coleta de documentos: não se aplica. Sem check-in aberto neste cliente: fica fora de uma sessão.'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
     vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'a_fazer', liberadas: [], na_sessao: false, erro: null })
-    await userEvent.click(screen.getByRole('button', { name: 'Inventário' }))
-    janela = screen.getByRole('dialog', { name: 'Inventário' })
-    await userEvent.click(within(janela).getByRole('button', { name: 'Reabrir tarefa' }))
+    janela = await editar('Inventário')
+    await userEvent.click(situacaoNoEditar(janela, 'A fazer'))
+    await salvar(janela)
     expect(marcarTarefa).toHaveBeenLastCalledWith('t6', 'a_fazer')
     await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith('Inventário voltou para a fazer.'))
   })
@@ -633,19 +732,35 @@ describe('ChecklistDoCliente: não se aplica', () => {
     expect(within(legenda).getByText('Não se aplica')).toBeInTheDocument()
   })
 
-  it('a gestão e a Central só leem: o motivo aparece na janela, sem "Não se aplica"', async () => {
-    for (const perfil of [gestor, central]) {
-      vi.mocked(lerChecklist).mockResolvedValue({ ...COM_NSA, pode_aplicar: true, pode_marcar: false })
+  it('a gestão e a Central só leem: o motivo aparece na janela, sem "Não se aplica" nem a situação para mudar', async () => {
+    for (const [perfil, lapis] of [[gestor, 'Editar'], [central, 'Ver']]) {
+      vi.mocked(lerChecklist).mockResolvedValue({ ...COM_NSA, pode_aplicar: true, pode_marcar: false, pode_comentar: perfil === gestor })
       const { unmount } = tela(perfil)
-      await userEvent.click(await screen.findByRole('button', { name: 'Inventário' }))
-      let janela = screen.getByRole('dialog', { name: 'Inventário' })
+      expect(await screen.findByText('Inventário', { selector: '[data-titulo]' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^Não se aplica:/ })).not.toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: `${lapis} Inventário` }))
+      const janela = screen.getByRole('dialog', { name: 'Inventário' })
       expect(within(janela).getByRole('region', { name: 'Motivo' })).toHaveTextContent('O cliente não tem estoque')
+      expect(within(janela).queryByRole('group', { name: 'Situação' })).not.toBeInTheDocument()
       await userEvent.click(within(janela.querySelector('[data-slot="janela-rodape"]')).getByRole('button', { name: 'Fechar' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Análise do DRE' }))
-      janela = screen.getByRole('dialog', { name: 'Análise do DRE' })
-      expect(within(janela).queryByRole('button', { name: 'Não se aplica' })).not.toBeInTheDocument()
       unmount()
     }
+  })
+
+  it('trocar o motivo é no Editar: grava com trocarMotivo, avisa, relê e avisa a página', async () => {
+    vi.mocked(lerChecklist).mockResolvedValue(COM_NSA)
+    vi.mocked(trocarMotivo).mockResolvedValue({ erro: null })
+    const { aoMudar } = tela(consultor)
+    const janela = await editar('Inventário')
+    const motivo = within(janela).getByRole('textbox', { name: 'Motivo' })
+    await userEvent.clear(motivo)
+    await userEvent.type(motivo, 'O estoque é do fornecedor')
+    await salvar(janela)
+    expect(trocarMotivo).toHaveBeenCalledWith('t6', 'O estoque é do fornecedor')
+    expect(marcarTarefa).not.toHaveBeenCalled()
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Inventário: motivo trocado.'))
+    await waitFor(() => expect(lerChecklist).toHaveBeenCalledTimes(2))
+    expect(aoMudar).toHaveBeenCalled()
   })
 })
 

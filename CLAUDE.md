@@ -405,8 +405,8 @@ Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as
   cliente) a tarefa fica feita, fora de uma sessão. O check-out mostra "Tarefas marcadas nesta sessão" e, com "O que foi
   feito" vazio, já vem com "Tarefas concluídas: A; B."; apagar o check-in não desmarca as tarefas.
 - **"Não se aplica"** (pedido do Diego, 18/11; design, "Acréscimo de 18/11"): terceiro jeito de fechar uma tarefa, ao
-  lado de "feita" (`estado = 'nao_se_aplica'`). Marca quem marca "feita" (só o consultor do cliente, pela janela da
-  tarefa, com ou sem check-in) e vale para obrigatória. **Bloqueada pode ser "não se aplica"; as que dependem dela
+  lado de "feita" (`estado = 'nao_se_aplica'`). Marca quem marca "feita" (só o consultor do cliente, pelo botão da
+  linha, que pede o motivo numa janela, ou pelo Editar, com ou sem check-in) e vale para obrigatória. **Bloqueada pode ser "não se aplica"; as que dependem dela
   esperam as dependências dela** (pedido do Diego, 18/11): a cadeia — a dependência feita libera; a que não se aplica
   só libera quando nenhuma pendente fica atrás dela (`private.nao_se_aplica_espera`; em `checklist_do_cliente`, a CTE
   recursiva `presas`; no Andamento, a mesma CTE uma vez por linha), e a tela mostra o que a tarefa espera de verdade
@@ -436,6 +436,21 @@ Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as
   direto, pela RLS do check-list; a contagem vem em cada tarefa de `checklist_do_cliente` (`comentarios`), com
   `pode_comentar`. O histórico curto da tarefa (o Editar) é `historico_da_tarefa`: as últimas 10 linhas do Histórico
   dela (`cliente_eventos.tarefa_id`) e os trechos de tempo.
+- **A linha da tarefa e o Editar** (pedido do Diego, 18/11, protótipo v2 aprovado; design, "Acréscimo de 18/11 (2)"):
+  a linha (`LinhaDaTarefa`, memorizada: num check-list de 500 só a marcada e as que ela libera redesenham) tem só o check
+  no começo (feita = check verde, sem selo; a que não se aplica, o quadrado cinza com `Ban`), o título em texto (clicar
+  não abre nada), um selo (Em andamento com o relógio, Pausada com os minutos, Bloqueada com "Espera: …" à vista e ligado
+  ao check e ao Iniciar desligados, Não se aplica, Opcional, Nesta sessão) e a descrição; à direita, o prazo como botão
+  (`PrazoDaTarefa`: vermelho se venceu, âmbar em 7 dias, cinza na resolvida; o balão só mostra a data, quanto falta e o
+  dia do modelo — sem "Mudar prazo"), Iniciar/Pausar/Retomar, Não se aplica, 💬 N (só com comentários) e o lápis
+  (Ver para quem só lê); o que não vale guarda o lugar, e no celular tudo vai para o "⋯". Motivo, nota, "feita por" e
+  comentários ficam só no **Editar** (`JanelaDaTarefa`, `JanelaFormulario` xl): situação em abas (A fazer · Em andamento ·
+  Pausada · Feita · Não se aplica; com dependência pendente, as que pedem dependências ficam desligadas com "Espera: …"),
+  o motivo só em Não se aplica (trocar é ali), prazo e "vem do modelo" só para ler, a nota, os comentários
+  (`ComentariosDaTarefa`, gravam na hora; o rascunho vai junto no Salvar e um comentário em edição segura o Salvar) e o
+  histórico curto. Salvar grava nesta ordem: nota, situação (ou o motivo trocado), comentário. A gestão comenta e só lê o
+  resto; a Central só lê. O relógio da tela é um só (`useAgora` em `src/components/checkins/tempo.js`): o banco conta
+  `tempo_segundos` e a tela soma o que passou desde a leitura (`lido_em`, no relógio daqui).
 - **Uso no recorte de quem vê:** "N clientes que você vê usam" (a Central conta todos). Uma consultoria nunca vê modelos,
   check-lists, clientes ou nomes de outra; o Histórico só diz o nome do modelo para a Central e para a consultoria dele.
 - **Menu Check-lists** (`/checklists`; `/checkins` redireciona com a mesma `?aba=`; "Check-in" fica só para as horas,

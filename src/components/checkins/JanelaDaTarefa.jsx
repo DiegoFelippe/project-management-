@@ -1,255 +1,285 @@
-import { useId, useState } from 'react'
-import { Ban, Check, ClipboardCheck, Lock, Play, Undo2 } from 'lucide-react'
+import { useEffect, useId, useState } from 'react'
+import { Ban, Check, Circle, ClipboardCheck, Clock, Lock, Pause, Play } from 'lucide-react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
+import Campo from '@/components/campos/Campo'
+import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import JanelaFormulario, { BotaoCancelar, CartaoDaSecao, SecaoFormulario } from '@/components/comum/JanelaFormulario'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
+import { useAlterado } from '@/components/comum/useAlterado'
+import { useEnvio } from '@/components/comum/useEnvio'
+import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { historicoDaTarefa } from '@/data/checklists'
+import { diaEmSP, horaEmSP } from '@/lib/calendario'
 import { MOTIVO_OBRIGATORIO } from '@/lib/erros'
-import { formatarDia } from '@/lib/mes'
-import { juntar, plural } from '@/lib/nomes'
+import { formatarDia, hoje as hojeEmSP } from '@/lib/mes'
+import { juntar } from '@/lib/nomes'
 import { cn } from '@/lib/utils'
-import { SelosDaTarefa } from './ListaDoChecklist'
-import { estaResolvida, feitaPorEm, rotuloDaSituacao } from './situacao'
+import ComentariosDaTarefa from './ComentariosDaTarefa'
+import { SeloDaSituacao, TempoCorrendo } from './LinhaDaTarefa'
+import { dataPorExtenso, diaCurto, feitaPorEm, prazoEmPalavras, situacaoDaTarefa, textoDaEspera } from './situacao'
+import { minutosFeitos, quandoEmSP } from './tempo'
 
-const MAXIMO_DA_NOTA = 500
-const MAXIMO_DO_MOTIVO = 500
-// Botão só com o ícone no celular (os secundários do rodapé): no toque, 44 px de largura.
-const SO_ICONE = 'max-sm:pointer-coarse:min-w-11'
+const MAXIMO = 500
+const EDITANDO_COMENTARIO = 'Salve ou cancele o comentário que você está editando.'
+const SITUACOES = [
+  { valor: 'a_fazer', rotulo: 'A fazer', icone: Circle },
+  { valor: 'andamento', rotulo: 'Em andamento', icone: Play },
+  { valor: 'pausada', rotulo: 'Pausada', icone: Pause },
+  { valor: 'feita', rotulo: 'Feita', icone: Check },
+  { valor: 'nao_se_aplica', rotulo: 'Não se aplica', icone: Ban },
+]
 
-// A cor de cada situação (a bolinha das tarefas relacionadas), a mesma do fluxograma.
-const PINTA = {
-  feita: 'bg-positive', andamento: 'bg-primary', livre: 'bg-input', bloqueada: 'bg-muted-foreground/40', hoje: 'bg-notice',
-  atrasada: 'bg-destructive',
-}
+// A regra do banco (marcar_tarefa): a fazer e não se aplica valem sempre; em andamento e feita pedem as dependências;
+// pausada também, menos a partir de em andamento (pausar pode sempre).
+const precisaDasDependencias = (destino, atual) => destino !== atual
+  && (destino === 'andamento' || destino === 'feita' || (destino === 'pausada' && atual !== 'andamento'))
 
-// O que cada botão manda e o texto dele enquanto grava.
-const ACOES = {
-  comecar: { estado: 'andamento', rotulo: 'Começar', andando: 'Começando…', icone: Play },
-  feita: { estado: 'feita', rotulo: 'Marcar como feita', andando: 'Marcando…', icone: Check },
-  voltar: { estado: 'a_fazer', rotulo: 'Voltar para a fazer', andando: 'Voltando…', icone: Undo2 },
-  reabrir: { estado: 'a_fazer', rotulo: 'Reabrir tarefa', andando: 'Reabrindo…', icone: Undo2 },
-  nota: { estado: null, rotulo: 'Salvar nota', andando: 'Salvando…', icone: Check },
-  // Com o motivo aberto (o botão do corpo some), o principal repete o nome da ação; curto para caber a 360 px.
-  naoSeAplica: { estado: 'nao_se_aplica', rotulo: 'Não se aplica', andando: 'Marcando…', icone: Ban },
-}
-
-function situacaoEmPalavras(tarefa, s) {
-  if (estaResolvida(tarefa)) return feitaPorEm(tarefa)
-  if (s.faltam === null) return 'Sem prazo'
-  if (s.atrasada) return `Atrasada há ${plural(-s.faltam, 'dia', 'dias')}`
-  if (s.venceHoje) return 'Vence hoje'
-  return `Faltam ${plural(s.faltam, 'dia', 'dias')}`
-}
-
-function Relacionadas({ rotulo, tarefas, situacoes, vazio, aoAbrir }) {
+// O campo Motivo (o Editar e a janela da linha): obrigatório, até 500 letras, com o contador e o que acontece.
+function CampoDoMotivo({ id, valor, aoMudar, erro, dica, autoFocus = false }) {
   return (
-    <div className="min-w-0 space-y-1.5">
-      <p className="section-label">{rotulo}</p>
-      {tarefas.length ? (
-        <ul aria-label={rotulo} className="space-y-1">
-          {tarefas.map((t) => {
-            const s = situacoes.get(t.id)
-            return (
-              <li key={t.id}>
-                <button type="button" onClick={() => aoAbrir(t)}
-                  className="botao-animado hover:bg-accent flex w-full min-w-0 items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-[background-color,translate,scale] outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-[0.97]">
-                  {s?.cor === 'nao_se_aplica'
-                    ? <Ban aria-hidden="true" className="text-muted-foreground size-3 shrink-0" strokeWidth={2.5} />
-                    : <span aria-hidden="true" className={cn('size-2.5 shrink-0 rounded-full', PINTA[s?.cor] ?? PINTA.livre)} />}
-                  <span className="min-w-0 flex-1 truncate text-rotulo font-medium">{t.titulo}</span>
-                  <span className="text-muted-foreground shrink-0 text-legenda">{s ? rotuloDaSituacao(t, s) : ''}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      ) : (
-        <p className="text-muted-foreground text-rotulo">{vazio}</p>
-      )}
-    </div>
+    <Campo id={id} rotulo="Motivo" erro={erro} dica={dica}>
+      <Textarea id={id} rows={3} maxLength={MAXIMO} autoFocus={autoFocus} value={valor} onChange={(e) => aoMudar(e.target.value)}
+        placeholder="Ex.: o cliente já tem o DRE auditado deste ano" />
+      <span className="text-muted-foreground justify-self-end text-legenda tabular-nums">{valor.length}/{MAXIMO}</span>
+    </Campo>
   )
 }
 
-// Janela da tarefa do check-list do cliente: onde ela está (cliente, etapa, obrigatória ou opcional), os selos, a
-// descrição, o prazo e a situação, do que ela depende e o que ela libera (clicáveis: abrem aquela tarefa), o motivo (na
-// que não se aplica) e a nota.
-// Para quem marca (o consultor do cliente) o rodapé muda com a situação: a fazer → Começar e Marcar como feita; em
-// andamento → Voltar para a fazer e Marcar como feita; feita ou não se aplica → Reabrir tarefa e Salvar nota; bloqueada →
-// Salvar nota (e Voltar para a fazer se já tinha começado). Para os outros: Fechar, e a nota e o motivo só para ler.
-// "Não se aplica" (a fazer ou em andamento, não bloqueada): o botão no corpo abre o campo Motivo (obrigatório, até 500
-// letras, o erro embaixo do campo) e o rodapé vira Cancelar, Voltar (sai do motivo) e Não se aplica (grava).
-// `aoAgir({ estado, nota, motivo? })` grava (estado nulo = só a nota; motivo só no "não se aplica") e devolve { erro };
-// sem erro, a janela fecha. `situacoes`: a situação de cada tarefa (situacaoDaTarefa), por id. Fechar com a nota mudada
-// ou o motivo escrito pergunta antes (usabilidade, U4).
-export default function JanelaDaTarefa({ tarefa, etapas, tarefas, situacoes, nomeDoCliente, inicio, podeMarcar, aoAgir, aoAbrir, aoFechar }) {
-  const [nota, setNota] = useState(tarefa.nota ?? '')
-  const [acao, setAcao] = useState(null)
-  const [erro, setErro] = useState(null)
-  const [comMotivo, setComMotivo] = useState(false)
+// O que acontece ao marcar "não se aplica" (a bloqueada fecha, mas as que dependem dela continuam esperando).
+function oQueAcontece(espera) {
+  const fecha = espera.length
+    ? `A tarefa fecha sem ser feita. As que dependem dela continuam esperando ${juntar(espera.map((d) => d.titulo))}.`
+    : 'A tarefa fecha sem ser feita e libera as que dependem dela.'
+  return `${fecha} O motivo fica na tarefa e no Histórico do cliente, para a auditoria.`
+}
+
+// "Não se aplica" pedido na hora, da linha (acréscimo de 18/11 (2)): só o motivo. `aoMarcar(motivo)` grava e devolve
+// { erro }; sem erro, a janela fecha. Fechar com o motivo escrito pergunta antes.
+export function JanelaNaoSeAplica({ tarefa, situacao, aoMarcar, aoFechar }) {
   const [motivo, setMotivo] = useState('')
-  const [erroDoMotivo, setErroDoMotivo] = useState(null)
-  const idNota = useId()
-  const idMotivo = useId()
-  const s = situacoes.get(tarefa.id)
-  const feita = tarefa.estado === 'feita'
-  const naoSeAplica = tarefa.estado === 'nao_se_aplica'
-  const resolvida = feita || naoSeAplica
-  const bloqueada = !resolvida && s.bloqueada
-  // A bloqueada também pode ser "não se aplica" (pedido do Diego, 18/11): as que dependem dela esperam o que ela espera.
-  const podeNaoSeAplica = podeMarcar && !resolvida
-  const numeroDaEtapa = etapas.findIndex((e) => e.id === tarefa.etapa_id) + 1
-  const etapa = etapas[numeroDaEtapa - 1]
-  const porId = new Map(tarefas.map((t) => [t.id, t]))
-  const dependeDe = (tarefa.depende_de ?? []).map((id) => porId.get(id)).filter(Boolean)
-  const libera = tarefas.filter((t) => t.depende_de?.includes(tarefa.id))
-  const alterado = nota !== (tarefa.nota ?? '') || motivo.trim() !== ''
-
-  async function agir(chave) {
-    if (acao) return
-    const pedido = { estado: ACOES[chave].estado, nota }
-    if (chave === 'naoSeAplica') {
-      if (!motivo.trim()) {
-        setErroDoMotivo(MOTIVO_OBRIGATORIO)
-        document.getElementById(idMotivo)?.focus()
-        return
-      }
-      pedido.motivo = motivo.trim()
-    }
-    setAcao(chave)
-    setErro(null)
-    const resposta = await aoAgir(pedido)
-    setAcao(null)
-    if (resposta?.erro) return setErro(resposta.erro)
-    aoFechar()
+  const id = useId()
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(aoFechar, {
+    validar: () => (motivo.trim() ? {} : { motivo: MOTIVO_OBRIGATORIO }),
+  })
+  function marcar(e) {
+    e.preventDefault()
+    if (conferir()) enviar(() => aoMarcar(motivo.trim()))
   }
-
-  function sairDoMotivo() {
-    setComMotivo(false)
-    setMotivo('')
-    setErroDoMotivo(null)
-    setErro(null)
-  }
-
-  // O botão principal envia o formulário (Marcar como feita, Não se aplica ou Salvar nota); os outros são
-  // botões comuns.
-  let secundarias = []
-  let principal = null
-  if (podeMarcar) {
-    if (resolvida) [secundarias, principal] = [['reabrir'], 'nota']
-    else if (comMotivo) [secundarias, principal] = [[], 'naoSeAplica']
-    else if (bloqueada) [secundarias, principal] = [tarefa.estado === 'andamento' ? ['voltar'] : [], 'nota']
-    else [secundarias, principal] = [[tarefa.estado === 'andamento' ? 'voltar' : 'comecar'], 'feita']
-  }
-  // No celular os botões secundários ficam só com o ícone (o nome continua para o leitor de tela), como na janela do
-  // cartão do quadro: Cancelar, o secundário e o principal cabem a 360 px.
-  const conteudoDoBotao = (chave, secundario = false) => {
-    const { rotulo, andando, icone: Icone } = ACOES[chave]
-    if (acao === chave) return andando
-    return <><Icone /> {secundario ? <span className="max-sm:sr-only">{rotulo}</span> : rotulo}</>
-  }
-
-  const detalhe = `${nomeDoCliente} · etapa ${numeroDaEtapa}, ${etapa?.nome ?? ''} · ${tarefa.obrigatoria ? 'obrigatória' : 'opcional'}`
   return (
-    <JanelaFormulario aberto aoFechar={aoFechar} titulo={tarefa.titulo} descricao={detalhe} icone={ClipboardCheck} largura="lg"
-      enviando={Boolean(acao)} alterado={alterado}
-      rodape={podeMarcar ? (
-        <>
-          <BotaoCancelar />
-          {comMotivo && (
-            <Button type="button" variant="outline" className={SO_ICONE} disabled={Boolean(acao)} onClick={sairDoMotivo}>
-              <Undo2 /> <span className="max-sm:sr-only">Voltar</span>
-            </Button>
+    <JanelaFormulario aberto aoFechar={aoFechar} titulo="Por que não se aplica?" descricao={tarefa.titulo} icone={Ban}
+      enviando={enviando} tentativa={tentativa} alterado={motivo.trim() !== ''} form="form-nao-se-aplica"
+      rotuloEnviar="Marcar não se aplica" rotuloEnviando="Marcando…">
+      <form id="form-nao-se-aplica" noValidate onSubmit={marcar} className="space-y-4">
+        <CampoDoMotivo id={id} valor={motivo} aoMudar={setMotivo} erro={erros.motivo} dica={oQueAcontece(situacao.espera)} autoFocus />
+        {erro && <Aviso>{erro}</Aviso>}
+      </form>
+    </JanelaFormulario>
+  )
+}
+
+// O texto de cada linha do histórico curto (as do Histórico do cliente desta tarefa e os trechos de tempo).
+function linhasDoHistorico({ eventos = [], trechos = [] }) {
+  const por = (nome) => (nome ? ` por ${nome}` : '')
+  const TEXTO = {
+    tarefa_nao_se_aplica: (e) => `Não se aplica${por(e.autor)}: “${e.motivo}”`,
+    motivo_trocado: (e) => `Motivo trocado${por(e.autor)}: “${e.motivo}”`,
+    tarefa_reaberta: (e) => `Reaberta${por(e.autor)}`,
+  }
+  const doHistorico = eventos.filter((e) => TEXTO[e.tipo]).map((e) => ({ chave: e.id, em: e.em, texto: TEXTO[e.tipo](e) }))
+  const dosTrechos = trechos.map((t) => ({
+    chave: `${t.inicio}-${t.pessoa}`,
+    em: t.inicio,
+    texto: t.fim
+      ? `Trabalhada${por(t.pessoa)}: ${minutosFeitos((new Date(t.fim) - new Date(t.inicio)) / 1000)}`
+      : `Em andamento${por(t.pessoa)}`,
+  }))
+  return [...doHistorico, ...dosTrechos].sort((a, b) => new Date(b.em) - new Date(a.em)).slice(0, 10)
+}
+
+// O histórico curto da tarefa (historico_da_tarefa): as últimas linhas do Histórico dela e os trechos de tempo.
+function HistoricoDaTarefa({ tarefaId }) {
+  const [historico, setHistorico] = useState(undefined)
+  const idTitulo = useId()
+  useEffect(() => {
+    let ativo = true
+    historicoDaTarefa(tarefaId).then((h) => ativo && setHistorico(h ?? null), () => ativo && setHistorico(null))
+    return () => {
+      ativo = false
+    }
+  }, [tarefaId])
+  const linhas = historico ? linhasDoHistorico(historico) : []
+  return (
+    <section aria-labelledby={idTitulo} className="min-w-0 space-y-2">
+      <h3 id={idTitulo} className="section-label">Histórico da tarefa</h3>
+      {historico === undefined ? <p className="text-muted-foreground text-rotulo">Carregando…</p>
+        : !linhas.length ? <p className="text-muted-foreground text-rotulo">Nada ainda.</p>
+          : (
+            <ol aria-labelledby={idTitulo} className="space-y-2">
+              {linhas.map((l) => (
+                <li key={l.chave} className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 text-rotulo">
+                  <span aria-hidden="true" className="bg-input mt-1.5 size-2 rounded-full" />
+                  <span className="break-words">{l.texto}</span>
+                  <span className="text-muted-foreground col-start-2 text-legenda tabular-nums">{quandoEmSP(l.em)}</span>
+                </li>
+              ))}
+            </ol>
           )}
-          {secundarias.map((chave) => (
-            <Button key={chave} type="button" variant="outline" className={SO_ICONE} disabled={Boolean(acao)} onClick={() => agir(chave)}>
-              {conteudoDoBotao(chave, true)}
-            </Button>
-          ))}
-          <Button type="submit" form="form-tarefa" disabled={Boolean(acao)}>{conteudoDoBotao(principal)}</Button>
-        </>
-      ) : (
-        <Button type="button" variant="outline" onClick={aoFechar}>Fechar</Button>
-      )}>
-      <form id="form-tarefa" noValidate onSubmit={(e) => { e.preventDefault(); if (principal) agir(principal) }} className="space-y-5">
-        <div data-selos className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <SelosDaTarefa tarefa={tarefa} situacao={s} />
+      <p className="text-muted-foreground text-legenda">O histórico completo fica na aba Histórico do cliente.</p>
+    </section>
+  )
+}
+
+// Quando o trecho aberto começou: "11:55" (hoje) ou "16/11 11:55".
+function desde(instante) {
+  const dia = diaEmSP(instante)
+  return dia === hojeEmSP() ? horaEmSP(instante) : `${diaCurto(dia)} ${horaEmSP(instante)}`
+}
+
+// O tempo feito (a soma dos trechos; na em andamento, o relógio correndo e desde quando), ou nada.
+function linhaDoTempo(tarefa) {
+  if (tarefa.estado === 'andamento' && tarefa.trecho_aberto_desde) {
+    return <>Tempo feito: <strong><TempoCorrendo tarefa={tarefa} /></strong> · em andamento desde {desde(tarefa.trecho_aberto_desde)}</>
+  }
+  if (!(tarefa.tempo_segundos > 0)) return null
+  return <>Tempo feito: <strong className="tabular-nums">{minutosFeitos(tarefa.tempo_segundos)}</strong>{tarefa.estado === 'pausada' && ' · pausada'}</>
+}
+
+// Editar tarefa (acréscimo de 18/11 (2), protótipo v2): o título e a descrição vêm do modelo (só ler); a situação em abas
+// (A fazer · Em andamento · Pausada · Feita · Não se aplica; com dependência pendente, as que pedem dependências ficam
+// desligadas, com "Espera: …"); o motivo só em Não se aplica (trocar o motivo é aqui); o prazo (só ler); a nota; os
+// comentários (gravam na hora) e o histórico curto. Para quem marca (o consultor do cliente), Salvar manda
+// `aoSalvar({ estado, motivo, nota, comentario })` (o rascunho do comentário vai junto) e devolve { erro }; sem erro, a
+// janela fecha. Para os outros, Fechar, com a situação, o motivo e a nota só para ler (a gestão comenta). Fechar com algo
+// mudado ou escrito pergunta antes. `aoMexer()`: um comentário entrou ou saiu (o check-list relê a contagem).
+export default function JanelaDaTarefa({
+  tarefa, etapas, tarefas, situacoes, nomeDoCliente, inicio, podeMarcar, aoSalvar, aoMexer, aoFechar,
+}) {
+  const [situacao, setSituacao] = useState(tarefa.estado)
+  const [motivo, setMotivo] = useState(tarefa.motivo ?? '')
+  const [nota, setNota] = useState(tarefa.nota ?? '')
+  const [rascunho, setRascunho] = useState('')
+  const [editandoComentario, setEditandoComentario] = useState(false)
+  const idMotivo = useId()
+  const idNota = useId()
+  const s = situacoes.get(tarefa.id)
+  const naoSeAplica = tarefa.estado === 'nao_se_aplica'
+  // O que ela espera mesmo resolvida (reabrir a feita ou a que não se aplica pede as dependências, como Iniciar).
+  const espera = situacaoDaTarefa({ ...tarefa, estado: 'a_fazer' }, new Map(tarefas.map((t) => [t.id, t])), null).espera
+  const alterado = useAlterado({ situacao, motivo, nota }) || rascunho.trim() !== '' || editandoComentario
+  const { erro, erros, tentativa, conferir, enviando, enviar } = useEnvio(aoFechar, {
+    validar: () => ({
+      ...(situacao === 'nao_se_aplica' && !motivo.trim() ? { motivo: MOTIVO_OBRIGATORIO } : {}),
+      ...(editandoComentario ? { comentario: EDITANDO_COMENTARIO } : {}),
+    }),
+  })
+
+  function salvar(e) {
+    e.preventDefault()
+    if (!podeMarcar || !conferir()) return
+    enviar(() => aoSalvar({
+      estado: situacao,
+      motivo: situacao === 'nao_se_aplica' ? motivo.trim() : null,
+      nota: nota.trim(),
+      comentario: rascunho.trim() || null,
+    }))
+  }
+
+  const numeroDaEtapa = etapas.findIndex((e) => e.id === tarefa.etapa_id) + 1
+  const detalhe = `Editar tarefa · ${nomeDoCliente} · etapa ${numeroDaEtapa}, ${etapas[numeroDaEtapa - 1]?.nome ?? ''} · ${tarefa.obrigatoria ? 'obrigatória' : 'opcional'}`
+  const prazo = tarefa.vence_em ? prazoEmPalavras(tarefa, s) : null
+  // Quem fechou e quando: para quem marca, embaixo das abas ("Não se aplica por Ana em 14/11/2026"); para os outros, com o
+  // selo.
+  const fechadaPor = feitaPorEm(tarefa)
+  const quem = (tarefa.estado === 'feita' || naoSeAplica) && (podeMarcar ? (
+    <p className="text-muted-foreground text-legenda">
+      {fechadaPor.startsWith('por ') ? `${naoSeAplica ? 'Não se aplica' : 'Feita'} ${fechadaPor}` : fechadaPor.charAt(0).toUpperCase() + fechadaPor.slice(1)}
+    </p>
+  ) : (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      {naoSeAplica ? <SeloDaSituacao tarefa={tarefa} situacao={s} /> : <Badge variant="positive"><Check /> Feita</Badge>}
+      <span className="text-muted-foreground text-legenda">{fechadaPor}</span>
+    </div>
+  ))
+  const tempo = linhaDoTempo(tarefa)
+
+  return (
+    <JanelaFormulario aberto aoFechar={aoFechar} titulo={tarefa.titulo} descricao={detalhe} icone={ClipboardCheck} largura="xl"
+      enviando={enviando} tentativa={tentativa} alterado={alterado} form="form-tarefa"
+      rotuloEnviar={podeMarcar ? 'Salvar' : undefined} rodape={podeMarcar ? undefined : <BotaoCancelar>Fechar</BotaoCancelar>}>
+      <form id="form-tarefa" noValidate onSubmit={salvar} className="space-y-5">
+        <div className="bg-muted/60 flex items-start gap-2.5 rounded-xl px-3 py-2.5">
+          <Lock className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <div className="min-w-0 space-y-0.5">
+            {tarefa.descricao && <p className="text-corpo break-words">{tarefa.descricao}</p>}
+            <p className="text-muted-foreground text-legenda">Vem do modelo: o título e a descrição mudam no modelo.</p>
+          </div>
         </div>
-        {tarefa.descricao && <p className="text-corpo break-words">{tarefa.descricao}</p>}
-        {bloqueada && podeMarcar && (
-          <p className="bg-muted/60 flex items-start gap-2 rounded-xl border px-3 py-2 text-rotulo">
-            <Lock className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span className="min-w-0">Ainda não dá para marcar como feita: espera {juntar(s.espera.map((d) => d.titulo))}.</span>
-          </p>
-        )}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <CartaoDaSecao className="p-3">
-            <p className="section-label">Prazo</p>
-            <p className="text-corpo tabular-nums">
-              {tarefa.vence_em
-                ? <><strong>{formatarDia(tarefa.vence_em)}</strong> · dia {tarefa.prazo_dias} a partir de {formatarDia(inicio)}</>
-                : 'Sem prazo'}
+
+        <SecaoFormulario titulo="Situação">
+          {podeMarcar ? (
+            <AbasSegmentadas rotulo="Situação" valor={situacao} aoMudar={setSituacao} abas={SITUACOES.map((aba) => ({
+              ...aba, desligada: espera.length > 0 && precisaDasDependencias(aba.valor, tarefa.estado),
+            }))} />
+          ) : !quem && (SeloDaSituacao({ tarefa, situacao: s }) ?? <p className="text-corpo">A fazer</p>)}
+          {quem}
+          {podeMarcar && espera.length > 0 && (
+            <p className="text-muted-foreground flex items-start gap-2 text-rotulo">
+              <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              <span className="min-w-0">{textoDaEspera({ espera })}.</span>
             </p>
-          </CartaoDaSecao>
-          <CartaoDaSecao className="p-3">
-            <p className="section-label">{feita ? 'Feita' : naoSeAplica ? 'Não se aplica' : 'Situação'}</p>
-            <p className="text-corpo">{situacaoEmPalavras(tarefa, s)}</p>
-          </CartaoDaSecao>
-        </div>
-        {naoSeAplica && (
-          <section aria-labelledby={`${idMotivo}-titulo`} className="bg-muted/50 space-y-1 rounded-xl border px-3 py-2.5">
-            <h3 id={`${idMotivo}-titulo`} className="section-label flex items-center gap-1.5">
-              <Ban className="size-3.5" aria-hidden="true" /> Motivo
-            </h3>
-            <p className="text-corpo break-words">{tarefa.motivo}</p>
-          </section>
-        )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Relacionadas rotulo="Depende de" tarefas={dependeDe} situacoes={situacoes} vazio="Nada: pode começar quando quiser." aoAbrir={aoAbrir} />
-          <Relacionadas rotulo="Libera" tarefas={libera} situacoes={situacoes} vazio="Nenhuma tarefa espera por esta." aoAbrir={aoAbrir} />
-        </div>
-        {podeNaoSeAplica && !comMotivo && (
-          <div className="bg-muted/40 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-3 py-2">
-            <p className="text-muted-foreground min-w-0 flex-1 basis-48 text-rotulo">Esta tarefa não é necessária neste cliente?</p>
-            <Button type="button" variant="outline" size="sm" disabled={Boolean(acao)} onClick={() => setComMotivo(true)}>
-              <Ban /> Não se aplica
-            </Button>
-          </div>
-        )}
-        {comMotivo && (
-          <div className="bg-muted/40 grid gap-2 rounded-xl border p-3">
-            <div className="flex items-baseline justify-between gap-3">
-              <Label htmlFor={idMotivo}>Motivo</Label>
-              <span className="text-muted-foreground text-legenda tabular-nums">{motivo.length}/{MAXIMO_DO_MOTIVO}</span>
-            </div>
-            <Textarea id={idMotivo} rows={3} maxLength={MAXIMO_DO_MOTIVO} autoFocus required value={motivo}
-              aria-invalid={erroDoMotivo ? true : undefined}
-              aria-describedby={erroDoMotivo ? `${idMotivo}-erro ${idMotivo}-ajuda` : `${idMotivo}-ajuda`}
-              placeholder="Ex.: o cliente já tem o DRE auditado deste ano"
-              onChange={(e) => {
-                setMotivo(e.target.value)
-                if (erroDoMotivo && e.target.value.trim()) setErroDoMotivo(null)
-              }} />
-            {erroDoMotivo && <p id={`${idMotivo}-erro`} className="text-rotulo text-destructive">{erroDoMotivo}</p>}
-            <p id={`${idMotivo}-ajuda`} className="text-muted-foreground text-legenda">
-              {bloqueada
-                ? `A tarefa fecha sem ser feita. As que dependem dela continuam esperando ${juntar(s.espera.map((d) => d.titulo))}.`
-                : 'A tarefa fecha sem ser feita e libera as que dependem dela.'}
-              {' '}O motivo fica na tarefa e no Histórico do cliente, para a auditoria.
+          )}
+          {tempo && (
+            <p className="text-muted-foreground flex items-start gap-2 text-rotulo">
+              <Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 [&_strong]:text-foreground [&_strong]:font-semibold">{tempo}</span>
             </p>
+          )}
+        </SecaoFormulario>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="min-w-0 space-y-5">
+            {podeMarcar && situacao === 'nao_se_aplica' && (
+              <CampoDoMotivo id={idMotivo} valor={motivo} aoMudar={setMotivo} erro={erros.motivo}
+                dica={naoSeAplica ? 'Trocar o motivo grava "Motivo trocado" no Histórico do cliente.' : oQueAcontece(espera)} />
+            )}
+            {!podeMarcar && naoSeAplica && (
+              <section aria-labelledby={`${idMotivo}-titulo`} className="space-y-1">
+                <h3 id={`${idMotivo}-titulo`} className="section-label flex items-center gap-1.5"><Ban className="size-3.5" aria-hidden="true" /> Motivo</h3>
+                <p className="text-corpo break-words">{tarefa.motivo}</p>
+              </section>
+            )}
+            <section aria-labelledby={`${idNota}-prazo`} className="space-y-2">
+              <h3 id={`${idNota}-prazo`} className="section-label">Prazo</h3>
+              <CartaoDaSecao className="space-y-0.5 p-3">
+                {prazo ? (
+                  <>
+                    <p className="text-corpo"><strong className="font-semibold">{prazo.texto}</strong> · {prazo.situacao.charAt(0).toLowerCase() + prazo.situacao.slice(1)}</p>
+                    <p className="text-muted-foreground text-legenda tabular-nums">
+                      {dataPorExtenso(tarefa.vence_em)} · dia {tarefa.prazo_dias} a partir de {formatarDia(inicio)}
+                    </p>
+                  </>
+                ) : <p className="text-corpo">Sem prazo</p>}
+              </CartaoDaSecao>
+            </section>
+            {podeMarcar ? (
+              <Campo id={idNota} rotulo="Nota (opcional)">
+                <Textarea id={idNota} rows={3} maxLength={MAXIMO} value={nota} onChange={(e) => setNota(e.target.value)}
+                  placeholder="Ex.: faltam os extratos de setembro" />
+                <span className="text-muted-foreground justify-self-end text-legenda tabular-nums">{nota.length}/{MAXIMO}</span>
+              </Campo>
+            ) : (
+              <section aria-labelledby={`${idNota}-nota`} className="space-y-1">
+                <h3 id={`${idNota}-nota`} className="section-label">Nota</h3>
+                <p className={cn('text-corpo break-words', !tarefa.nota && 'text-muted-foreground')}>{tarefa.nota || 'Sem nota.'}</p>
+              </section>
+            )}
           </div>
-        )}
-        {podeMarcar ? (
-          <div className="grid gap-2">
-            <Label htmlFor={idNota}>Nota (opcional)</Label>
-            <Textarea id={idNota} rows={3} maxLength={MAXIMO_DA_NOTA} value={nota} onChange={(e) => setNota(e.target.value)}
-              placeholder="Ex.: faltam os extratos de setembro" />
+          <div className="min-w-0 space-y-6">
+            <ComentariosDaTarefa tarefaId={tarefa.id} total={tarefa.comentarios ?? 0} rascunho={rascunho} aoMudarRascunho={setRascunho}
+              aoEditar={setEditandoComentario} erroDaEdicao={erros.comentario} aoMexer={aoMexer} />
+            <HistoricoDaTarefa tarefaId={tarefa.id} />
           </div>
-        ) : (
-          <SecaoFormulario titulo="Nota">
-            <p className={cn('text-corpo break-words', !tarefa.nota && 'text-muted-foreground')}>{tarefa.nota || 'Sem nota.'}</p>
-          </SecaoFormulario>
-        )}
+        </div>
         {erro && <Aviso>{erro}</Aviso>}
       </form>
     </JanelaFormulario>
