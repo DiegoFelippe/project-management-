@@ -11,7 +11,8 @@ const cruz = () => grafico().querySelector('[data-cruz]')
 // começa nela) e a da direita é 16 px: x(i) = margem + i × (640 − margem − 16) / 4.
 const margem = () => Number(grafico().querySelector('line').getAttribute('x1'))
 const x = (i) => margem() + (i * (640 - margem() - 16)) / 4
-const pontosDe = (el) => el.getAttribute('points').trim().split(/\s+/).map((p) => p.split(',').map(Number))
+// A linha é um <path> "Mx,yLx,yL…" (pathLength funciona em todo navegador no path, não em todo no polyline).
+const pontosDe = (el) => el.getAttribute('d').slice(1).split('L').map((p) => p.split(',').map(Number))
 
 describe('GraficoDeLinha', () => {
   it('um alvo focável só; → e ← movem a cruz e a dica lista todas as séries do ponto', async () => {
@@ -93,6 +94,8 @@ describe('GraficoDeLinha', () => {
     )
     const real = grafico().querySelector('[data-serie="0"]')
     const projecao = grafico().querySelector('[data-serie="1"]')
+    expect(real.tagName).toBe('path')
+    expect(projecao.tagName).toBe('path')
     expect(real).toHaveAttribute('pathLength', '1')
     expect(real).toHaveClass('grafico-desenha')
     expect(projecao).not.toHaveAttribute('pathLength')

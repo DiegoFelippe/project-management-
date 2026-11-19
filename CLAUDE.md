@@ -351,8 +351,9 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
   (11 px) ou maior; rótulos do eixo X com 44 px entre eles (sempre o último); a 360 px nada rola para o lado.
 - **Todo gráfico tem visão em tabela** ("Ver em tabela", com os mesmos números) e **dica no mouse, no toque e no
   teclado** (o SVG é `role="group"` com o nome do gráfico; marca focável com `aria-label`; na linha, um alvo só e as
-  setas ← →; no mapa de calor, um alvo só e as setas ← → ↑ ↓; Esc fecha). Texto da dica é texto do React, nunca HTML
-  montado. Nos quadradinhos e na faixa os números ficam à vista na legenda (imagem com o resumo, sem dica).
+  setas ← →; no mapa de calor, um alvo só e as setas ← → ↑ ↓; nos quadradinhos, um alvo só e as setas andam de grupo,
+  com o mouse e o toque no quadradinho; na faixa, cada parte focável; Esc fecha). Texto da dica é texto do React, nunca
+  HTML montado.
 - **Movimento** (pedido do Diego, 19/11): colunas e barras crescem em onda (`.grafico-onda`, `.grafico-onda-deitada`,
   atraso pelo índice em `--i`), a linha e o arco se desenham (`.grafico-desenha`, com `pathLength="1"`; nunca no
   tracejado), células e quadradinhos entram em cascata (`.grafico-cascata`), e os números dos cartões correm até o valor

@@ -8,7 +8,8 @@ import { escalaBonita, formatarEixo, formatarValor, margemDoEixo, passoDosRotulo
 import { useDica } from './useDica'
 import { useLargura } from './useLargura'
 
-const emTexto = (pontos) => pontos.map((p) => p.join(',')).join(' ')
+// Linha como <path> ("Mx,yLx,y…"), não <polyline>: o pathLength do desenho (.grafico-desenha) vale no path em todo navegador.
+const caminho = (pontos) => `M${pontos.map((p) => p.join(',')).join('L')}`
 const textoDaDica = (d) => `${d.titulo}: ${d.linhas.map((l) => [l.valor, l.rotulo].filter(Boolean).join(' ')).join(', ')}`
 
 // Linha (e área clara) por posição no eixo X (semanas, dias do mês), em SVG na largura real do contêiner. Um alvo
@@ -120,7 +121,7 @@ export default function GraficoDeLinha({
                   d={`M${pontos[0][0]},${y(0)}L${pontos.map((p) => p.join(',')).join('L')}L${pontos.at(-1)[0]},${y(0)}Z`} />
               )}
               {/* pathLength="1" só na cheia: no tracejado ele mudaria o "5 4". A tracejada aparece quando a cheia termina. */}
-              <polyline data-serie={s} points={emTexto(pontos)} fill="none" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"
+              <path data-serie={s} d={caminho(pontos)} fill="none" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"
                 strokeDasharray={serie.tracejada ? '5 4' : undefined} pathLength={serie.tracejada ? undefined : 1}
                 style={{ stroke: serie.cor ? corDe(serie.cor) : undefined, animationDelay: serie.tracejada ? '0.9s' : undefined }}
                 className={cn('stroke-grafico-serie', serie.tracejada ? 'grafico-cascata' : 'grafico-desenha')} />

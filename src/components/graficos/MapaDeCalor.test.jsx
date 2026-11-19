@@ -105,6 +105,25 @@ describe('MapaDeCalor', () => {
     for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(44)
   })
 
+  it('rótulos esparsos a 300 px: ficam os não vazios, do último para trás, a 44 px um do outro (nenhum some à toa)', () => {
+    const { redimensionar } = simularResizeObserver()
+    const DIAS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom']
+    const desenharSemanas = (n, rotulosX) => render(<MapaDeCalor rotulo={`Semanas ${n}`} linhas={DIAS} colunas={rotulosX.map((_, i) => `semana ${i + 1}`)}
+      rotulosX={rotulosX} valores={DIAS.map(() => rotulosX.map(() => 1))} cor="var(--cor-turquesa-forte)" unidade="h" />)
+    // O "Dias com check-in" do protótipo: 12 semanas, rótulo a cada 3 (colunas 0, 3, 6, 9).
+    desenharSemanas(12, ['01/09', '', '', '22/09', '', '', '13/10', '', '', '03/11', '', ''])
+    // Um ano: 53 semanas, um rótulo por mês (a cada 4 semanas).
+    desenharSemanas(53, Array.from({ length: 53 }, (_, i) => (i % 4 === 0 ? `m${i / 4 + 1}` : '')))
+    redimensionar(300)
+    const rotulos = (n) => [...screen.getByRole('group', { name: `Semanas ${n}` }).querySelectorAll('[data-rotulo-x]')]
+    expect(rotulos(12).map((t) => t.textContent)).toEqual(['01/09', '22/09', '13/10', '03/11'])
+    const doAno = rotulos(53)
+    expect(doAno.at(-1).textContent).toBe('m14') // o último não vazio sempre fica
+    expect(doAno.length).toBeGreaterThanOrEqual(4)
+    const xs = doAno.map((t) => Number(t.getAttribute('x')))
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(44)
+  })
+
   it('sem linhas ou colunas, nada', () => {
     const { container } = render(<MapaDeCalor rotulo="Nada" linhas={[]} colunas={[]} valores={[]} cor="var(--cor-azul-forte)" />)
     expect(container).toBeEmptyDOMElement()

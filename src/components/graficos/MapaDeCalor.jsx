@@ -3,18 +3,34 @@ import { TAMANHO } from '@/lib/tipografia'
 import { cn } from '@/lib/utils'
 import { corDe } from './cores'
 import Dica from './Dica'
-import { formatarValor, margemDoEixo, passoDosRotulos } from './escala'
+import { formatarValor, margemDoEixo } from './escala'
 import { useDica } from './useDica'
 import { useLargura } from './useLargura'
 
 const preso = (v, maximo) => Math.max(0, Math.min(maximo, v))
 const NIVEIS = [0.18, 0.45, 0.72, 1]
+const ENTRE_ROTULOS = 44
+
+// Quais rótulos do eixo X aparecem: os não vazios, do último para trás, cada um a 44 px do último que ficou (com
+// rótulos esparsos, um passo contado sobre todas as colunas pularia justo os que existem).
+function rotulosQueCabem(rotulos, centro) {
+  const ficam = new Set()
+  let anterior = Infinity
+  for (let j = rotulos.length - 1; j >= 0; j--) {
+    if (rotulos[j] && anterior - centro(j) >= ENTRE_ROTULOS) {
+      ficam.add(j)
+      anterior = centro(j)
+    }
+  }
+  return ficam
+}
 
 // Mapa de calor (pedido do Diego, 19/11): linhas × colunas (dia da semana × hora; dias × semanas), a força do valor numa
 // cor só (`cor`: nome de COR ou valor de CSS); zero fica no fundo afundado. SVG na largura real; as células encolhem
-// (até 53 semanas cabem a 360 px) e os rótulos do eixo X (`rotulosX`: '' pula) ficam a 44 px uns dos outros. Um alvo
-// focável só: o mouse acha a célula embaixo dele e as setas ← → ↑ ↓ (Home e End: começo e fim da linha) andam de célula,
-// com o contorno e a dica ("seg, 10h: 12 check-ins"); o leitor de tela ouve a célula nova. As células entram em cascata.
+// (até 53 semanas cabem a 360 px) e os rótulos do eixo X (`rotulosX`: '' pula) ficam a 44 px uns dos outros (sempre o
+// último não vazio). Um alvo focável só: o mouse acha a célula embaixo dele e as setas ← → ↑ ↓ (Home e End: começo e
+// fim da linha) andam de célula, com o contorno e a dica ("seg, 10h: 12 check-ins"); o leitor de tela ouve a célula
+// nova. As células entram em cascata.
 // valores[linha][coluna]; sem linhas ou colunas, nada.
 export default function MapaDeCalor(props) {
   if (!props.linhas?.length || !props.colunas?.length) return null
@@ -44,7 +60,7 @@ function Mapa({ rotulo, linhas, colunas, valores, cor, unidade = '', rotulosX = 
   const valorDe = (i, j) => valores[i]?.[j] ?? 0
   const maior = Math.max(0, ...valores.flat())
   const conteudoDe = (i, j) => ({ titulo: `${linhas[i]}, ${colunas[j]}`, linhas: [{ valor: formatarValor(valorDe(i, j), unidade) }] })
-  const passo = passoDosRotulos(n, util)
+  const comRotulo = rotulosQueCabem(rotulosX.slice(0, n), (j) => x(j) + larguraDaCelula / 2)
   // O contorno só aparece com a dica aberta: Esc, rolar ou tocar fora fecham os dois (o foco fica no alvo).
   const cursor = dica ? celula : null
 
@@ -92,7 +108,7 @@ function Mapa({ rotulo, linhas, colunas, valores, cor, unidade = '', rotulosX = 
               style={{ fill: cheia ? corDe(cor) : undefined, '--i': i + j }} className={cn('grafico-cascata pointer-events-none', !cheia && 'fill-muted')} />
           )
         }))}
-        {colunas.map((_, j) => (rotulosX[j] && (n - 1 - j) % passo === 0 ? (
+        {colunas.map((_, j) => (comRotulo.has(j) ? (
           <text key={j} data-rotulo-x="" x={x(j) + larguraDaCelula / 2} y={altura - 6} textAnchor="middle" fontSize={TAMANHO.legenda}
             className="pointer-events-none fill-muted-foreground tabular-nums">{rotulosX[j]}</text>
         ) : null))}
