@@ -9,7 +9,7 @@ import { lerChecklist, marcarTarefa } from '@/data/checklists'
 import {
   apagarCliente, buscarCliente, checkinsPorSemana, hojeDoCliente, horasPorConsultor, horasPorDia, horasPorMes, listarEventos,
 } from '@/data/clientes'
-import { cartoesDoQuadro, limparQuadroDoCliente, quadroDoCliente } from '@/data/quadro'
+import { cartoesDoQuadro, limparQuadroDoCliente, quadroDoCliente, quadroPorId } from '@/data/quadro'
 import { ouvirQuadro } from '@/data/quadroAoVivo'
 import { deslocarMes, mesAtual, rotuloDoMes } from '@/lib/mes'
 import { escolherNoSeletor } from '@/test/campos'
@@ -125,6 +125,7 @@ beforeEach(() => {
   vi.mocked(checkinsPorSemana).mockResolvedValue([])
   vi.mocked(horasPorDia).mockResolvedValue({ mes: '2026-11-01', dias: [], realizado: 0, previsao: 40, projecao: null, dias_no_mes: 30 })
   vi.mocked(hojeDoCliente).mockResolvedValue(HOJE)
+  vi.mocked(quadroPorId).mockResolvedValue({ id: 'q1', colunas: [{ id: 'c1', nome: 'A fazer', cor: null, cartoes: 3 }, { id: 'c2', nome: 'Concluído', cor: 4, concluidos: true, cartoes: 1 }] })
   vi.mocked(tarefasDoCheckin).mockResolvedValue([])
   vi.mocked(meuCheckinAberto).mockResolvedValue(null)
   vi.mocked(listarArquivos).mockResolvedValue({ itens: [], total: 0 })
@@ -159,10 +160,15 @@ describe('Cliente (página)', () => {
     expect(screen.getByRole('region', { name: 'Hoje' })).toHaveAccessibleDescription('A situação de agora: não segue o período do filtro.')
     expect(hojeDoCliente).toHaveBeenCalledTimes(1)
     expect(hojeDoCliente).toHaveBeenCalledWith('k1')
-    // Os gráficos seguem o período (sem navegação própria); o das etapas usa as etapas da mesma leitura da faixa.
+    // Os gráficos seguem o período (sem navegação própria); os de hoje (etapas, tempo e o quadro) usam a mesma leitura da
+    // faixa, e o quadro vem pelo id dela (quadro_por_id, que nunca cria quadro; quadro_do_cliente não é chamado na Geral).
     const graficos = screen.getByRole('region', { name: 'No período' })
     expect(within(graficos).queryByRole('group', { name: 'Mês' })).toBeNull()
-    expect(within(graficos).getByRole('region', { name: 'Andamento do check-list por etapa · hoje' })).toBeInTheDocument()
+    expect(within(graficos).getByRole('region', { name: 'Check-list por etapa' })).toHaveTextContent('Situação de hoje · Gestão financeira')
+    expect(within(graficos).getByRole('region', { name: 'Onde foi o tempo' })).toHaveTextContent('Nenhuma tarefa com tempo marcado.')
+    await waitFor(() => expect(within(graficos).getByRole('region', { name: 'Quadro do cliente' })).toHaveTextContent('1 de 4 cartões concluídos · 1 atrasado'))
+    expect(quadroPorId).toHaveBeenCalledWith('q1')
+    expect(quadroDoCliente).not.toHaveBeenCalled()
     await waitFor(() => expect(horasPorDia).toHaveBeenCalledWith('k1', mesAtual()))
     // A ordem: ficha → filtros → Hoje → gráficos.
     const ordem = [screen.getByRole('region', { name: 'Resumo do cliente' }), barra, screen.getByRole('region', { name: 'Hoje' }), graficos]
@@ -218,9 +224,23 @@ describe('Cliente (página)', () => {
     tela()
     expect(await screen.findByText('Arquivado em 12/10/2026.')).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'Previsão do mês' })).toBeNull()
-    // Os gráficos do período continuam (histórico).
+    // Os gráficos do período continuam (histórico), e os de hoje também (o check-list e o quadro, só para ler).
     expect(screen.getByRole('region', { name: 'No período' })).toBeInTheDocument()
     await waitFor(() => expect(horasPorDia).toHaveBeenCalled())
+    expect(screen.getByRole('region', { name: 'Check-list por etapa' })).toHaveTextContent('1 de 2 resolvidas')
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Quadro do cliente' })).toHaveTextContent('1 de 4 cartões concluídos'))
+  })
+
+  it('erro na leitura de hoje: a faixa e os blocos de hoje dizem; "Tentar de novo" num deles relê a faixa', async () => {
+    vi.mocked(hojeDoCliente).mockRejectedValueOnce(new Error('x'))
+    const usuario = userEvent.setup()
+    tela()
+    const quadro = await screen.findByRole('region', { name: 'Quadro do cliente' })
+    await waitFor(() => expect(within(quadro).getByRole('alert')).toHaveTextContent('Não foi possível carregar a situação de hoje.'))
+    await usuario.click(within(quadro).getByRole('button', { name: 'Tentar de novo' }))
+    await waitFor(() => expect(hojeDoCliente).toHaveBeenCalledTimes(2))
+    expect(await screen.findByRole('group', { name: 'Previsão do mês' })).toBeInTheDocument()
+    await waitFor(() => expect(quadroPorId).toHaveBeenCalledWith('q1'))
   })
 
   it('um check-out na página (versao) recarrega a faixa e os gráficos', async () => {
@@ -238,6 +258,7 @@ describe('Cliente (página)', () => {
     expect(horasPorMes).toHaveBeenCalledTimes(2)
     expect(horasPorConsultor).toHaveBeenCalledTimes(2)
     expect(checkinsPorSemana).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(quadroPorId).toHaveBeenCalledTimes(2))
   })
 
   it('trocar o mês na barra de filtros relê os gráficos, e não a faixa Hoje (ela é de hoje)', async () => {

@@ -61,6 +61,29 @@ describe('HojeDoCliente', () => {
     expect(cartao('Check-list').getByText('próxima 20/11')).toBeInTheDocument()
   })
 
+  it('cada cartão com o ícone num quadradinho de um tom da paleta (azul, turquesa, violeta, mostarda, verde)', () => {
+    tela()
+    const tons = { 'Previsão do mês': 'azul', 'Último check-in': 'turquesa', 'Próxima reunião': 'violeta', Quadro: 'mostarda', 'Check-list': 'verde' }
+    for (const [nome, tom] of Object.entries(tons)) {
+      const ladrilho = screen.getByRole('group', { name: nome }).querySelector('[data-ladrilho]')
+      expect(ladrilho, nome).toHaveClass(`bg-cor-${tom}-suave`, `text-cor-${tom}-texto`)
+      expect(ladrilho.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    }
+  })
+
+  it('as barras nas cores de estado de todo gráfico: feita em verde, não se aplica em grafite, atrasada no vermelho cheio', () => {
+    tela({ hoje: { ...HOJE, checklist: { ...HOJE.checklist, nao_se_aplica: 2 } } })
+    const partes = (nome) => [...screen.getByRole('group', { name: nome }).querySelectorAll('[data-parte]')]
+      .map((p) => [p.dataset.parte, p.style.flexGrow, p.style.background])
+    // 28 tarefas: 12 feitas, 2 não se aplicam, 3 atrasadas e 11 a fazer no prazo (atrasadas por último, como nas etapas).
+    expect(partes('Check-list')).toEqual([
+      ['feita', '12', 'var(--positive-cheio)'], ['nsa', '2', 'var(--cor-grafite-forte)'], ['neutro', '11', 'var(--grafico-neutro)'],
+      ['atrasada', '3', 'var(--destructive-cheio)'],
+    ])
+    // No quadro, o que está no prazo não é "feito": fica no azul da série.
+    expect(partes('Quadro')).toEqual([['atrasada', '2', 'var(--destructive-cheio)'], ['serie', '10', 'var(--grafico-serie)']])
+  })
+
   it('selos vai passar / abaixo do ritmo / no ritmo / sem selo no começo do mês', () => {
     const com = (previsao) => ({ ...HOJE, previsao: { ...HOJE.previsao, ...previsao } })
     const { rerender } = tela()

@@ -124,6 +124,21 @@ describe('MapaDeCalor', () => {
     for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(44)
   })
 
+  it('célula nula (fora do período, dia que não chegou) não desenha; dicaDe dá o título e o texto de cada célula', async () => {
+    const dicaDe = (i, j) => ({ titulo: `${LINHAS[i]}, dia ${j + 1}`, linhas: [{ valor: VALORES[i][j] == null ? 'fora do período' : `${VALORES[i][j]} h` }] })
+    const comNulos = [[null, 2, 12, 1], [3, 0, 0, null], [0, 0, 6, null]]
+    desenhar({ valores: comNulos, dicaDe: (i, j) => ({ ...dicaDe(i, j), linhas: [{ valor: comNulos[i][j] == null ? 'fora do período' : `${comNulos[i][j]} h` }] }) })
+    expect(celula(0, 0)).toBeNull()
+    expect(celula(1, 3)).toBeNull()
+    expect(grafico().querySelectorAll('[data-celula]')).toHaveLength(9)
+    expect(celula(1, 1)).toHaveClass('fill-muted') // zero continua no fundo afundado
+    await userEvent.tab()
+    expect(within(screen.getByRole('tooltip')).getByText('seg, dia 1')).toBeInTheDocument()
+    expect(within(screen.getByRole('tooltip')).getByText('fora do período')).toBeInTheDocument()
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}')
+    expect(anuncio()).toHaveTextContent('seg, dia 3: 12 h')
+  })
+
   it('sem linhas ou colunas, nada', () => {
     const { container } = render(<MapaDeCalor rotulo="Nada" linhas={[]} colunas={[]} valores={[]} cor="var(--cor-azul-forte)" />)
     expect(container).toBeEmptyDOMElement()

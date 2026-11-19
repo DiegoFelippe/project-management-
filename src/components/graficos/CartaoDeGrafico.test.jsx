@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { Ban, Check } from 'lucide-react'
 import CartaoDeGrafico from './CartaoDeGrafico'
 
 const TABELA = {
@@ -142,6 +143,13 @@ describe('CartaoDeGrafico', () => {
     expect(texto).toHaveClass('truncate')
     expect(texto).toHaveAttribute('title', nome)
     expect(texto.closest('li')).toHaveClass('min-w-0', 'max-w-full')
+  })
+
+  it('legenda com ícone (estado sempre com ícone e palavra: as situações das etapas do check-list)', () => {
+    render(<Cartao legenda={[{ forma: 'quadrado', cor: 'feita', texto: 'Feitas', icone: Check }, { forma: 'quadrado', cor: 'nsa', texto: 'Não se aplicam', icone: Ban }]} />)
+    const linhas = within(screen.getByRole('list', { name: 'Legenda' })).getAllByRole('listitem')
+    expect(linhas[0].querySelector('svg.lucide-check')).toHaveAttribute('aria-hidden', 'true')
+    expect(linhas[1].querySelector('svg.lucide-ban')).not.toBeNull()
   })
 
   it('atualizando (trocou o período): o gráfico fica a 60% até chegar o novo', () => {

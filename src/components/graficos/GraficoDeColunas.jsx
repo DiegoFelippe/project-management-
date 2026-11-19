@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { TAMANHO } from '@/lib/tipografia'
+import { corDe } from './cores'
 import Dica from './Dica'
 import EixoY from './EixoY'
 import { caminhoDaColuna, escalaBonita, formatarEixo, margemDoEixo, passoDosRotulos } from './escala'
@@ -12,7 +13,8 @@ import { useLargura } from './useLargura'
 // ponto por item; o último trecho tracejado e o ponto vazado quando o último item é `parcial`) ou uma referência
 // horizontal (previsão), com rótulo. Cada coluna é focável (aria-label) e mostra a dica no mouse, no toque e no foco.
 // As colunas crescem em onda da esquerda para a direita (.grafico-onda), só quando aparecem (chave nova).
-// itens: [{ chave, rotulo, valor, referencia?, esmaecido?, parcial?, rotuloNaColuna?, aria, dica }].
+// `cor` (nome de COR ou valor de CSS) pinta a coluna no lugar do azul da série (o mês que passou da previsão).
+// itens: [{ chave, rotulo, valor, cor?, referencia?, esmaecido?, parcial?, rotuloNaColuna?, aria, dica }].
 export default function GraficoDeColunas({
   itens, altura = 210, unidade = 'h', linhaDeReferencia = false, referenciaHorizontal = null, rotuloAria,
 }) {
@@ -55,7 +57,8 @@ export default function GraficoDeColunas({
               <rect x={centro(i) - banda / 2 + 1} y={m.t} width={Math.max(0, banda - 2)} height={alturaUtil} rx="6"
                 className="fill-transparent group-hover/coluna:fill-muted/70 group-focus-visible/coluna:fill-muted/70 group-focus-visible/coluna:stroke-ring group-focus-visible/coluna:stroke-2" />
               {d && (
-                <path data-coluna="" data-largura={larguraDaColuna} d={d} fillOpacity={item.esmaecido ? 0.42 : undefined} style={{ '--i': i }}
+                <path data-coluna="" data-largura={larguraDaColuna} d={d} fillOpacity={item.esmaecido ? 0.42 : undefined}
+                  style={{ '--i': i, fill: item.cor ? corDe(item.cor) : undefined }}
                   className="grafico-onda pointer-events-none fill-grafico-serie transition-[filter] group-hover/coluna:brightness-115 group-focus-visible/coluna:brightness-115" />
               )}
             </g>

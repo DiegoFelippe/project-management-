@@ -366,6 +366,16 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
   que o banco usou. Quem vê cada bloco: a tabela da seção 2 de
   `docs/superpowers/specs/2026-11-19-graficos-variados-e-paleta-design.md` (consultor sem fila, ocupação, horas por
   unidade e cidades).
+- **Aba Geral do cliente** (pedido do Diego, 19/11): a mesma grade (8 + 4, depois pares de 6), na ordem do protótipo —
+  horas × previsão (projeção vermelha quando passa), horas por consultor (rosca, total no meio), horas por mês (o mês
+  que passou da previsão em vermelho com "▲" e, até 6 meses, o número; o escolhido no Mês, ou o de hoje num período, em
+  azul; os outros em turquesa; num período, os de fora esmaecidos), dias com check-in
+  (calor semanas × dias, turquesa, da mesma leitura do burn-up), check-list por etapa (as seis situações e "N de M"),
+  onde foi o tempo, check-ins por semana e o quadro do cliente (faixa na cor de cada coluna, pela `paleta` de
+  `CORES_DAS_COLUNAS`; o Vermelho vai no rosa). Os de hoje vêm da leitura da faixa Hoje (`hoje_do_cliente`) e o quadro
+  por `quadro_por_id` com o id dela (nunca `quadro_do_cliente`, que cria o quadro de quem mexe). As situações
+  (`SITUACOES`) e as cores de estado (`COR` de `graficos/cores.js`) seguram 3:1 como marca nos dois temas
+  (`contraste.test.js`), e a faixa Hoje usa as mesmas (feita sempre verde, atrasada no vermelho cheio).
 - **A leitura (frase do gráfico) usa só números do banco** ou a lista inteira que o gráfico mostra, nunca uma amostra:
   as regras ficam em `src/lib/frasesDosGraficos.js`, com teste. A variação dos cartões ("▲ 12% vs out.") é
   `src/lib/variacao.js` + `rotuloDaComparacao` (`src/lib/periodo.js`), com o período anterior vindo do banco.

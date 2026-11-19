@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { CORES_DO_EVENTO } from '@/components/calendario/cores'
+import { COR } from '@/components/graficos/cores'
 import { CORES_DO_AVATAR, TEXTO_ESCURO, corDoTextoSobre } from './cores'
 import { CONTRASTE_MINIMO, contraste, misturar } from './contraste'
 
@@ -101,6 +102,16 @@ describe('contraste dos tokens de src/index.css', () => {
     const t = TEMAS[tema]
     const fracas = MARCAS.map((nome) => ({ nome, contraste: arredondar(contraste(t[nome], t.card)) }))
       .filter((m) => !(m.contraste >= CONTRASTE_MINIMO))
+    expect(fracas).toEqual([])
+  })
+
+  // As situações das tarefas (rosca e etapas do check-list, faixa Hoje): COR de graficos/cores.js são marcas (arcos,
+  // partes de barra) com nome e ícone ao lado: seguram 3:1 sobre o cartão (pedido do Diego, 19/11).
+  it.each(Object.keys(TEMAS))('no %s, as marcas de estado dos gráficos (COR: feita, não se aplica, andamento, pausada, a fazer, atrasada) seguram 3:1 sobre o cartão', (tema) => {
+    const t = TEMAS[tema]
+    const fracas = ['feita', 'nsa', 'andamento', 'pausada', 'afazer', 'atrasada']
+      .map((estado) => ({ estado, contraste: arredondar(contraste(t[/^var\(--([\w-]+)\)$/.exec(COR[estado])[1]], t.card)) }))
+      .filter((m) => !(m.contraste >= 3))
     expect(fracas).toEqual([])
   })
 

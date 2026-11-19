@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   burnupDoPainel, fraseDaFila, fraseDaOcupacao, fraseDasCidades, fraseDasEtapas, fraseDasHorasPorCliente, fraseDasHorasPorUnidade,
-  fraseDasSemanas, fraseDasSemanasDoCliente, fraseDasTarefas, fraseDoBurnupDoPainel, fraseDoCalor, fraseDoMesDoCliente,
+  fraseDasSemanas, fraseDasSemanasDoCliente, fraseDasTarefas, fraseDoBurnupDoPainel, fraseDoCalor, fraseDoMesDoCliente, fraseDoQuadro,
+  fraseDosDiasComCheckin, fraseDoTempo,
   fraseDoPeriodoDoCliente, fraseDoRisco, fraseDosConsultores, fraseDosMeses, fraseDosSeisMeses, nomeDaCidade, porcentoResolvido,
 } from './frasesDosGraficos'
 
@@ -212,16 +213,59 @@ describe('fraseDasSemanasDoCliente', () => {
 })
 
 describe('fraseDasEtapas (check-list)', () => {
-  it('a etapa com mais atrasadas', () => {
-    const etapas = [{ nome: 'Implantação', tarefas: 10, feitas: 8, atrasadas: 1 }, { nome: 'Financeiro', tarefas: 12, feitas: 4, atrasadas: 3 }]
+  it('"N de M" resolvidas (feitas + não se aplica) e a etapa com mais atrasadas', () => {
+    const etapas = [{ nome: 'Implantação', tarefas: 10, feitas: 7, nao_se_aplica: 1, atrasadas: 1 }, { nome: 'Financeiro', tarefas: 12, feitas: 4, atrasadas: 3 }]
     const partes = fraseDasEtapas(etapas)
-    expect(texto(partes)).toBe('Financeiro tem 3 tarefas atrasadas · situação de hoje')
-    expect(fortes(partes)).toEqual(['Financeiro'])
-    expect(texto(fraseDasEtapas([{ nome: 'Fiscal', tarefas: 2, feitas: 0, atrasadas: 1 }]))).toBe('Fiscal tem 1 tarefa atrasada · situação de hoje')
+    expect(texto(partes)).toBe('12 de 22 resolvidas · Financeiro tem 3 tarefas atrasadas')
+    expect(fortes(partes)).toEqual(['12 de 22', 'Financeiro'])
+    expect(texto(fraseDasEtapas([{ nome: 'Fiscal', tarefas: 2, feitas: 0, atrasadas: 1 }]))).toBe('0 de 2 resolvidas · Fiscal tem 1 tarefa atrasada')
   })
 
   it('nenhuma atrasada', () => {
-    expect(texto(fraseDasEtapas([{ nome: 'Fiscal', tarefas: 4, feitas: 2, atrasadas: 0 }]))).toBe('Nenhuma tarefa atrasada · situação de hoje')
+    expect(texto(fraseDasEtapas([{ nome: 'Fiscal', tarefas: 4, feitas: 2, atrasadas: 0 }]))).toBe('2 de 4 resolvidas · nenhuma atrasada')
+  })
+})
+
+describe('fraseDosDiasComCheckin (calendário de calor do cliente)', () => {
+  const dia = (d, horas) => ({ dia: d, horas })
+  it('quantos dias tiveram check-in e o dia da semana com mais horas (a lista inteira do período)', () => {
+    // 16/11 é segunda; 18/11 e 11/11, quartas.
+    const dias = [dia('2026-11-11', 2), dia('2026-11-15', 0), dia('2026-11-16', 3), dia('2026-11-17', 0), dia('2026-11-18', 2.5)]
+    const partes = fraseDosDiasComCheckin(dias, MES)
+    expect(texto(partes)).toBe('3 dias com check-in no mês · mais horas na quarta (4,5 h)')
+    expect(fortes(partes)).toEqual(['3 dias com check-in'])
+    expect(texto(fraseDosDiasComCheckin([dia('2026-11-15', 1)], ANO))).toBe('1 dia com check-in no ano · mais horas no domingo (1 h)')
+  })
+
+  it('sem nenhum dia com horas', () => {
+    expect(texto(fraseDosDiasComCheckin([dia('2026-11-16', 0)], PERIODO))).toBe('Sem horas no período')
+    expect(texto(fraseDosDiasComCheckin([], MES))).toBe('Sem horas neste mês')
+  })
+})
+
+describe('fraseDoTempo (onde foi o tempo do check-list)', () => {
+  it('a tarefa com mais tempo marcado', () => {
+    const partes = fraseDoTempo([{ titulo: 'Análise do DRE', segundos: 13_200 }, { titulo: 'Mapa de custos', segundos: 8100 }])
+    expect(texto(partes)).toBe('Análise do DRE levou mais tempo: 3 h 40')
+    expect(fortes(partes)).toEqual(['Análise do DRE'])
+    expect(texto(fraseDoTempo([{ titulo: 'Reunião', segundos: 40 }]))).toBe('Reunião levou mais tempo: menos de 1 min')
+    expect(texto(fraseDoTempo([{ titulo: 'Reunião', segundos: 720 }]))).toBe('Reunião levou mais tempo: 12 min')
+  })
+})
+
+describe('fraseDoQuadro (cartões por coluna)', () => {
+  const colunas = [{ nome: 'A fazer', cartoes: 4 }, { nome: 'Em andamento', cartoes: 3 }, { nome: 'Concluído', cartoes: 7, concluidos: true }]
+  it('concluídos de todos (a coluna de concluídos) e os atrasados (do banco)', () => {
+    const partes = fraseDoQuadro(colunas, 2)
+    expect(texto(partes)).toBe('7 de 14 cartões concluídos · 2 atrasados')
+    expect(fortes(partes)).toEqual(['7 de 14', '2'])
+    expect(texto(fraseDoQuadro(colunas, 1))).toBe('7 de 14 cartões concluídos · 1 atrasado')
+    expect(texto(fraseDoQuadro(colunas, 0))).toBe('7 de 14 cartões concluídos · nenhum atrasado')
+  })
+
+  it('sem coluna de concluídos: só o total', () => {
+    expect(texto(fraseDoQuadro(colunas.slice(0, 2), 0))).toBe('7 cartões · nenhum atrasado')
+    expect(texto(fraseDoQuadro([{ nome: 'A fazer', cartoes: 1 }], undefined))).toBe('1 cartão')
   })
 })
 

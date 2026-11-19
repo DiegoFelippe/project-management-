@@ -15,7 +15,8 @@ function Amostra({ forma, cor }) {
   )
 }
 
-// Legenda de um gráfico: itens [{ forma: 'quadrado' | 'linha' | 'tracejado' | 'faixa' | 'marca', cor, texto }]. Texto
+// Legenda de um gráfico: itens [{ forma: 'quadrado' | 'linha' | 'tracejado' | 'faixa' | 'marca', cor, texto, icone? }]
+// (`icone`, um ícone do lucide, quando o item é um estado: estado sempre com ícone e palavra). Texto
 // maior que o cartão (nome de consultoria) corta com reticências e vai inteiro no title.
 export default function Legenda({ itens }) {
   if (!itens?.length) return null
@@ -24,6 +25,7 @@ export default function Legenda({ itens }) {
       {itens.map((item, i) => (
         <li key={`${item.texto}-${i}`} className="inline-flex min-w-0 max-w-full items-center gap-1.5">
           <Amostra forma={item.forma} cor={item.cor} />
+          {item.icone && <item.icone aria-hidden="true" className="size-3.5 shrink-0" />}
           <span title={item.texto} className="truncate">{item.texto}</span>
         </li>
       ))}

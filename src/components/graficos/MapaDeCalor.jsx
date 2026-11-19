@@ -30,14 +30,15 @@ function rotulosQueCabem(rotulos, centro) {
 // (até 53 semanas cabem a 360 px) e os rótulos do eixo X (`rotulosX`: '' pula) ficam a 44 px uns dos outros (sempre o
 // último não vazio). Um alvo focável só: o mouse acha a célula embaixo dele e as setas ← → ↑ ↓ (Home e End: começo e
 // fim da linha) andam de célula, com o contorno e a dica ("seg, 10h: 12 check-ins"); o leitor de tela ouve a célula
-// nova. As células entram em cascata.
-// valores[linha][coluna]; sem linhas ou colunas, nada.
+// nova. As células entram em cascata. Célula nula (dia fora do período ou que ainda não chegou) fica em branco.
+// valores[linha][coluna]; sem linhas ou colunas, nada. `dicaDe(i, j)` (opcional): { titulo, linhas } da dica de cada
+// célula (o dia de cada célula do calendário), no lugar de "linha, coluna: valor".
 export default function MapaDeCalor(props) {
   if (!props.linhas?.length || !props.colunas?.length) return null
   return <Mapa {...props} />
 }
 
-function Mapa({ rotulo, linhas, colunas, valores, cor, unidade = '', rotulosX = colunas }) {
+function Mapa({ rotulo, linhas, colunas, valores, cor, unidade = '', rotulosX = colunas, dicaDe }) {
   const contem = useRef(null)
   const svg = useRef(null)
   const largura = useLargura(contem)
@@ -59,7 +60,7 @@ function Mapa({ rotulo, linhas, colunas, valores, cor, unidade = '', rotulosX = 
   const y = (i) => i * (alturaDaCelula + vao)
   const valorDe = (i, j) => valores[i]?.[j] ?? 0
   const maior = Math.max(0, ...valores.flat())
-  const conteudoDe = (i, j) => ({ titulo: `${linhas[i]}, ${colunas[j]}`, linhas: [{ valor: formatarValor(valorDe(i, j), unidade) }] })
+  const conteudoDe = (i, j) => dicaDe?.(i, j) ?? { titulo: `${linhas[i]}, ${colunas[j]}`, linhas: [{ valor: formatarValor(valorDe(i, j), unidade) }] }
   const comRotulo = rotulosQueCabem(rotulosX.slice(0, n), (j) => x(j) + larguraDaCelula / 2)
   // O contorno só aparece com a dica aberta: Esc, rolar ou tocar fora fecham os dois (o foco fica no alvo).
   const cursor = dica ? celula : null
@@ -100,6 +101,7 @@ function Mapa({ rotulo, linhas, colunas, valores, cor, unidade = '', rotulosX = 
             className="pointer-events-none fill-muted-foreground">{nome}</text>
         ))}
         {linhas.map((_, i) => colunas.map((__, j) => {
+          if (valores[i]?.[j] === null) return null
           const v = valorDe(i, j)
           const cheia = v > 0 && maior > 0
           return (

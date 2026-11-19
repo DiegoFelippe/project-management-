@@ -52,8 +52,13 @@ describe('BarraSegmentada (quadro, check-list)', () => {
     const partes = [...container.querySelectorAll('[data-parte]')]
     expect(partes.map((p) => p.dataset.parte)).toEqual(['atrasada', 'feita'])
     expect(partes.map((p) => p.style.flexGrow)).toEqual(['2', '10'])
-    expect(partes[0]).toHaveClass('bg-grafico-acima')
-    expect(partes[1]).toHaveClass('bg-grafico-serie')
+    // As cores de estado de todo gráfico (COR): atrasada no vermelho cheio, feita no verde (nunca o azul da série).
+    expect(partes.map((p) => p.style.background)).toEqual(['var(--destructive-cheio)', 'var(--positive-cheio)'])
+  })
+
+  it('a cor de qualquer nome de COR (não se aplica, série)', () => {
+    const { container } = render(<BarraSegmentada partes={[{ valor: 1, tom: 'nsa' }, { valor: 3, tom: 'serie' }]} />)
+    expect([...container.querySelectorAll('[data-parte]')].map((p) => p.style.background)).toEqual(['var(--cor-grafite-forte)', 'var(--grafico-serie)'])
   })
 
   it('tudo zero: só a trilha', () => {

@@ -2,7 +2,8 @@
 // "Números e frases"). Cada uma recebe o JSON que o banco mandou e devolve as `partes` de <Leitura>: texto corrido e
 // { forte } para o número que importa. Só usam números prontos do banco ou a lista inteira que o gráfico mostra (nunca
 // uma amostra): contagens, participações e projeções vêm do banco.
-import { formatarHoras, formatarOcupacao } from '@/lib/horas'
+import { diaDaSemana } from '@/lib/calendario'
+import { formatarDuracao, formatarHoras, formatarOcupacao } from '@/lib/horas'
 import { mesAtual } from '@/lib/mes'
 
 const NUMERO = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 })
@@ -130,11 +131,43 @@ export function fraseDasSemanasDoCliente(semanas, periodo) {
   return [{ forte: plural(quantidade, 'check-in', 'check-ins') }, ` ${noMesOu(periodo)} · ${formatarHoras(horas / quantidade)} em média`]
 }
 
-// Etapas do check-list (situação de hoje): a etapa com mais tarefas atrasadas.
+// Etapas do check-list (situação de hoje): "12 de 22 resolvidas" (feitas + não se aplica, de todas as etapas) e a etapa
+// com mais tarefas atrasadas.
 export function fraseDasEtapas(etapas) {
+  const soma = (conta) => etapas.reduce((total, e) => total + conta(e), 0)
+  const resolvidas = soma((e) => e.feitas + (e.nao_se_aplica ?? 0))
+  const inicio = [{ forte: `${INTEIRO.format(resolvidas)} de ${INTEIRO.format(soma((e) => e.tarefas))}` }, ' resolvidas · ']
   const pior = etapas.reduce((a, b) => (b.atrasadas > (a?.atrasadas ?? 0) ? b : a), null)
-  if (!pior) return ['Nenhuma tarefa atrasada · situação de hoje']
-  return [{ forte: pior.nome }, ` tem ${plural(pior.atrasadas, 'tarefa atrasada', 'tarefas atrasadas')} · situação de hoje`]
+  if (!pior) return [...inicio, 'nenhuma atrasada']
+  return [...inicio, { forte: pior.nome }, ` tem ${plural(pior.atrasadas, 'tarefa atrasada', 'tarefas atrasadas')}`]
+}
+
+// Calendário de calor do cliente (os dias do período, de horas_do_cliente_por_dia): quantos dias tiveram check-in e o
+// dia da semana com mais horas. "12 dias com check-in no mês · mais horas na quarta (14 h)".
+export function fraseDosDiasComCheckin(dias, periodo) {
+  const com = dias.filter((d) => d.horas > 0)
+  if (!com.length) return [`Sem horas ${nesse(periodo)}`]
+  const porDia = com.reduce((soma, d) => ({ ...soma, [diaDaSemana(d.dia)]: (soma[diaDaSemana(d.dia)] ?? 0) + d.horas }), {})
+  const dia = Object.keys(porDia).map(Number).reduce((a, b) => (porDia[b] > porDia[a] ? b : a))
+  return [{ forte: plural(com.length, 'dia com check-in', 'dias com check-in') },
+    ` ${noMesOu(periodo)} · mais horas ${preposicao(dia)} ${DIAS_POR_EXTENSO[dia]} (${formatarHoras(porDia[dia])})`]
+}
+
+// Onde foi o tempo (as tarefas com mais tempo marcado, de hoje_do_cliente: a maior primeiro).
+const duracao = (segundos) => (segundos < 60 ? 'menos de 1 min' : formatarDuracao(segundos * 1000))
+export function fraseDoTempo([maior]) {
+  return [{ forte: maior.titulo }, ` levou mais tempo: ${duracao(maior.segundos)}`]
+}
+
+// Quadro do cliente (cartões por coluna, de quadro_por_id; os atrasados, de hoje_do_cliente): "7 de 14 cartões
+// concluídos · 2 atrasados" (com a coluna de concluídos) ou "14 cartões".
+export function fraseDoQuadro(colunas, atrasados) {
+  const total = colunas.reduce((soma, c) => soma + c.cartoes, 0)
+  const partes = colunas.some((c) => c.concluidos)
+    ? [{ forte: `${INTEIRO.format(colunas.filter((c) => c.concluidos).reduce((soma, c) => soma + c.cartoes, 0))} de ${INTEIRO.format(total)}` }, ' cartões concluídos']
+    : [{ forte: plural(total, 'cartão', 'cartões') }]
+  if (atrasados == null) return partes
+  return [...partes, ' · ', ...(atrasados ? [{ forte: INTEIRO.format(atrasados) }, atrasados === 1 ? ' atrasado' : ' atrasados'] : ['nenhum atrasado'])]
 }
 
 // ── Início, gráficos variados (pedido do Diego, 19/11) ──

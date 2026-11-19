@@ -27,8 +27,8 @@ import { lerPeriodo, paraEndereco, periodoAoTrocar, validarPeriodo } from '@/lib
 
 const HORA = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' })
 
-// A faixa "Hoje" numa leitura só (hoje_do_cliente), que a página reparte: os 5 cartões e as etapas do check-list, que vão
-// para o gráfico do check-list (design 2026-11-17-graficos-do-inicio-e-do-cliente). Estável para o useLeitura.
+// A faixa "Hoje" numa leitura só (hoje_do_cliente), que a página reparte: os 5 cartões e os gráficos de hoje (check-list
+// por etapa, onde foi o tempo e o quadro, pelo id dele; pedido do Diego, 19/11). Estável para o useLeitura.
 const lerHoje = ({ id }) => hojeDoCliente(id)
 const CHAVES_DO_PERIODO = ['periodo', 'mes', 'de', 'ate']
 
@@ -42,6 +42,7 @@ function GeralDoCliente({ cliente, versao, podeAplicar }) {
   const erroDoPeriodo = periodo.tipo === 'mes' ? null : validarPeriodo(periodo.de, periodo.ate, hoje)
   const [tentativa, setTentativa] = useState(0)
   const leituraDeHoje = useLeituraDoBloco(lerHoje, { id: cliente.id, versao, tentativa })
+  const relerHoje = () => setTentativa((t) => t + 1)
 
   function irPara(novo) {
     setParametros((antes) => {
@@ -63,10 +64,10 @@ function GeralDoCliente({ cliente, versao, podeAplicar }) {
           aoMudarDatas={(datas) => irPara(datas)} />
       </BarraDeFiltros>
       <HojeDoCliente hoje={leituraDeHoje.dados} erro={leituraDeHoje.erro} atualizando={leituraDeHoje.atualizando} podeAplicar={podeAplicar}
-        aoTentarDeNovo={() => setTentativa((t) => t + 1)} />
+        aoTentarDeNovo={relerHoje} />
       {erroDoPeriodo
         ? <p className="card p-4 text-corpo text-muted-foreground">Ajuste as datas na barra de filtros para ver os gráficos.</p>
-        : <GraficosDoCliente key={cliente.id} cliente={cliente} periodo={periodo} versao={versao} etapas={leituraDeHoje.dados?.checklist?.etapas} />}
+        : <GraficosDoCliente key={cliente.id} cliente={cliente} periodo={periodo} versao={versao} hoje={leituraDeHoje} aoRelerHoje={relerHoje} />}
     </div>
   )
 }

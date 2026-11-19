@@ -99,6 +99,16 @@ describe('BarrasHorizontais', () => {
     expect([...linha('Fiscal').querySelectorAll('[data-parte]')].map((p) => p.dataset.parte)).toEqual(['feita', 'neutro'])
   })
 
+  it('etapa com atrasadas: o alerta no mesmo vermelho da parte atrasada (não o do trecho acima do limite)', () => {
+    desenhar({
+      itens: [{ chave: 'fin', nome: 'Financeiro', valorTexto: '4 de 12', aria: 'Financeiro: 4 de 12', dica: { titulo: 'Financeiro', linhas: [] },
+        icone: 'atrasada', partes: [{ valor: 4, tom: 'feita' }, { valor: 3, tom: 'atrasada' }, { valor: 5, tom: 'afazer' }] }],
+    })
+    const icone = linha('Financeiro').querySelector('[data-icone="atrasada"]')
+    expect(icone).toHaveClass('text-destructive-cheio')
+    expect(icone).toHaveAttribute('aria-hidden', 'true')
+  })
+
   it('as seis situações do check-list na ordem: feitas, não se aplica, em andamento, pausadas, a fazer, atrasadas', () => {
     desenhar({
       itens: [{
@@ -110,7 +120,7 @@ describe('BarrasHorizontais', () => {
     const partes = [...linha('Diagnóstico').querySelectorAll('[data-parte]')]
     expect(partes.map((p) => p.dataset.parte)).toEqual(['feita', 'nsa', 'pausada', 'afazer', 'atrasada'])
     expect(partes.map((p) => p.style.background)).toEqual(['var(--positive-cheio)', 'var(--cor-grafite-forte)', 'var(--cor-mostarda-forte)',
-      'var(--input)', 'var(--destructive-cheio)'])
+      'var(--cor-violeta-forte)', 'var(--destructive-cheio)'])
   })
 
   it('cor por item (ranking colorido): a barra na cor dada, no lugar do azul da série', () => {

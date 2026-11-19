@@ -59,6 +59,15 @@ describe('GraficoDeColunas', () => {
     expect(colunas[5]).not.toHaveAttribute('fill-opacity')
   })
 
+  it('cor por item (o mês que passou da previsão em vermelho): no lugar do azul da série', () => {
+    render(<GraficoDeColunas itens={itens(6, (i) => (i === 2 ? { cor: 'acima' } : i === 5 ? { cor: 'var(--cor-turquesa-forte)' } : {}))} rotuloAria="Realizado e capacidade por mês" />)
+    const colunas = grafico().querySelectorAll('[data-coluna]')
+    expect(colunas[2].style.fill).toBe('var(--grafico-acima)')
+    expect(colunas[5].style.fill).toBe('var(--cor-turquesa-forte)')
+    expect(colunas[0].style.fill).toBe('')
+    expect(colunas[0]).toHaveClass('fill-grafico-serie')
+  })
+
   it('linha de referência com um ponto por item e o último trecho tracejado com ponto vazado quando parcial', () => {
     const { rerender } = render(<GraficoDeColunas linhaDeReferencia itens={itens()} rotuloAria="Realizado e capacidade por mês" />)
     expect(grafico().querySelectorAll('[data-ponto-referencia]')).toHaveLength(6)
