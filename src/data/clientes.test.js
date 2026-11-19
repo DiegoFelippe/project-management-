@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supabase } from '@/lib/supabase'
 import { criarBancoFalso } from '@/test/bancoFalso'
 import {
-  buscarClientes, checkinsPorSemana, contarClientesAtivos, hojeDoCliente, horasPorConsultor, horasPorDia, horasPorMes,
-  listarClientes, listarEventos,
+  buscarClientes, checkinsPorSemana, contarClientesAtivos, desfazerEnvio, desfazerEscolha, hojeDoCliente, horasPorConsultor,
+  horasPorDia, horasPorMes, listarClientes, listarEventos,
 } from './clientes'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
@@ -164,5 +164,22 @@ describe('gráficos da aba Geral (nomes dos parâmetros)', () => {
     vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: { code: 'P0001', message: 'sem_permissao' } })
     await expect(hojeDoCliente('k1')).rejects.toMatchObject({ message: 'sem_permissao' })
     await expect(horasPorDia('k1', null)).rejects.toMatchObject({ message: 'sem_permissao' })
+  })
+})
+
+// "Desfazer" dos avisos de Mandar e Escolher (usabilidade, U3): o banco só volta atrás se o cliente está como a ação deixou.
+describe('desfazerEnvio e desfazerEscolha', () => {
+  it('chamam as funções do banco com o que a ação deixou e devolvem { erro: null }', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: null })
+    expect(await desfazerEnvio('k1', 's2')).toEqual({ erro: null })
+    expect(supabase.rpc).toHaveBeenLastCalledWith('desfazer_envio', { p_cliente: 'k1', p_consultoria: 's2' })
+    expect(await desfazerEscolha('k1', 'p1')).toEqual({ erro: null })
+    expect(supabase.rpc).toHaveBeenLastCalledWith('desfazer_escolha', { p_cliente: 'k1', p_consultor: 'p1' })
+  })
+
+  it('o cliente mudou no meio: diz que nada foi desfeito', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: { code: 'P0001', message: 'cliente_mudou' } })
+    expect(await desfazerEnvio('k1', 's2')).toEqual({ erro: 'O cliente mudou depois disso; nada foi desfeito.' })
+    expect(await desfazerEscolha('k1', 'p1')).toEqual({ erro: 'O cliente mudou depois disso; nada foi desfeito.' })
   })
 })

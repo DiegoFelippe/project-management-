@@ -116,6 +116,17 @@ export function escolherConsultor(id, consultorId) {
   return mudar(id, { consultor_id: consultorId })
 }
 
+// "Desfazer" dos avisos (usabilidade, U3): o banco devolve o cliente à Central (o envio) ou tira o consultor (a escolha) só
+// se ele ainda está como a ação deixou; se alguém mexeu nele no meio, recusa (cliente_mudou) e nada muda. { erro }.
+async function desfazer(funcao, argumentos) {
+  const { error } = await supabase.rpc(funcao, argumentos)
+  return { erro: error ? traduzirErroBanco(error, { sobre: 'cliente' }) : null }
+}
+
+export const desfazerEnvio = (id, consultoriaId) => desfazer('desfazer_envio', { p_cliente: id, p_consultoria: consultoriaId })
+
+export const desfazerEscolha = (id, consultorId) => desfazer('desfazer_escolha', { p_cliente: id, p_consultor: consultorId })
+
 export function ajustarPrevisao(id, horasMes) {
   return mudar(id, { horas_mes: horasMes })
 }

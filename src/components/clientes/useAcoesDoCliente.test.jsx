@@ -5,13 +5,15 @@ import { toast } from 'sonner'
 import { avisar } from '@/components/comum/avisar'
 import { Button } from '@/components/ui/button'
 import { consultoriasPorOcupacao, consultoresPorOcupacao } from '@/data/capacidade'
-import { escolherConsultor, mandarParaConsultoria } from '@/data/clientes'
+import { desfazerEnvio, desfazerEscolha, escolherConsultor, mandarParaConsultoria } from '@/data/clientes'
 import { aoMudarOCheckin } from '@/lib/checkinMudou'
 import { useAcoesDoCliente } from './useAcoesDoCliente'
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
 vi.mock('@/components/comum/avisar', () => ({ avisar: vi.fn() }))
-vi.mock('@/data/clientes', () => ({ mandarParaConsultoria: vi.fn(), escolherConsultor: vi.fn() }))
+vi.mock('@/data/clientes', () => ({
+  mandarParaConsultoria: vi.fn(), escolherConsultor: vi.fn(), desfazerEnvio: vi.fn(), desfazerEscolha: vi.fn(),
+}))
 vi.mock('@/data/capacidade', () => ({ consultoriasPorOcupacao: vi.fn(), consultoresPorOcupacao: vi.fn() }))
 
 const ALFA = { id: 'k1', nome: 'Alfa', horas_mes: 10, consultoria_id: null, consultoria: null, consultor_id: null, consultor: null }
@@ -40,17 +42,21 @@ beforeEach(() => {
   vi.mocked(consultoresPorOcupacao).mockResolvedValue({ itens: [{ id: 'p1', nome: 'Ana', capacidade: 100, reservado: 10, ocupacao: 0.1 }], total: 1 })
   vi.mocked(mandarParaConsultoria).mockResolvedValue({ erro: null })
   vi.mocked(escolherConsultor).mockResolvedValue({ erro: null })
+  vi.mocked(desfazerEnvio).mockResolvedValue({ erro: null })
+  vi.mocked(desfazerEscolha).mockResolvedValue({ erro: null })
 })
 
 describe('avisos de Mandar e Escolher consultor com Desfazer e Ver cliente (usabilidade, U3)', () => {
-  it('enviar da central: Desfazer devolve o cliente à Central (consultoria nula), Ver cliente leva a ele', async () => {
+  it('enviar da central: Desfazer devolve o cliente à Central (se ninguém mexeu nele), Ver cliente leva a ele', async () => {
     const aoMudar = await confirmar('mandar', ALFA, 'Mandar para Outra')
     expect(mandarParaConsultoria).toHaveBeenCalledWith('k1', 's2')
     expect(avisar).toHaveBeenCalledWith('Cliente Alfa enviado para Outra.', {
       acoes: [{ rotulo: 'Desfazer', aoClicar: expect.any(Function) }, VER],
     })
     await act(() => acoesDoAviso()[0].aoClicar())
-    expect(mandarParaConsultoria).toHaveBeenLastCalledWith('k1', null)
+    // O banco confere que o cliente ainda está como o envio deixou (na Outra, sem consultor); não grava às cegas.
+    expect(desfazerEnvio).toHaveBeenCalledWith('k1', 's2')
+    expect(mandarParaConsultoria).toHaveBeenCalledTimes(1)
     expect(toast.success).toHaveBeenCalledWith('Cliente Alfa voltou para a Central.')
     expect(aoMudar).toHaveBeenCalledTimes(2)
   })
@@ -67,7 +73,8 @@ describe('avisos de Mandar e Escolher consultor com Desfazer e Ver cliente (usab
       acoes: [{ rotulo: 'Desfazer', aoClicar: expect.any(Function) }, VER],
     })
     await act(() => acoesDoAviso()[0].aoClicar())
-    expect(escolherConsultor).toHaveBeenLastCalledWith('k1', null)
+    expect(desfazerEscolha).toHaveBeenCalledWith('k1', 'p1')
+    expect(escolherConsultor).toHaveBeenCalledTimes(1)
     expect(toast.success).toHaveBeenCalledWith('Alfa voltou a aguardar consultor.')
     expect(aoMudar).toHaveBeenCalledTimes(2)
   })
@@ -81,11 +88,12 @@ describe('avisos de Mandar e Escolher consultor com Desfazer e Ver cliente (usab
     expect(ouvinte).toHaveBeenCalledTimes(1)
   })
 
-  it('Desfazer recusado pelo banco mostra a mensagem e não recarrega de novo', async () => {
+  it('Desfazer recusado (o cliente mudou nos 10 s do aviso) mostra a mensagem e relê a tela', async () => {
     const aoMudar = await confirmar('consultor', NA_STI, 'Escolher Ana')
-    vi.mocked(escolherConsultor).mockResolvedValue({ erro: 'Você não tem permissão para isso.' })
+    vi.mocked(desfazerEscolha).mockResolvedValue({ erro: 'O cliente mudou depois disso; nada foi desfeito.' })
     await act(() => acoesDoAviso()[0].aoClicar())
-    expect(toast.error).toHaveBeenCalledWith('Você não tem permissão para isso.')
-    expect(aoMudar).toHaveBeenCalledTimes(1)
+    expect(toast.error).toHaveBeenCalledWith('O cliente mudou depois disso; nada foi desfeito.')
+    expect(toast.success).not.toHaveBeenCalledWith('Alfa voltou a aguardar consultor.')
+    expect(aoMudar).toHaveBeenCalledTimes(2)
   })
 })

@@ -71,6 +71,8 @@ const ERROS_MENSAGEM_BANCO = {
   checkin_sem_cliente: 'Você não é o consultor deste cliente.',
   checkin_no_futuro: 'O horário não pode estar no futuro.',
   consultoria_escolhe_consultor: 'Quem escolhe o consultor é a consultoria.',
+  // "Desfazer" de Mandar ou Escolher consultor quando alguém mexeu no cliente nos 10 s do aviso
+  cliente_mudou: 'O cliente mudou depois disso; nada foi desfeito.',
   objeto_de_outra_pessoa: ERROS_FUNCAO.sem_permissao,
   sem_permissao: ERROS_FUNCAO.sem_permissao,
   // Quadro do cliente

@@ -175,3 +175,40 @@ describe('clientes de ponta a ponta', () => {
     expect(a.reservado).not.toBeUndefined()
   })
 })
+
+// "Desfazer" dos avisos de Mandar e Escolher consultor (usabilidade, U3): pela API, com a RLS de verdade, o banco só volta
+// atrás se o cliente está como a ação deixou.
+describe('Desfazer o envio e a escolha', () => {
+  const estado = async (id) =>
+    (await admin.from('clientes').select('consultoria_id, consultor_id').eq('id', id).single()).data
+
+  it('a Central desfaz o envio que ninguém mexeu: o cliente volta para a Central', async () => {
+    const id = await novoCliente('Desfazer envio')
+    await comoCentral.from('clientes').update({ consultoria_id: A }).eq('id', id)
+    const { error } = await comoCentral.rpc('desfazer_envio', { p_cliente: id, p_consultoria: A })
+    expect(error).toBeNull()
+    expect(await estado(id)).toEqual({ consultoria_id: null, consultor_id: null })
+  })
+
+  it('a consultoria escolheu o consultor nos 10 s do aviso: o Desfazer da Central é recusado e nada muda', async () => {
+    const id = await novoCliente('Desfazer depois da escolha')
+    await comoCentral.from('clientes').update({ consultoria_id: A }).eq('id', id)
+    await comoGestor.from('clientes').update({ consultor_id: pessoaA.id }).eq('id', id)
+    const { error } = await comoCentral.rpc('desfazer_envio', { p_cliente: id, p_consultoria: A })
+    expect(error?.message).toBe('cliente_mudou')
+    expect(await estado(id)).toEqual({ consultoria_id: A, consultor_id: pessoaA.id })
+  })
+
+  it('a gestão desfaz a escolha enquanto o consultor é o mesmo; trocado no meio, é recusado', async () => {
+    const id = await novoCliente('Desfazer escolha')
+    await comoCentral.from('clientes').update({ consultoria_id: A }).eq('id', id)
+    await comoGestor.from('clientes').update({ consultor_id: pessoaA.id }).eq('id', id)
+    expect((await comoGestor.rpc('desfazer_escolha', { p_cliente: id, p_consultor: gestorA.id })).error?.message)
+      .toBe('cliente_mudou')
+    expect((await comoGestor.rpc('desfazer_escolha', { p_cliente: id, p_consultor: pessoaA.id })).error).toBeNull()
+    expect(await estado(id)).toEqual({ consultoria_id: A, consultor_id: null })
+    // Outra consultoria nem alcança o cliente.
+    expect((await comoAdminB.rpc('desfazer_escolha', { p_cliente: id, p_consultor: pessoaA.id })).error?.message)
+      .toBe('sem_permissao')
+  })
+})
