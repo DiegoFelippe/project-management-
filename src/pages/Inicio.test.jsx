@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { meuCheckinAberto } from '@/data/checkins'
@@ -158,6 +158,30 @@ describe('Início (gráficos)', () => {
     expect(within(fila).queryByText('Aguardando consultoria')).toBeNull()
     expect(screen.getByRole('region', { name: 'Ocupação por consultor' })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Indicadores do mês' })).getByText('Aguardando consultor')).toBeInTheDocument()
+  })
+
+  it('faixa: central e gestão veem "N clientes precisam de você" e o Ver leva ao bloco; com 0 some; consultor não vê', async () => {
+    responder(CENTRAL)
+    const { unmount } = renderizarTela(<Inicio />, { perfil: perfil('central') })
+    expect(await screen.findByText('1 cliente precisa de você.')).toBeInTheDocument()
+    const alvo = document.getElementById('clientes-em-risco')
+    expect(alvo).toBe(document.querySelector('[data-bloco="risco"]'))
+    alvo.scrollIntoView = vi.fn()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver os 1' }))
+    expect(alvo.scrollIntoView).toHaveBeenCalled()
+    expect(alvo).toHaveFocus()
+    unmount()
+    vi.mocked(clientesEmRisco).mockResolvedValue({ ...RISCO, itens: [], total: 0, sem_checkin: 0 })
+    renderizarTela(<Inicio />, { perfil: perfil('admin') })
+    await screen.findByRole('region', { name: 'Clientes em risco' })
+    expect(document.querySelector('[data-faixa-do-inicio]')).toBeNull()
+  })
+
+  it('consultor não vê a faixa', async () => {
+    responder(PESSOA)
+    renderizarTela(<Inicio />, { perfil: perfil('pessoa') })
+    await screen.findByRole('region', { name: 'Meus clientes em risco' })
+    expect(document.querySelector('[data-faixa-do-inicio]')).toBeNull()
   })
 
   it('consultor: horas no período e risco, horas nos meus clientes e semanas, calor e check-lists, meses; sem fila, ocupação, horas por unidade e cidades', async () => {

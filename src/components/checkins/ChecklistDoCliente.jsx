@@ -5,6 +5,7 @@ import AbasSegmentadas from '@/components/comum/AbasSegmentadas'
 import BarraDeFiltros from '@/components/comum/BarraDeFiltros'
 import { GraficoCarregando } from '@/components/comum/Carregando'
 import ConfirmarAcao from '@/components/comum/ConfirmarAcao'
+import { brilharPorMarca } from '@/lib/brilhar'
 import { anotarTarefa, comentarTarefa, lerChecklist, marcarTarefa, tirarModelo, trocarMotivo } from '@/data/checklists'
 import { formatarDia, hoje as hojeEmSP } from '@/lib/mes'
 import { juntar } from '@/lib/nomes'
@@ -180,6 +181,7 @@ export default function ChecklistDoCliente({ cliente, perfil, versao, aoMudar, c
     }
     toast.success(avisoDaMarcacao(tarefa, estado, resposta))
     mudou()
+    brilharPorMarca(tarefa.id)
   }, [mudou, ocupar])
 
   const abrirTarefa = useCallback((t) => setJanela({ tipo: 'tarefa', id: t.id }), [])

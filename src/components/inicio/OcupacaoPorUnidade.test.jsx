@@ -34,7 +34,7 @@ describe('OcupacaoPorUnidade', () => {
     const barra = (linha) => linha.querySelector('[data-trecho="base"]').style.background
     expect(barra(linhas[0])).toBe('var(--destructive-cheio)') // 130%
     expect(barra(linhas[3])).toBe('var(--cor-azul-forte)') // 95%
-    expect(barra(linhas[7])).toBe('var(--notice-cheio)') // 60%, folga
+    expect(barra(linhas[7])).toBe('var(--grafico-folga)') // 60%, folga
     expect(linhas[0].querySelector('[data-marca-do-valor]')).not.toBeNull()
     const legenda = within(screen.getByRole('list', { name: 'Legenda' })).getAllByRole('listitem').map((li) => li.textContent)
     expect(legenda).toEqual(['Acima de 100%', '70% a 100%', 'Folga (abaixo de 70%)'])

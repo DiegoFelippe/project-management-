@@ -9,6 +9,7 @@ import {
 import { limparPastaDoCliente } from '@/data/arquivos'
 import { lancarHoras } from '@/data/checkins'
 import { limparQuadroDoCliente } from '@/data/quadro'
+import { brilharPorMarca } from '@/lib/brilhar'
 import { avisarQueOCheckinMudou } from '@/lib/checkinMudou'
 import FormularioCliente from './FormularioCliente'
 import JanelaCheckin from './JanelaCheckin'
@@ -33,6 +34,7 @@ export function useAcoesDoCliente({ aoMudar, aoApagar }) {
     if (!resposta.erro) {
       toast.success(cliente ? `Cliente ${dados.nome} atualizado.` : `Cliente ${dados.nome} criado.`)
       recarregar()
+      if (cliente) brilharPorMarca(cliente.id) // a linha da lista (some se a tela não tem lista)
     }
     return resposta
   }

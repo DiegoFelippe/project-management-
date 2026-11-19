@@ -105,6 +105,12 @@ describe('contraste dos tokens de src/index.css', () => {
     expect(fracas).toEqual([])
   })
 
+  // A barra de folga da Ocupação fica sobre a zona --notice-soft: marca de 3:1 também ali (o --notice-cheio dava 2,86:1).
+  it.each(Object.keys(TEMAS))('no %s, a marca de folga segura 3:1 sobre a zona de folga (--notice-soft)', (tema) => {
+    const t = TEMAS[tema]
+    expect(arredondar(contraste(t['grafico-folga'], t['notice-soft']))).toBeGreaterThanOrEqual(3)
+  })
+
   // As situações das tarefas (rosca e etapas do check-list, faixa Hoje): COR de graficos/cores.js são marcas (arcos,
   // partes de barra) com nome e ícone ao lado: seguram 3:1 sobre o cartão (pedido do Diego, 19/11).
   it.each(Object.keys(TEMAS))('no %s, as marcas de estado dos gráficos (COR: feita, não se aplica, andamento, pausada, a fazer, atrasada) seguram 3:1 sobre o cartão', (tema) => {

@@ -7,6 +7,7 @@ import CheckinsPorSemana from '@/components/inicio/CheckinsPorSemana'
 import ClientesEmRisco from '@/components/inicio/ClientesEmRisco'
 import ClientesPorCidade from '@/components/inicio/ClientesPorCidade'
 import FilaDeClientes from '@/components/inicio/FilaDeClientes'
+import FaixaDoInicio, { ID_DO_RISCO } from '@/components/inicio/FaixaDoInicio'
 import FiltroDePeriodo from '@/components/inicio/FiltroDePeriodo'
 import GraficoDeMeses from '@/components/inicio/GraficoDeMeses'
 import HorasNoPeriodoDoPainel from '@/components/inicio/HorasNoPeriodoDoPainel'
@@ -75,6 +76,7 @@ export default function Inicio() {
   // `versao` muda depois de um check-in ou check-out feito no Início (relê o que muda com ele); cada bloco tem a própria
   // tentativa ("Tentar de novo" relê só ele).
   const [versao, setVersao] = useState(0)
+  const [totalDoRisco, setTotalDoRisco] = useState(null)
   const [tentativas, setTentativas] = useState({ painel: 0, comparacao: 0, fila: 0, semanas: 0, porDia: 0, unidades: 0, calor: 0, tarefas: 0, cidades: 0 })
   const tentarDeNovo = (bloco) => () => setTentativas((t) => ({ ...t, [bloco]: t[bloco] + 1 }))
 
@@ -113,7 +115,7 @@ export default function Inicio() {
     aoTentarDeNovo: tentarDeNovo(bloco) })
   const bloco = {
     porDia: <HorasNoPeriodoDoPainel periodo={periodo} {...doBloco(porDia, 'porDia')} />,
-    risco: <ClientesEmRisco recorte={recorte} versao={versao} />,
+    risco: <ClientesEmRisco recorte={recorte} versao={versao} aoSaberTotal={setTotalDoRisco} />,
     semanas: <CheckinsPorSemana periodo={periodo} {...doBloco(semanas, 'semanas')} />,
     calor: <QuandoOsCheckins periodo={periodo} {...doBloco(calor, 'calor')} />,
     tarefas: <TarefasDosChecklists recorte={recorte} {...doBloco(tarefas, 'tarefas')} />,
@@ -167,8 +169,9 @@ export default function Inicio() {
             <p role="alert" className="card border-destructive/40 p-4 text-corpo text-destructive">{recusado}</p>
           ) : (
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 max-sm:gap-3 lg:grid-cols-12">
+              {!consultor && <div className="empty:hidden lg:col-span-12"><FaixaDoInicio total={totalDoRisco} /></div>}
               {blocos.map(({ chave, largura, bloco }) => (
-                <div key={chave} data-bloco={chave} className={cn('grid min-w-0', LARGURA[largura])}>{bloco}</div>
+                <div key={chave} data-bloco={chave} id={chave === 'risco' ? ID_DO_RISCO : undefined} tabIndex={chave === 'risco' ? -1 : undefined} className={cn('grid min-w-0', LARGURA[largura])}>{bloco}</div>
               ))}
             </div>
           )}

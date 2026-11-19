@@ -214,6 +214,16 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
 - **`Seletor` com muitas opções** usa `buscar` (busca no banco), nunca a lista inteira. Para escolher **várias de uma
   vez**, `multiplo` (a lista fica aberta e cada clique marca ou desmarca; as escolhidas aparecem fora do campo, com
   "Tirar", como `EscolhaDePessoas` no Novo time e em "Colocar pessoas") — pedido do Diego, 18/11 (usabilidade).
+- **Névoa: sombra, brilho, botão com resultado e faixa** (pedido do Diego, 19/11; protótipo `docs/prototipo/cores-poc.html`).
+  O `.card` se separa do fundo pela **sombra longa** (`--sombra-card`, claro e escuro), não pela borda (a borda fica
+  transparente: `border-<cor>` ainda funciona nos cartões de aviso); o que fica dentro do cartão é `.dentro-do-cartao`
+  (afundado, raio menor). **O que acabou de mudar brilha uma vez** (`brilhar(elemento)`/`brilharPorMarca(id)` de
+  `src/lib/brilhar.js`: `.mudou` por 1,6 s, nada com "reduzir movimento"): a linha de Clientes salva (`<Linha marca>`), o
+  cartão movido no quadro e a tarefa marcada (`data-brilho`); nunca ao carregar. **Botão que termina em "✓ Salvo"**:
+  `BotaoComResultado` (`acao` devolve `{ erro }`; gira por 300 ms no mínimo, mostra o rótulo feito sobre `bg-positive-soft`
+  por 2 s, a largura não muda; usa o `Button`), hoje no Testar das integrações. **Faixa do Início** (`FaixaDoInicio`,
+  central e gestão): "N clientes precisam de você" com "Ver os N", que rola até o bloco Clientes em risco e põe o foco
+  nele; some com N = 0 (o N é o total do bloco, sem leitura nova).
 - **Todo menu do trilho abre com `BarraDeFiltros`** (Início, Clientes, Calendário, Check-lists, Quadros — a
   `BarraDoQuadro` do cliente, sem o seletor Consultoria —, Times, Usuários, Consultorias, Integrações), e a barra **sempre começa com o ícone e a palavra "Filtros"** (como no Calendário; o componente já
   traz, não repita na tela). Pedido do Diego (2026-11-17). Nada de prop para esconder o rótulo. Depois vêm abas,
@@ -343,7 +353,7 @@ Design: `docs/superpowers/specs/2026-11-17-graficos-do-inicio-e-do-cliente-desig
   essas peças; peça nova entra lá, com teste. Sem nada para mostrar (total 0), a peça não desenha nada e o cartão mostra
   o vazio (nunca arco NaN nem 0/0).
 - **Séries pela paleta de 19/11** (`corDaSerie(i)` de `graficos/cores.js`): ordem fixa azul, turquesa, violeta, mostarda,
-  rosa, verde, laranja, índigo; mais de 8 itens: os 8 maiores e "Outros" em grafite (`COR_OUTROS`). Estado nunca usa a paleta.
+  rosa, verde, laranja, índigo; mais de 8 itens: os 8 maiores e "Outros" em grafite (`COR_OUTROS`) (pedido do Diego, 19/11). Estado nunca usa a paleta.
 - **Cores só por `--grafico-*`** (`src/index.css`, claro e escuro; nomes curtos em `graficos/cores.js`): nada de hex
   nem `--primary` direto no gráfico. Série, acima, folga e referência seguram 4,5:1 sobre o cartão
   (`src/lib/contraste.test.js`); vermelho e âmbar sempre com ícone e o número escrito; texto nunca na cor da série.

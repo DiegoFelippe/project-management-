@@ -87,7 +87,7 @@ function LinhaDaTarefa({ tarefa, situacao, inicio, podeMarcar, podeComentar, ocu
   ]
 
   return (
-    <li aria-busy={ocupada || undefined}
+    <li data-brilho={tarefa.id} aria-busy={ocupada || undefined}
       className={cn('grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-4 py-3 aria-busy:cursor-progress sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]',
         naoSeAplica && 'bg-muted/40')}>
       <div className="col-start-1 row-start-1 pt-0.5">

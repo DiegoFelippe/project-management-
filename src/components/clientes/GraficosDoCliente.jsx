@@ -151,10 +151,14 @@ function HorasNoPeriodo({ leitura, periodo: periodoDoFiltro, aoTentarDeNovo }) {
 // As partes da rosca de consultores: a ordem do banco (mais horas primeiro) pela paleta; quem a pessoa não vê é "Outro
 // consultor" (2, 3… se houver mais de um: o nome é a chave do arco); mais de 8, os 8 maiores e "Outros" em grafite.
 function partesDosConsultores(lista) {
-  let semNome = 0
-  const partes = lista.map((c, i) => ({
-    nome: c.nome ?? (++semNome > 1 ? `Outro consultor ${semNome}` : 'Outro consultor'), valor: c.horas, cor: corDaSerie(i),
-  }))
+  const vistos = new Map()
+  const partes = lista.map((c, i) => {
+    const nome = c.nome ?? 'Outro consultor'
+    const vez = (vistos.get(nome) ?? 0) + 1
+    vistos.set(nome, vez)
+    // Nome repetido (dois consultores iguais, ou vários que a pessoa não vê) ganha número: o nome é a chave do arco.
+    return { nome: vez > 1 ? `${nome} ${vez}` : nome, valor: c.horas, cor: corDaSerie(i) }
+  })
   if (partes.length <= CONSULTORES_NA_ROSCA) return partes
   const resto = partes.slice(CONSULTORES_NA_ROSCA).reduce((soma, p) => soma + p.valor, 0)
   return [...partes.slice(0, CONSULTORES_NA_ROSCA), { nome: 'Outros', valor: resto, cor: COR_OUTROS }]

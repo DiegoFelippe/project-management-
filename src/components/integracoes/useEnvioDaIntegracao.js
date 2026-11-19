@@ -51,17 +51,21 @@ export function useEnvioDaIntegracao(montar, aoSalvar, aoTestar) {
     }
   }
 
+  // Devolve { erro } (o botão com resultado mostra "✓ Conectado" ou volta ao rótulo; o aviso da janela já diz o erro).
   async function testar() {
     setTeste(null)
     const montado = dados()
-    if (!montado) return
+    if (!montado) return { erro: 'Confira os campos.' }
     const foto = JSON.stringify(montado)
     setTestando(true)
     try {
-      setTeste({ dados: foto, resultado: await aoTestar(montado.config, montado.segredo, montado.extras ?? {}) })
+      const resultado = await aoTestar(montado.config, montado.segredo, montado.extras ?? {})
+      setTeste({ dados: foto, resultado })
+      return { erro: resultado?.erro ?? null }
     } catch (e) {
       console.error(e)
       setTeste({ dados: foto, resultado: { erro: SEM_REDE_AO_TESTAR } })
+      return { erro: SEM_REDE_AO_TESTAR }
     } finally {
       setTestando(false)
     }

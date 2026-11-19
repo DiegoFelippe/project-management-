@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import CartaoDeGrafico from '@/components/graficos/CartaoDeGrafico'
 import Dica from '@/components/graficos/Dica'
@@ -103,11 +103,14 @@ function TabelaDoRisco({ recorte, versao }) {
 // Clientes em risco hoje (design "4."; não depende do período, então não recarrega ao trocá-lo): sem check-in há 30+
 // dias ou ritmo dos últimos 30 dias acima de 120% da previsão (clientes_em_risco, já ordenado por risco). Até 6 linhas
 // com as duas mini barras; "Ver todos os N" abre a tabela paginada no banco. `versao` muda depois de um check-in feito
-// no Início (relê).
-export default function ClientesEmRisco({ recorte, versao = 0 }) {
+// no Início (relê). `aoSaberTotal(total)` entrega o total à faixa do Início.
+export default function ClientesEmRisco({ recorte, versao = 0, aoSaberTotal }) {
   const [tentativa, setTentativa] = useState(0)
   const [emTabela, setEmTabela] = useState(false)
   const leitura = useLeitura(lerPrimeira, { tentativa, versao })
+  const total = leitura.dados?.total ?? null
+  // A faixa do Início usa este total (sem outra leitura).
+  useEffect(() => { aoSaberTotal?.(total) }, [total, aoSaberTotal])
   const titulo = recorte === 'pessoa' ? 'Meus clientes em risco' : 'Clientes em risco'
   if (!leitura.dados) {
     return <CartaoDeGrafico titulo={titulo} estado={leitura.erro ? 'erro' : 'carregando'} altura={240}

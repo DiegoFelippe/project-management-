@@ -91,12 +91,13 @@ const foraDeControle = (e) => !e.target.closest('a, button, input, textarea, sel
 
 // aoDuploClique: atalho do mouse para editar a linha (Clientes, pedido do Diego, 18/11); o lápis continua sendo o
 // caminho pelo teclado e pelo toque. O mousedown do segundo clique não seleciona o texto da linha.
-export function Linha({ className, aoDuploClique, children }) {
+// `marca`: o id da linha para o brilho de "acabou de mudar" (brilhar.js procura data-brilho).
+export function Linha({ className, aoDuploClique, marca, children }) {
   const duplo = aoDuploClique ? {
     onMouseDown: (e) => { if (e.detail > 1 && foraDeControle(e)) e.preventDefault() },
     onDoubleClick: (e) => { if (foraDeControle(e)) aoDuploClique() },
   } : {}
-  return <tr {...duplo} className={cn('group border-b transition-colors last:border-0 hover:bg-muted/40', className)}>{children}</tr>
+  return <tr {...duplo} data-brilho={marca} className={cn('group border-b transition-colors last:border-0 hover:bg-muted/40', className)}>{children}</tr>
 }
 
 export function Celula({ className, children }) {

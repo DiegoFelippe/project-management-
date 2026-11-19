@@ -205,12 +205,15 @@ function Checklist({ checklist, podeAplicar, className, ...dica }) {
   }
   const { tarefas, feitas, nao_se_aplica: naoSeAplica = 0, atrasadas, proxima } = checklist
   const resolvidas = feitas + naoSeAplica
+  // Andamento, pausadas e a fazer no prazo: uma parte só, em violeta (o cinza não segura 3:1 como marca).
+  const restantes = tarefas - resolvidas - atrasadas
   return (
     <Cartao titulo="Check-list" icone={ClipboardList} tom="verde" className={className} {...dica} dica={{
       titulo: checklist.modelo_nome,
       linhas: [
         { valor: progressoEmPalavras(checklist), cor: 'feita' },
         { valor: plural(atrasadas, 'atrasada', 'atrasadas'), cor: 'atrasada' },
+        ...(restantes > 0 ? [{ valor: `${INTEIRO.format(restantes)} a fazer`, cor: 'afazer' }] : []),
         ...(proxima ? [{ valor: diaMes(proxima.vence_em), rotulo: 'próxima tarefa' }] : []),
       ],
     }}>
@@ -218,7 +221,7 @@ function Checklist({ checklist, podeAplicar, className, ...dica }) {
         detalhe={naoSeAplica ? `${INTEIRO.format(resolvidas)} de ${INTEIRO.format(tarefas)} resolvidas` : `${INTEIRO.format(feitas)} de ${INTEIRO.format(tarefas)} tarefas`} />
       {/* As cores e a ordem das etapas do check-list (feitas, não se aplicam, a fazer no prazo, atrasadas por último). */}
       <BarraSegmentada partes={[{ valor: feitas, tom: 'feita' }, { valor: naoSeAplica, tom: 'nsa' },
-        { valor: tarefas - resolvidas - atrasadas, tom: 'neutro' }, { valor: atrasadas, tom: 'atrasada' }]} />
+        { valor: restantes, tom: 'afazer' }, { valor: atrasadas, tom: 'atrasada' }]} />
       <Rodape>
         {atrasadas
           ? <Badge variant="outline" className={SELO_PERIGO}><TriangleAlert aria-hidden="true" />{plural(atrasadas, 'atrasada', 'atrasadas')}</Badge>

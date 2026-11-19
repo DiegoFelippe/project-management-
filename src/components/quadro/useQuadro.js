@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { brilharPorMarca } from '@/lib/brilhar'
 import { cartoesDoQuadro, moverCartao, moverColuna } from '@/data/quadro'
 import { ouvirQuadro } from '@/data/quadroAoVivo'
 
@@ -348,6 +349,7 @@ export function useQuadro({ ler, chave, filtros }) {
     }
     if (resposta.renumerou && !refazer.includes(para)) refazer.push(para)
     for (const id of refazer) lerColuna(q.id, id)
+    brilharPorMarca(cartao.id) // o cartão movido (já está na coluna nova)
   }, [desfazer, invalidar, lerColuna, mudarColunas])
 
   const soltarColuna = useCallback(async ({ draggableId, destination }) => {

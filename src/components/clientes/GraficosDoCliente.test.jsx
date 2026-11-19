@@ -229,6 +229,16 @@ describe('GraficosDoCliente', () => {
     expect(cartao('Horas por consultor')).toHaveTextContent('Ana Lima fez 79% das horas')
   })
 
+  it('horas por consultor: dois consultores visíveis com o mesmo nome ganham número (sem chave repetida)', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(horasPorConsultor).mockResolvedValue([{ consultorId: 'p1', nome: 'Ana Lima', horas: 10 }, { consultorId: 'p2', nome: 'Ana Lima', horas: 6 }])
+    tela()
+    const rosca = await screen.findByRole('group', { name: 'Horas por consultor · Novembro de 2026' })
+    expect(within(rosca).getAllByRole('img').map((x) => x.getAttribute('aria-label').split(':')[0])).toEqual(['Ana Lima', 'Ana Lima 2'])
+    expect(erro.mock.calls.flat().join(' ')).not.toMatch(/same key/)
+    erro.mockRestore()
+  })
+
   it('horas por consultor: vários escondidos ganham números (nomes únicos, sem chave repetida) e mais de 8 viram os 8 maiores + "Outros"', async () => {
     const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
     const doze = Array.from({ length: 12 }, (_, i) => ({ consultorId: `p${i}`, nome: i === 1 || i === 3 ? null : `Pessoa ${i + 1}`, horas: 24 - i * 2 }))

@@ -1,6 +1,7 @@
 import { Plug, RefreshCw } from 'lucide-react'
 import { Aviso } from '@/components/auth/TelaDeAcesso'
 import JanelaFormulario, { BotaoCancelar } from '@/components/comum/JanelaFormulario'
+import BotaoComResultado from '@/components/comum/BotaoComResultado'
 import { Button } from '@/components/ui/button'
 
 // Moldura comum dos formulários de integração: título, campos, avisos e o rodapé Cancelar · Testar · Salvar.
@@ -19,9 +20,8 @@ export default function JanelaIntegracao({
         <>
           <BotaoCancelar />
           {aoTestar && (
-            <Button type="button" variant="outline" onClick={aoTestar} disabled={ocupado}>
-              <RefreshCw className={testando ? 'animate-spin' : ''} /> {testando ? 'Testando…' : 'Testar'}
-            </Button>
+            <BotaoComResultado variant="outline" acao={aoTestar} rotulo="Testar" rotuloFeito="✓ Conectado" rotuloIndo="Testando…"
+              icone={<RefreshCw aria-hidden="true" />} aoErro={() => {}} disabled={enviando} />
           )}
           <Button type="submit" form="form-integracao" disabled={ocupado}>{enviando ? 'Salvando…' : 'Salvar'}</Button>
         </>

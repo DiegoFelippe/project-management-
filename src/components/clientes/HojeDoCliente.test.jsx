@@ -77,7 +77,7 @@ describe('HojeDoCliente', () => {
       .map((p) => [p.dataset.parte, p.style.flexGrow, p.style.background])
     // 28 tarefas: 12 feitas, 2 não se aplicam, 3 atrasadas e 11 a fazer no prazo (atrasadas por último, como nas etapas).
     expect(partes('Check-list')).toEqual([
-      ['feita', '12', 'var(--positive-cheio)'], ['nsa', '2', 'var(--cor-grafite-forte)'], ['neutro', '11', 'var(--grafico-neutro)'],
+      ['feita', '12', 'var(--positive-cheio)'], ['nsa', '2', 'var(--cor-grafite-forte)'], ['afazer', '11', 'var(--cor-violeta-forte)'],
       ['atrasada', '3', 'var(--destructive-cheio)'],
     ])
     // No quadro, o que está no prazo não é "feito": fica no azul da série.

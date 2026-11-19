@@ -8,7 +8,7 @@ import { formatarHoras, formatarOcupacao } from '@/lib/horas'
 const INTEIRO = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
 const FOLGA = 0.7
 // As faixas (pedido do Diego, 19/11): o fundo suave de cada uma e a barra no tom cheio da faixa em que o valor cai.
-const COR_DA_FAIXA = { acima: 'var(--destructive-cheio)', serie: corDaPaleta('azul'), folga: 'var(--notice-cheio)' }
+const COR_DA_FAIXA = { acima: 'var(--destructive-cheio)', serie: corDaPaleta('azul'), folga: 'var(--grafico-folga)' }
 const zonasAte = (maximo) => [
   { ate: FOLGA, cor: 'var(--notice-soft)' },
   { ate: 1, cor: corDaPaleta('azul', 'suave') },

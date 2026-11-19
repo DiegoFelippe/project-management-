@@ -140,6 +140,17 @@ describe('Clientes (central)', () => {
     expect(editarCliente).toHaveBeenCalledWith('k1', expect.objectContaining({ nome: 'Provedor Alfa', horasMes: 40 }))
   })
 
+  it('Salvar a edição faz a linha do cliente brilhar uma vez (e a lista não brilha ao carregar)', async () => {
+    renderizarTela(<Clientes />, { perfil: central })
+    const linhaAlfa = await screen.findByRole('row', { name: /Provedor Alfa/ })
+    expect(document.querySelector('.mudou')).toBeNull()
+    await userEvent.click(within(linhaAlfa).getByRole('button', { name: 'Editar' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Editar cliente' })).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(editarCliente).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByRole('row', { name: /Provedor Alfa/ })).toHaveClass('mudou'))
+    expect(document.querySelectorAll('.mudou')).toHaveLength(1)
+  })
+
   it('Novo cliente cria e recarrega', async () => {
     renderizarTela(<Clientes />, { perfil: central })
     await userEvent.click(await screen.findByRole('button', { name: 'Novo cliente' }))

@@ -183,6 +183,16 @@ describe('ChecklistDoCliente: com modelo', () => {
     expect(aoMudar).toHaveBeenCalledTimes(1)
   })
 
+  it('a tarefa marcada brilha uma vez (ao carregar, nenhuma)', async () => {
+    vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'feita', liberadas: [], na_sessao: false, erro: null })
+    tela(consultor)
+    const caixa = await screen.findByRole('checkbox', { name: 'Coleta de documentos' })
+    expect(document.querySelector('.mudou')).toBeNull()
+    await userEvent.click(caixa)
+    await waitFor(() => expect(caixa.closest('li')).toHaveClass('mudou'))
+    expect(document.querySelectorAll('.mudou')).toHaveLength(1)
+  })
+
   it('marcar sem check-in aberto aqui: o aviso diz que fica feita, fora de uma sessão', async () => {
     vi.mocked(marcarTarefa).mockResolvedValue({ estado: 'feita', liberadas: [], na_sessao: false, erro: null })
     tela(consultor)

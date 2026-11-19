@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { avaliarSenha, gerarSenha, mensagemDeValidacao, NOME_DAS_FORCAS } from '@/lib/senha'
 import { cn } from '@/lib/utils'
 
-const COR_DA_FORCA = { fraca: 'bg-destructive', media: 'bg-notice', forte: 'bg-positive' }
+const COR_DA_FORCA = { fraca: 'bg-destructive-cheio', media: 'bg-notice-cheio', forte: 'bg-positive-cheio' }
 const COR_DO_TEXTO = { fraca: 'text-destructive', media: 'text-notice', forte: 'text-positive' }
 
 // Campo de senha forte: mostrar/esconder, medidor Fraca/Média/Forte (da largura do campo, com o nome na mesma linha),
