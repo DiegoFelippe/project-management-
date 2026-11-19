@@ -187,7 +187,7 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
   de `src/components/campos/`, pelo mesmo `id`) ganha sozinho `aria-invalid` (borda vermelha) e `aria-describedby`. A
   janela confere tudo numa função que junta as falhas (`{ campo: mensagem }`, nunca `if … return setErro(...)` em
   fila) e passa ao `useEnvio(aoConcluir, { validar })`: `conferir()` diz se pode enviar; depois do primeiro Salvar os
-  erros acompanham a tela (corrigiu, a marca some). A ação pode devolver `{ erros }` (o campo que o servidor recusou).
+  erros acompanham a tela (corrigiu, a marca some). A ação pode devolver `{ erros }` (o campo que o servidor recusou); com `useEnvio(..., { validar, valores })`, a marca do servidor sai quando o valor daquele campo muda.
   `tentativa` vai para a `JanelaFormulario`, que leva o foco ao primeiro campo errado a cada Salvar com erro (nunca
   enquanto a pessoa digita). O `erro` (texto único, no `Aviso`) fica para o servidor e o resumo. E-mail e telefone são
   conferidos só na tela (`src/lib/validacao.js`; opcionais: vazio passa; telefone com DDD, 10 ou 11 números); o banco
