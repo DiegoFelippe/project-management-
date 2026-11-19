@@ -437,7 +437,10 @@ Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as
   (`andamento`) abre um trecho em `checklist_tarefa_tempos` (no máximo um aberto por tarefa); qualquer outra situação o
   fecha. O tempo é a soma dos trechos (o aberto, até agora): `tempo_segundos` e `trecho_aberto_desde` vêm em
   `marcar_tarefa` e em cada tarefa de `checklist_do_cliente`. Pausar a em andamento pode sempre; começar ou pausar a
-  partir de outra situação pede as dependências. Quem: o consultor do cliente, como marcar.
+  partir de outra situação pede as dependências. Quem: o consultor do cliente, como marcar. **O relógio pára sozinho**
+  quando ninguém mais pode pausá-lo: check-list encerrado (tirar, trocar, cliente movido), consultor trocado ou cliente
+  arquivado — o trecho fecha e a tarefa em andamento vira pausada (gatilhos `clientes_parar_relogios` e
+  `cliente_checklists_parar_relogios`, 19/11). Trecho sempre fecha em `greatest(now(), inicio)`.
 - **Comentários da tarefa** (CRUD, como no Quadro): comentam o consultor do cliente e a gestão (admin e gestor da
   consultoria do cliente), com o cliente e o check-list ativos; a Central e o dono só leem; cada um edita o seu; apaga
   o autor ou a gestão. Leitura por `comentarios_da_tarefa` (30 por vez, `pode_editar`/`pode_apagar` por comentário) e,
