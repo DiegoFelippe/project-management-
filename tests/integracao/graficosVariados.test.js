@@ -180,8 +180,12 @@ describe('gráficos variados contra o banco de verdade', () => {
     const outros = porUnidade.series.find((s) => s.id === null)
     for (const consultoria of [ids.A, ids.B]) {
       const propria = porUnidade.series.find((s) => s.id === consultoria)
-      if (propria) expect(soma(propria)).toBe(1)
-      else expect(soma(outros)).toBeGreaterThanOrEqual(1)
+      if (propria) {
+        expect(soma(propria)).toBe(1)
+      } else {
+        expect(outros).toBeDefined()
+        expect(soma(outros)).toBeGreaterThanOrEqual(1)
+      }
     }
   })
 })
