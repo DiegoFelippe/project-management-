@@ -240,8 +240,10 @@ Pedido do Diego (2026-11-16). Visual de referência: `docs/superpowers/specs/202
 - **Cartão que leva ao filtro** — pedido do Diego, 18/11 (usabilidade, U5): `CartoesDeNumeros` aceita `destino` por
   cartão (a função que aplica o filtro; a lista volta à página 1) e `ativo` (o do filtro que vale, `aria-current`). O
   cartão vira botão ("Aguardando consultor: 16. Mostrar na lista"), com foco à vista e o afundar dos botões. Só ganha
-  destino o número que a lista filtra no banco, com o mesmo recorte (Clientes: as situações; Usuários: Pessoas ativas e
-  Sem tipo de consultoria; Consultorias ativas; Modelos ativos); os outros continuam só número.
+  destino o número que a lista filtra no banco, com o mesmo recorte (Clientes: as situações; Usuários: Pessoas ativas,
+  Sem tipo de consultoria e Acima de 100%; Consultorias ativas; Modelos ativos); os outros continuam só número. O "Acima
+  de 100%" de Usuários é o filtro Ocupação da barra (só nos ativos): a lista vem de `pessoas_acima_de_100` (linhas de
+  `perfis` com a conta e o recorte do cartão, no mês da tela; colunas, filtros e página pela API, como na lista).
 - **Botões do cabeçalho da página** (`Cabecalho`): a ação principal do contexto é `default` (cheia, `--primary`) e as
   demais são `outline`, tamanho padrão, com ícone. Apagar no cabeçalho é `outline` com o realce de perigo no hover.
   Nas linhas de tabela as ações são a `AcaoDaLinha` (seção Listas); `ghost sm` com texto só para a ação principal única
@@ -398,7 +400,13 @@ Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as
   "hoje" é o dia em São Paulo). Editar, arquivar ou apagar o modelo depois nunca muda um check-list.
 - **Um check-list ativo por cliente.** Trocar encerra o ativo e começa outro do zero; tirar encerra sem pôr outro; o
   encerrado fica como histórico (nunca se apaga) e segura o cliente (apagar cliente com check-list dá 23503 e a tela
-  manda arquivar). **Cliente que muda de consultoria (ou volta à Central) tem o check-list ativo encerrado na hora**
+  manda arquivar). **Intocado, tirar ou trocar apaga** (pedido do Diego, 18/11, usabilidade, U6): sem nenhuma tarefa fora
+  de "a fazer", nota, trecho de tempo, comentário, linha em check-in ou linha de tarefa no Histórico
+  (`private.checklist_intocado`), o check-list some de vez e não segura o cliente; o Histórico guarda as linhas do modelo
+  (aplicado, trocado, tirado) com o nome, só para a Central e a consultoria dele (`cliente_eventos.modelo` e
+  `modelo_consultoria`). `checklist_do_cliente` diz `checklist.intocado` e a confirmação de Tirar (e o aviso de Trocar)
+  diz qual dos dois acontece; no tocado, que o cliente não poderá mais ser apagado, só arquivado. `tirar_modelo` devolve
+  `'apagado'` ou `'encerrado'`. Mover o cliente continua encerrando (o gatilho não apaga). **Cliente que muda de consultoria (ou volta à Central) tem o check-list ativo encerrado na hora**
   (gatilho no banco, `cliente_movido`): a consultoria nova começa sem modelo e o antigo não volta.
 - **O que entra no check-in:** tarefa marcada pelo consultor com o check-in aberto **neste** cliente entra no resumo dele
   (`checkin_tarefas`, com o título copiado); desmarcar com ele aberto tira. Sem check-in aberto (ou com ele em outro
@@ -494,6 +502,11 @@ Design: `docs/superpowers/specs/2026-11-17-modelos-de-checkin-design.md` (com as
   lápis da gestão toma o lugar do "Ajustar previsão" (a previsão está no formulário); na página do cliente, os dois ficam.
 - **Check-in é de quem trabalhou** e fica na consultoria daquele momento; mudança de consultor, consultoria ou
   arquivamento com check-in aberto fecha o check-in na hora.
+- **"Desfazer" de Mandar e de Escolher consultor só volta se nada mudou** (pedido do Diego, 18/11, usabilidade, U3):
+  `desfazer_envio` (a Central; o cliente ainda na consultoria, sem consultor, sem check-list ativo e não arquivado) e
+  `desfazer_escolha` (a gestão; o consultor ainda é aquele, sem check-in aberto e não arquivado), security invoker (a RLS
+  e o gatilho de sempre). Mudou nos 10 s do aviso: `cliente_mudou` ("O cliente mudou depois disso; nada foi desfeito."),
+  nada muda e a tela relê. Nunca gravar o valor antigo às cegas.
 - **Uma consultoria nunca vê clientes, horas ou nomes de outra.** Quem não é da central só alcança dados de
   colegas pelas funções do banco, não por leitura direta.
 - **A busca de Clientes passa por cima da situação** (pedido do Diego, 18/11, usabilidade): com algo na busca, a lista
